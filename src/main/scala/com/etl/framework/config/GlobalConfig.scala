@@ -9,6 +9,7 @@ case class GlobalConfig(
                          processing: ProcessingConfig,
                          performance: PerformanceConfig,
                          monitoring: MonitoringConfig,
+                         security: SecurityConfig
                        )
 
 /**
@@ -68,3 +69,11 @@ case class MonitoringConfig(
                              logLevel: String
                            )
 
+/**
+ * Security configuration
+ */
+case class SecurityConfig(
+                           encryptionEnabled: Boolean,
+                           kmsKeyId: Option[String],
+                           authenticationEnabled: Boolean
+                         )

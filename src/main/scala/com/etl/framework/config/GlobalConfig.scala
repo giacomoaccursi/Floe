@@ -7,6 +7,7 @@ case class GlobalConfig(
                          spark: SparkConfig,
                          paths: PathsConfig,
                          processing: ProcessingConfig,
+                         performance: PerformanceConfig,
                          monitoring: MonitoringConfig,
                        )
 
@@ -46,6 +47,16 @@ case class ProcessingConfig(
                              checkpointInterval: String
                            )
 
+/**
+ * Performance configuration
+ */
+case class PerformanceConfig(
+                              parallelFlows: Boolean,
+                              parallelNodes: Boolean,
+                              broadcastThreshold: Long,
+                              cacheValidated: Boolean,
+                              shufflePartitions: Int
+                            )
 
 /**
  * Monitoring configuration

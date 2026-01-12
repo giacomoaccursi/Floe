@@ -1,6 +1,6 @@
 package com.etl.framework.config
 
-import com.etl.framework.core.FlowTransformation
+import core.FlowTransformation
 
 /**
  * Configuration for a single data flow

@@ -11,10 +11,12 @@ class FileDataReader(sourceConfig: SourceConfig)(implicit spark: SparkSession) e
 
   /**
    * Reads data from file source
-   *
    * @return DataFrame containing the file data
+   * @throws UnsupportedFileFormatException if file format is not supported
    */
   override def read(): DataFrame = {
+    // Validate format
+    validateFormat(sourceConfig.format)
 
     // Create reader with format
     val reader = spark.read
@@ -30,4 +32,23 @@ class FileDataReader(sourceConfig: SourceConfig)(implicit spark: SparkSession) e
     // Load data
     reader.load(fullPath)
   }
+
+  /**
+   * Validates that the file format is supported
+   * @param format File format to validate
+   * @throws UnsupportedFileFormatException if format is not supported
+   */
+  private def validateFormat(format: String): Unit = {
+    val supportedFormats = Set("csv", "parquet", "json")
+    if (!supportedFormats.contains(format.toLowerCase)) {
+      throw new UnsupportedFileFormatException(
+        s"Unsupported file format: $format. Supported formats: ${supportedFormats.mkString(", ")}"
+      )
+    }
+  }
 }
+
+/**
+ * Exception thrown when an unsupported file format is encountered
+ */
+class UnsupportedFileFormatException(message: String) extends RuntimeException(message)

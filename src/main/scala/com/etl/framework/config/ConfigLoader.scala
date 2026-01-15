@@ -12,7 +12,7 @@ import scala.util.{Failure, Success, Try}
  */
 trait ConfigLoader[T] {
   def load(path: String): Either[ConfigurationException, T]
-  
+
   protected def loadYamlFile(path: String): Either[ConfigurationException, String] = {
     Try {
       val source = Source.fromFile(path)
@@ -25,7 +25,7 @@ trait ConfigLoader[T] {
       ))
     }
   }
-  
+
   protected def parseYaml[A: Decoder](yaml: String, path: String): Either[ConfigurationException, A] = {
     parser.parse(yaml) match {
       case Right(json) =>
@@ -42,14 +42,14 @@ trait ConfigLoader[T] {
       ))
     }
   }
-  
+
   /**
    * Substitutes environment variables in the format ${VAR_NAME} or $VAR_NAME
    */
   protected def substituteEnvVars(text: String): String = {
     // Pattern to match ${VAR_NAME} or $VAR_NAME
     val pattern = """\$\{([^}]+)\}|\$([A-Za-z_][A-Za-z0-9_]*)""".r
-    
+
     pattern.replaceAllIn(text, m => {
       val varName = Option(m.group(1)).getOrElse(m.group(2))
       sys.env.getOrElse(varName, m.matched)
@@ -61,9 +61,9 @@ trait ConfigLoader[T] {
  * Configuration exception
  */
 case class ConfigurationException(
-  message: String,
-  cause: Option[Throwable] = None
-) extends Exception(message, cause.orNull)
+                                   message: String,
+                                   cause: Option[Throwable] = None
+                                 ) extends Exception(message, cause.orNull)
 
 /**
  * Circe decoders for configuration classes
@@ -77,7 +77,9 @@ object ConfigDecoders {
   implicit val securityConfigDecoder: Decoder[SecurityConfig] = deriveDecoder[SecurityConfig]
   implicit val globalConfigDecoder: Decoder[GlobalConfig] = deriveDecoder[GlobalConfig]
 
-  
+  implicit val domainConfigDecoder: Decoder[DomainConfig] = deriveDecoder[DomainConfig]
+  implicit val domainsConfigDecoder: Decoder[DomainsConfig] = deriveDecoder[DomainsConfig]
+
   implicit val sourceConfigDecoder: Decoder[SourceConfig] = deriveDecoder[SourceConfig]
   implicit val columnConfigDecoder: Decoder[ColumnConfig] = deriveDecoder[ColumnConfig]
   implicit val schemaConfigDecoder: Decoder[SchemaConfig] = deriveDecoder[SchemaConfig]
@@ -87,7 +89,7 @@ object ConfigDecoders {
   implicit val validationRuleDecoder: Decoder[ValidationRule] = deriveDecoder[ValidationRule]
   implicit val validationConfigDecoder: Decoder[ValidationConfig] = deriveDecoder[ValidationConfig]
   implicit val outputConfigDecoder: Decoder[OutputConfig] = deriveDecoder[OutputConfig]
-  
+
   // Custom decoder for FlowConfig that excludes transformation fields (they are set programmatically, not from YAML)
   implicit val flowConfigDecoder: Decoder[FlowConfig] = (c: HCursor) => {
     for {
@@ -114,7 +116,7 @@ object ConfigDecoders {
       postValidationTransformation = None  // Set programmatically
     )
   }
-  
+
   implicit val modelConfigDecoder: Decoder[ModelConfig] = deriveDecoder[ModelConfig]
   implicit val dagOutputConfigDecoder: Decoder[DAGOutputConfig] = deriveDecoder[DAGOutputConfig]
   implicit val joinConditionDecoder: Decoder[JoinCondition] = deriveDecoder[JoinCondition]
@@ -129,7 +131,7 @@ object ConfigDecoders {
  */
 class GlobalConfigLoader extends ConfigLoader[GlobalConfig] {
   import ConfigDecoders._
-  
+
   override def load(path: String): Either[ConfigurationException, GlobalConfig] = {
     for {
       yaml <- loadYamlFile(path)
@@ -139,6 +141,19 @@ class GlobalConfigLoader extends ConfigLoader[GlobalConfig] {
   }
 }
 
+/**
+ * Domains configuration loader
+ */
+class DomainsConfigLoader extends ConfigLoader[DomainsConfig] {
+  import ConfigDecoders._
+
+  override def load(path: String): Either[ConfigurationException, DomainsConfig] = {
+    for {
+      yaml <- loadYamlFile(path)
+      config <- parseYaml[DomainsConfig](yaml, path)
+    } yield config
+  }
+}
 
 /**
  * Flow configuration loader
@@ -146,14 +161,14 @@ class GlobalConfigLoader extends ConfigLoader[GlobalConfig] {
 class FlowConfigLoader extends ConfigLoader[FlowConfig] {
   import ConfigDecoders._
   import java.io.File
-  
+
   override def load(path: String): Either[ConfigurationException, FlowConfig] = {
     for {
       yaml <- loadYamlFile(path)
       config <- parseYaml[FlowConfig](yaml, path)
     } yield config
   }
-  
+
   /**
    * Loads all flow configurations from a directory
    */
@@ -163,12 +178,12 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
       if (!dir.exists() || !dir.isDirectory) {
         throw new IllegalArgumentException(s"Directory does not exist: $directory")
       }
-      
+
       val yamlFiles = dir.listFiles()
         .filter(_.isFile)
         .filter(f => f.getName.endsWith(".yaml") || f.getName.endsWith(".yml"))
         .toSeq
-      
+
       yamlFiles.map(f => load(f.getAbsolutePath))
     } match {
       case Success(results) =>
@@ -193,7 +208,7 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
  */
 class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
   import ConfigDecoders._
-  
+
   override def load(path: String): Either[ConfigurationException, AggregationConfig] = {
     for {
       yaml <- loadYamlFile(path)

@@ -323,6 +323,129 @@ class FlowExecutor(
     }
   }
 
+  /**
+   * Writes validated data
+   */
+  private def writeValidated(validData: DataFrame, batchId: String): Unit = {
+    val outputPath = flowConfig.output.path.getOrElse(
+      s"${globalConfig.paths.validatedPath}/${flowConfig.name}"
+    )
+
+    val startTime = System.currentTimeMillis()
+    val recordCount = validData.count()
+
+    var writer = validData.write
+      .mode(SaveMode.Overwrite)
+      .format(flowConfig.output.format)
+      .option("compression", flowConfig.output.compression)
+
+    // Apply additional options
+    flowConfig.output.options.foreach { case (key, value) =>
+      writer = writer.option(key, value)
+    }
+
+    // Apply partitioning if configured
+    if (flowConfig.output.partitionBy.nonEmpty) {
+      writer = writer.partitionBy(flowConfig.output.partitionBy: _*)
+    }
+
+    writer.save(outputPath)
+
+    val duration = System.currentTimeMillis() - startTime
+    logDataWrite("validated", outputPath, recordCount, duration)
+  }
+
+  /**
+   * Writes rejected data
+   */
+  private def writeRejected(rejectedData: DataFrame, batchId: String): Unit = {
+    val rejectedPath = flowConfig.output.rejectedPath.getOrElse(
+      s"${globalConfig.paths.rejectedPath}/${flowConfig.name}"
+    )
+
+    val startTime = System.currentTimeMillis()
+    val recordCount = rejectedData.count()
+
+    // Add audit fields
+    val rejectedWithAudit = rejectedData
+      .withColumn("_rejected_at", lit(Instant.now().toString))
+      .withColumn("_batch_id", lit(batchId))
+
+    // Overwrite previous rejected records
+    rejectedWithAudit.write
+      .mode(SaveMode.Overwrite)
+      .format("parquet")
+      .save(rejectedPath)
+
+    val duration = System.currentTimeMillis() - startTime
+    logDataWrite("rejected", rejectedPath, recordCount, duration)
+  }
+
+  /**
+   * Writes additional tables created during transformations
+   */
+  private def writeAdditionalTables(batchId: String): Unit = {
+    additionalTables.foreach { case (tableName, tableInfo) =>
+      val outputPath = tableInfo.outputPath.getOrElse(
+        s"${globalConfig.paths.validatedPath}/${flowConfig.name}_${tableName}"
+      )
+
+      val recordCount = tableInfo.data.count()
+
+      var writer = tableInfo.data.write
+        .mode(SaveMode.Overwrite)
+        .format("parquet")
+
+      // Apply partitioning if specified in metadata
+      tableInfo.dagMetadata.foreach { metadata =>
+        if (metadata.partitionBy.nonEmpty) {
+          writer = writer.partitionBy(metadata.partitionBy: _*)
+        }
+      }
+
+      writer.save(outputPath)
+
+      logAdditionalTable(tableName, flowConfig.name, recordCount, outputPath)
+
+      // Write metadata for the additional table
+      writeAdditionalTableMetadata(tableName, tableInfo, outputPath, batchId)
+    }
+  }
+
+  /**
+   * Writes metadata for an additional table
+   */
+  private def writeAdditionalTableMetadata(
+    tableName: String,
+    tableInfo: AdditionalTableInfo,
+    outputPath: String,
+    batchId: String
+  ): Unit = {
+    val metadataPath = s"${globalConfig.paths.metadataPath}/$batchId/additional_tables/${tableName}.json"
+
+    val metadata = Map(
+      "table_name" -> tableName,
+      "table_type" -> "additional",
+      "created_by_flow" -> flowConfig.name,
+      "record_count" -> tableInfo.data.count(),
+      "path" -> outputPath,
+      "dag_metadata" -> tableInfo.dagMetadata.map { dm =>
+        Map(
+          "primary_key" -> dm.primaryKey,
+          "join_keys" -> dm.joinKeys,
+          "description" -> dm.description.getOrElse(""),
+          "partition_by" -> dm.partitionBy
+        )
+      }.getOrElse(Map.empty),
+      "schema" -> Map(
+        "fields" -> tableInfo.data.schema.fields.map { field =>
+          Map(
+            "name" -> field.name,
+            "type" -> field.dataType.typeName
+          )
+        }
+      )
+    )
     
     // Convert to JSON and write
     import org.json4s._

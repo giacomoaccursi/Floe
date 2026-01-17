@@ -1,4 +1,4 @@
-typackage com.etl.framework
+package com.etl.framework
 
 package object core {
   /**

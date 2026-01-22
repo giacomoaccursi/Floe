@@ -1,0 +1,460 @@
+package com.etl.framework.aggregation
+
+import com.etl.framework.config._
+import com.etl.framework.TestConfig
+import org.scalacheck.{Gen, Properties}
+import org.scalacheck.Prop.forAll
+import org.scalacheck.Test.Parameters
+import org.apache.spark.sql.SparkSession
+import org.json4s._
+import org.json4s.jackson.Serialization
+import org.json4s.jackson.Serialization.write
+
+import java.nio.file.{Files, Paths, StandardOpenOption}
+
+/**
+ * Property-based tests for auto-discovery of additional tables
+ * Feature: spark-etl-framework, Property 31: Auto-Discovery of Additional Tables
+ * Validates: Requirements 24.1, 24.2
+ * 
+ * Test configuration: Uses standardTestCount (20 cases)
+ */
+object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
+  
+  // Configure test parameters
+  override def overrideParameters(p: Parameters): Parameters = TestConfig.standardParams
+  
+  // Create a minimal Spark session for testing
+  implicit val spark: SparkSession = SparkSession.builder()
+    .appName("AutoDiscoveryPropertiesTest")
+    .master("local[*]")
+    .config("spark.ui.enabled", "false")
+    .config("spark.sql.shuffle.partitions", "2")
+    .getOrCreate()
+  
+  // Generator for table names
+  val tableNameGen: Gen[String] = for {
+    prefix <- Gen.oneOf("summary", "aggregate", "derived", "enriched")
+    suffix <- Gen.choose(1, 100)
+  } yield s"${prefix}_$suffix"
+  
+  // Generator for additional table metadata
+  val additionalTableMetadataGen: Gen[AdditionalTableMetadata] = for {
+    pkCount <- Gen.choose(1, 3)
+    pkColumns <- Gen.listOfN(pkCount, Gen.alphaNumStr.suchThat(_.nonEmpty)).map(_.distinct)
+    joinKeyCount <- Gen.choose(0, 3)
+    joinKeys <- if (joinKeyCount > 0) {
+      Gen.listOfN(joinKeyCount, for {
+        flowName <- Gen.alphaNumStr.suchThat(_.nonEmpty)
+        keyCount <- Gen.choose(1, 2)
+        keys <- Gen.listOfN(keyCount, Gen.alphaNumStr.suchThat(_.nonEmpty))
+      } yield (flowName, keys)).map(_.toMap)
+    } else {
+      Gen.const(Map.empty[String, Seq[String]])
+    }
+    description <- Gen.option(Gen.alphaNumStr)
+    partitionCount <- Gen.choose(0, 2)
+    partitionBy <- Gen.listOfN(partitionCount, Gen.alphaNumStr.suchThat(_.nonEmpty))
+  } yield AdditionalTableMetadata(
+    primaryKey = pkColumns,
+    joinKeys = joinKeys,
+    description = description,
+    partitionBy = partitionBy
+  )
+  
+  // Generator for additional table info
+  val additionalTableInfoGen: Gen[AdditionalTableInfo] = for {
+    tableName <- tableNameGen
+    metadata <- additionalTableMetadataGen
+  } yield AdditionalTableInfo(
+    tableName = tableName,
+    path = s"/data/validated/$tableName",
+    dagMetadata = metadata
+  )
+  
+  // Generator for GlobalConfig with temporary metadata path
+  def globalConfigWithTempPathGen: Gen[GlobalConfig] = for {
+    tempDir <- Gen.const(Files.createTempDirectory("dag-test-"))
+  } yield GlobalConfig(
+    spark = SparkConfig(
+      appName = "test",
+      master = "local[*]",
+      config = Map.empty
+    ),
+    paths = PathsConfig(
+      inputBase = "/data/input",
+      outputBase = "/data/output",
+      validatedPath = "/data/validated",
+      rejectedPath = "/data/rejected",
+      metadataPath = tempDir.toString,
+      modelPath = "/data/model",
+      stagingPath = "/data/staging",
+      checkpointPath = "/data/checkpoint"
+    ),
+    processing = ProcessingConfig(
+      batchIdFormat = "yyyyMMdd_HHmmss",
+      executionMode = "batch",
+      failOnValidationError = false,
+      maxRejectionRate = 0.1,
+      rollbackOnFailure = false,
+      checkpointEnabled = false,
+      checkpointInterval = "5m"
+    ),
+    performance = PerformanceConfig(
+      parallelFlows = false,
+      parallelNodes = false,
+      broadcastThreshold = 10485760L,
+      cacheValidated = false,
+      shufflePartitions = 200
+    ),
+    monitoring = MonitoringConfig(
+      enabled = false,
+      metricsExporter = None,
+      metricsEndpoint = None,
+      logLevel = "INFO"
+    ),
+    security = SecurityConfig(
+      encryptionEnabled = false,
+      kmsKeyId = None,
+      authenticationEnabled = false
+    )
+  )
+  
+  /**
+   * Writes additional table metadata to the metadata directory
+   */
+  def writeAdditionalTableMetadata(
+    metadataPath: String,
+    tables: Seq[AdditionalTableInfo]
+  ): Unit = {
+    implicit val formats: Formats = Serialization.formats(NoTypeHints)
+    
+    // Create latest/additional_tables directory
+    val additionalTablesDir = Paths.get(s"$metadataPath/latest/additional_tables")
+    Files.createDirectories(additionalTablesDir)
+    
+    // Write metadata for each table
+    tables.foreach { table =>
+      val metadata = Map(
+        "table_name" -> table.tableName,
+        "table_type" -> "additional",
+        "path" -> table.path,
+        "dag_metadata" -> Map(
+          "primary_key" -> table.dagMetadata.primaryKey,
+          "join_keys" -> table.dagMetadata.joinKeys,
+          "description" -> table.dagMetadata.description.getOrElse(""),
+          "partition_by" -> table.dagMetadata.partitionBy
+        )
+      )
+      
+      val jsonString = write(metadata)
+      val metadataFile = additionalTablesDir.resolve(s"${table.tableName}.json")
+      Files.write(metadataFile, jsonString.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+    }
+  }
+  
+  /**
+   * Cleans up temporary metadata directory
+   */
+  def cleanupMetadataDir(metadataPath: String): Unit = {
+    try {
+      val path = Paths.get(metadataPath)
+      if (Files.exists(path)) {
+        import scala.collection.JavaConverters._
+        Files.walk(path)
+          .iterator()
+          .asScala
+          .toSeq
+          .reverse
+          .foreach(p => Files.deleteIfExists(p))
+      }
+    } catch {
+      case _: Exception => // Ignore cleanup errors
+    }
+  }
+  
+  /**
+   * Property 31: Auto-Discovery of Additional Tables
+   * For any additional tables created with dagMetadata, when auto-discovery is enabled,
+   * the DAG_Orchestrator should discover and create DAG nodes for them.
+   */
+  property("auto_discovery_creates_dag_nodes_for_additional_tables") = forAll(
+    Gen.listOfN(3, additionalTableInfoGen),
+    globalConfigWithTempPathGen
+  ) { (additionalTables, globalConfig) =>
+    try {
+      // Write additional table metadata
+      writeAdditionalTableMetadata(globalConfig.paths.metadataPath, additionalTables)
+      
+      // Create DAG config with empty nodes (will be populated by auto-discovery)
+      val dagConfig = AggregationConfig(
+        name = "test_aggregation",
+        description = "Test auto-discovery",
+        version = "1.0",
+        batchModel = ModelConfig(
+          `class` = "com.example.BatchModel",
+          mappingFile = None,
+          mapperClass = None
+        ),
+        finalModel = ModelConfig(
+          `class` = "com.example.FinalModel",
+          mappingFile = None,
+          mapperClass = None
+        ),
+        output = DAGOutputConfig(
+          batch = OutputConfig(
+            path = Some("/data/model/batch"),
+            rejectedPath = None,
+            format = "parquet",
+            partitionBy = Seq.empty,
+            compression = "snappy",
+            options = Map.empty
+          ),
+          `final` = OutputConfig(
+            path = Some("/data/model/final"),
+            rejectedPath = None,
+            format = "parquet",
+            partitionBy = Seq.empty,
+            compression = "snappy",
+            options = Map.empty
+          )
+        ),
+        nodes = Seq.empty  // No configured nodes
+      )
+      
+      // Create orchestrator with auto-discovery enabled
+      val orchestrator = new DAGOrchestrator(dagConfig, globalConfig, autoDiscoverAdditionalTables = true)
+      
+      // Use reflection to access private discoverAdditionalTables method
+      val method = orchestrator.getClass.getDeclaredMethod("discoverAdditionalTables")
+      method.setAccessible(true)
+      val discoveredNodes = method.invoke(orchestrator).asInstanceOf[Seq[DAGNode]]
+      
+      // Verify that all additional tables were discovered
+      val discoveredTableNames = discoveredNodes.map(_.sourceFlow).toSet
+      val expectedTableNames = additionalTables.map(_.tableName).toSet
+      
+      val allTablesDiscovered = expectedTableNames.subsetOf(discoveredTableNames)
+      
+      // Verify that discovered nodes have correct properties
+      val nodesHaveCorrectProperties = discoveredNodes.forall { node =>
+        val table = additionalTables.find(_.tableName == node.sourceFlow)
+        table.exists { t =>
+          // Node ID should be table_name_node
+          node.id == s"${t.tableName}_node" &&
+          // Source path should match
+          node.sourcePath == t.path &&
+          // Dependencies should be inferred from join keys
+          node.dependencies.size == t.dagMetadata.joinKeys.size
+        }
+      }
+      
+      allTablesDiscovered && nodesHaveCorrectProperties
+      
+    } finally {
+      // Cleanup
+      cleanupMetadataDir(globalConfig.paths.metadataPath)
+    }
+  }
+  
+  /**
+   * Property 31: Auto-Discovery Infers Dependencies from Join Keys
+   * For any additional table with join keys, auto-discovery should infer dependencies
+   * based on the join keys.
+   */
+  property("auto_discovery_infers_dependencies_from_join_keys") = forAll(
+    additionalTableInfoGen.suchThat(_.dagMetadata.joinKeys.nonEmpty),
+    globalConfigWithTempPathGen
+  ) { (additionalTable, globalConfig) =>
+    try {
+      // Write additional table metadata
+      writeAdditionalTableMetadata(globalConfig.paths.metadataPath, Seq(additionalTable))
+      
+      // Create DAG config
+      val dagConfig = AggregationConfig(
+        name = "test_aggregation",
+        description = "Test dependency inference",
+        version = "1.0",
+        batchModel = ModelConfig("com.example.BatchModel", None, None),
+        finalModel = ModelConfig("com.example.FinalModel", None, None),
+        output = DAGOutputConfig(
+          batch = OutputConfig(Some("/data/model/batch"), None, "parquet", Seq.empty, "snappy", Map.empty),
+          `final` = OutputConfig(Some("/data/model/final"), None, "parquet", Seq.empty, "snappy", Map.empty)
+        ),
+        nodes = Seq.empty
+      )
+      
+      // Create orchestrator with auto-discovery enabled
+      val orchestrator = new DAGOrchestrator(dagConfig, globalConfig, autoDiscoverAdditionalTables = true)
+      
+      // Use reflection to access private discoverAdditionalTables method
+      val method = orchestrator.getClass.getDeclaredMethod("discoverAdditionalTables")
+      method.setAccessible(true)
+      val discoveredNodes = method.invoke(orchestrator).asInstanceOf[Seq[DAGNode]]
+      
+      // Find the discovered node for this table
+      val discoveredNode = discoveredNodes.find(_.sourceFlow == additionalTable.tableName)
+      
+      discoveredNode.exists { node =>
+        // Dependencies should be flow_name_node for each join key
+        val expectedDependencies = additionalTable.dagMetadata.joinKeys.keys.map(flow => s"${flow}_node").toSet
+        val actualDependencies = node.dependencies.toSet
+        
+        expectedDependencies == actualDependencies
+      }
+      
+    } finally {
+      cleanupMetadataDir(globalConfig.paths.metadataPath)
+    }
+  }
+  
+  /**
+   * Property 31: Auto-Discovery Creates Join Configuration
+   * For any additional table with join keys, auto-discovery should create a join configuration.
+   */
+  property("auto_discovery_creates_join_configuration") = forAll(
+    additionalTableInfoGen.suchThat(_.dagMetadata.joinKeys.nonEmpty),
+    globalConfigWithTempPathGen
+  ) { (additionalTable, globalConfig) =>
+    try {
+      // Write additional table metadata
+      writeAdditionalTableMetadata(globalConfig.paths.metadataPath, Seq(additionalTable))
+      
+      // Create DAG config
+      val dagConfig = AggregationConfig(
+        name = "test_aggregation",
+        description = "Test join configuration",
+        version = "1.0",
+        batchModel = ModelConfig("com.example.BatchModel", None, None),
+        finalModel = ModelConfig("com.example.FinalModel", None, None),
+        output = DAGOutputConfig(
+          batch = OutputConfig(Some("/data/model/batch"), None, "parquet", Seq.empty, "snappy", Map.empty),
+          `final` = OutputConfig(Some("/data/model/final"), None, "parquet", Seq.empty, "snappy", Map.empty)
+        ),
+        nodes = Seq.empty
+      )
+      
+      // Create orchestrator with auto-discovery enabled
+      val orchestrator = new DAGOrchestrator(dagConfig, globalConfig, autoDiscoverAdditionalTables = true)
+      
+      // Use reflection to access private discoverAdditionalTables method
+      val method = orchestrator.getClass.getDeclaredMethod("discoverAdditionalTables")
+      method.setAccessible(true)
+      val discoveredNodes = method.invoke(orchestrator).asInstanceOf[Seq[DAGNode]]
+      
+      // Find the discovered node for this table
+      val discoveredNode = discoveredNodes.find(_.sourceFlow == additionalTable.tableName)
+      
+      discoveredNode.exists { node =>
+        node.join.exists { joinConfig =>
+          // Join should be left_outer
+          joinConfig.`type` == "left_outer" &&
+          // Strategy should be nest
+          joinConfig.strategy == "nest" &&
+          // Nest as should be the table name
+          joinConfig.nestAs.contains(additionalTable.tableName) &&
+          // Parent should be first join key flow
+          additionalTable.dagMetadata.joinKeys.headOption.exists { case (parentFlow, _) =>
+            joinConfig.parent == s"${parentFlow}_node"
+          }
+        }
+      }
+      
+    } finally {
+      cleanupMetadataDir(globalConfig.paths.metadataPath)
+    }
+  }
+  
+  /**
+   * Property 31: Auto-Discovery Handles Missing Metadata Directory
+   * When the metadata directory doesn't exist, auto-discovery should return empty list.
+   */
+  property("auto_discovery_handles_missing_metadata_directory") = forAll(globalConfigWithTempPathGen) { 
+    globalConfig =>
+      try {
+        // Don't create metadata directory
+        
+        // Create DAG config
+        val dagConfig = AggregationConfig(
+          name = "test_aggregation",
+          description = "Test missing metadata",
+          version = "1.0",
+          batchModel = ModelConfig("com.example.BatchModel", None, None),
+          finalModel = ModelConfig("com.example.FinalModel", None, None),
+          output = DAGOutputConfig(
+            batch = OutputConfig(Some("/data/model/batch"), None, "parquet", Seq.empty, "snappy", Map.empty),
+            `final` = OutputConfig(Some("/data/model/final"), None, "parquet", Seq.empty, "snappy", Map.empty)
+          ),
+          nodes = Seq.empty
+        )
+        
+        // Create orchestrator with auto-discovery enabled
+        val orchestrator = new DAGOrchestrator(dagConfig, globalConfig, autoDiscoverAdditionalTables = true)
+        
+        // Use reflection to access private discoverAdditionalTables method
+        val method = orchestrator.getClass.getDeclaredMethod("discoverAdditionalTables")
+        method.setAccessible(true)
+        val discoveredNodes = method.invoke(orchestrator).asInstanceOf[Seq[DAGNode]]
+        
+        // Should return empty list
+        discoveredNodes.isEmpty
+        
+      } finally {
+        cleanupMetadataDir(globalConfig.paths.metadataPath)
+      }
+  }
+  
+  /**
+   * Property 31: Auto-Discovery Disabled Returns Empty List
+   * When auto-discovery is disabled, no additional tables should be discovered.
+   */
+  property("auto_discovery_disabled_returns_empty_list") = forAll(
+    Gen.listOfN(3, additionalTableInfoGen),
+    globalConfigWithTempPathGen
+  ) { (additionalTables, globalConfig) =>
+    try {
+      // Write additional table metadata
+      writeAdditionalTableMetadata(globalConfig.paths.metadataPath, additionalTables)
+      
+      // Create DAG config with some configured nodes
+      val configuredNode = DAGNode(
+        id = "configured_node",
+        description = "Configured node",
+        sourceFlow = "test_flow",
+        sourcePath = "/data/validated/test_flow",
+        dependencies = Seq.empty,
+        join = None,
+        select = Seq.empty,
+        filters = Seq.empty
+      )
+      
+      val dagConfig = AggregationConfig(
+        name = "test_aggregation",
+        description = "Test auto-discovery disabled",
+        version = "1.0",
+        batchModel = ModelConfig("com.example.BatchModel", None, None),
+        finalModel = ModelConfig("com.example.FinalModel", None, None),
+        output = DAGOutputConfig(
+          batch = OutputConfig(Some("/data/model/batch"), None, "parquet", Seq.empty, "snappy", Map.empty),
+          `final` = OutputConfig(Some("/data/model/final"), None, "parquet", Seq.empty, "snappy", Map.empty)
+        ),
+        nodes = Seq(configuredNode)
+      )
+      
+      // Create orchestrator with auto-discovery DISABLED
+      val orchestrator = new DAGOrchestrator(dagConfig, globalConfig, autoDiscoverAdditionalTables = false)
+      
+      // Build execution plan - this should only include configured nodes
+      val plan = orchestrator.buildExecutionPlan()
+      
+      // Flatten all nodes from all groups
+      val allNodes = plan.groups.flatMap(_.nodes)
+      
+      // Should only have the configured node, no discovered nodes
+      allNodes.size == 1 && allNodes.head.id == "configured_node"
+      
+    } finally {
+      cleanupMetadataDir(globalConfig.paths.metadataPath)
+    }
+  }
+}

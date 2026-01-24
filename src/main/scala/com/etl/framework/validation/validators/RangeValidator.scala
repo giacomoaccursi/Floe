@@ -1,7 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.ValidationRule
-import com.etl.framework.validation.Validator
+import com.etl.framework.validation.{ValidationStepResult, Validator}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 

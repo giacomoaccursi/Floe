@@ -71,7 +71,7 @@ object CustomValidatorProperties extends Properties("CustomValidator") {
         val rule = ValidationRule(
           `type` = "custom",
           column = Some("value"),
-          `class` = Some("com.etl.framework.phase1.TestCustomValidator"),
+          `class` = Some("com.etl.framework.validation.TestCustomValidator"),
           config = Some(Map("threshold" -> "5")),
           description = Some("Test custom validator"),
           skipNull = Some(false),
@@ -102,7 +102,7 @@ object CustomValidatorProperties extends Properties("CustomValidator") {
         val rule = ValidationRule(
           `type` = "custom",
           column = Some("value"),
-          `class` = Some("com.etl.framework.phase1.TestCustomValidator"),
+          `class` = Some("com.etl.framework.validation.TestCustomValidator"),
           config = Some(Map("threshold" -> "5")),
           description = Some("Test custom validator"),
           skipNull = Some(false),
@@ -144,7 +144,7 @@ object CustomValidatorProperties extends Properties("CustomValidator") {
       val rule = ValidationRule(
         `type` = "custom",
         column = Some("value"),
-        `class` = Some("com.etl.framework.phase1.TestCustomValidator"),
+        `class` = Some("com.etl.framework.validation.TestCustomValidator"),
         config = Some(Map("threshold" -> threshold.toString)),
         description = Some("Test custom validator with threshold"),
         skipNull = Some(false),
@@ -181,7 +181,7 @@ object CustomValidatorProperties extends Properties("CustomValidator") {
         val rule = ValidationRule(
           `type` = "custom",
           column = Some("value"),
-          `class` = Some("com.etl.framework.phase1.TestConfigurableValidator"),
+          `class` = Some("com.etl.framework.validation.TestConfigurableValidator"),
           config = Some(Map("prefix" -> "test_", "suffix" -> "_end")),
           description = Some("Test configurable validator"),
           skipNull = Some(false),
@@ -276,7 +276,7 @@ object CustomValidatorProperties extends Properties("CustomValidator") {
         val rule1 = ValidationRule(
           `type` = "custom",
           column = Some("value"),
-          `class` = Some("com.etl.framework.phase1.TestCustomValidator"),
+          `class` = Some("com.etl.framework.validation.TestCustomValidator"),
           config = Some(Map("threshold" -> "5")),
           description = Some("First custom validator"),
           skipNull = Some(false),
@@ -286,7 +286,7 @@ object CustomValidatorProperties extends Properties("CustomValidator") {
         val rule2 = ValidationRule(
           `type` = "custom",
           column = Some("amount"),
-          `class` = Some("com.etl.framework.phase1.TestConfigurableValidator"),
+          `class` = Some("com.etl.framework.validation.TestConfigurableValidator"),
           config = Some(Map("prefix" -> "test_")),
           description = Some("Second custom validator"),
           skipNull = Some(false),
@@ -329,7 +329,7 @@ object CustomValidatorProperties extends Properties("CustomValidator") {
         val rule = ValidationRule(
           `type` = "custom",
           column = Some("value"),
-          `class` = Some("com.etl.framework.phase1.TestCustomValidator"),
+          `class` = Some("com.etl.framework.validation.TestCustomValidator"),
           config = Some(Map("threshold" -> "5")),
           description = Some("Test custom validator"),
           skipNull = Some(false),
@@ -372,7 +372,7 @@ object CustomValidatorProperties extends Properties("CustomValidator") {
         val rule = ValidationRule(
           `type` = "custom",
           column = Some("value"),
-          `class` = Some("com.etl.framework.phase1.TestCustomValidator"),
+          `class` = Some("com.etl.framework.validation.TestCustomValidator"),
           config = Some(Map("threshold" -> "5")),
           description = Some("Test custom validator"),
           skipNull = Some(false),

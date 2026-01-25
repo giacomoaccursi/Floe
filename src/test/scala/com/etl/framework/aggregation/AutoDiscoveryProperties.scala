@@ -32,11 +32,12 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
     .config("spark.sql.shuffle.partitions", "2")
     .getOrCreate()
   
-  // Generator for table names
+  // Generator for table names with timestamp to ensure uniqueness
   val tableNameGen: Gen[String] = for {
     prefix <- Gen.oneOf("summary", "aggregate", "derived", "enriched")
-    suffix <- Gen.choose(1, 100)
-  } yield s"${prefix}_$suffix"
+    suffix <- Gen.choose(1, 100000)
+    timestamp <- Gen.const(System.nanoTime())
+  } yield s"${prefix}_${suffix}_${timestamp}"
   
   // Generator for additional table metadata
   val additionalTableMetadataGen: Gen[AdditionalTableMetadata] = for {
@@ -72,9 +73,10 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
     dagMetadata = metadata
   )
   
-  // Generator for GlobalConfig with temporary metadata path
+  // Generator for GlobalConfig with temporary metadata path (unique per test)
   def globalConfigWithTempPathGen: Gen[GlobalConfig] = for {
-    tempDir <- Gen.const(Files.createTempDirectory("dag-test-"))
+    uniqueId <- Gen.const(s"dag-test-${System.nanoTime()}-${java.util.UUID.randomUUID()}")
+    tempDir <- Gen.const(Files.createTempDirectory(uniqueId))
   } yield GlobalConfig(
     spark = SparkConfig(
       appName = "test",
@@ -154,23 +156,47 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
   }
   
   /**
-   * Cleans up temporary metadata directory
+   * Cleans up temporary metadata directory with retry logic
    */
   def cleanupMetadataDir(metadataPath: String): Unit = {
-    try {
-      val path = Paths.get(metadataPath)
-      if (Files.exists(path)) {
-        import scala.collection.JavaConverters._
-        Files.walk(path)
-          .iterator()
-          .asScala
-          .toSeq
-          .reverse
-          .foreach(p => Files.deleteIfExists(p))
+    def attemptCleanup(retries: Int = 3): Unit = {
+      try {
+        val path = Paths.get(metadataPath)
+        if (Files.exists(path)) {
+          import scala.collection.JavaConverters._
+          // Wait a bit to ensure all file handles are released
+          Thread.sleep(50)
+          
+          val filesToDelete = Files.walk(path)
+            .iterator()
+            .asScala
+            .toSeq
+            .reverse
+          
+          filesToDelete.foreach { p =>
+            try {
+              Files.deleteIfExists(p)
+            } catch {
+              case _: Exception if retries > 0 =>
+                // Retry on failure
+                Thread.sleep(100)
+                if (retries == 1) {
+                  // Last attempt - force delete
+                  p.toFile.delete()
+                }
+            }
+          }
+        }
+      } catch {
+        case _: Exception if retries > 0 =>
+          Thread.sleep(100)
+          attemptCleanup(retries - 1)
+        case _: Exception => 
+          // Ignore final cleanup errors - temp dirs will be cleaned by OS
       }
-    } catch {
-      case _: Exception => // Ignore cleanup errors
     }
+    
+    attemptCleanup()
   }
   
   /**
@@ -179,10 +205,12 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
    * the DAG_Orchestrator should discover and create DAG nodes for them.
    */
   property("auto_discovery_creates_dag_nodes_for_additional_tables") = forAll(
-    Gen.listOfN(3, additionalTableInfoGen),
+    Gen.listOfN(3, additionalTableInfoGen).map(tables => tables.groupBy(_.tableName).map(_._2.head).toSeq), // Ensure unique table names
     globalConfigWithTempPathGen
   ) { (additionalTables, globalConfig) =>
+    var metadataPathToClean: Option[String] = None
     try {
+      metadataPathToClean = Some(globalConfig.paths.metadataPath)
       // Write additional table metadata
       writeAdditionalTableMetadata(globalConfig.paths.metadataPath, additionalTables)
       
@@ -252,8 +280,8 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
       allTablesDiscovered && nodesHaveCorrectProperties
       
     } finally {
-      // Cleanup
-      cleanupMetadataDir(globalConfig.paths.metadataPath)
+      // Cleanup with proper error handling
+      metadataPathToClean.foreach(cleanupMetadataDir)
     }
   }
   
@@ -266,7 +294,9 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
     additionalTableInfoGen.suchThat(_.dagMetadata.joinKeys.nonEmpty),
     globalConfigWithTempPathGen
   ) { (additionalTable, globalConfig) =>
+    var metadataPathToClean: Option[String] = None
     try {
+      metadataPathToClean = Some(globalConfig.paths.metadataPath)
       // Write additional table metadata
       writeAdditionalTableMetadata(globalConfig.paths.metadataPath, Seq(additionalTable))
       
@@ -304,7 +334,7 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
       }
       
     } finally {
-      cleanupMetadataDir(globalConfig.paths.metadataPath)
+      metadataPathToClean.foreach(cleanupMetadataDir)
     }
   }
   
@@ -316,7 +346,9 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
     additionalTableInfoGen.suchThat(_.dagMetadata.joinKeys.nonEmpty),
     globalConfigWithTempPathGen
   ) { (additionalTable, globalConfig) =>
+    var metadataPathToClean: Option[String] = None
     try {
+      metadataPathToClean = Some(globalConfig.paths.metadataPath)
       // Write additional table metadata
       writeAdditionalTableMetadata(globalConfig.paths.metadataPath, Seq(additionalTable))
       
@@ -361,7 +393,7 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
       }
       
     } finally {
-      cleanupMetadataDir(globalConfig.paths.metadataPath)
+      metadataPathToClean.foreach(cleanupMetadataDir)
     }
   }
   
@@ -371,7 +403,9 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
    */
   property("auto_discovery_handles_missing_metadata_directory") = forAll(globalConfigWithTempPathGen) { 
     globalConfig =>
+      var metadataPathToClean: Option[String] = None
       try {
+        metadataPathToClean = Some(globalConfig.paths.metadataPath)
         // Don't create metadata directory
         
         // Create DAG config
@@ -400,7 +434,7 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
         discoveredNodes.isEmpty
         
       } finally {
-        cleanupMetadataDir(globalConfig.paths.metadataPath)
+        metadataPathToClean.foreach(cleanupMetadataDir)
       }
   }
   
@@ -409,10 +443,12 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
    * When auto-discovery is disabled, no additional tables should be discovered.
    */
   property("auto_discovery_disabled_returns_empty_list") = forAll(
-    Gen.listOfN(3, additionalTableInfoGen),
+    Gen.listOfN(3, additionalTableInfoGen).map(tables => tables.groupBy(_.tableName).map(_._2.head).toSeq), // Ensure unique table names
     globalConfigWithTempPathGen
   ) { (additionalTables, globalConfig) =>
+    var metadataPathToClean: Option[String] = None
     try {
+      metadataPathToClean = Some(globalConfig.paths.metadataPath)
       // Write additional table metadata
       writeAdditionalTableMetadata(globalConfig.paths.metadataPath, additionalTables)
       
@@ -454,7 +490,7 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
       allNodes.size == 1 && allNodes.head.id == "configured_node"
       
     } finally {
-      cleanupMetadataDir(globalConfig.paths.metadataPath)
+      metadataPathToClean.foreach(cleanupMetadataDir)
     }
   }
 }

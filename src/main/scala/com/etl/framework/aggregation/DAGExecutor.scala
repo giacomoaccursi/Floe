@@ -1,0 +1,77 @@
+package com.etl.framework.aggregation
+
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.slf4j.LoggerFactory
+
+import scala.collection.mutable
+import scala.concurrent._
+import scala.concurrent.duration._
+import ExecutionContext.Implicits.global
+
+/**
+ * Executes DAG execution plans
+ */
+class DAGExecutor(nodeProcessor: DAGNodeProcessor) {
+  
+  private val logger = LoggerFactory.getLogger(getClass)
+  
+  /**
+   * Executes DAG nodes according to the execution plan
+   */
+  def execute(plan: DAGExecutionPlan): DataFrame = {
+    logger.info("Executing DAG plan")
+    val nodeResults = mutable.Map[String, DataFrame]()
+    
+    plan.groups.foreach { group =>
+      logger.info(s"Executing DAG group with ${group.nodes.size} nodes (parallel=${group.parallel})")
+      
+      val groupResults = if (group.parallel) {
+        executeGroupParallel(group, nodeResults.toMap)
+      } else {
+        executeGroupSequential(group, nodeResults.toMap)
+      }
+      
+      groupResults.foreach { case (nodeId, df) =>
+        nodeResults(nodeId) = df
+      }
+    }
+    
+    val rootResult = nodeResults(plan.rootNode)
+    logger.info(s"DAG execution completed, returning root node: ${plan.rootNode}")
+    rootResult
+  }
+  
+  /**
+   * Executes a group of nodes sequentially
+   */
+  private def executeGroupSequential(
+    group: DAGExecutionGroup,
+    nodeResults: Map[String, DataFrame]
+  ): Map[String, DataFrame] = {
+    val results = mutable.Map[String, DataFrame]()
+    
+    group.nodes.foreach { node =>
+      val result = nodeProcessor.executeNode(node, nodeResults ++ results)
+      results(node.id) = result
+    }
+    
+    results.toMap
+  }
+  
+  /**
+   * Executes a group of nodes in parallel
+   */
+  private def executeGroupParallel(
+    group: DAGExecutionGroup,
+    nodeResults: Map[String, DataFrame]
+  ): Map[String, DataFrame] = {
+    val futures = group.nodes.map { node =>
+      Future {
+        node.id -> nodeProcessor.executeNode(node, nodeResults)
+      }
+    }
+    
+    val allResults = Future.sequence(futures)
+    Await.result(allResults, Duration.Inf).toMap
+  }
+}

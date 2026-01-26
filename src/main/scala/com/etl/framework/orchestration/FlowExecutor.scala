@@ -1,6 +1,6 @@
 package com.etl.framework.orchestration
 
-import com.etl.framework.config.{FlowConfig, GlobalConfig}
+import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
 import com.etl.framework.core.{AdditionalTableMetadata, TransformationContext}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.logging.FrameworkLogger
@@ -19,7 +19,8 @@ import scala.collection.mutable
 class FlowExecutor(
   flowConfig: FlowConfig,
   globalConfig: GlobalConfig,
-  validatedFlows: Map[String, DataFrame] = Map.empty
+  validatedFlows: Map[String, DataFrame] = Map.empty,
+  domainsConfig: Option[DomainsConfig] = None
 )(implicit spark: SparkSession) extends FrameworkLogger {
   
   // Storage for additional tables created during transformations
@@ -264,7 +265,7 @@ class FlowExecutor(
    */
   private def validateData(data: DataFrame): ValidationResult = {
     logDebug("Starting validation", Map("recordCount" -> data.count()))
-    val engine = new ValidationEngine()
+    val engine = new ValidationEngine(domainsConfig)
     engine.validate(data, flowConfig, validatedFlows)
   }
   

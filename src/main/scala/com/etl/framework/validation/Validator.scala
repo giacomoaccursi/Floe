@@ -1,6 +1,6 @@
 package com.etl.framework.validation
 
-import com.etl.framework.config.ValidationRule
+import com.etl.framework.config.{DomainsConfig, ValidationRule}
 import com.etl.framework.validation.validators.{DomainValidator, RangeValidator, RegexValidator}
 import org.apache.spark.sql.DataFrame
 
@@ -27,13 +27,14 @@ object ValidatorFactory {
    * Creates a Validator instance based on the rule type
    *
    * @param rule Validation rule configuration
+   * @param domainsConfig Optional domains configuration for domain validation
    * @return Validator instance
    */
-  def create(rule: ValidationRule): Validator = {
+  def create(rule: ValidationRule, domainsConfig: Option[DomainsConfig] = None): Validator = {
     rule.`type` match {
       case "regex" => new RegexValidator()
       case "range" => new RangeValidator()
-      case "domain" => new DomainValidator()
+      case "domain" => new DomainValidator(domainsConfig)
       case "custom" => createCustomValidator(rule)
       case unsupported =>
         throw new UnsupportedValidatorException(

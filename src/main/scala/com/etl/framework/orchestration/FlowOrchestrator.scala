@@ -1,6 +1,6 @@
 package com.etl.framework.orchestration
 
-import com.etl.framework.config.{FlowConfig, GlobalConfig}
+import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
 import com.etl.framework.logging.FrameworkLogger
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -13,7 +13,8 @@ import scala.collection.mutable
  */
 class FlowOrchestrator(
   globalConfig: GlobalConfig,
-  flowConfigs: Seq[FlowConfig]
+  flowConfigs: Seq[FlowConfig],
+  domainsConfig: Option[DomainsConfig] = None
 )(implicit spark: SparkSession) extends FrameworkLogger {
   
   /**
@@ -339,7 +340,7 @@ class FlowOrchestrator(
   ): FlowResult = {
     logDebug(s"Starting flow execution", Map("flowName" -> flowConfig.name, "batchId" -> batchId))
     
-    val executor = new FlowExecutor(flowConfig, globalConfig, validatedFlows)
+    val executor = new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig)
     executor.execute(batchId)
   }
   

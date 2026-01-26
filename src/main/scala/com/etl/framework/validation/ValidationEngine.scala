@@ -1,6 +1,6 @@
 package com.etl.framework.validation
 
-import com.etl.framework.config.FlowConfig
+ import com.etl.framework.config.{DomainsConfig, FlowConfig}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -8,7 +8,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * Core validation engine that coordinates all validation steps
  * Adds a warnings column to track non-fatal validation issues
  */
-class ValidationEngine(implicit spark: SparkSession) {
+class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit spark: SparkSession) {
   
   /**
    * Validates a DataFrame according to the flow configuration
@@ -216,7 +216,7 @@ class ValidationEngine(implicit spark: SparkSession) {
     var rejectedDf: Option[DataFrame] = None
     
     for (rule <- flowConfig.validation.rules) {
-      val validator = ValidatorFactory.create(rule)
+      val validator = ValidatorFactory.create(rule, domainsConfig)
       val result = validator.validate(currentDf, rule)
       
       if (rule.onFailure == "reject") {

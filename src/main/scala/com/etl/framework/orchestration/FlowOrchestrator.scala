@@ -78,11 +78,11 @@ class FlowOrchestrator(
       }
       
       // All flows completed successfully
-      createSuccessResult(batchId, flowResults.toSeq, startTime)
+      createSuccessResult(batchId, flowResults, startTime)
       
     } catch {
       case e: Exception =>
-        handleExecutionFailure(batchId, flowResults.toSeq, startTime, e)
+        handleExecutionFailure(batchId, flowResults, startTime, e)
     }
   }
   

@@ -125,7 +125,6 @@ object ParallelExecutionProperties extends Properties("ParallelExecution") {
         executionMode = if (parallel) "parallel" else "sequential",
         failOnValidationError = false,
         maxRejectionRate = 1.0,
-        rollbackOnFailure = false,
         checkpointEnabled = false,
         checkpointInterval = "5m"
       ),

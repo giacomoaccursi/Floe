@@ -98,7 +98,6 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
       executionMode = "batch",
       failOnValidationError = false,
       maxRejectionRate = 0.1,
-      rollbackOnFailure = false,
       checkpointEnabled = false,
       checkpointInterval = "5m"
     ),

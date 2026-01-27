@@ -1,7 +1,7 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
-import com.etl.framework.orchestration.batch.{BatchMetadataWriter, BatchRollbackHandler, FlowGroupExecutor}
+import com.etl.framework.orchestration.batch.{BatchMetadataWriter, FlowGroupExecutor}
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.DependencyGraphBuilder
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -25,7 +25,6 @@ class FlowOrchestrator(
   private val dependencyBuilder = new DependencyGraphBuilder(flowConfigs)
   private val groupExecutor = new FlowGroupExecutor(globalConfig, domainsConfig)
   private val metadataWriter = new BatchMetadataWriter(globalConfig, flowConfigs)
-  private val rollbackHandler = new BatchRollbackHandler(globalConfig, flowConfigs)
   
   /**
    * Builds execution plan based on FK dependencies
@@ -121,10 +120,6 @@ class FlowOrchestrator(
         // Flow failed completely
         logger.error(s"Flow ${result.flowName} failed: ${result.error.getOrElse("Unknown error")}")
         
-        if (globalConfig.processing.rollbackOnFailure) {
-          rollbackHandler.rollback(batchId, flowResults.toSeq)
-        }
-        
         return Some(IngestionResult(
           batchId = batchId,
           flowResults = flowResults.toSeq,
@@ -137,10 +132,6 @@ class FlowOrchestrator(
           s"Stopping execution - flow ${result.flowName} " +
           f"rejection rate: ${result.rejectionRate}%.2f%%, rejected: ${result.rejectedRecords}"
         )
-        
-        if (globalConfig.processing.rollbackOnFailure) {
-          rollbackHandler.rollback(batchId, flowResults.toSeq)
-        }
         
         return Some(IngestionResult(
           batchId = batchId,
@@ -208,10 +199,6 @@ class FlowOrchestrator(
   ): IngestionResult = {
     val executionTimeMs = (System.nanoTime() - startTime) / 1000000
     logger.error(s"Ingestion execution failed after ${executionTimeMs}ms - batchId: $batchId", error)
-    
-    if (globalConfig.processing.rollbackOnFailure) {
-      rollbackHandler.rollback(batchId, flowResults)
-    }
     
     IngestionResult(
       batchId = batchId,

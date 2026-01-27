@@ -22,7 +22,6 @@ class FlowGroupExecutor(
   
   /**
    * Executes a group of flows sequentially
-   * Returns early if a flow fails and rollbackOnFailure is enabled
    */
   def executeSequential(
     group: ExecutionGroup,
@@ -35,13 +34,10 @@ class FlowGroupExecutor(
       val result = executeFlow(flowConfig, batchId, validatedFlows)
       results.append(result)
       
-      // Check if we should stop execution immediately
-      // Only stop if rollbackOnFailure is enabled, otherwise continue with remaining flows
-      if (globalConfig.processing.rollbackOnFailure) {
-        if (!result.success || shouldStopExecution(result)) {
-          // Stop executing remaining flows in this group
-          return results.toSeq
-        }
+      // Check if we should stop execution immediately on failure
+      if (!result.success || shouldStopExecution(result)) {
+        // Stop executing remaining flows in this group
+        return results.toSeq
       }
     }
     

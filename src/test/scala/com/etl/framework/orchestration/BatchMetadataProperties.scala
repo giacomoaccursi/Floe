@@ -114,7 +114,6 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
         executionMode = "sequential",
         failOnValidationError = false,
         maxRejectionRate = 1.0,
-        rollbackOnFailure = false,
         checkpointEnabled = false,
         checkpointInterval = "5m"
       ),

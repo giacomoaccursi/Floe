@@ -43,7 +43,6 @@ case class ProcessingConfig(
                              executionMode: String,
                              failOnValidationError: Boolean,
                              maxRejectionRate: Double,
-                             rollbackOnFailure: Boolean,
                              checkpointEnabled: Boolean,
                              checkpointInterval: String
                            )

@@ -531,26 +531,6 @@ case class FlowExecutionException(
 }
 
 /**
- * Rollback operation failure
- */
-case class RollbackException(
-  batchId: String,
-  completedFlows: Seq[String],
-  details: String,
-  cause: Throwable = null
-) extends OrchestrationException(
-  s"Rollback failed for batch '$batchId' (completed flows: ${completedFlows.mkString(", ")}): $details",
-  cause
-) {
-  override def errorCode: String = "ORCHESTRATION_ROLLBACK"
-  override def context: Map[String, Any] = Map(
-    "batchId" -> batchId,
-    "completedFlows" -> completedFlows.mkString(", "),
-    "details" -> details
-  )
-}
-
-/**
  * Unsupported operation
  */
 case class UnsupportedOperationException(

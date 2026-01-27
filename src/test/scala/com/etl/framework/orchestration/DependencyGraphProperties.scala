@@ -189,7 +189,6 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
         executionMode = "batch",
         failOnValidationError = false,
         maxRejectionRate = 0.1,
-        rollbackOnFailure = false,
         checkpointEnabled = false,
         checkpointInterval = "5m"
       ),
@@ -221,12 +220,9 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
    */
   property("dependency_graph_contains_all_fk_edges") = forAll(validFlowDAGGen, globalConfigGen) { 
     (flows, globalConfig) =>
-      val orchestrator = new FlowOrchestrator(globalConfig, flows)
-      
-      // Use reflection to access private buildDependencyGraph method
-      val method = orchestrator.getClass.getDeclaredMethod("buildDependencyGraph")
-      method.setAccessible(true)
-      val dependencyGraph = method.invoke(orchestrator).asInstanceOf[Map[String, Set[String]]]
+      // Use DependencyGraphBuilder directly
+      val builder = new com.etl.framework.orchestration.planning.DependencyGraphBuilder(flows)
+      val dependencyGraph = builder.buildGraph()
       
       // Verify that all FK relationships are in the graph
       val allFKsRepresented = flows.forall { flow =>
@@ -360,7 +356,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
       spark = SparkConfig("test", "local[*]", Map.empty),
       paths = PathsConfig("/data/input", "/data/output", "/data/validated", "/data/rejected",
         "/data/metadata", "/data/model", "/data/staging", "/data/checkpoint"),
-      processing = ProcessingConfig("yyyyMMdd_HHmmss", "batch", false, 0.1, false, false, "5m"),
+      processing = ProcessingConfig("yyyyMMdd_HHmmss", "batch", false, 0.1, false, "5m"),
       performance = PerformanceConfig(false, false, 10485760L, false, 200),
       monitoring = MonitoringConfig(false, None, None, "INFO"),
       security = SecurityConfig(false, None, false)

@@ -67,7 +67,6 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       executionMode <- Gen.oneOf("batch", "streaming")
       failOnValidationError <- Gen.oneOf(true, false)
       maxRejectionRate <- Gen.choose(0.0, 1.0)
-      rollbackOnFailure <- Gen.oneOf(true, false)
       checkpointEnabled <- Gen.oneOf(true, false)
       checkpointInterval <- Gen.oneOf("5m", "10m", "30m")
     } yield ProcessingConfig(
@@ -75,7 +74,6 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       executionMode = executionMode,
       failOnValidationError = failOnValidationError,
       maxRejectionRate = maxRejectionRate,
-      rollbackOnFailure = rollbackOnFailure,
       checkpointEnabled = checkpointEnabled,
       checkpointInterval = checkpointInterval
     )
@@ -441,7 +439,6 @@ processing:
   executionMode: batch
   failOnValidationError: false
   maxRejectionRate: 0.1
-  rollbackOnFailure: false
   checkpointEnabled: false
   checkpointInterval: 5m
 performance:

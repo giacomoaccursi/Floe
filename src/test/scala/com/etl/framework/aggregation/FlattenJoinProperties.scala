@@ -85,7 +85,7 @@ object FlattenJoinProperties extends Properties("FlattenJoin") {
       spark = SparkConfig("test", "local[*]", Map.empty),
       paths = PathsConfig("/data/input", "/data/output", "/data/validated", "/data/rejected",
         "/data/metadata", "/data/model", "/data/staging", "/data/checkpoint"),
-      processing = ProcessingConfig("yyyyMMdd_HHmmss", "batch", false, 0.1, false, false, "5m"),
+      processing = ProcessingConfig("yyyyMMdd_HHmmss", "batch", false, 0.1, false, "5m"),
       performance = PerformanceConfig(false, false, 10485760L, false, 200),
       monitoring = MonitoringConfig(false, None, None, "INFO"),
       security = SecurityConfig(false, None, false)

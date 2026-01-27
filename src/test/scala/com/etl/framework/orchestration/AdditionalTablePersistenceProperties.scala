@@ -97,7 +97,6 @@ object AdditionalTablePersistenceProperties extends Properties("AdditionalTableP
         executionMode = "batch",
         failOnValidationError = false,
         maxRejectionRate = 0.1,
-        rollbackOnFailure = false,
         checkpointEnabled = false,
         checkpointInterval = "10m"
       ),

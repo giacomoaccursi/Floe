@@ -260,7 +260,6 @@ class FrameworkMetrics(collector: MetricsCollector = new InMemoryMetricsCollecto
     val DAG_JOIN_RESULT_RECORDS = "etl.dag.join_result_records"
     
     // System metrics
-    val ROLLBACK_COUNT = "etl.system.rollback_count"
     val INVARIANT_VIOLATIONS = "etl.system.invariant_violations"
     val ERRORS = "etl.system.errors"
   }
@@ -446,14 +445,6 @@ class FrameworkMetrics(collector: MetricsCollector = new InMemoryMetricsCollecto
     collector.recordGauge(MetricNames.DAG_JOIN_PARENT_RECORDS, parentRecords.toDouble, tags)
     collector.recordGauge(MetricNames.DAG_JOIN_CHILD_RECORDS, childRecords.toDouble, tags)
     collector.recordGauge(MetricNames.DAG_JOIN_RESULT_RECORDS, resultRecords.toDouble, tags)
-  }
-  
-  /**
-   * Record rollback
-   */
-  def recordRollback(batchId: String, flowCount: Int): Unit = {
-    val tags = Map("batch" -> batchId)
-    collector.incrementCounter(MetricNames.ROLLBACK_COUNT, tags)
   }
   
   /**

@@ -67,7 +67,6 @@ object CustomOutputPathProperties extends Properties("CustomOutputPath") {
         executionMode = "batch",
         failOnValidationError = false,
         maxRejectionRate = 0.1,
-        rollbackOnFailure = false,
         checkpointEnabled = false,
         checkpointInterval = "10m"
       ),

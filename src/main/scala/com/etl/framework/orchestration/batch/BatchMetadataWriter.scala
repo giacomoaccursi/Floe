@@ -1,10 +1,11 @@
-package com.etl.framework.orchestration
+package com.etl.framework.orchestration.batch
 
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
-import org.slf4j.LoggerFactory
+import com.etl.framework.orchestration.flow.FlowResult
 import org.json4s._
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.write
+import org.slf4j.LoggerFactory
 
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.time.Instant

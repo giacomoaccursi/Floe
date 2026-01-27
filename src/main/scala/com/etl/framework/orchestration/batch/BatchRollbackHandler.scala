@@ -1,6 +1,7 @@
-package com.etl.framework.orchestration
+package com.etl.framework.orchestration.batch
 
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
+import com.etl.framework.orchestration.flow.FlowResult
 import org.slf4j.LoggerFactory
 
 import java.nio.file.{Files, Paths}

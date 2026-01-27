@@ -4,7 +4,7 @@ package com.etl.framework.orchestration
 import com.etl.framework.TestConfig
 import com.etl.framework.config._
 import com.etl.framework.core.{AdditionalTableMetadata, TransformationContext}
-import com.etl.framework.orchestration.FlowExecutor
+import com.etl.framework.orchestration.flow.FlowExecutor
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.scalacheck.Prop.forAll

@@ -1,4 +1,4 @@
-package com.etl.framework.orchestration
+package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config.FlowConfig
 import com.etl.framework.core.{AdditionalTableMetadata, TransformationContext}

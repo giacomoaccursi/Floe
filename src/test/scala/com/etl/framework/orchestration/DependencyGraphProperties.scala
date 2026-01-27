@@ -2,6 +2,7 @@ package com.etl.framework.orchestration
 
 import com.etl.framework.config._
 import com.etl.framework.TestConfig
+import com.etl.framework.orchestration.planning.CircularDependencyException
 import org.scalacheck.{Arbitrary, Gen, Properties}
 import org.scalacheck.Prop.forAll
 import org.scalacheck.Test.Parameters

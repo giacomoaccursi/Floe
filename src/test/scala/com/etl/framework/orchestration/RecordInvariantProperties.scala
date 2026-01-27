@@ -1,6 +1,7 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.TestConfig
+import com.etl.framework.orchestration.flow.InvariantViolationException
 import org.apache.spark.sql.SparkSession
 import org.scalacheck.{Gen, Properties}
 import org.scalacheck.Prop.forAll

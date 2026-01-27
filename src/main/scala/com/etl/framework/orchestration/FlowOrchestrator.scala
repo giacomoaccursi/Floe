@@ -65,10 +65,9 @@ class FlowOrchestrator(
     
     try {
       // Execute each group in order
-      plan.groups.zipWithIndex.foreach { case (group, groupIndex) =>
-        val mode = if (group.parallel) "parallel" else "sequential"
-        logger.info(s"Executing group ${groupIndex + 1}/${plan.groups.size} ($mode, ${group.flows.size} flows)")
-        
+      plan.groups.foreach { group =>
+        logger.info(s"Executing group [${group.flows.map(_.name).mkString(",")}]")
+
         val groupResults = executeGroup(group, batchId, validatedFlows.toMap)
         
         // Process group results

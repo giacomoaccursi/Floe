@@ -1,13 +1,13 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
-import com.etl.framework.core.{AdditionalTableMetadata, TransformationContext}
+import com.etl.framework.core.{AdditionalTableMetadata, TimingUtil, TransformationContext}
 import com.etl.framework.io.readers.DataReaderFactory
-import com.etl.framework.logging.FrameworkLogger
 import com.etl.framework.merge.DeltaMergerFactory
 import com.etl.framework.validation.{ValidationEngine, ValidationResult}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.functions._
+import org.slf4j.LoggerFactory
 
 import java.time.Instant
 import scala.collection.mutable
@@ -21,7 +21,9 @@ class FlowExecutor(
   globalConfig: GlobalConfig,
   validatedFlows: Map[String, DataFrame] = Map.empty,
   domainsConfig: Option[DomainsConfig] = None
-)(implicit spark: SparkSession) extends FrameworkLogger {
+)(implicit spark: SparkSession) {
+  
+  private val logger = LoggerFactory.getLogger(getClass)
   
   // Storage for additional tables created during transformations
   private val additionalTables = mutable.Map[String, AdditionalTableInfo]()
@@ -30,38 +32,28 @@ class FlowExecutor(
    * Executes the complete flow
    */
   def execute(batchId: String): FlowResult = {
-    val startTime = System.currentTimeMillis()
+    val startTime = System.nanoTime()
     
     try {
-      logOperationStart("FlowExecution", Map(
-        "flowName" -> flowConfig.name,
-        "batchId" -> batchId,
-        "loadMode" -> flowConfig.loadMode.`type`
-      ))
+      logger.info(s"Starting flow ${flowConfig.name} - batchId: $batchId, loadMode: ${flowConfig.loadMode.`type`}")
       
       // 1. Read data from source
-      val (rawData, readDurationMs) = withTimingResult("ReadData") {
+      val rawData = TimingUtil.timed(logger, s"Read ${flowConfig.source.`type`} from ${flowConfig.source.path}") {
         readData()
       }
       val inputCount = rawData.count()
-      logDataSourceRead(
-        flowConfig.source.`type`,
-        flowConfig.source.path,
-        inputCount,
-        readDurationMs
-      )
       
       // 2. Apply pre-validation transformations
       val preTransformedData = applyPreValidationTransformations(rawData, batchId)
       
       // 3. Merge with existing data (delta mode)
-      val (mergedData, mergeDurationMs) = withTimingResult("MergeData") {
+      val mergedData = TimingUtil.timed(logger, "Merge with existing data") {
         mergeWithExisting(preTransformedData)
       }
       val mergedCount = mergedData.count()
       
       // 4. Validate data
-      val (validationResult, validationDurationMs) = withTimingResult("ValidateData") {
+      val validationResult = TimingUtil.timed(logger, "Validate data") {
         validateData(mergedData)
       }
       val validCount = validationResult.valid.count()
@@ -69,14 +61,10 @@ class FlowExecutor(
       
       // Log validation results
       if (rejectedCount > 0) {
+        val rejectionRate = (rejectedCount.toDouble / mergedCount * 100)
+        logger.warn(f"Validation rejected $rejectedCount/$mergedCount records ($rejectionRate%.2f%%)")
         validationResult.rejectionReasons.foreach { case (reason, count) =>
-          logValidationRejection(
-            flowConfig.name,
-            reason,
-            count,
-            mergedCount,
-            s"Validation took ${validationDurationMs}ms"
-          )
+          logger.warn(s"  - $reason: $count records")
         }
       }
       
@@ -89,7 +77,7 @@ class FlowExecutor(
       
       // 6. Verify invariant: input = valid + rejected
       verifyInvariant(inputCount, validCount, rejectedCount)
-      logInvariantVerification(flowConfig.name, inputCount, validCount, rejectedCount, passed = true)
+      logger.debug(s"Invariant verified: $inputCount = $validCount + $rejectedCount")
       
       // 7. Write validated data
       writeValidated(postTransformedData, batchId)
@@ -103,7 +91,7 @@ class FlowExecutor(
       writeAdditionalTables(batchId)
       
       // 10. Write metadata
-      val executionTimeMs = System.currentTimeMillis() - startTime
+      val executionTimeMs = (System.nanoTime() - startTime) / 1000000
       val result = FlowResult(
         flowName = flowConfig.name,
         batchId = batchId,
@@ -120,24 +108,15 @@ class FlowExecutor(
       writeMetadata(result, batchId)
       
       // Log flow summary
-      logFlowSummary(
-        flowConfig.name,
-        batchId,
-        inputCount,
-        validCount,
-        rejectedCount,
-        executionTimeMs
-      )
+      val rejectionRate = if (inputCount > 0) (rejectedCount.toDouble / inputCount * 100) else 0.0
+      logger.info(f"Flow ${flowConfig.name} completed in ${executionTimeMs}ms - input: $inputCount, valid: $validCount, rejected: $rejectedCount ($rejectionRate%.2f%%)")
       
       result
       
     } catch {
       case e: InvariantViolationException =>
-        logOperationFailure("FlowExecution", e, Map(
-          "flowName" -> flowConfig.name,
-          "batchId" -> batchId,
-          "reason" -> "InvariantViolation"
-        ))
+        val executionTimeMs = (System.nanoTime() - startTime) / 1000000
+        logger.error(s"Flow ${flowConfig.name} failed after ${executionTimeMs}ms - invariant violation: ${e.getMessage}", e)
         FlowResult(
           flowName = flowConfig.name,
           batchId = batchId,
@@ -146,10 +125,8 @@ class FlowExecutor(
         )
       
       case e: Exception =>
-        logOperationFailure("FlowExecution", e, Map(
-          "flowName" -> flowConfig.name,
-          "batchId" -> batchId
-        ))
+        val executionTimeMs = (System.nanoTime() - startTime) / 1000000
+        logger.error(s"Flow ${flowConfig.name} failed after ${executionTimeMs}ms: ${e.getMessage}", e)
         FlowResult(
           flowName = flowConfig.name,
           batchId = batchId,
@@ -160,20 +137,10 @@ class FlowExecutor(
   }
   
   /**
-   * Helper method to execute a block and return both result and duration
-   */
-  private def withTimingResult[T](operation: String)(block: => T): (T, Long) = {
-    val startTime = System.currentTimeMillis()
-    val result = block
-    val duration = System.currentTimeMillis() - startTime
-    (result, duration)
-  }
-  
-  /**
    * Reads data from source
    */
   private def readData(): DataFrame = {
-    logDebug(s"Creating reader for source type: ${flowConfig.source.`type`}")
+    logger.debug(s"Creating reader for source type: ${flowConfig.source.`type`}")
     val reader = DataReaderFactory.create(flowConfig.source)
     reader.read()
   }
@@ -187,28 +154,20 @@ class FlowExecutor(
   ): DataFrame = {
     flowConfig.preValidationTransformation match {
       case Some(transformation) =>
-        val startTime = System.currentTimeMillis()
-        val inputCount = data.count()
-        
-        val context = TransformationContext(
-          currentFlow = flowConfig.name,
-          currentData = data,
-          validatedFlows = Map.empty, // No validated flows available yet
-          batchId = batchId,
-          spark = spark
-        )
-        val result = transformation(context)
-        val outputCount = result.count()
-        val duration = System.currentTimeMillis() - startTime
-        
-        logTransformation(
-          flowConfig.name,
-          "PreValidation",
-          inputCount,
-          outputCount,
-          duration
-        )
-        result
+        TimingUtil.timed(logger, "Pre-validation transformation") {
+          val inputCount = data.count()
+          val context = TransformationContext(
+            currentFlow = flowConfig.name,
+            currentData = data,
+            validatedFlows = Map.empty, // No validated flows available yet
+            batchId = batchId,
+            spark = spark
+          )
+          val transformed = transformation(context)
+          val outputCount = transformed.count()
+          logger.info(s"Pre-validation transformation: $inputCount → $outputCount records")
+          transformed
+        }
       
       case None =>
         data
@@ -221,7 +180,7 @@ class FlowExecutor(
   private def mergeWithExisting(newData: DataFrame): DataFrame = {
     if (flowConfig.loadMode.`type` == "full") {
       // Full load: no merge needed
-      logDebug("Full load mode, skipping merge")
+      logger.debug("Full load mode, skipping merge")
       return newData
     }
     
@@ -234,7 +193,7 @@ class FlowExecutor(
       Some(spark.read.parquet(outputPath))
     } catch {
       case _: Exception =>
-        logInfo(s"No existing data found, treating as initial load", Map("path" -> outputPath))
+        logger.info(s"No existing data found at $outputPath, treating as initial load")
         None
     }
     
@@ -243,19 +202,10 @@ class FlowExecutor(
     
     // Create merger and merge
     val merger = DeltaMergerFactory.create(flowConfig.loadMode)
-    val startTime = System.currentTimeMillis()
     val result = merger.merge(newData, existingData)
     val resultCount = result.count()
-    val duration = System.currentTimeMillis() - startTime
     
-    logMergeOperation(
-      flowConfig.name,
-      flowConfig.loadMode.`type`,
-      existingCount,
-      newCount,
-      resultCount,
-      duration
-    )
+    logger.info(s"Merge ${flowConfig.loadMode.`type`}: existing $existingCount + new $newCount → result $resultCount records")
     
     result
   }
@@ -264,7 +214,7 @@ class FlowExecutor(
    * Validates data
    */
   private def validateData(data: DataFrame): ValidationResult = {
-    logDebug("Starting validation", Map("recordCount" -> data.count()))
+    logger.debug(s"Starting validation on ${data.count()} records")
     val engine = new ValidationEngine(domainsConfig)
     engine.validate(data, flowConfig, validatedFlows)
   }
@@ -279,45 +229,38 @@ class FlowExecutor(
   ): DataFrame = {
     flowConfig.postValidationTransformation match {
       case Some(transformation) =>
-        val startTime = System.currentTimeMillis()
-        val inputCount = data.count()
-        
-        // Create context with custom addTable implementation
-        val context = new TransformationContext(
-          currentFlow = flowConfig.name,
-          currentData = data,
-          validatedFlows = validatedFlows,
-          batchId = batchId,
-          spark = spark
-        ) {
-          override def addTable(
-            tableName: String,
-            data: DataFrame,
-            outputPath: Option[String] = None,
-            dagMetadata: Option[AdditionalTableMetadata] = None
-          ): Unit = {
-            // Store table info for later writing
-            additionalTables(tableName) = AdditionalTableInfo(
-              tableName = tableName,
-              data = data,
-              outputPath = outputPath,
-              dagMetadata = dagMetadata
-            )
+        TimingUtil.timed(logger, "Post-validation transformation") {
+          val inputCount = data.count()
+          
+          // Create context with custom addTable implementation
+          val context = new TransformationContext(
+            currentFlow = flowConfig.name,
+            currentData = data,
+            validatedFlows = validatedFlows,
+            batchId = batchId,
+            spark = spark
+          ) {
+            override def addTable(
+              tableName: String,
+              data: DataFrame,
+              outputPath: Option[String] = None,
+              dagMetadata: Option[AdditionalTableMetadata] = None
+            ): Unit = {
+              // Store table info for later writing
+              additionalTables(tableName) = AdditionalTableInfo(
+                tableName = tableName,
+                data = data,
+                outputPath = outputPath,
+                dagMetadata = dagMetadata
+              )
+            }
           }
+          
+          val transformed = transformation(context)
+          val outputCount = transformed.count()
+          logger.info(s"Post-validation transformation: $inputCount → $outputCount records")
+          transformed
         }
-        
-        val result = transformation(context)
-        val outputCount = result.count()
-        val duration = System.currentTimeMillis() - startTime
-        
-        logTransformation(
-          flowConfig.name,
-          "PostValidation",
-          inputCount,
-          outputCount,
-          duration
-        )
-        result
       
       case None =>
         data
@@ -332,28 +275,27 @@ class FlowExecutor(
       s"${globalConfig.paths.validatedPath}/${flowConfig.name}"
     )
 
-    val startTime = System.currentTimeMillis()
-    val recordCount = validData.count()
+    TimingUtil.timed(logger, s"Write validated data to $outputPath") {
+      val recordCount = validData.count()
 
-    var writer = validData.write
-      .mode(SaveMode.Overwrite)
-      .format(flowConfig.output.format)
-      .option("compression", flowConfig.output.compression)
+      var writer = validData.write
+        .mode(SaveMode.Overwrite)
+        .format(flowConfig.output.format)
+        .option("compression", flowConfig.output.compression)
 
-    // Apply additional options
-    flowConfig.output.options.foreach { case (key, value) =>
-      writer = writer.option(key, value)
+      // Apply additional options
+      flowConfig.output.options.foreach { case (key, value) =>
+        writer = writer.option(key, value)
+      }
+
+      // Apply partitioning if configured
+      if (flowConfig.output.partitionBy.nonEmpty) {
+        writer = writer.partitionBy(flowConfig.output.partitionBy: _*)
+      }
+
+      writer.save(outputPath)
+      logger.info(s"Wrote $recordCount validated records")
     }
-
-    // Apply partitioning if configured
-    if (flowConfig.output.partitionBy.nonEmpty) {
-      writer = writer.partitionBy(flowConfig.output.partitionBy: _*)
-    }
-
-    writer.save(outputPath)
-
-    val duration = System.currentTimeMillis() - startTime
-    logDataWrite("validated", outputPath, recordCount, duration)
   }
 
   /**
@@ -364,22 +306,22 @@ class FlowExecutor(
       s"${globalConfig.paths.rejectedPath}/${flowConfig.name}"
     )
 
-    val startTime = System.currentTimeMillis()
-    val recordCount = rejectedData.count()
+    TimingUtil.timed(logger, s"Write rejected data to $rejectedPath") {
+      val recordCount = rejectedData.count()
 
-    // Add audit fields
-    val rejectedWithAudit = rejectedData
-      .withColumn("_rejected_at", lit(Instant.now().toString))
-      .withColumn("_batch_id", lit(batchId))
+      // Add audit fields
+      val rejectedWithAudit = rejectedData
+        .withColumn("_rejected_at", lit(Instant.now().toString))
+        .withColumn("_batch_id", lit(batchId))
 
-    // Overwrite previous rejected records
-    rejectedWithAudit.write
-      .mode(SaveMode.Overwrite)
-      .format("parquet")
-      .save(rejectedPath)
+      // Overwrite previous rejected records
+      rejectedWithAudit.write
+        .mode(SaveMode.Overwrite)
+        .format("parquet")
+        .save(rejectedPath)
 
-    val duration = System.currentTimeMillis() - startTime
-    logDataWrite("rejected", rejectedPath, recordCount, duration)
+      logger.info(s"Wrote $recordCount rejected records")
+    }
   }
 
   /**
@@ -406,7 +348,7 @@ class FlowExecutor(
 
       writer.save(outputPath)
 
-      logAdditionalTable(tableName, flowConfig.name, recordCount, outputPath)
+      logger.info(s"Additional table $tableName: $recordCount records → $outputPath")
 
       // Write metadata for the additional table
       writeAdditionalTableMetadata(tableName, tableInfo, outputPath, batchId)
@@ -462,7 +404,7 @@ class FlowExecutor(
     Files.createDirectories(path.getParent)
     Files.write(path, jsonString.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
     
-    logDebug(s"Additional table metadata written", Map("tableName" -> tableName, "path" -> metadataPath))
+    logger.debug(s"Additional table metadata written: $tableName → $metadataPath")
   }
   
   /**
@@ -500,7 +442,7 @@ class FlowExecutor(
     Files.createDirectories(path.getParent)
     Files.write(path, jsonString.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
     
-    logDebug(s"Flow metadata written", Map("flowName" -> flowConfig.name, "path" -> metadataPath))
+    logger.debug(s"Flow metadata written: ${flowConfig.name} → $metadataPath")
   }
   
   /**
@@ -510,7 +452,7 @@ class FlowExecutor(
     if (input != valid + rejected) {
       val message = s"Invariant violation in flow ${flowConfig.name}: " +
         s"input_count ($input) != valid_count ($valid) + rejected_count ($rejected)"
-      logError(message)
+      logger.error(message)
       throw new InvariantViolationException(message)
     }
   }

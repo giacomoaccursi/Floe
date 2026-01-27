@@ -1,8 +1,8 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
-import com.etl.framework.logging.FrameworkLogger
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.slf4j.LoggerFactory
 
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -15,13 +15,15 @@ class FlowOrchestrator(
   globalConfig: GlobalConfig,
   flowConfigs: Seq[FlowConfig],
   domainsConfig: Option[DomainsConfig] = None
-)(implicit spark: SparkSession) extends FrameworkLogger {
+)(implicit spark: SparkSession) {
+  
+  private val logger = LoggerFactory.getLogger(getClass)
   
   /**
    * Builds execution plan based on FK dependencies
    */
   def buildExecutionPlan(): ExecutionPlan = {
-    logOperationStart("BuildExecutionPlan", Map("flowCount" -> flowConfigs.size))
+    logger.info(s"Building execution plan for ${flowConfigs.size} flows")
     
     // Build dependency graph from Foreign Keys
     val dependencyGraph = buildDependencyGraph()
@@ -32,10 +34,7 @@ class FlowOrchestrator(
     // Group flows into execution groups for parallel execution
     val groups = groupFlowsForParallelExecution(sortedFlows, dependencyGraph)
     
-    logInfo(s"Execution plan created with ${groups.size} groups", Map(
-      "totalFlows" -> flowConfigs.size,
-      "groups" -> groups.size
-    ))
+    logger.info(s"Execution plan created with ${groups.size} groups (${flowConfigs.size} flows)")
     
     ExecutionPlan(groups)
   }
@@ -161,12 +160,9 @@ class FlowOrchestrator(
    */
   def execute(): IngestionResult = {
     val batchId = generateBatchId()
-    val startTime = System.currentTimeMillis()
+    val startTime = System.nanoTime()
     
-    logOperationStart("IngestionExecution", Map(
-      "batchId" -> batchId,
-      "flowCount" -> flowConfigs.size
-    ))
+    logger.info(s"Starting ingestion execution - batchId: $batchId, flows: ${flowConfigs.size}")
     
     val plan = buildExecutionPlan()
     
@@ -176,10 +172,8 @@ class FlowOrchestrator(
     try {
       // Execute each group in order
       plan.groups.zipWithIndex.foreach { case (group, groupIndex) =>
-        logInfo(s"Executing group ${groupIndex + 1}/${plan.groups.size}", Map(
-          "flowCount" -> group.flows.size,
-          "parallel" -> group.parallel
-        ))
+        val mode = if (group.parallel) "parallel" else "sequential"
+        logger.info(s"Executing group ${groupIndex + 1}/${plan.groups.size} ($mode, ${group.flows.size} flows)")
         
         val groupResults = if (group.parallel) {
           // Parallel execution
@@ -195,10 +189,7 @@ class FlowOrchestrator(
           
           if (!result.success) {
             // Flow failed completely
-            logOperationFailure("FlowExecution", 
-              new Exception(result.error.getOrElse("Unknown error")),
-              Map("flowName" -> result.flowName, "batchId" -> batchId)
-            )
+            logger.error(s"Flow ${result.flowName} failed: ${result.error.getOrElse("Unknown error")}")
             
             if (globalConfig.processing.rollbackOnFailure) {
               rollback(batchId, flowResults.toSeq)
@@ -212,10 +203,7 @@ class FlowOrchestrator(
             )
           } else if (shouldStopExecution(result)) {
             // Flow succeeded but should stop execution (e.g., too many rejections)
-            logWarning(s"Stopping execution due to validation errors in flow ${result.flowName}", Map(
-              "rejectionRate" -> result.rejectionRate,
-              "rejectedRecords" -> result.rejectedRecords
-            ))
+            logger.warn(s"Stopping execution - flow ${result.flowName} rejection rate: ${result.rejectionRate}%, rejected: ${result.rejectedRecords}")
             
             if (globalConfig.processing.rollbackOnFailure) {
               rollback(batchId, flowResults.toSeq)
@@ -239,23 +227,16 @@ class FlowOrchestrator(
       }
       
       // All flows completed successfully
-      val executionTimeMs = System.currentTimeMillis() - startTime
+      val executionTimeMs = (System.nanoTime() - startTime) / 1000000
       writeBatchMetadata(batchId, flowResults.toSeq, executionTimeMs, success = true)
       
       // Log batch summary
       val totalInput = flowResults.map(_.inputRecords).sum
       val totalValid = flowResults.map(_.validRecords).sum
       val totalRejected = flowResults.map(_.rejectedRecords).sum
+      val rejectionRate = if (totalInput > 0) (totalRejected.toDouble / totalInput * 100) else 0.0
       
-      logBatchSummary(
-        batchId,
-        flowResults.size,
-        totalInput,
-        totalValid,
-        totalRejected,
-        executionTimeMs,
-        success = true
-      )
+      logger.info(f"Batch $batchId completed in ${executionTimeMs}ms - flows: ${flowResults.size}, input: $totalInput, valid: $totalValid, rejected: $totalRejected ($rejectionRate%.2f%%)")
       
       IngestionResult(
         batchId = batchId,
@@ -265,7 +246,8 @@ class FlowOrchestrator(
       
     } catch {
       case e: Exception =>
-        logOperationFailure("IngestionExecution", e, Map("batchId" -> batchId))
+        val executionTimeMs = (System.nanoTime() - startTime) / 1000000
+        logger.error(s"Ingestion execution failed after ${executionTimeMs}ms - batchId: $batchId", e)
         
         if (globalConfig.processing.rollbackOnFailure) {
           rollback(batchId, flowResults.toSeq)
@@ -338,7 +320,7 @@ class FlowOrchestrator(
     batchId: String,
     validatedFlows: Map[String, DataFrame]
   ): FlowResult = {
-    logDebug(s"Starting flow execution", Map("flowName" -> flowConfig.name, "batchId" -> batchId))
+    logger.debug(s"Starting flow ${flowConfig.name} - batchId: $batchId")
     
     val executor = new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig)
     executor.execute(batchId)
@@ -356,23 +338,13 @@ class FlowOrchestrator(
     // Check if rejection rate exceeds threshold
     if (globalConfig.processing.maxRejectionRate > 0 &&
         result.rejectionRate > globalConfig.processing.maxRejectionRate) {
-      logValidationWarning(
-        result.flowName,
-        "RejectionRateThreshold",
-        result.rejectedRecords,
-        f"Rate ${result.rejectionRate}%.2f%% exceeds threshold ${globalConfig.processing.maxRejectionRate}%.2f%%"
-      )
+      logger.warn(f"Flow ${result.flowName} rejection rate ${result.rejectionRate}%.2f%% exceeds threshold ${globalConfig.processing.maxRejectionRate}%.2f%% (${result.rejectedRecords} records)")
       return globalConfig.processing.failOnValidationError
     }
     
     // Check if there are any rejected records and fail_on_validation_error is true
     if (globalConfig.processing.failOnValidationError && result.rejectedRecords > 0) {
-      logValidationWarning(
-        result.flowName,
-        "ValidationError",
-        result.rejectedRecords,
-        "failOnValidationError is enabled"
-      )
+      logger.warn(s"Flow ${result.flowName} has ${result.rejectedRecords} rejected records and failOnValidationError is enabled")
       return true
     }
     
@@ -384,7 +356,7 @@ class FlowOrchestrator(
    */
   private def rollback(batchId: String, results: Seq[FlowResult]): Unit = {
     val flowsToRollback = results.filter(_.success).map(_.flowName)
-    logRollback(batchId, flowsToRollback, "Flow failure or validation error")
+    logger.warn(s"Rolling back batch $batchId - flows: [${flowsToRollback.mkString(", ")}]")
     
     results.filter(_.success).foreach { result =>
       try {
@@ -395,21 +367,21 @@ class FlowOrchestrator(
           s"${globalConfig.paths.validatedPath}/${result.flowName}"
         )
         deleteDirectory(validatedPath)
-        logDebug(s"Deleted validated data", Map("flowName" -> result.flowName, "path" -> validatedPath))
+        logger.debug(s"Deleted validated data for ${result.flowName}: $validatedPath")
         
         // Delete rejected output
         val rejectedPath = flowConfig.output.rejectedPath.getOrElse(
           s"${globalConfig.paths.rejectedPath}/${result.flowName}"
         )
         deleteDirectory(rejectedPath)
-        logDebug(s"Deleted rejected data", Map("flowName" -> result.flowName, "path" -> rejectedPath))
+        logger.debug(s"Deleted rejected data for ${result.flowName}: $rejectedPath")
         
         // For delta mode, we would restore previous state here
         // This is a simplified implementation
         
       } catch {
         case e: Exception =>
-          logError(s"Error during rollback of flow ${result.flowName}", Some(e))
+          logger.error(s"Error during rollback of flow ${result.flowName}: ${e.getMessage}", e)
       }
     }
     
@@ -521,7 +493,7 @@ class FlowOrchestrator(
     // Create "latest" symlink
     createLatestSymlink(batchId)
     
-    logDebug(s"Batch metadata written", Map("batchId" -> batchId, "path" -> metadataPath))
+    logger.debug(s"Batch metadata written - batchId: $batchId, path: $metadataPath")
   }
   
   /**
@@ -541,10 +513,10 @@ class FlowOrchestrator(
       
       // Create new symlink
       Files.createSymbolicLink(latestPath, targetPath)
-      logDebug(s"Created 'latest' symlink", Map("batchId" -> batchId))
+      logger.debug(s"Created 'latest' symlink for batch $batchId")
     } catch {
       case e: Exception =>
-        logWarning(s"Could not create 'latest' symlink: ${e.getMessage}")
+        logger.warn(s"Could not create 'latest' symlink: ${e.getMessage}")
     }
   }
 }

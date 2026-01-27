@@ -1,16 +1,21 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
-import com.etl.framework.core.{AdditionalTableMetadata, TimingUtil, TransformationContext}
+import com.etl.framework.core.{AdditionalTableMetadata, TransformationContext}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.merge.DeltaMergerFactory
+import com.etl.framework.util.TimingUtil
 import com.etl.framework.validation.{ValidationEngine, ValidationResult}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.functions._
 import org.slf4j.LoggerFactory
-
+import org.json4s._
+import org.json4s.jackson.Serialization
+import org.json4s.jackson.Serialization.write
 import java.time.Instant
 import scala.collection.mutable
+import java.nio.file.{Files, Paths, StandardOpenOption}
+
 
 /**
  * Executes a single flow through Read → Merge → Validate → Split → Write
@@ -27,7 +32,10 @@ class FlowExecutor(
   
   // Storage for additional tables created during transformations
   private val additionalTables = mutable.Map[String, AdditionalTableInfo]()
-  
+
+  implicit val formats: Formats = Serialization.formats(NoTypeHints)
+
+
   /**
    * Executes the complete flow
    */
@@ -391,15 +399,10 @@ class FlowExecutor(
     )
     
     // Convert to JSON and write
-    import org.json4s._
-    import org.json4s.jackson.Serialization
-    import org.json4s.jackson.Serialization.write
-    implicit val formats: Formats = Serialization.formats(NoTypeHints)
-    
+
     val jsonString = write(metadata)
     
     // Write to file
-    import java.nio.file.{Files, Paths, StandardOpenOption}
     val path = Paths.get(metadataPath)
     Files.createDirectories(path.getParent)
     Files.write(path, jsonString.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
@@ -429,15 +432,11 @@ class FlowExecutor(
     )
     
     // Convert to JSON and write
-    import org.json4s._
-    import org.json4s.jackson.Serialization
-    import org.json4s.jackson.Serialization.write
-    implicit val formats: Formats = Serialization.formats(NoTypeHints)
-    
+
+
     val jsonString = write(metadata)
     
     // Write to file
-    import java.nio.file.{Files, Paths, StandardOpenOption}
     val path = Paths.get(metadataPath)
     Files.createDirectories(path.getParent)
     Files.write(path, jsonString.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)

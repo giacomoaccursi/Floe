@@ -1,4 +1,4 @@
-package com.etl.framework.core
+package com.etl.framework.util
 
 import org.slf4j.Logger
 

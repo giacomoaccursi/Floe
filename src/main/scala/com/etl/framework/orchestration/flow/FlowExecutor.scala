@@ -45,15 +45,18 @@ class FlowExecutor(
       val rawData = TimingUtil.timed(logger, s"Read ${flowConfig.source.`type`} from ${flowConfig.source.path}") {
         readData()
       }
-      val inputCount = rawData.count()
-      
+
       // 2. Apply pre-validation transformations
       val preTransformedData = transformer.applyPreValidation(rawData, batchId)
-      
+
+
+      val inputCount = preTransformedData.count()
+
       // 3. Merge with existing data (delta mode)
       val mergedData = TimingUtil.timed(logger, "Merge with existing data") {
         mergeWithExisting(preTransformedData)
       }
+
       val mergedCount = mergedData.count()
       
       // 4. Validate data

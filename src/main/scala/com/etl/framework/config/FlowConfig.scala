@@ -56,7 +56,7 @@ case class ColumnConfig(
 case class LoadModeConfig(
                            `type`: String,  // "full" | "delta" | "scd2"
                            keyColumns: Seq[String] = Seq.empty,
-                           mergeStrategy: Option[String] = None,  // "upsert" | "append" | "replace"
+                           mergeStrategy: Option[String] = None,  // "upsert" | "append"
                            updateTimestampColumn: Option[String] = None,
                            validFromColumn: Option[String] = None,
                            validToColumn: Option[String] = None,

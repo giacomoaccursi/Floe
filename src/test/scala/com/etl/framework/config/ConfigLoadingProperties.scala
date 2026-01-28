@@ -215,7 +215,7 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       loadType <- Gen.oneOf("full", "delta", "scd2")
       keyCount <- Gen.choose(0, 3)
       keyColumns <- Gen.listOfN(keyCount, Gen.alphaNumStr.suchThat(_.nonEmpty))
-      mergeStrategy <- Gen.option(Gen.oneOf("upsert", "append", "replace"))
+      mergeStrategy <- Gen.option(Gen.oneOf("upsert", "append"))
       updateTimestampColumn <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty))
       validFromColumn <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty))
       validToColumn <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty))

@@ -37,11 +37,9 @@ object DeltaMergerFactory {
             new UpsertMerger(loadMode.keyColumns, loadMode.updateTimestampColumn)
           case Some("append") =>
             new AppendMerger()
-          case Some("replace") =>
-            new FullReplaceMerger()
           case other =>
             throw new IllegalArgumentException(
-              s"Invalid merge strategy: $other. Valid values are: upsert, append, replace"
+              s"Invalid merge strategy: $other. Valid values are: upsert, append"
             )
         }
       

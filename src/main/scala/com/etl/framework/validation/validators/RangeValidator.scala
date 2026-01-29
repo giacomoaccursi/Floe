@@ -1,67 +1,88 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.ValidationRule
-import com.etl.framework.validation.{ValidationStepResult, Validator}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.Column
 
 /**
  * Validator for range validation (numeric and date types)
  */
-class RangeValidator(flowName: Option[String] = None) extends Validator {
+class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flowName) {
   
-  override def validate(df: DataFrame, rule: ValidationRule): ValidationStepResult = {
-    val flowContext = flowName.map(f => s" in flow '$f'").getOrElse("")
-    
-    val column = rule.column.getOrElse {
+  override protected def validatorName: String = "Range"
+  
+  override protected def exampleConfiguration: String = 
+    """type: "range", column: "age", min: "18", max: "100""""
+  
+  override protected def rejectionCode: String = "RANGE_VALIDATION_FAILED"
+  
+  override protected def validationStep: String = "range_validation"
+  
+  override protected def rejectionReason(rule: ValidationRule, column: String): String = {
+    val rangeDesc = (rule.min, rule.max) match {
+      case (Some(min), Some(max)) => s"between $min and $max"
+      case (Some(min), None) => s">= $min"
+      case (None, Some(max)) => s"<= $max"
+      case _ => "valid range"
+    }
+    s"Value in column '$column' is not $rangeDesc"
+  }
+  
+  override protected def buildValidationCondition(
+    df: DataFrame, 
+    rule: ValidationRule, 
+    column: String
+  ): Column = {
+    // Validate that at least one of min or max is specified
+    if (rule.min.isEmpty && rule.max.isEmpty) {
       throw new ValidationException(
-        s"Range validation configuration error$flowContext: 'column' field is required.\n"
+        s"Range validation error for column '$column'${flowContext}: at least one of 'min' or 'max' is required"
       )
     }
     
-    val skipNull = rule.skipNull.getOrElse(true)
-    
-    // Build range condition
     var rangeCondition = lit(true)
     
+    // Add min condition
     if (rule.min.isDefined) {
       val minValue = rule.min.get
+      validateNumericValue(minValue, "min", column)
       rangeCondition = rangeCondition && (col(column) >= lit(minValue))
     }
     
+    // Add max condition
     if (rule.max.isDefined) {
       val maxValue = rule.max.get
+      validateNumericValue(maxValue, "max", column)
       rangeCondition = rangeCondition && (col(column) <= lit(maxValue))
     }
     
-    // Apply skipNull logic
-    val finalCondition = if (skipNull) {
-      col(column).isNull || rangeCondition
-    } else {
-      rangeCondition
+    // Validate that min <= max
+    (rule.min, rule.max) match {
+      case (Some(min), Some(max)) =>
+        if (min.toDouble > max.toDouble) {
+          throw new ValidationException(
+            s"Range validation error for column '$column'${flowContext}: 'min' ($min) > 'max' ($max)"
+          )
+        }
+      case _ => // OK
     }
     
-    val validDf = df.filter(finalCondition)
-    val invalidDf = df.filter(!finalCondition)
-    
-    if (invalidDf.isEmpty) {
-      ValidationStepResult(validDf, None)
-    } else {
-      val rangeDesc = (rule.min, rule.max) match {
-        case (Some(min), Some(max)) => s"between $min and $max"
-        case (Some(min), None) => s">= $min"
-        case (None, Some(max)) => s"<= $max"
-        case _ => "valid range"
-      }
-      
-      val rejectedDf = invalidDf
-        .withColumn("_rejection_code", lit("RANGE_VALIDATION_FAILED"))
-        .withColumn("_rejection_reason", 
-          lit(s"Value in column '$column' is not $rangeDesc"))
-        .withColumn("_validation_step", lit("range_validation"))
-        .withColumn("_rejected_at", current_timestamp())
-      
-      ValidationStepResult(validDf, Some(rejectedDf))
+    rangeCondition
+  }
+  
+  /**
+   * Validates that a value is numeric
+   */
+  private def validateNumericValue(value: String, fieldName: String, column: String): Unit = {
+    try {
+      value.toDouble
+    } catch {
+      case e: NumberFormatException =>
+        throw new ValidationException(
+          s"Range validation error for column '$column'${flowContext}: '$fieldName' value '$value' is not numeric",
+          e
+        )
     }
   }
 }

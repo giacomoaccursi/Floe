@@ -8,12 +8,16 @@ import org.apache.spark.sql.functions._
 /**
  * Validator for range validation (numeric and date types)
  */
-class RangeValidator extends Validator {
+class RangeValidator(flowName: Option[String] = None) extends Validator {
   
   override def validate(df: DataFrame, rule: ValidationRule): ValidationStepResult = {
-    val column = rule.column.getOrElse(
-      throw new ValidationException("Column not specified for range validation")
-    )
+    val flowContext = flowName.map(f => s" in flow '$f'").getOrElse("")
+    
+    val column = rule.column.getOrElse {
+      throw new ValidationException(
+        s"Range validation configuration error$flowContext: 'column' field is required.\n"
+      )
+    }
     
     val skipNull = rule.skipNull.getOrElse(true)
     

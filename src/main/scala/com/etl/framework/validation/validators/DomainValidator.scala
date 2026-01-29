@@ -10,40 +10,45 @@ import org.apache.spark.sql.functions._
  * Validates that values are in a predefined set of allowed values
  * Requires DomainsConfig to be provided - no inline values supported
  */
-class DomainValidator(domainsConfig: Option[DomainsConfig] = None) extends Validator {
+class DomainValidator(domainsConfig: Option[DomainsConfig] = None, flowName: Option[String] = None) extends Validator {
   
   override def validate(df: DataFrame, rule: ValidationRule): ValidationStepResult = {
-    val column = rule.column.getOrElse(
-      throw new IllegalArgumentException("Column not specified for domain validation")
-    )
+    val flowContext = flowName.map(f => s" in flow '$f'").getOrElse("")
     
-    val domainName = rule.domainName.getOrElse(
-      throw new IllegalArgumentException("Domain name not specified for domain validation")
-    )
+    val column = rule.column.getOrElse {
+      throw new IllegalArgumentException(
+        s"Domain validation configuration error$flowContext: 'column' field is required.\n")
+    }
+    
+    val domainName = rule.domainName.getOrElse {
+      throw new IllegalArgumentException(
+        s"Domain validation configuration error for column '$column'$flowContext: 'domainName' field is required.\n"
+      )
+    }
     
     val skipNull = rule.skipNull.getOrElse(true)
     
     if (domainsConfig.isEmpty) {
       throw new IllegalArgumentException(
-        s"DomainsConfig is required for domain validation. " +
-        s"Ensure domains.yaml is loaded and passed to ValidationEngine."
+        s"DomainsConfig is required for domain validation on column '$column' (domain: '$domainName').\n"
       )
     }
     
     // Load domain values from DomainsConfig
-    val domainConfig = domainsConfig.get.domains.get(domainName).getOrElse {
-      throw new IllegalArgumentException(
-        s"Domain '$domainName' not found in DomainsConfig. " +
-        s"Available domains: ${domainsConfig.get.domains.keys.mkString(", ")}"
-      )
+    val domainConfig = domainsConfig.get.domains.get(domainName) match {
+      case Some(config) => config
+      case None =>
+        throw new IllegalArgumentException(
+          s"Domain '$domainName' not found in DomainsConfig for column '$column'$flowContext.\n"
+        )
     }
-
-
     
     val domainValues = domainConfig.values
     
     if (domainValues.isEmpty) {
-      throw new IllegalArgumentException(s"Domain '$domainName' has no values defined")
+      throw new ValidationException(
+        s"Domain '$domainName' has no values defined for column '$column'$flowContext.\n"
+      )
     }
     
     val caseSensitive = domainConfig.caseSensitive
@@ -72,7 +77,7 @@ class DomainValidator(domainsConfig: Option[DomainsConfig] = None) extends Valid
       val rejectedDf = invalidDf
         .withColumn("_rejection_code", lit("DOMAIN_VALIDATION_FAILED"))
         .withColumn("_rejection_reason", 
-          lit(s"Value in column '$column' is not in domain '$domainName' (allowed: ${domainValues.take(5).mkString(", ")}${if (domainValues.size > 5) "..." else ""})"))
+          lit(s"Value in column '$column' is not in domain '$domainName' (allowed: ${domainValues.take(3).mkString(", ")}${if (domainValues.size > 3) "..." else ""})"))
         .withColumn("_validation_step", lit("domain_validation"))
         .withColumn("_rejected_at", current_timestamp())
       

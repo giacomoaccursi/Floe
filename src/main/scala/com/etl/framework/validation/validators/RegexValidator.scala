@@ -8,16 +8,22 @@ import org.apache.spark.sql.functions._
 /**
  * Validator for regex pattern matching
  */
-class RegexValidator extends Validator {
+class RegexValidator(flowName: Option[String] = None) extends Validator {
   
   override def validate(df: DataFrame, rule: ValidationRule): ValidationStepResult = {
-    val column = rule.column.getOrElse(
-      throw new ValidationException("Column not specified for regex validation")
-    )
+    val flowContext = flowName.map(f => s" in flow '$f'").getOrElse("")
     
-    val pattern = rule.pattern.getOrElse(
-      throw new ValidationException("Pattern not specified for regex validation")
-    )
+    val column = rule.column.getOrElse {
+      throw new ValidationException(
+        s"Regex validation configuration error$flowContext: 'column' field is required.\n"
+      )
+    }
+    
+    val pattern = rule.pattern.getOrElse {
+      throw new ValidationException(
+        s"Regex validation configuration error for column '$column'$flowContext: 'pattern' field is required.\n"
+      )
+    }
     
     val skipNull = rule.skipNull.getOrElse(true)
     

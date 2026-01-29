@@ -216,7 +216,7 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit spa
     var rejectedDf: Option[DataFrame] = None
     
     for (rule <- flowConfig.validation.rules) {
-      val validator = ValidatorFactory.create(rule, domainsConfig)
+      val validator = ValidatorFactory.create(rule, domainsConfig, Some(flowConfig.name))
       val result = validator.validate(currentDf, rule)
       
       if (rule.onFailure == "reject") {

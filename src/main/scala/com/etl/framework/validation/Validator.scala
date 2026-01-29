@@ -28,17 +28,24 @@ object ValidatorFactory {
    *
    * @param rule Validation rule configuration
    * @param domainsConfig Optional domains configuration for domain validation
+   * @param flowName Optional flow name for better error messages
    * @return Validator instance
    */
-  def create(rule: ValidationRule, domainsConfig: Option[DomainsConfig] = None): Validator = {
+  def create(
+    rule: ValidationRule, 
+    domainsConfig: Option[DomainsConfig] = None,
+    flowName: Option[String] = None
+  ): Validator = {
     rule.`type` match {
-      case "regex" => new RegexValidator()
-      case "range" => new RangeValidator()
-      case "domain" => new DomainValidator(domainsConfig)
-      case "custom" => createCustomValidator(rule)
+      case "regex" => new RegexValidator(flowName)
+      case "range" => new RangeValidator(flowName)
+      case "domain" => new DomainValidator(domainsConfig, flowName)
+      case "custom" => createCustomValidator(rule, flowName)
       case unsupported =>
+        val flowContext = flowName.map(f => s" in flow '$f'").getOrElse("")
         throw new UnsupportedValidatorException(
-          s"Unsupported validator type: $unsupported"
+          s"Unsupported validator type: '$unsupported'$flowContext\n" +
+          s"Supported types: regex, range, domain, custom\n"
         )
     }
   }
@@ -46,10 +53,16 @@ object ValidatorFactory {
   /**
    * Creates a custom validator via reflection
    */
-  private def createCustomValidator(rule: ValidationRule): Validator = {
-    val className = rule.`class`.getOrElse(
-      throw new CustomValidatorException("Custom validator class not specified")
-    )
+  private def createCustomValidator(rule: ValidationRule, flowName: Option[String]): Validator = {
+    val flowContext = flowName.map(f => s" in flow '$f'").getOrElse("")
+    
+    val className = rule.`class`.getOrElse {
+      throw new CustomValidatorException(
+        s"Custom validator configuration error$flowContext: 'class' field is required.\n" +
+        "Example: type: \"custom\", class: \"com.example.MyValidator\"\n" +
+        s"Current rule: $rule"
+      )
+    }
 
     try {
       val clazz = Class.forName(className)

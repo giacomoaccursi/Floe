@@ -44,8 +44,7 @@ object ValidatorFactory {
       case unsupported =>
         val flowContext = flowName.map(f => s" in flow '$f'").getOrElse("")
         throw new UnsupportedValidatorException(
-          s"Unsupported validator type: '$unsupported'$flowContext\n" +
-          s"Supported types: regex, range, domain, custom\n"
+          s"Unsupported validator type: '$unsupported'$flowContext. Supported: regex, range, domain, custom"
         )
     }
   }
@@ -58,9 +57,7 @@ object ValidatorFactory {
     
     val className = rule.`class`.getOrElse {
       throw new CustomValidatorException(
-        s"Custom validator configuration error$flowContext: 'class' field is required.\n" +
-        "Example: type: \"custom\", class: \"com.example.MyValidator\"\n" +
-        s"Current rule: $rule"
+        s"Custom validator error$flowContext: 'class' field is required"
       )
     }
 

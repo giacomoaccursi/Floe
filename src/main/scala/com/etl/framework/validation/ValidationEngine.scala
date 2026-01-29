@@ -1,12 +1,13 @@
 package com.etl.framework.validation
 
- import com.etl.framework.config.{DomainsConfig, FlowConfig}
+import com.etl.framework.config.{DomainsConfig, FlowConfig, ValidationRule}
+import com.etl.framework.validation.validators._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * Core validation engine that coordinates all validation steps
- * Adds a warnings column to track non-fatal validation issues
+ * Delegates actual validation logic to specialized validators
  */
 class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit spark: SparkSession) {
   
@@ -29,21 +30,26 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit spa
     var rejectedDf: Option[DataFrame] = None
     val rejectionReasons = scala.collection.mutable.Map[String, Long]()
     
+    val flowName = Some(flowConfig.name)
+    
     // Step 1: Schema validation
-    val schemaResult = validateSchema(currentDf, flowConfig)
+    val schemaValidator = new SchemaValidator(flowConfig, flowName)
+    val schemaResult = schemaValidator.validate(currentDf, ValidationRule("schema"))
     currentDf = schemaResult.valid
     rejectedDf = combineRejected(rejectedDf, schemaResult.rejected)
     schemaResult.rejected.foreach(r => rejectionReasons("schema_validation") = r.count())
     
     // Step 2: Not-null validation
-    val notNullResult = validateNotNull(currentDf, flowConfig)
+    val notNullValidator = new NotNullValidator(flowConfig, flowName)
+    val notNullResult = notNullValidator.validate(currentDf, ValidationRule("not_null"))
     currentDf = notNullResult.valid
     rejectedDf = combineRejected(rejectedDf, notNullResult.rejected)
     notNullResult.rejected.foreach(r => rejectionReasons("not_null_validation") = r.count())
     
     // Step 3: Primary Key validation
     if (flowConfig.validation.primaryKey.nonEmpty) {
-      val pkResult = validatePrimaryKey(currentDf, flowConfig)
+      val pkValidator = new PrimaryKeyValidator(flowConfig, flowName)
+      val pkResult = pkValidator.validate(currentDf, ValidationRule("pk"))
       currentDf = pkResult.valid
       rejectedDf = combineRejected(rejectedDf, pkResult.rejected)
       pkResult.rejected.foreach(r => rejectionReasons("pk_validation") = r.count())
@@ -51,7 +57,8 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit spa
     
     // Step 4: Foreign Key validation
     if (flowConfig.validation.foreignKeys.nonEmpty) {
-      val fkResult = validateForeignKeys(currentDf, flowConfig, validatedFlows)
+      val fkValidator = new ForeignKeyValidator(flowConfig, validatedFlows, flowName)
+      val fkResult = fkValidator.validate(currentDf, ValidationRule("fk"))
       currentDf = fkResult.valid
       rejectedDf = combineRejected(rejectedDf, fkResult.rejected)
       fkResult.rejected.foreach(r => rejectionReasons("fk_validation") = r.count())
@@ -66,146 +73,6 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit spa
     }
     
     ValidationResult(currentDf, rejectedDf, rejectionReasons.toMap)
-  }
-  
-  /**
-   * Validates that all required columns are present and types match
-   */
-  private def validateSchema(df: DataFrame, flowConfig: FlowConfig): ValidationStepResult = {
-    if (!flowConfig.schema.enforceSchema) {
-      return ValidationStepResult(df, None)
-    }
-    
-    val requiredColumns = flowConfig.schema.columns.map(_.name).toSet
-    val actualColumns = df.columns.toSet
-    
-    // Check for missing required columns
-    val missingColumns = requiredColumns -- actualColumns
-    if (missingColumns.nonEmpty) {
-      // Reject all records if required columns are missing
-      val rejectedDf = addRejectionMetadata(
-        df,
-        "SCHEMA_VALIDATION_FAILED",
-        s"Missing required columns: ${missingColumns.mkString(", ")}",
-        "schema_validation"
-      )
-      return ValidationStepResult(
-        df.limit(0), // Empty valid DataFrame
-        Some(rejectedDf)
-      )
-    }
-    
-    // TODO: Add type validation
-    ValidationStepResult(df, None)
-  }
-  
-  /**
-   * Validates not-null constraints
-   */
-  private def validateNotNull(df: DataFrame, flowConfig: FlowConfig): ValidationStepResult = {
-    val notNullColumns = flowConfig.schema.columns
-      .filter(!_.nullable)
-      .map(_.name)
-    
-    if (notNullColumns.isEmpty) {
-      return ValidationStepResult(df, None)
-    }
-    
-    // Build condition for null checks
-    val nullCondition = notNullColumns
-      .map(col => s"`$col` IS NULL")
-      .mkString(" OR ")
-    
-    val rejectedDf = df.filter(nullCondition)
-    val validDf = df.filter(s"NOT ($nullCondition)")
-    
-    if (rejectedDf.isEmpty) {
-      ValidationStepResult(validDf, None)
-    } else {
-      val rejectedWithMetadata = addRejectionMetadata(
-        rejectedDf,
-        "NOT_NULL_VIOLATION",
-        s"Null value in non-nullable column(s): ${notNullColumns.mkString(", ")}",
-        "not_null_validation"
-      )
-      ValidationStepResult(validDf, Some(rejectedWithMetadata))
-    }
-  }
-  
-  /**
-   * Validates Primary Key uniqueness
-   */
-  private def validatePrimaryKey(df: DataFrame, flowConfig: FlowConfig): ValidationStepResult = {
-    val pkColumns = flowConfig.validation.primaryKey
-    
-    // Find duplicates using groupBy and count
-    val duplicates = df
-      .groupBy(pkColumns.map(col): _*)
-      .agg(count("*").as("_count"))
-      .filter(col("_count") > 1)
-      .drop("_count")
-    
-    if (duplicates.isEmpty) {
-      return ValidationStepResult(df, None)
-    }
-    
-    // Join to get all duplicate records
-    val rejectedDf = df.join(duplicates, pkColumns, "inner")
-    val validDf = df.join(duplicates, pkColumns, "left_anti")
-    
-    val rejectedWithMetadata = addRejectionMetadata(
-      rejectedDf,
-      "PK_DUPLICATE",
-      s"Duplicate primary key: ${pkColumns.mkString(", ")}",
-      "pk_validation"
-    )
-    
-    ValidationStepResult(validDf, Some(rejectedWithMetadata))
-  }
-  
-  /**
-   * Validates Foreign Key integrity
-   */
-  private def validateForeignKeys(
-    df: DataFrame,
-    flowConfig: FlowConfig,
-    validatedFlows: Map[String, DataFrame]
-  ): ValidationStepResult = {
-    
-    var currentDf = df
-    var rejectedDf: Option[DataFrame] = None
-    
-    for (fk <- flowConfig.validation.foreignKeys) {
-      val referencedFlow = validatedFlows.get(fk.references.flow)
-      
-      if (referencedFlow.isEmpty) {
-        throw new ForeignKeyValidationException(
-          s"Referenced flow '${fk.references.flow}' not found in validated flows"
-        )
-      }
-      
-      // Perform left anti join to find orphan records
-      val orphans = currentDf
-        .join(
-          referencedFlow.get.select(fk.references.column),
-          currentDf(fk.column) === referencedFlow.get(fk.references.column),
-          "left_anti"
-        )
-      
-      if (!orphans.isEmpty) {
-        val orphansWithMetadata = addRejectionMetadata(
-          orphans,
-          "FK_VIOLATION",
-          s"Foreign key violation: ${fk.name} (${fk.column} -> ${fk.references.flow}.${fk.references.column})",
-          "fk_validation"
-        )
-        
-        rejectedDf = combineRejected(rejectedDf, Some(orphansWithMetadata))
-        currentDf = currentDf.join(orphans.select(fk.column), Seq(fk.column), "left_anti")
-      }
-    }
-    
-    ValidationStepResult(currentDf, rejectedDf)
   }
   
   /**
@@ -261,22 +128,6 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit spa
   }
   
   /**
-   * Adds rejection metadata to rejected records
-   */
-  private def addRejectionMetadata(
-    df: DataFrame,
-    rejectionCode: String,
-    rejectionReason: String,
-    validationStep: String
-  ): DataFrame = {
-    df
-      .withColumn("_rejection_code", lit(rejectionCode))
-      .withColumn("_rejection_reason", lit(rejectionReason))
-      .withColumn("_validation_step", lit(validationStep))
-      .withColumn("_rejected_at", current_timestamp())
-  }
-  
-  /**
    * Combines rejected DataFrames
    */
   private def combineRejected(
@@ -312,8 +163,3 @@ case class ValidationStepResult(
   // If validWithWarnings is not provided, use valid
   def getValidWithWarnings: DataFrame = if (validWithWarnings != null) validWithWarnings else valid
 }
-
-/**
- * Exception thrown when Foreign Key validation fails
- */
-class ForeignKeyValidationException(message: String) extends RuntimeException(message)

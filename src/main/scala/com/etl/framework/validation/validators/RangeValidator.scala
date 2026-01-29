@@ -12,9 +12,6 @@ class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flow
   
   override protected def validatorName: String = "Range"
   
-  override protected def exampleConfiguration: String = 
-    """type: "range", column: "age", min: "18", max: "100""""
-  
   override protected def rejectionCode: String = "RANGE_VALIDATION_FAILED"
   
   override protected def validationStep: String = "range_validation"

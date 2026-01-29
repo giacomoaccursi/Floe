@@ -17,9 +17,6 @@ class DomainValidator(
   
   override protected def validatorName: String = "Domain"
   
-  override protected def exampleConfiguration: String = 
-    """type: "domain", column: "country", domainName: "allowed_countries""""
-  
   override protected def rejectionCode: String = "DOMAIN_VALIDATION_FAILED"
   
   override protected def validationStep: String = "domain_validation"

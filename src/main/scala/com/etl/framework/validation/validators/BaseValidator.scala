@@ -91,11 +91,6 @@ abstract class BaseValidator(flowName: Option[String] = None) extends Validator 
   protected def validatorName: String
   
   /**
-   * Example configuration for error messages
-   */
-  protected def exampleConfiguration: String
-  
-  /**
    * Rejection code for this validator
    */
   protected def rejectionCode: String

@@ -12,9 +12,6 @@ class RegexValidator(flowName: Option[String] = None) extends BaseValidator(flow
   
   override protected def validatorName: String = "Regex"
   
-  override protected def exampleConfiguration: String = 
-    """type: "regex", column: "email", pattern: "^[a-z]+@[a-z]+\.[a-z]+$""""
-  
   override protected def rejectionCode: String = "REGEX_VALIDATION_FAILED"
   
   override protected def validationStep: String = "regex_validation"

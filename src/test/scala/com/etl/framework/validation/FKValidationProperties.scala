@@ -2,6 +2,7 @@ package com.etl.framework.validation
 
 import com.etl.framework.config._
 import com.etl.framework.TestConfig
+import com.etl.framework.validation.validators.ForeignKeyValidationException
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalacheck.{Gen, Properties}
 import org.scalacheck.Prop.forAll

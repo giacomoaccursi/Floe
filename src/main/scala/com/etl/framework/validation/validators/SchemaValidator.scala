@@ -1,7 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.{FlowConfig, ValidationRule}
-import com.etl.framework.validation.ValidationStepResult
+import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
 
 /**
@@ -13,7 +13,7 @@ class SchemaValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
   
   override def validate(df: DataFrame, rule: ValidationRule): ValidationStepResult = {
     if (!flowConfig.schema.enforceSchema) {
-      return ValidationStepResult(df, None)
+      return ValidationUtils.validResult(df)
     }
     
     val requiredColumns = flowConfig.schema.columns.map(_.name).toSet
@@ -22,17 +22,16 @@ class SchemaValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
     // Check for missing required columns
     val missingColumns = requiredColumns -- actualColumns
     if (missingColumns.nonEmpty) {
-      val rejectedDf = addRejectionMetadata(
+      return ValidationUtils.resultWithRejections(
+        df.limit(0),
         df,
         "SCHEMA_VALIDATION_FAILED",
         s"Missing required columns in flow $flowName: ${missingColumns.mkString(", ")}",
         "schema_validation"
       )
-      
-      return ValidationStepResult(df.limit(0), Some(rejectedDf))
     }
     
     // TODO: Add type validation
-    ValidationStepResult(df, None)
+    ValidationUtils.validResult(df)
   }
 }

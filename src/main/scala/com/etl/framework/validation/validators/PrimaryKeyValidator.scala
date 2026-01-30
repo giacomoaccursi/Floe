@@ -1,7 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.{FlowConfig, ValidationRule}
-import com.etl.framework.validation.ValidationStepResult
+import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 
@@ -16,7 +16,7 @@ class PrimaryKeyValidator(flowConfig: FlowConfig, flowName: Option[String] = Non
     val pkColumns = flowConfig.validation.primaryKey
     
     if (pkColumns.isEmpty) {
-      return ValidationStepResult(df, None)
+      return ValidationUtils.validResult(df)
     }
     
     // Find duplicates using groupBy and count
@@ -27,20 +27,19 @@ class PrimaryKeyValidator(flowConfig: FlowConfig, flowName: Option[String] = Non
       .drop("_count")
     
     if (duplicates.isEmpty) {
-      return ValidationStepResult(df, None)
+      return ValidationUtils.validResult(df)
     }
     
     // Join to get all duplicate records
     val rejectedDf = df.join(duplicates, pkColumns, "inner")
     val validDf = df.join(duplicates, pkColumns, "left_anti")
     
-    val rejectedWithMetadata = addRejectionMetadata(
+    ValidationUtils.resultWithRejections(
+      validDf,
       rejectedDf,
       "PK_DUPLICATE",
       s"Duplicate primary key in flow $flowName: ${pkColumns.mkString(", ")}",
       "pk_validation"
     )
-    
-    ValidationStepResult(validDf, Some(rejectedWithMetadata))
   }
 }

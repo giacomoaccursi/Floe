@@ -1,7 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.{FlowConfig, ValidationRule}
-import com.etl.framework.validation.ValidationStepResult
+import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
 
 /**
@@ -16,7 +16,7 @@ class ForeignKeyValidator(
   
   override def validate(df: DataFrame, rule: ValidationRule): ValidationStepResult = {
     if (flowConfig.validation.foreignKeys.isEmpty) {
-      return ValidationStepResult(df, None)
+      return ValidationUtils.validResult(df)
     }
     
     var currentDf = df
@@ -40,14 +40,14 @@ class ForeignKeyValidator(
         )
       
       if (!orphans.isEmpty) {
-        val orphansWithMetadata = addRejectionMetadata(
+        val orphansWithMetadata = ValidationUtils.addRejectionMetadata(
           orphans,
           "FK_VIOLATION",
           s"Foreign key violation in flow $flowName: ${fk.name} (${fk.column} -> ${fk.references.flow}.${fk.references.column})",
           "fk_validation"
         )
         
-        rejectedDf = combineRejected(rejectedDf, Some(orphansWithMetadata))
+        rejectedDf = ValidationUtils.combineRejected(rejectedDf, Some(orphansWithMetadata))
         currentDf = currentDf.join(orphans.select(fk.column), Seq(fk.column), "left_anti")
       }
     }

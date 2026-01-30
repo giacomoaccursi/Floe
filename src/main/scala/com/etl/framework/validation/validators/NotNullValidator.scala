@@ -1,7 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.{FlowConfig, ValidationRule}
-import com.etl.framework.validation.ValidationStepResult
+import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
 
 /**
@@ -17,7 +17,7 @@ class NotNullValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
       .map(_.name)
     
     if (notNullColumns.isEmpty) {
-      return ValidationStepResult(df, None)
+      return ValidationUtils.validResult(df)
     }
     
     // Build condition for null checks
@@ -29,16 +29,15 @@ class NotNullValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
     val validDf = df.filter(s"NOT ($nullCondition)")
     
     if (rejectedDf.isEmpty) {
-      ValidationStepResult(validDf, None)
+      ValidationUtils.validResult(validDf)
     } else {
-      val rejectedWithMetadata = addRejectionMetadata(
+      ValidationUtils.resultWithRejections(
+        validDf,
         rejectedDf,
         "NOT_NULL_VIOLATION",
         s"Null value in non-nullable column(s) in flow $flowName: ${notNullColumns.mkString(", ")}",
         "not_null_validation"
       )
-      
-      ValidationStepResult(validDf, Some(rejectedWithMetadata))
     }
   }
 }

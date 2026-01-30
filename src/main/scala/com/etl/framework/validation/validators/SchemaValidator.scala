@@ -25,7 +25,7 @@ class SchemaValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
       val rejectedDf = addRejectionMetadata(
         df,
         "SCHEMA_VALIDATION_FAILED",
-        s"Missing required columns$flowContext: ${missingColumns.mkString(", ")}",
+        s"Missing required columns in flow $flowName: ${missingColumns.mkString(", ")}",
         "schema_validation"
       )
       

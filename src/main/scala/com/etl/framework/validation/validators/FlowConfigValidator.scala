@@ -14,12 +14,7 @@ abstract class FlowConfigValidator(
   protected val flowConfig: FlowConfig,
   protected val flowName: Option[String] = None
 ) extends Validator {
-  
-  /**
-   * Returns the flow context string for error messages
-   */
-  protected def flowContext: String = flowName.map(f => s" in flow '$f'").getOrElse("")
-  
+
   /**
    * Adds rejection metadata to a DataFrame
    */

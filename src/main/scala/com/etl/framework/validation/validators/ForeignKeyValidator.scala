@@ -27,7 +27,7 @@ class ForeignKeyValidator(
       
       if (referencedFlow.isEmpty) {
         throw new ForeignKeyValidationException(
-          s"Referenced flow '${fk.references.flow}' not found$flowContext"
+          s"Referenced flow '${fk.references.flow}' not found in flow $flowName"
         )
       }
       
@@ -43,7 +43,7 @@ class ForeignKeyValidator(
         val orphansWithMetadata = addRejectionMetadata(
           orphans,
           "FK_VIOLATION",
-          s"Foreign key violation$flowContext: ${fk.name} (${fk.column} -> ${fk.references.flow}.${fk.references.column})",
+          s"Foreign key violation in flow $flowName: ${fk.name} (${fk.column} -> ${fk.references.flow}.${fk.references.column})",
           "fk_validation"
         )
         

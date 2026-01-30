@@ -37,7 +37,7 @@ class PrimaryKeyValidator(flowConfig: FlowConfig, flowName: Option[String] = Non
     val rejectedWithMetadata = addRejectionMetadata(
       rejectedDf,
       "PK_DUPLICATE",
-      s"Duplicate primary key$flowContext: ${pkColumns.mkString(", ")}",
+      s"Duplicate primary key in flow $flowName: ${pkColumns.mkString(", ")}",
       "pk_validation"
     )
     

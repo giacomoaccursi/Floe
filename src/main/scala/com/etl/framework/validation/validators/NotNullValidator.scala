@@ -34,7 +34,7 @@ class NotNullValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
       val rejectedWithMetadata = addRejectionMetadata(
         rejectedDf,
         "NOT_NULL_VIOLATION",
-        s"Null value in non-nullable column(s)$flowContext: ${notNullColumns.mkString(", ")}",
+        s"Null value in non-nullable column(s) in flow $flowName: ${notNullColumns.mkString(", ")}",
         "not_null_validation"
       )
       

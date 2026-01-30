@@ -46,7 +46,7 @@ class FlowExecutor(
         }
 
         // 2. Apply pre-validation transformations
-        val preTransformedData = transformer.applyPreValidation(rawData, batchId)
+        val preTransformedData = transformer.applyPreValidationTransformation(rawData, batchId)
 
 
         val inputCount = preTransformedData.count()
@@ -69,7 +69,7 @@ class FlowExecutor(
         logValidationResults(validationResult, mergedCount, rejectedCount)
         
         // 5. Apply post-validation transformations
-        val postTransformedData = transformer.applyPostValidation(
+        val postTransformedData = transformer.applyPostValidationTransformation(
           validationResult.valid,
           batchId,
           validatedFlows

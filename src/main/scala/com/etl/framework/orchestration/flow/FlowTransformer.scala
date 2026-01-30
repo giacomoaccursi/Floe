@@ -21,7 +21,7 @@ class FlowTransformer(
   /**
    * Applies pre-validation transformations
    */
-  def applyPreValidation(data: DataFrame, batchId: String): DataFrame = {
+  def applyPreValidationTransformation(data: DataFrame, batchId: String): DataFrame = {
     flowConfig.preValidationTransformation match {
       case Some(transformation) =>
         TimingUtil.timed(logger, "Pre-validation transformation") {
@@ -47,7 +47,7 @@ class FlowTransformer(
   /**
    * Applies post-validation transformations
    */
-  def applyPostValidation(
+  def applyPostValidationTransformation(
     data: DataFrame,
     batchId: String,
     validatedFlows: Map[String, DataFrame]

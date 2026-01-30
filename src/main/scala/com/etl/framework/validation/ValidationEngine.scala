@@ -91,9 +91,5 @@ case class ValidationResult(
  */
 case class ValidationStepResult(
   valid: DataFrame,
-  rejected: Option[DataFrame],
-  validWithWarnings: DataFrame = null
-) {
-  // If validWithWarnings is not provided, use valid
-  def getValidWithWarnings: DataFrame = if (validWithWarnings != null) validWithWarnings else valid
-}
+  rejected: Option[DataFrame]
+)

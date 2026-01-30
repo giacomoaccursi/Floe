@@ -126,8 +126,8 @@ class DependencyGraphBuilder(flowConfigs: Seq[FlowConfig]) {
       remaining.clear()
       remaining ++= nextRemaining
     }
-    
-    groups.toSeq
+
+    groups
   }
 }
 

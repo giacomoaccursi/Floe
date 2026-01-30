@@ -121,7 +121,7 @@ class FlowOrchestrator(
         
         return Some(IngestionResult(
           batchId = batchId,
-          flowResults = flowResults.toSeq,
+          flowResults = flowResults,
           success = false,
           error = Some(s"Flow ${result.flowName} failed: ${result.error.getOrElse("Unknown error")}")
         ))
@@ -134,7 +134,7 @@ class FlowOrchestrator(
         
         return Some(IngestionResult(
           batchId = batchId,
-          flowResults = flowResults.toSeq,
+          flowResults = flowResults,
           success = false,
           error = Some(s"Flow ${result.flowName} exceeded rejection threshold or has validation errors")
         ))

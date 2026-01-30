@@ -32,7 +32,7 @@ object DataReaderFactory {
       case "jdbc" => new JDBCDataReader(sourceConfig)
       case unsupported =>
         throw new UnsupportedSourceTypeException(
-          s"Unsupported source type: $unsupported. Supported types: file, jdbc"
+          s"Unsupported source type: $unsupported. Supported types: file ('csv', 'parquet', 'json'), jdbc"
         )
     }
   }

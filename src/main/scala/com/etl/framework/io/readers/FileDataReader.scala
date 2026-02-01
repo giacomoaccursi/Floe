@@ -1,13 +1,18 @@
 package com.etl.framework.io.readers
 
-import com.etl.framework.config.SourceConfig
+import com.etl.framework.config.{SchemaConfig, SourceConfig}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * DataReader implementation for file-based sources
  * Supports CSV, Parquet, JSON formats with file pattern matching
+ * Can optionally enforce schema during read for type safety
  */
-class FileDataReader(sourceConfig: SourceConfig)(implicit spark: SparkSession) extends DataReader {
+class FileDataReader(
+  sourceConfig: SourceConfig,
+  schemaConfig: Option[SchemaConfig] = None
+)(implicit spark: SparkSession) extends DataReader {
 
   /**
    * Reads data from file source
@@ -19,9 +24,18 @@ class FileDataReader(sourceConfig: SourceConfig)(implicit spark: SparkSession) e
     validateFormat(sourceConfig.format)
 
     // Create reader with format
-    val reader = spark.read
-      .format(sourceConfig.format)
-      .options(sourceConfig.options)
+    var reader = spark.read.format(sourceConfig.format)
+    
+    // Apply schema if provided and enforceSchema is true
+    schemaConfig.foreach { schema =>
+      if (schema.enforceSchema) {
+        val sparkSchema = convertToSparkSchema(schema)
+        reader = reader.schema(sparkSchema)
+      }
+    }
+    
+    // Apply options
+    reader = reader.options(sourceConfig.options)
 
     // Determine path with optional file pattern
     val fullPath = sourceConfig.filePattern match {
@@ -31,6 +45,43 @@ class FileDataReader(sourceConfig: SourceConfig)(implicit spark: SparkSession) e
 
     // Load data
     reader.load(fullPath)
+  }
+
+  /**
+   * Converts SchemaConfig to Spark StructType
+   */
+  private def convertToSparkSchema(schema: SchemaConfig): StructType = {
+    StructType(schema.columns.map { col =>
+      StructField(
+        col.name,
+        mapTypeToSparkType(col.`type`),
+        col.nullable
+      )
+    })
+  }
+  
+  /**
+   * Maps string type names to Spark DataTypes
+   */
+  private def mapTypeToSparkType(typeName: String): DataType = {
+    typeName.toLowerCase match {
+      case "string" | "varchar" | "text" => StringType
+      case "int" | "integer" => IntegerType
+      case "long" | "bigint" => LongType
+      case "float" => FloatType
+      case "double" => DoubleType
+      case "boolean" | "bool" => BooleanType
+      case "date" => DateType
+      case "timestamp" | "datetime" => TimestampType
+      case "decimal" => DecimalType(38, 18) // Default precision
+      case "binary" => BinaryType
+      case "byte" | "tinyint" => ByteType
+      case "short" | "smallint" => ShortType
+      case other => 
+        throw new UnsupportedTypeException(
+          s"Unsupported type: $other. Supported types: string, int, long, float, double, boolean, date, timestamp, decimal, binary, byte, short"
+        )
+    }
   }
 
   /**
@@ -52,3 +103,8 @@ class FileDataReader(sourceConfig: SourceConfig)(implicit spark: SparkSession) e
  * Exception thrown when an unsupported file format is encountered
  */
 class UnsupportedFileFormatException(message: String) extends RuntimeException(message)
+
+/**
+ * Exception thrown when an unsupported type is encountered
+ */
+class UnsupportedTypeException(message: String) extends RuntimeException(message)

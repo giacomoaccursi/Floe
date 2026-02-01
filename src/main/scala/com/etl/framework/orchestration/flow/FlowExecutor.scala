@@ -111,7 +111,7 @@ class FlowExecutor(
    */
   private def readData(): DataFrame = {
     logger.debug(s"Creating reader for source type: ${flowConfig.source.`type`}")
-    val reader = DataReaderFactory.create(flowConfig.source)
+    val reader = DataReaderFactory.create(flowConfig.source, Some(flowConfig.schema))
     reader.read()
   }
   

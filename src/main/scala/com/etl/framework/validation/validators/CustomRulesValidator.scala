@@ -1,7 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, ValidationRule}
-import com.etl.framework.validation.{ValidationStepResult, Validator, ValidatorFactory}
+import com.etl.framework.validation.{ValidationStepResult, ValidationUtils, Validator, ValidatorFactory}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 

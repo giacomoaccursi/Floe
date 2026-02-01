@@ -19,7 +19,7 @@ class SchemaValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
     val requiredColumns = flowConfig.schema.columns.map(_.name).toSet
     val actualColumns = df.columns.toSet
     
-    // Check for missing required columns
+    // 1. Check for missing required columns
     val missingColumns = requiredColumns -- actualColumns
     if (missingColumns.nonEmpty) {
       return ValidationUtils.resultWithRejections(
@@ -31,7 +31,20 @@ class SchemaValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
       )
     }
     
-    // TODO: Add type validation
+    // 2. Check for extra columns (if not allowed)
+    if (!flowConfig.schema.allowExtraColumns) {
+      val extraColumns = actualColumns -- requiredColumns
+      if (extraColumns.nonEmpty) {
+        return ValidationUtils.resultWithRejections(
+          df.limit(0),
+          df,
+          "SCHEMA_EXTRA_COLUMNS",
+          s"Unexpected extra columns in flow $flowName: ${extraColumns.mkString(", ")}",
+          "schema_validation"
+        )
+      }
+    }
+    
     ValidationUtils.validResult(df)
   }
 }

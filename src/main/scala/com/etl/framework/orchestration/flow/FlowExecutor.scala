@@ -84,7 +84,6 @@ class FlowExecutor(
         // 8. Create result (execution time will be added after timing completes)
         createFlowResult(
           batchId, inputCount, mergedCount, validCount, rejectedCount,
-          0L, // Placeholder, will be updated with actual execution time
           validationResult.rejectionReasons
         )
         
@@ -237,7 +236,6 @@ class FlowExecutor(
     mergedCount: Long,
     validCount: Long,
     rejectedCount: Long,
-    executionTimeMs: Long,
     rejectionReasons: Map[String, Long]
   ): FlowResult = {
     FlowResult(
@@ -248,8 +246,7 @@ class FlowExecutor(
       mergedRecords = mergedCount,
       validRecords = validCount,
       rejectedRecords = rejectedCount,
-      rejectionRate = if (inputCount > 0) rejectedCount.toDouble / inputCount else 0.0,
-      executionTimeMs = executionTimeMs,
+      rejectionRate = if (inputCount > 0) rejectedCount.toDouble / inputCount else 0.0, // Will be set by caller after timing completes
       rejectionReasons = rejectionReasons
     )
   }

@@ -3,6 +3,7 @@ package com.etl.framework.orchestration.flow
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
 import com.etl.framework.core.AdditionalTableMetadata
 import com.etl.framework.util.TimingUtil
+import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.slf4j.LoggerFactory
@@ -63,8 +64,8 @@ class FlowDataWriter(
 
       // Add audit fields
       val rejectedWithAudit = rejectedData
-        .withColumn("_rejected_at", lit(Instant.now().toString))
-        .withColumn("_batch_id", lit(batchId))
+        .withColumn(REJECTED_AT, lit(Instant.now().toString))
+        .withColumn(BATCH_ID, lit(batchId))
 
       // Overwrite previous rejected records
       rejectedWithAudit.write

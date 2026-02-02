@@ -105,11 +105,6 @@ object ParallelExecutionProperties extends Properties("ParallelExecution") {
   // Helper to create GlobalConfig with parallel execution enabled
   def createGlobalConfig(tempDir: String, parallel: Boolean): GlobalConfig = {
     GlobalConfig(
-      spark = SparkConfig(
-        appName = "test",
-        master = "local[*]",
-        config = Map.empty
-      ),
       paths = PathsConfig(
         inputBase = s"$tempDir/input",
         outputBase = s"$tempDir/output",

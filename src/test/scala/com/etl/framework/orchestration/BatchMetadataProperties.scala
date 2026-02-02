@@ -94,11 +94,6 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
   // Helper to create GlobalConfig
   def createGlobalConfig(tempDir: String, batchIdFormat: String): GlobalConfig = {
     GlobalConfig(
-      spark = SparkConfig(
-        appName = "test",
-        master = "local[*]",
-        config = Map.empty
-      ),
       paths = PathsConfig(
         inputBase = s"$tempDir/input",
         outputBase = s"$tempDir/output",

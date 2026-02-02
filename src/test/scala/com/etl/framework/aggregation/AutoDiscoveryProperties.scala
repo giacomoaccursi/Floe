@@ -79,11 +79,6 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
     uniqueId <- Gen.const(s"dag-test-${System.nanoTime()}-${java.util.UUID.randomUUID()}")
     tempDir <- Gen.const(Files.createTempDirectory(uniqueId))
   } yield GlobalConfig(
-    spark = SparkConfig(
-      appName = "test",
-      master = "local[*]",
-      config = Map.empty
-    ),
     paths = PathsConfig(
       inputBase = "/data/input",
       outputBase = "/data/output",

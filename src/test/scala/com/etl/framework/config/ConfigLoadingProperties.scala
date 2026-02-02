@@ -25,20 +25,6 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
   
   // Generators for configuration objects
   
-  implicit val arbSparkConfig: Arbitrary[SparkConfig] = Arbitrary {
-    for {
-      appName <- Gen.alphaNumStr.suchThat(_.nonEmpty)
-      master <- Gen.oneOf("local[*]", "yarn", "spark://localhost:7077")
-      configSize <- Gen.choose(0, 5)
-      configKeys <- Gen.listOfN(configSize, Gen.alphaNumStr.suchThat(_.nonEmpty))
-      configValues <- Gen.listOfN(configSize, Gen.alphaNumStr)
-    } yield SparkConfig(
-      appName = appName,
-      master = master,
-      config = configKeys.zip(configValues).toMap
-    )
-  }
-  
   implicit val arbPathsConfig: Arbitrary[PathsConfig] = Arbitrary {
     for {
       inputBase <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/input/$s")
@@ -123,14 +109,12 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
   
   implicit val arbGlobalConfig: Arbitrary[GlobalConfig] = Arbitrary {
     for {
-      spark <- arbSparkConfig.arbitrary
       paths <- arbPathsConfig.arbitrary
       processing <- arbProcessingConfig.arbitrary
       performance <- arbPerformanceConfig.arbitrary
       monitoring <- arbMonitoringConfig.arbitrary
       security <- arbSecurityConfig.arbitrary
     } yield GlobalConfig(
-      spark = spark,
       paths = paths,
       processing = processing,
       performance = performance,

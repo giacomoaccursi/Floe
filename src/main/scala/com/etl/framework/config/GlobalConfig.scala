@@ -4,22 +4,12 @@ package com.etl.framework.config
  * Global configuration for the ETL framework
  */
 case class GlobalConfig(
-                         spark: SparkConfig,
                          paths: PathsConfig,
                          processing: ProcessingConfig,
                          performance: PerformanceConfig,
                          monitoring: MonitoringConfig,
                          security: SecurityConfig
                        )
-
-/**
- * Spark configuration
- */
-case class SparkConfig(
-                        appName: String,
-                        master: String,
-                        config: Map[String, String]
-                      )
 
 /**
  * Path configuration for input/output directories

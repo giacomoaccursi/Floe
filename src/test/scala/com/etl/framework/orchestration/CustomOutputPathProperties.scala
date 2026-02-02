@@ -47,11 +47,6 @@ object CustomOutputPathProperties extends Properties("CustomOutputPath") {
   // Generator for GlobalConfig
   val globalConfigGen: Gen[GlobalConfig] = Gen.const(
     GlobalConfig(
-      spark = SparkConfig(
-        appName = "test",
-        master = "local[*]",
-        config = Map.empty
-      ),
       paths = PathsConfig(
         inputBase = "/tmp/input",
         outputBase = "/tmp/output",

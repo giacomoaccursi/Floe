@@ -77,11 +77,6 @@ object AdditionalTablePersistenceProperties extends Properties("AdditionalTableP
   // Helper to create test configuration
   def createTestConfig(flowName: String, tempDir: String): (FlowConfig, GlobalConfig) = {
     val globalConfig = GlobalConfig(
-      spark = SparkConfig(
-        appName = "test",
-        master = "local[*]",
-        config = Map.empty
-      ),
       paths = PathsConfig(
         inputBase = s"$tempDir/input",
         outputBase = s"$tempDir/output",

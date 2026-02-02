@@ -169,11 +169,6 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
   // Generator for GlobalConfig
   val globalConfigGen: Gen[GlobalConfig] = Gen.const(
     GlobalConfig(
-      spark = SparkConfig(
-        appName = "test",
-        master = "local[*]",
-        config = Map.empty
-      ),
       paths = PathsConfig(
         inputBase = "/data/input",
         outputBase = "/data/output",
@@ -353,7 +348,6 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
     )
     
     val globalConfig = GlobalConfig(
-      spark = SparkConfig("test", "local[*]", Map.empty),
       paths = PathsConfig("/data/input", "/data/output", "/data/validated", "/data/rejected",
         "/data/metadata", "/data/model", "/data/staging", "/data/checkpoint"),
       processing = ProcessingConfig("yyyyMMdd_HHmmss", "batch", false, 0.1, false, "5m"),

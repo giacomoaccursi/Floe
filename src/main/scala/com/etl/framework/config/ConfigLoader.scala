@@ -205,7 +205,6 @@ case class ConfigurationException(
  * Circe decoders for configuration classes
  */
 object ConfigDecoders {
-  implicit val sparkConfigDecoder: Decoder[SparkConfig] = deriveDecoder[SparkConfig]
   implicit val pathsConfigDecoder: Decoder[PathsConfig] = deriveDecoder[PathsConfig]
   implicit val processingConfigDecoder: Decoder[ProcessingConfig] = deriveDecoder[ProcessingConfig]
   implicit val performanceConfigDecoder: Decoder[PerformanceConfig] = deriveDecoder[PerformanceConfig]

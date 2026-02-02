@@ -82,7 +82,6 @@ object FlattenJoinProperties extends Properties("FlattenJoin") {
   // Helper to apply flatten join using DAGOrchestrator's private method
   def applyFlattenJoin(parent: DataFrame, child: DataFrame, joinConfig: JoinConfig): DataFrame = {
     val globalConfig = GlobalConfig(
-      spark = SparkConfig("test", "local[*]", Map.empty),
       paths = PathsConfig("/data/input", "/data/output", "/data/validated", "/data/rejected",
         "/data/metadata", "/data/model", "/data/staging", "/data/checkpoint"),
       processing = ProcessingConfig("yyyyMMdd_HHmmss", "batch", false, 0.1, false, "5m"),

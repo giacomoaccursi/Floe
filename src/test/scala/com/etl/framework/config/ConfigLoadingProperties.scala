@@ -27,21 +27,13 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
   
   implicit val arbPathsConfig: Arbitrary[PathsConfig] = Arbitrary {
     for {
-      inputBase <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/input/$s")
-      outputBase <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/output/$s")
       validated <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/validated/$s")
       rejected <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/rejected/$s")
       metadata <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/metadata/$s")
-      model <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/model/$s")
-      staging <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/staging/$s")
-      checkpoint <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/checkpoint/$s")
     } yield PathsConfig(
       validatedPath = validated,
       rejectedPath = rejected,
-      metadataPath = metadata,
-      modelPath = model,
-      stagingPath = staging,
-      checkpointPath = checkpoint
+      metadataPath = metadata
     )
   }
   
@@ -51,15 +43,11 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       executionMode <- Gen.oneOf("batch", "streaming")
       failOnValidationError <- Gen.oneOf(true, false)
       maxRejectionRate <- Gen.choose(0.0, 1.0)
-      checkpointEnabled <- Gen.oneOf(true, false)
-      checkpointInterval <- Gen.oneOf("5m", "10m", "30m")
     } yield ProcessingConfig(
       batchIdFormat = batchIdFormat,
       executionMode = executionMode,
       failOnValidationError = failOnValidationError,
-      maxRejectionRate = maxRejectionRate,
-      checkpointEnabled = checkpointEnabled,
-      checkpointInterval = checkpointInterval
+      maxRejectionRate = maxRejectionRate
     )
   }
   

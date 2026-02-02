@@ -17,10 +17,7 @@ case class GlobalConfig(
 case class PathsConfig(
                         validatedPath: String,
                         rejectedPath: String,
-                        metadataPath: String,
-                        modelPath: String,
-                        stagingPath: String,
-                        checkpointPath: String
+                        metadataPath: String
                       )
 
 /**
@@ -30,9 +27,7 @@ case class ProcessingConfig(
                              batchIdFormat: String,
                              executionMode: String,
                              failOnValidationError: Boolean,
-                             maxRejectionRate: Double,
-                             checkpointEnabled: Boolean,
-                             checkpointInterval: String
+                             maxRejectionRate: Double
                            )
 
 /**

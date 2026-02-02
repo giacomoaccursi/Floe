@@ -51,17 +51,12 @@ object CustomOutputPathProperties extends Properties("CustomOutputPath") {
         validatedPath = "/tmp/validated",
         rejectedPath = "/tmp/rejected",
         metadataPath = "/tmp/metadata",
-        modelPath = "/tmp/model",
-        stagingPath = "/tmp/staging",
-        checkpointPath = "/tmp/checkpoint"
       ),
       processing = ProcessingConfig(
         batchIdFormat = "yyyyMMdd_HHmmss",
         executionMode = "batch",
         failOnValidationError = false,
         maxRejectionRate = 0.1,
-        checkpointEnabled = false,
-        checkpointInterval = "10m"
       ),
       performance = PerformanceConfig(
         parallelFlows = false,

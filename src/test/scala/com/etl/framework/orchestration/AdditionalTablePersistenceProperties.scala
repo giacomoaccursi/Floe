@@ -81,17 +81,12 @@ object AdditionalTablePersistenceProperties extends Properties("AdditionalTableP
         validatedPath = s"$tempDir/validated",
         rejectedPath = s"$tempDir/rejected",
         metadataPath = s"$tempDir/metadata",
-        modelPath = s"$tempDir/model",
-        stagingPath = s"$tempDir/staging",
-        checkpointPath = s"$tempDir/checkpoint"
       ),
       processing = ProcessingConfig(
         batchIdFormat = "yyyyMMdd_HHmmss",
         executionMode = "batch",
         failOnValidationError = false,
         maxRejectionRate = 0.1,
-        checkpointEnabled = false,
-        checkpointInterval = "10m"
       ),
       performance = PerformanceConfig(
         parallelFlows = false,

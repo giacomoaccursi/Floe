@@ -155,17 +155,12 @@ object DAGNodeExecutionOrderProperties extends Properties("DAGNodeExecutionOrder
         validatedPath = "/data/validated",
         rejectedPath = "/data/rejected",
         metadataPath = "/data/metadata",
-        modelPath = "/data/model",
-        stagingPath = "/data/staging",
-        checkpointPath = "/data/checkpoint"
       ),
       processing = ProcessingConfig(
         batchIdFormat = "yyyyMMdd_HHmmss",
         executionMode = "batch",
         failOnValidationError = false,
         maxRejectionRate = 0.1,
-        checkpointEnabled = false,
-        checkpointInterval = "5m"
       ),
       performance = PerformanceConfig(
         parallelFlows = false,
@@ -317,9 +312,8 @@ object DAGNodeExecutionOrderProperties extends Properties("DAGNodeExecutionOrder
     )
     
     val globalConfig = GlobalConfig(
-      paths = PathsConfig("/data/validated", "/data/rejected",
-        "/data/metadata", "/data/model", "/data/staging", "/data/checkpoint"),
-      processing = ProcessingConfig("yyyyMMdd_HHmmss", "batch", false, 0.1, false, "5m"),
+      paths = PathsConfig("/data/validated", "/data/rejected", "/data/metadata"),
+      processing = ProcessingConfig("yyyyMMdd_HHmmss", "batch", false, 0.1),
       performance = PerformanceConfig(false, false, 10485760L, false, 200),
       monitoring = MonitoringConfig(false, None, None, "INFO"),
       security = SecurityConfig(false, None, false)

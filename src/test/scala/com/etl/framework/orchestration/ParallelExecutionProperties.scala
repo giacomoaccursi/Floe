@@ -109,17 +109,12 @@ object ParallelExecutionProperties extends Properties("ParallelExecution") {
         validatedPath = s"$tempDir/validated",
         rejectedPath = s"$tempDir/rejected",
         metadataPath = s"$tempDir/metadata",
-        modelPath = s"$tempDir/model",
-        stagingPath = s"$tempDir/staging",
-        checkpointPath = s"$tempDir/checkpoint"
       ),
       processing = ProcessingConfig(
         batchIdFormat = "yyyyMMdd_HHmmss",
         executionMode = if (parallel) "parallel" else "sequential",
         failOnValidationError = false,
         maxRejectionRate = 1.0,
-        checkpointEnabled = false,
-        checkpointInterval = "5m"
       ),
       performance = PerformanceConfig(
         parallelFlows = parallel,

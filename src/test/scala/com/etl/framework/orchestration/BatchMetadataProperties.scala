@@ -98,17 +98,12 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
         validatedPath = s"$tempDir/validated",
         rejectedPath = s"$tempDir/rejected",
         metadataPath = s"$tempDir/metadata",
-        modelPath = s"$tempDir/model",
-        stagingPath = s"$tempDir/staging",
-        checkpointPath = s"$tempDir/checkpoint"
       ),
       processing = ProcessingConfig(
         batchIdFormat = batchIdFormat,
         executionMode = "sequential",
         failOnValidationError = false,
         maxRejectionRate = 1.0,
-        checkpointEnabled = false,
-        checkpointInterval = "5m"
       ),
       performance = PerformanceConfig(
         parallelFlows = false,

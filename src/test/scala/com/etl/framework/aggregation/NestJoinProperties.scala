@@ -84,9 +84,8 @@ object NestJoinProperties extends Properties("NestJoin") {
   // Helper to apply nest join using DAGOrchestrator's private method
   def applyNestJoin(parent: DataFrame, child: DataFrame, joinConfig: JoinConfig): DataFrame = {
     val globalConfig = GlobalConfig(
-      paths = PathsConfig("/data/validated", "/data/rejected",
-        "/data/metadata", "/data/model", "/data/staging", "/data/checkpoint"),
-      processing = ProcessingConfig("yyyyMMdd_HHmmss", "batch", false, 0.1, false, "5m"),
+      paths = PathsConfig("/data/validated", "/data/rejected", "/data/metadata"),
+      processing = ProcessingConfig("yyyyMMdd_HHmmss", "batch", false, 0.1),
       performance = PerformanceConfig(false, false, 10485760L, false, 200),
       monitoring = MonitoringConfig(false, None, None, "INFO"),
       security = SecurityConfig(false, None, false)

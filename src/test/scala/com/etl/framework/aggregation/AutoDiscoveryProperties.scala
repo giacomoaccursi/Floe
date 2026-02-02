@@ -83,17 +83,12 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
       validatedPath = "/data/validated",
       rejectedPath = "/data/rejected",
       metadataPath = tempDir.toString,
-      modelPath = "/data/model",
-      stagingPath = "/data/staging",
-      checkpointPath = "/data/checkpoint"
     ),
     processing = ProcessingConfig(
       batchIdFormat = "yyyyMMdd_HHmmss",
       executionMode = "batch",
       failOnValidationError = false,
       maxRejectionRate = 0.1,
-      checkpointEnabled = false,
-      checkpointInterval = "5m"
     ),
     performance = PerformanceConfig(
       parallelFlows = false,

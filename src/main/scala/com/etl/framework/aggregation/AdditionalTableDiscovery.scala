@@ -1,7 +1,17 @@
 package com.etl.framework.aggregation
 
 import com.etl.framework.config.{DAGNode, GlobalConfig, JoinConfig}
+import com.etl.framework.core.AdditionalTableMetadata
 import org.slf4j.LoggerFactory
+
+/**
+ * Metadata about an additional table loaded from disk (for discovery)
+ */
+case class AdditionalTableMetadataFile(
+  tableName: String,
+  path: String,
+  dagMetadata: AdditionalTableMetadata
+)
 
 /**
  * Discovers additional tables from metadata
@@ -45,7 +55,7 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
   /**
    * Loads additional tables metadata from the metadata directory
    */
-  private def loadAdditionalTablesMetadata(metadataPath: String): Seq[AdditionalTableInfo] = {
+  private def loadAdditionalTablesMetadata(metadataPath: String): Seq[AdditionalTableMetadataFile] = {
     import java.nio.file.{Files, Paths}
     import scala.collection.JavaConverters._
     import org.json4s._
@@ -82,7 +92,7 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
           }
           
           dagMetadataOpt.map { dagMetadata =>
-            AdditionalTableInfo(tableName, path, dagMetadata)
+            AdditionalTableMetadataFile(tableName, path, dagMetadata)
           }
         } catch {
           case e: Exception =>
@@ -96,14 +106,14 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
   /**
    * Infers dependencies from join keys
    */
-  private def inferDependencies(table: AdditionalTableInfo): Seq[String] = {
+  private def inferDependencies(table: AdditionalTableMetadataFile): Seq[String] = {
     table.dagMetadata.joinKeys.keys.map(flow => s"${flow}_node").toSeq
   }
   
   /**
    * Infers join configuration from metadata
    */
-  private def inferJoinConfig(table: AdditionalTableInfo): Option[JoinConfig] = {
+  private def inferJoinConfig(table: AdditionalTableMetadataFile): Option[JoinConfig] = {
     table.dagMetadata.joinKeys.headOption.map { case (parentFlow, keys) =>
       JoinConfig(
         `type` = "left_outer",
@@ -116,22 +126,3 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
     }
   }
 }
-
-/**
- * Information about an additional table
- */
-case class AdditionalTableInfo(
-  tableName: String,
-  path: String,
-  dagMetadata: AdditionalTableMetadata
-)
-
-/**
- * Metadata for integrating additional tables into DAG
- */
-case class AdditionalTableMetadata(
-  primaryKey: Seq[String],
-  joinKeys: Map[String, Seq[String]] = Map.empty,
-  description: Option[String] = None,
-  partitionBy: Seq[String] = Seq.empty
-)

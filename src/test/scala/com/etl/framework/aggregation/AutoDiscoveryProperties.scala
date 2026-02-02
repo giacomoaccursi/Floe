@@ -2,6 +2,7 @@ package com.etl.framework.aggregation
 
 import com.etl.framework.config._
 import com.etl.framework.TestConfig
+import com.etl.framework.core.AdditionalTableMetadata
 import org.scalacheck.{Gen, Properties}
 import org.scalacheck.Prop.forAll
 import org.scalacheck.Test.Parameters
@@ -63,11 +64,11 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
     partitionBy = partitionBy
   )
   
-  // Generator for additional table info
-  val additionalTableInfoGen: Gen[AdditionalTableInfo] = for {
+  // Generator for additional table metadata file
+  val additionalTableMetadataFileGen: Gen[AdditionalTableMetadataFile] = for {
     tableName <- tableNameGen
     metadata <- additionalTableMetadataGen
-  } yield AdditionalTableInfo(
+  } yield AdditionalTableMetadataFile(
     tableName = tableName,
     path = s"/data/validated/$tableName",
     dagMetadata = metadata
@@ -126,7 +127,7 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
    */
   def writeAdditionalTableMetadata(
     metadataPath: String,
-    tables: Seq[AdditionalTableInfo]
+    tables: Seq[AdditionalTableMetadataFile]
   ): Unit = {
     implicit val formats: Formats = Serialization.formats(NoTypeHints)
     
@@ -204,7 +205,7 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
    * the DAG_Orchestrator should discover and create DAG nodes for them.
    */
   property("auto_discovery_creates_dag_nodes_for_additional_tables") = forAll(
-    Gen.listOfN(3, additionalTableInfoGen).map(tables => tables.groupBy(_.tableName).map(_._2.head).toSeq), // Ensure unique table names
+    Gen.listOfN(3, additionalTableMetadataFileGen).map(tables => tables.groupBy(_.tableName).map(_._2.head).toSeq), // Ensure unique table names
     globalConfigWithTempPathGen
   ) { (additionalTables, globalConfig) =>
     var metadataPathToClean: Option[String] = None
@@ -290,7 +291,7 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
    * based on the join keys.
    */
   property("auto_discovery_infers_dependencies_from_join_keys") = forAll(
-    additionalTableInfoGen.suchThat(_.dagMetadata.joinKeys.nonEmpty),
+    additionalTableMetadataFileGen.suchThat(_.dagMetadata.joinKeys.nonEmpty),
     globalConfigWithTempPathGen
   ) { (additionalTable, globalConfig) =>
     var metadataPathToClean: Option[String] = None
@@ -342,7 +343,7 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
    * For any additional table with join keys, auto-discovery should create a join configuration.
    */
   property("auto_discovery_creates_join_configuration") = forAll(
-    additionalTableInfoGen.suchThat(_.dagMetadata.joinKeys.nonEmpty),
+    additionalTableMetadataFileGen.suchThat(_.dagMetadata.joinKeys.nonEmpty),
     globalConfigWithTempPathGen
   ) { (additionalTable, globalConfig) =>
     var metadataPathToClean: Option[String] = None
@@ -442,7 +443,7 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
    * When auto-discovery is disabled, no additional tables should be discovered.
    */
   property("auto_discovery_disabled_returns_empty_list") = forAll(
-    Gen.listOfN(3, additionalTableInfoGen).map(tables => tables.groupBy(_.tableName).map(_._2.head).toSeq), // Ensure unique table names
+    Gen.listOfN(3, additionalTableMetadataFileGen).map(tables => tables.groupBy(_.tableName).map(_._2.head).toSeq), // Ensure unique table names
     globalConfigWithTempPathGen
   ) { (additionalTables, globalConfig) =>
     var metadataPathToClean: Option[String] = None

@@ -1,6 +1,7 @@
 package com.etl.framework.pipeline
 
 import com.etl.framework.config.OutputConfig
+import com.etl.framework.exceptions.MissingConfigFieldException
 import com.etl.framework.io.writers.FinalModelWriter
 import com.etl.framework.mapping.FinalModelMapper
 import org.apache.spark.sql.{Dataset, Encoder, SparkSession}
@@ -36,7 +37,11 @@ class ExportPipeline[B: Encoder, F: Encoder] private(
         logger.info(s"Loading Batch Model from: $path")
         spark.read.parquet(path).as[B]
       case (None, None) =>
-        throw new IllegalStateException("Either batchModelPath or batchModelDataset must be provided")
+        throw MissingConfigFieldException(
+          file = "export-pipeline",
+          field = "batchModelPath or batchModelDataset",
+          section = "batch model source"
+        )
     }
     
     logger.info(s"Batch Model loaded with ${batchModel.count()} records")
@@ -257,8 +262,10 @@ class ExportPipelineBuilder[B: Encoder, F: Encoder](implicit spark: SparkSession
     
     // Validate that either path or dataset is provided
     if (batchModelPathOpt.isEmpty && batchModelDatasetOpt.isEmpty) {
-      throw new IllegalStateException(
-        "Batch Model source is required. Use withBatchModelPath() or withBatchModelDataset()"
+      throw MissingConfigFieldException(
+        file = "export-pipeline-builder",
+        field = "batchModelPath or batchModelDataset",
+        section = "batch model source"
       )
     }
     
@@ -269,8 +276,10 @@ class ExportPipelineBuilder[B: Encoder, F: Encoder](implicit spark: SparkSession
       case (None, Some(className)) =>
         FinalModelMapper.loadMapper[B, F](className)
       case (None, None) =>
-        throw new IllegalStateException(
-          "Mapper is required. Use withMapper() or withMapperClass()"
+        throw MissingConfigFieldException(
+          file = "export-pipeline-builder",
+          field = "mapper or mapperClass",
+          section = "mapper configuration"
         )
     }
     

@@ -2,6 +2,7 @@ package com.etl.framework.pipeline
 
 import com.etl.framework.config.{DomainsConfigLoader, FlowConfig, FlowConfigLoader, GlobalConfig, GlobalConfigLoader}
 import com.etl.framework.core.FlowTransformation.FlowTransformation
+import com.etl.framework.exceptions.MissingConfigFieldException
 import com.etl.framework.orchestration.{FlowOrchestrator, IngestionResult}
 import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
@@ -200,8 +201,10 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
         (global, fc)
 
       case _ =>
-        throw new IllegalStateException(
-          "Must provide either configDirectory or both globalConfig and flowConfigs"
+        throw MissingConfigFieldException(
+          file = "pipeline-builder",
+          field = "configDirectory or (globalConfig + flowConfigs)",
+          section = "pipeline configuration"
         )
     }
 

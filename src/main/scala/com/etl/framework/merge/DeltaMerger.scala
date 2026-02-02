@@ -1,9 +1,10 @@
 package com.etl.framework.merge
 
+import com.etl.framework.config.LoadModeConfig
+import com.etl.framework.exceptions.{MergeException, UnsupportedOperationException}
 import com.etl.framework.merge.MergeColumns._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
-import com.etl.framework.config.LoadModeConfig
 
 /**
  * Handles merge of incremental data with existing data
@@ -39,8 +40,10 @@ object DeltaMergerFactory {
           case Some("append") =>
             new AppendMerger()
           case other =>
-            throw new IllegalArgumentException(
-              s"Invalid merge strategy: $other. Valid values are: upsert, append"
+            throw MergeException(
+              flowName = "unknown",
+              mergeStrategy = other.getOrElse("none"),
+              details = s"Invalid merge strategy. Valid values are: upsert, append"
             )
         }
       
@@ -63,8 +66,9 @@ object DeltaMergerFactory {
         new FullReplaceMerger()
       
       case other =>
-        throw new IllegalArgumentException(
-          s"Invalid load mode type: $other. Valid values are: full, delta, scd2"
+        throw UnsupportedOperationException(
+          operation = s"load mode type: ${other}",
+          details = "Valid values are: full, delta, scd2"
         )
     }
   }

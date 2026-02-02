@@ -1,5 +1,6 @@
 package com.etl.framework.config
 
+import com.etl.framework.exceptions.DataSourceException
 import io.circe.{Decoder, HCursor}
 import io.circe.yaml.parser
 import io.circe.generic.semiauto._
@@ -311,7 +312,11 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
     Try {
       val dir = new File(directory)
       if (!dir.exists() || !dir.isDirectory) {
-        throw new IllegalArgumentException(s"Directory does not exist: $directory")
+        throw DataSourceException(
+          sourceType = "directory",
+          sourcePath = directory,
+          details = "Directory does not exist or is not a directory"
+        )
       }
 
       val yamlFiles = dir.listFiles()

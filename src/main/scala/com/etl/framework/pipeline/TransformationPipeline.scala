@@ -2,6 +2,7 @@ package com.etl.framework.pipeline
 
 import com.etl.framework.aggregation.DAGOrchestrator
 import com.etl.framework.config.{AggregationConfig, DAGConfigLoader, GlobalConfig, GlobalConfigLoader}
+import com.etl.framework.exceptions.MissingConfigFieldException
 import com.etl.framework.io.writers.BatchModelWriter
 import com.etl.framework.mapping.{BatchModelEnricher, BatchModelMapper, MappingConfig}
 import org.apache.spark.sql.{Dataset, Encoder, SparkSession}
@@ -254,11 +255,19 @@ class TransformationPipelineBuilder[T: Encoder](implicit spark: SparkSession) {
     
     // Validate required configurations
     val dagConfig = dagConfigOpt.getOrElse {
-      throw new IllegalStateException("DAG configuration is required. Use withDAGConfig() or withDAGConfigFile()")
+      throw MissingConfigFieldException(
+        file = "transformation-pipeline-builder",
+        field = "dagConfig",
+        section = "pipeline configuration"
+      )
     }
     
     val globalConfig = globalConfigOpt.getOrElse {
-      throw new IllegalStateException("Global configuration is required. Use withGlobalConfig() or withGlobalConfigFile()")
+      throw MissingConfigFieldException(
+        file = "transformation-pipeline-builder",
+        field = "globalConfig",
+        section = "pipeline configuration"
+      )
     }
     
     // Load mapping config if file was specified

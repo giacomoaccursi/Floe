@@ -2,6 +2,7 @@ package com.etl.framework.validation.validators
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, ValidationRule}
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils, Validator, ValidatorFactory}
+import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -107,14 +108,14 @@ class CustomRulesValidator(
     warningMessage: String
   ): DataFrame = {
     df.join(
-      failedRecords.withColumn("_warning_msg", lit(warningMessage)),
+      failedRecords.withColumn(WARNING_MSG, lit(warningMessage)),
       pkColumns,
       "left"
     ).withColumn(
-      "_warnings",
-      when(col("_warning_msg").isNotNull,
-        array_union(col("_warnings"), array(col("_warning_msg"))))
-        .otherwise(col("_warnings"))
-    ).drop("_warning_msg")
+      WARNINGS,
+      when(col(WARNING_MSG).isNotNull,
+        array_union(col(WARNINGS), array(col(WARNING_MSG))))
+        .otherwise(col(WARNINGS))
+    ).drop(WARNING_MSG)
   }
 }

@@ -2,6 +2,7 @@ package com.etl.framework.validation.validators
 
 import com.etl.framework.config.ValidationRule
 import com.etl.framework.validation.{ValidationStepResult, Validator}
+import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Column
@@ -61,10 +62,10 @@ abstract class BaseValidator(flowName: Option[String] = None) extends Validator 
    */
   protected def createRejectedDataFrame(invalidDf: DataFrame, rule: ValidationRule, column: String): DataFrame = {
     invalidDf
-      .withColumn("_rejection_code", lit(rejectionCode))
-      .withColumn("_rejection_reason", lit(rejectionReason(rule, column)))
-      .withColumn("_validation_step", lit(validationStep))
-      .withColumn("_rejected_at", current_timestamp())
+      .withColumn(REJECTION_CODE, lit(rejectionCode))
+      .withColumn(REJECTION_REASON, lit(rejectionReason(rule, column)))
+      .withColumn(VALIDATION_STEP, lit(validationStep))
+      .withColumn(REJECTED_AT, current_timestamp())
   }
   
   /**

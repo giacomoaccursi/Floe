@@ -1,6 +1,7 @@
 package com.etl.framework.validation
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, ValidationRule}
+import com.etl.framework.validation.ValidationColumns._
 import com.etl.framework.validation.validators._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -26,7 +27,7 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit spa
   ): ValidationResult = {
     
     val flowName = Some(flowConfig.name)
-    val initialDf = df.withColumn("_warnings", array().cast("array<string>"))
+    val initialDf = df.withColumn(WARNINGS, array().cast("array<string>"))
     
     val validationSteps: Seq[ValidationStep] = Seq(
       ValidationStep("schema_validation", shouldExecute = true, new SchemaValidator(flowConfig, flowName), ValidationRule("schema")),

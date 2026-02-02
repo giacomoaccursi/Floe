@@ -1,7 +1,7 @@
 package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
-import com.etl.framework.core.AdditionalTableMetadata
+import com.etl.framework.core.AdditionalTableInfo
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.merge.DeltaMergerFactory
 import com.etl.framework.util.TimingUtil
@@ -13,7 +13,7 @@ import scala.collection.mutable
 
 /**
  * Executes a single flow through Read → Merge → Validate → Transform → Write
- * Coordinates the flow execution using specialized components
+ * Focused on orchestrating the flow execution pipeline
  */
 class FlowExecutor(
   flowConfig: FlowConfig,
@@ -37,63 +37,7 @@ class FlowExecutor(
    */
   def execute(batchId: String): FlowResult = {
     val (result, executionTimeMs) = TimingUtil.timedWithDuration(logger, s"Execute flow ${flowConfig.name}") {
-      try {
-        logger.info(s"Starting flow ${flowConfig.name} - batchId: $batchId, loadMode: ${flowConfig.loadMode.`type`}")
-        
-        // 1. Read data from source
-        val rawData = TimingUtil.timed(logger, s"Read ${flowConfig.source.`type`} from ${flowConfig.source.path}") {
-          readData()
-        }
-
-        // 2. Apply pre-validation transformations
-        val preTransformedData = transformer.applyPreValidationTransformation(rawData, batchId)
-
-
-        val inputCount = preTransformedData.count()
-
-        // 3. Merge with existing data (delta mode)
-        val mergedData = TimingUtil.timed(logger, "Merge with existing data") {
-          mergeWithExisting(preTransformedData)
-        }
-
-        val mergedCount = mergedData.count()
-        
-        // 4. Validate data
-        val validationResult = TimingUtil.timed(logger, "Validate data") {
-          validateData(mergedData)
-        }
-        val validCount = validationResult.valid.count()
-        val rejectedCount = validationResult.rejected.map(_.count()).getOrElse(0L)
-        
-        // Log validation results
-        logValidationResults(validationResult, mergedCount, rejectedCount)
-        
-        // 5. Apply post-validation transformations
-        val postTransformedData = transformer.applyPostValidationTransformation(
-          validationResult.valid,
-          batchId,
-          validatedFlows
-        )
-        
-        // 6. Verify invariant: input = valid + rejected
-        verifyInvariant(inputCount, validCount, rejectedCount)
-        
-        // 7. Write all data
-        writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
-        
-        // 8. Create result (execution time will be added after timing completes)
-        createFlowResult(
-          batchId, inputCount, mergedCount, validCount, rejectedCount,
-          validationResult.rejectionReasons
-        )
-        
-      } catch {
-        case e: InvariantViolationException =>
-          handleFailure(batchId, e, isInvariantViolation = true)
-        
-        case e: Exception =>
-          handleFailure(batchId, e, isInvariantViolation = false)
-      }
+      executeFlow(batchId)
     }
     
     // Update result with actual execution time
@@ -104,6 +48,71 @@ class FlowExecutor(
     logFlowSummary(finalResult)
     
     finalResult
+  }
+  
+  /**
+   * Core flow execution logic
+   */
+  private def executeFlow(batchId: String): FlowResult = {
+    try {
+      logger.info(s"Starting flow ${flowConfig.name} - batchId: $batchId, loadMode: ${flowConfig.loadMode.`type`}")
+      
+      // 1. Read data from source
+      val rawData = TimingUtil.timed(logger, s"Read ${flowConfig.source.`type`} from ${flowConfig.source.path}") {
+        readData()
+      }
+
+      // 2. Apply pre-validation transformations
+      val preTransformedData = transformer.applyPreValidationTransformation(rawData, batchId)
+      val inputCount = preTransformedData.count()
+
+      // 3. Merge with existing data (delta mode)
+      val mergedData = TimingUtil.timed(logger, "Merge with existing data") {
+        mergeWithExisting(preTransformedData)
+      }
+      val mergedCount = mergedData.count()
+      
+      // 4. Validate data
+      val validationResult = TimingUtil.timed(logger, "Validate data") {
+        validateData(mergedData)
+      }
+      val validCount = validationResult.valid.count()
+      val rejectedCount = validationResult.rejected.map(_.count()).getOrElse(0L)
+      
+      // Log validation results
+      logValidationResults(validationResult, mergedCount, rejectedCount)
+      
+      // 5. Apply post-validation transformations
+      val postTransformedData = transformer.applyPostValidationTransformation(
+        validationResult.valid,
+        batchId,
+        validatedFlows
+      )
+      
+      // 6. Verify invariant: input = valid + rejected
+      verifyInvariant(inputCount, validCount, rejectedCount)
+      
+      // 7. Write all data
+      writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
+      
+      // 8. Create success result
+      FlowResult.success(
+        flowConfig.name,
+        batchId,
+        inputCount,
+        mergedCount,
+        validCount,
+        rejectedCount,
+        validationResult.rejectionReasons
+      )
+      
+    } catch {
+      case e: InvariantViolationException =>
+        handleFailure(batchId, e, isInvariantViolation = true)
+      
+      case e: Exception =>
+        handleFailure(batchId, e, isInvariantViolation = false)
+    }
   }
   
   /**
@@ -129,14 +138,10 @@ class FlowExecutor(
     )
     
     val existingData = loadExistingData(outputPath)
-    val newCount = newData.count()
-    val existingCount = existingData.map(_.count()).getOrElse(0L)
-    
     val merger = DeltaMergerFactory.create(flowConfig.loadMode)
     val result = merger.merge(newData, existingData)
-    val resultCount = result.count()
     
-    logger.info(s"Merge ${flowConfig.loadMode.`type`}: existing $existingCount + new $newCount → result $resultCount records")
+    logMergeStats(newData.count(), existingData.map(_.count()).getOrElse(0L), result.count())
     
     result
   }
@@ -228,27 +233,39 @@ class FlowExecutor(
   }
   
   /**
-   * Creates flow result
+   * Verifies invariant: input = valid + rejected
    */
-  private def createFlowResult(
+  private def verifyInvariant(input: Long, valid: Long, rejected: Long): Unit = {
+    if (input != valid + rejected) {
+      val message = s"Invariant violation in flow ${flowConfig.name}: " +
+        s"input_count ($input) != valid_count ($valid) + rejected_count ($rejected)"
+      logger.error(message)
+      throw new InvariantViolationException(message)
+    }
+    logger.debug(s"Invariant verified: $input = $valid + $rejected")
+  }
+  
+  /**
+   * Handles flow execution failure
+   */
+  private def handleFailure(
     batchId: String,
-    inputCount: Long,
-    mergedCount: Long,
-    validCount: Long,
-    rejectedCount: Long,
-    rejectionReasons: Map[String, Long]
+    error: Exception,
+    isInvariantViolation: Boolean
   ): FlowResult = {
-    FlowResult(
-      flowName = flowConfig.name,
-      batchId = batchId,
-      success = true,
-      inputRecords = inputCount,
-      mergedRecords = mergedCount,
-      validRecords = validCount,
-      rejectedRecords = rejectedCount,
-      rejectionRate = if (inputCount > 0) rejectedCount.toDouble / inputCount else 0.0, // Will be set by caller after timing completes
-      rejectionReasons = rejectionReasons
+    val errorType = if (isInvariantViolation) "invariant violation" else "error"
+    val errorMessage = if (isInvariantViolation) {
+      s"Invariant violation: ${error.getMessage}"
+    } else {
+      error.getMessage
+    }
+    
+    logger.error(
+      s"Flow ${flowConfig.name} failed - $errorType: ${error.getMessage}",
+      error
     )
+    
+    FlowResult.failure(flowConfig.name, batchId, errorMessage)
   }
   
   /**
@@ -267,70 +284,9 @@ class FlowExecutor(
   }
   
   /**
-   * Handles flow execution failure
+   * Logs merge statistics
    */
-  private def handleFailure(
-    batchId: String,
-    error: Exception,
-    isInvariantViolation: Boolean
-  ): FlowResult = {
-    val errorType = if (isInvariantViolation) "invariant violation" else "error"
-    
-    logger.error(
-      s"Flow ${flowConfig.name} failed - $errorType: ${error.getMessage}",
-      error
-    )
-    
-    FlowResult(
-      flowName = flowConfig.name,
-      batchId = batchId,
-      success = false,
-      error = Some(if (isInvariantViolation) s"Invariant violation: ${error.getMessage}" else error.getMessage)
-    )
-  }
-  
-  /**
-   * Verifies invariant: input = valid + rejected
-   */
-  private def verifyInvariant(input: Long, valid: Long, rejected: Long): Unit = {
-    if (input != valid + rejected) {
-      val message = s"Invariant violation in flow ${flowConfig.name}: " +
-        s"input_count ($input) != valid_count ($valid) + rejected_count ($rejected)"
-      logger.error(message)
-      throw new InvariantViolationException(message)
-    }
-    logger.debug(s"Invariant verified: $input = $valid + $rejected")
+  private def logMergeStats(newCount: Long, existingCount: Long, resultCount: Long): Unit = {
+    logger.info(s"Merge ${flowConfig.loadMode.`type`}: existing $existingCount + new $newCount → result $resultCount records")
   }
 }
-
-/**
- * Result of flow execution
- */
-case class FlowResult(
-  flowName: String,
-  batchId: String,
-  success: Boolean,
-  inputRecords: Long = 0,
-  mergedRecords: Long = 0,
-  validRecords: Long = 0,
-  rejectedRecords: Long = 0,
-  rejectionRate: Double = 0.0,
-  executionTimeMs: Long = 0,
-  rejectionReasons: Map[String, Long] = Map.empty,
-  error: Option[String] = None
-)
-
-/**
- * Information about an additional table
- */
-case class AdditionalTableInfo(
-  tableName: String,
-  data: DataFrame,
-  outputPath: Option[String],
-  dagMetadata: Option[AdditionalTableMetadata]
-)
-
-/**
- * Exception thrown when record invariant is violated
- */
-class InvariantViolationException(message: String) extends Exception(message)

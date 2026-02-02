@@ -47,6 +47,16 @@ case class AdditionalTableMetadata(
                                   )
 
 /**
+ * Information about an additional table created during transformations
+ */
+case class AdditionalTableInfo(
+  tableName: String,
+  data: DataFrame,
+  outputPath: Option[String],
+  dagMetadata: Option[AdditionalTableMetadata]
+)
+
+/**
  * Function type for transformations
  */
 object FlowTransformation {

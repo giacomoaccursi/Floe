@@ -1,7 +1,7 @@
 package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config.FlowConfig
-import com.etl.framework.core.{AdditionalTableMetadata, TransformationContext}
+import com.etl.framework.core.{AdditionalTableInfo, AdditionalTableMetadata, TransformationContext}
 import com.etl.framework.util.TimingUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory

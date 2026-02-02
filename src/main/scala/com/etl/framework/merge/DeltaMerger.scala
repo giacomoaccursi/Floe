@@ -1,5 +1,6 @@
 package com.etl.framework.merge
 
+import com.etl.framework.merge.MergeColumns._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import com.etl.framework.config.LoadModeConfig
@@ -125,9 +126,9 @@ class UpsertMerger(
     
     // Add row number and keep only the first (most recent) record for each key
     combined
-      .withColumn("_row_num", row_number().over(windowSpec))
-      .filter(col("_row_num") === 1)
-      .drop("_row_num")
+      .withColumn(ROW_NUM, row_number().over(windowSpec))
+      .filter(col(ROW_NUM) === 1)
+      .drop(ROW_NUM)
   }
   
   /**
@@ -235,15 +236,15 @@ class SCD2Merger(
     // 1. Changed records: key matches but compare key differs
     val changedRecords = joined
       .filter(
-        col("new._compare_key").isNotNull &&
-        col("existing._compare_key").isNotNull &&
-        col("new._compare_key") =!= col("existing._compare_key")
+        col(s"new.$COMPARE_KEY").isNotNull &&
+        col(s"existing.$COMPARE_KEY").isNotNull &&
+        col(s"new.$COMPARE_KEY") =!= col(s"existing.$COMPARE_KEY")
       )
       .select(keyColumns.map(c => col(s"existing.$c").alias(c)): _*)
     
     // 2. New records: key doesn't exist in existing
     val newRecords = joined
-      .filter(col("existing._compare_key").isNull)
+      .filter(col(s"existing.$COMPARE_KEY").isNull)
       .select(
         newData.columns.map(c => col(s"new.$c").alias(c)): _*
       )
@@ -254,9 +255,9 @@ class SCD2Merger(
     // 3. Unchanged records: key matches and compare key matches
     val unchangedKeys = joined
       .filter(
-        col("new._compare_key").isNotNull &&
-        col("existing._compare_key").isNotNull &&
-        col("new._compare_key") === col("existing._compare_key")
+        col(s"new.$COMPARE_KEY").isNotNull &&
+        col(s"existing.$COMPARE_KEY").isNotNull &&
+        col(s"new.$COMPARE_KEY") === col(s"existing.$COMPARE_KEY")
       )
       .select(keyColumns.map(c => col(s"existing.$c").alias(c)): _*)
     

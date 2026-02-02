@@ -106,8 +106,6 @@ object ParallelExecutionProperties extends Properties("ParallelExecution") {
   def createGlobalConfig(tempDir: String, parallel: Boolean): GlobalConfig = {
     GlobalConfig(
       paths = PathsConfig(
-        inputBase = s"$tempDir/input",
-        outputBase = s"$tempDir/output",
         validatedPath = s"$tempDir/validated",
         rejectedPath = s"$tempDir/rejected",
         metadataPath = s"$tempDir/metadata",

@@ -15,8 +15,6 @@ case class GlobalConfig(
  * Path configuration for input/output directories
  */
 case class PathsConfig(
-                        inputBase: String,
-                        outputBase: String,
                         validatedPath: String,
                         rejectedPath: String,
                         metadataPath: String,

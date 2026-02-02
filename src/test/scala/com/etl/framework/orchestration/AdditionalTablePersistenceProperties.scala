@@ -78,8 +78,6 @@ object AdditionalTablePersistenceProperties extends Properties("AdditionalTableP
   def createTestConfig(flowName: String, tempDir: String): (FlowConfig, GlobalConfig) = {
     val globalConfig = GlobalConfig(
       paths = PathsConfig(
-        inputBase = s"$tempDir/input",
-        outputBase = s"$tempDir/output",
         validatedPath = s"$tempDir/validated",
         rejectedPath = s"$tempDir/rejected",
         metadataPath = s"$tempDir/metadata",

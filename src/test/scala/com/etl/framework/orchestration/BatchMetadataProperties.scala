@@ -95,8 +95,6 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
   def createGlobalConfig(tempDir: String, batchIdFormat: String): GlobalConfig = {
     GlobalConfig(
       paths = PathsConfig(
-        inputBase = s"$tempDir/input",
-        outputBase = s"$tempDir/output",
         validatedPath = s"$tempDir/validated",
         rejectedPath = s"$tempDir/rejected",
         metadataPath = s"$tempDir/metadata",

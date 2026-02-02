@@ -36,8 +36,6 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       staging <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/staging/$s")
       checkpoint <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/checkpoint/$s")
     } yield PathsConfig(
-      inputBase = inputBase,
-      outputBase = outputBase,
       validatedPath = validated,
       rejectedPath = rejected,
       metadataPath = metadata,

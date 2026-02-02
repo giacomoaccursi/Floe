@@ -48,8 +48,6 @@ object CustomOutputPathProperties extends Properties("CustomOutputPath") {
   val globalConfigGen: Gen[GlobalConfig] = Gen.const(
     GlobalConfig(
       paths = PathsConfig(
-        inputBase = "/tmp/input",
-        outputBase = "/tmp/output",
         validatedPath = "/tmp/validated",
         rejectedPath = "/tmp/rejected",
         metadataPath = "/tmp/metadata",

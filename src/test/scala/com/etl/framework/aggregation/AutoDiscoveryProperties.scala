@@ -80,8 +80,6 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
     tempDir <- Gen.const(Files.createTempDirectory(uniqueId))
   } yield GlobalConfig(
     paths = PathsConfig(
-      inputBase = "/data/input",
-      outputBase = "/data/output",
       validatedPath = "/data/validated",
       rejectedPath = "/data/rejected",
       metadataPath = tempDir.toString,

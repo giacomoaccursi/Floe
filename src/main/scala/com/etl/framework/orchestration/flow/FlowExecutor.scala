@@ -66,9 +66,14 @@ class FlowExecutor(
       val preTransformedData = transformer.applyPreValidationTransformation(rawData, batchId)
       val inputCount = preTransformedData.count()
 
-      // 3. Merge with existing data (delta mode)
-      val mergedData = TimingUtil.timed(logger, "Merge with existing data") {
-        mergeWithExisting(preTransformedData)
+      val mergedData = if (flowConfig.loadMode.`type` == "full") {
+        logger.debug("Full load mode, skipping merge")
+        preTransformedData
+      } else {
+        // 3. Merge with existing data (delta mode only)
+        TimingUtil.timed(logger, "Merge with existing data") {
+          mergeWithExisting(preTransformedData)
+        }
       }
       val mergedCount = mergedData.count()
       
@@ -125,14 +130,9 @@ class FlowExecutor(
   }
   
   /**
-   * Merges with existing data (delta mode)
+   * Merges new data with existing data
    */
   private def mergeWithExisting(newData: DataFrame): DataFrame = {
-    if (flowConfig.loadMode.`type` == "full") {
-      logger.debug("Full load mode, skipping merge")
-      return newData
-    }
-    
     val outputPath = flowConfig.output.path.getOrElse(
       s"${globalConfig.paths.validatedPath}/${flowConfig.name}"
     )

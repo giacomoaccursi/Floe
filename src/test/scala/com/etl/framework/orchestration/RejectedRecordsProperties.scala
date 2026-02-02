@@ -1,6 +1,7 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.TestConfig
+import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -42,11 +43,11 @@ object RejectedRecordsProperties extends Properties("RejectedRecords") {
   
   // Required audit fields for rejected records
   val requiredAuditFields = Set(
-    "_rejection_reason",
-    "_rejection_code",
-    "_rejected_at",
-    "_batch_id",
-    "_validation_step"
+    REJECTION_REASON,
+    REJECTION_CODE,
+    REJECTED_AT,
+    BATCH_ID,
+    VALIDATION_STEP
   )
   
   /**
@@ -62,11 +63,11 @@ object RejectedRecordsProperties extends Properties("RejectedRecords") {
     
     // Simulate adding audit fields (as done in writeRejected)
     val rejectedDf = originalDf
-      .withColumn("_rejection_reason", lit("Test rejection"))
-      .withColumn("_rejection_code", lit("TEST_CODE"))
-      .withColumn("_rejected_at", lit("2024-01-20T10:00:00Z"))
-      .withColumn("_batch_id", lit("batch_001"))
-      .withColumn("_validation_step", lit("test_validation"))
+      .withColumn(REJECTION_REASON, lit("Test rejection"))
+      .withColumn(REJECTION_CODE, lit("TEST_CODE"))
+      .withColumn(REJECTED_AT, lit("2024-01-20T10:00:00Z"))
+      .withColumn(BATCH_ID, lit("batch_001"))
+      .withColumn(VALIDATION_STEP, lit("test_validation"))
     
     val rejectedColumns = rejectedDf.columns.toSet
     
@@ -93,11 +94,11 @@ object RejectedRecordsProperties extends Properties("RejectedRecords") {
     
     // Simulate adding audit fields
     val rejectedDf = originalDf
-      .withColumn("_rejection_reason", lit("Test rejection"))
-      .withColumn("_rejection_code", lit("TEST_CODE"))
-      .withColumn("_rejected_at", lit("2024-01-20T10:00:00Z"))
-      .withColumn("_batch_id", lit("batch_001"))
-      .withColumn("_validation_step", lit("test_validation"))
+      .withColumn(REJECTION_REASON, lit("Test rejection"))
+      .withColumn(REJECTION_CODE, lit("TEST_CODE"))
+      .withColumn(REJECTED_AT, lit("2024-01-20T10:00:00Z"))
+      .withColumn(BATCH_ID, lit("batch_001"))
+      .withColumn(VALIDATION_STEP, lit("test_validation"))
     
     // Select only original columns from rejected DataFrame
     val rejectedOriginalColumns = rejectedDf.select("id", "value", "status")
@@ -123,11 +124,11 @@ object RejectedRecordsProperties extends Properties("RejectedRecords") {
     
     // Simulate adding audit fields
     val rejectedDf = originalDf
-      .withColumn("_rejection_reason", lit("Test rejection"))
-      .withColumn("_rejection_code", lit("TEST_CODE"))
-      .withColumn("_rejected_at", lit("2024-01-20T10:00:00Z"))
-      .withColumn("_batch_id", lit("batch_001"))
-      .withColumn("_validation_step", lit("test_validation"))
+      .withColumn(REJECTION_REASON, lit("Test rejection"))
+      .withColumn(REJECTION_CODE, lit("TEST_CODE"))
+      .withColumn(REJECTED_AT, lit("2024-01-20T10:00:00Z"))
+      .withColumn(BATCH_ID, lit("batch_001"))
+      .withColumn(VALIDATION_STEP, lit("test_validation"))
     
     // Check for null values in audit fields
     val nullCounts = requiredAuditFields.map { field =>
@@ -150,27 +151,27 @@ object RejectedRecordsProperties extends Properties("RejectedRecords") {
     
     // Simulate first batch rejected records
     val batch1Rejected = batch1Data.toDF("id", "value", "status")
-      .withColumn("_rejection_reason", lit("Batch 1 rejection"))
-      .withColumn("_rejection_code", lit("BATCH1_CODE"))
-      .withColumn("_rejected_at", lit("2024-01-20T10:00:00Z"))
-      .withColumn("_batch_id", lit("batch_001"))
-      .withColumn("_validation_step", lit("validation_1"))
+      .withColumn(REJECTION_REASON, lit("Batch 1 rejection"))
+      .withColumn(REJECTION_CODE, lit("BATCH1_CODE"))
+      .withColumn(REJECTED_AT, lit("2024-01-20T10:00:00Z"))
+      .withColumn(BATCH_ID, lit("batch_001"))
+      .withColumn(VALIDATION_STEP, lit("validation_1"))
     
     // Simulate second batch rejected records (overwriting)
     val batch2Rejected = batch2Data.toDF("id", "value", "status")
-      .withColumn("_rejection_reason", lit("Batch 2 rejection"))
-      .withColumn("_rejection_code", lit("BATCH2_CODE"))
-      .withColumn("_rejected_at", lit("2024-01-20T11:00:00Z"))
-      .withColumn("_batch_id", lit("batch_002"))
-      .withColumn("_validation_step", lit("validation_2"))
+      .withColumn(REJECTION_REASON, lit("Batch 2 rejection"))
+      .withColumn(REJECTION_CODE, lit("BATCH2_CODE"))
+      .withColumn(REJECTED_AT, lit("2024-01-20T11:00:00Z"))
+      .withColumn(BATCH_ID, lit("batch_002"))
+      .withColumn(VALIDATION_STEP, lit("validation_2"))
     
     // In overwrite mode, only batch 2 data should remain
     val batch1Count = batch1Rejected.count()
     val batch2Count = batch2Rejected.count()
     
     // Verify batch IDs are different
-    val batch1Id = batch1Rejected.select("_batch_id").first().getString(0)
-    val batch2Id = batch2Rejected.select("_batch_id").first().getString(0)
+    val batch1Id = batch1Rejected.select(BATCH_ID).first().getString(0)
+    val batch2Id = batch2Rejected.select(BATCH_ID).first().getString(0)
     
     batch1Id != batch2Id &&
     batch1Count >= 0 &&
@@ -195,15 +196,15 @@ object RejectedRecordsProperties extends Properties("RejectedRecords") {
     
     // Simulate adding audit fields with descriptive reasons
     val rejectedDf = originalDf
-      .withColumn("_rejection_reason", lit(rejectionReasons.head))
-      .withColumn("_rejection_code", lit("PK_DUPLICATE"))
-      .withColumn("_rejected_at", lit("2024-01-20T10:00:00Z"))
-      .withColumn("_batch_id", lit("batch_001"))
-      .withColumn("_validation_step", lit("pk_validation"))
+      .withColumn(REJECTION_REASON, lit(rejectionReasons.head))
+      .withColumn(REJECTION_CODE, lit("PK_DUPLICATE"))
+      .withColumn(REJECTED_AT, lit("2024-01-20T10:00:00Z"))
+      .withColumn(BATCH_ID, lit("batch_001"))
+      .withColumn(VALIDATION_STEP, lit("pk_validation"))
     
     // Verify rejection reason is non-empty
     val reasonLengths = rejectedDf
-      .select(length(col("_rejection_reason")).as("reason_length"))
+      .select(length(col(REJECTION_REASON)).as("reason_length"))
       .collect()
       .map(row => Option(row.get(0)).map(_.toString.toLong).getOrElse(0L))
     
@@ -230,15 +231,15 @@ object RejectedRecordsProperties extends Properties("RejectedRecords") {
     
     // Simulate adding audit fields with validation step
     val rejectedDf = originalDf
-      .withColumn("_rejection_reason", lit("Validation failed"))
-      .withColumn("_rejection_code", lit("VALIDATION_FAILED"))
-      .withColumn("_rejected_at", lit("2024-01-20T10:00:00Z"))
-      .withColumn("_batch_id", lit("batch_001"))
-      .withColumn("_validation_step", lit(validationSteps.head))
+      .withColumn(REJECTION_REASON, lit("Validation failed"))
+      .withColumn(REJECTION_CODE, lit("VALIDATION_FAILED"))
+      .withColumn(REJECTED_AT, lit("2024-01-20T10:00:00Z"))
+      .withColumn(BATCH_ID, lit("batch_001"))
+      .withColumn(VALIDATION_STEP, lit(validationSteps.head))
     
     // Verify validation step is non-empty
     val stepLengths = rejectedDf
-      .select(length(col("_validation_step")).as("step_length"))
+      .select(length(col(VALIDATION_STEP)).as("step_length"))
       .collect()
       .map(row => Option(row.get(0)).map(_.toString.toLong).getOrElse(0L))
     
@@ -255,15 +256,15 @@ object RejectedRecordsProperties extends Properties("RejectedRecords") {
     
     // Simulate adding audit fields with timestamp
     val rejectedDf = originalDf
-      .withColumn("_rejection_reason", lit("Test rejection"))
-      .withColumn("_rejection_code", lit("TEST_CODE"))
-      .withColumn("_rejected_at", lit("2024-01-20T10:00:00Z"))
-      .withColumn("_batch_id", lit("batch_001"))
-      .withColumn("_validation_step", lit("test_validation"))
+      .withColumn(REJECTION_REASON, lit("Test rejection"))
+      .withColumn(REJECTION_CODE, lit("TEST_CODE"))
+      .withColumn(REJECTED_AT, lit("2024-01-20T10:00:00Z"))
+      .withColumn(BATCH_ID, lit("batch_001"))
+      .withColumn(VALIDATION_STEP, lit("test_validation"))
     
     // Verify timestamp format (basic check for ISO 8601 pattern)
     val timestamps = rejectedDf
-      .select(col("_rejected_at"))
+      .select(col(REJECTED_AT))
       .collect()
       .map(_.getString(0))
     

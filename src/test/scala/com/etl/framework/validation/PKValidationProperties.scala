@@ -2,7 +2,9 @@ package com.etl.framework.validation
 
 import com.etl.framework.config._
 import com.etl.framework.TestConfig
+import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.scalacheck.{Gen, Properties}
 import org.scalacheck.Prop.forAll
@@ -154,10 +156,10 @@ object PKValidationProperties extends Properties("PKValidation") {
           
           // Rejected records should have correct metadata
           val hasCorrectMetadata = result.rejected.exists { rejectedDf =>
-            rejectedDf.columns.contains("_rejection_code") &&
-            rejectedDf.columns.contains("_rejection_reason") &&
-            rejectedDf.columns.contains("_validation_step") &&
-            rejectedDf.filter($"_rejection_code" === "PK_DUPLICATE").count() == duplicateRecordCount
+            rejectedDf.columns.contains(REJECTION_CODE) &&
+            rejectedDf.columns.contains(REJECTION_REASON) &&
+            rejectedDf.columns.contains(VALIDATION_STEP) &&
+            rejectedDf.filter(col(REJECTION_CODE) === "PK_DUPLICATE").count() == duplicateRecordCount
           }
           
           allDuplicatesRejected && validHasUniqueKeys && hasCorrectMetadata
@@ -183,14 +185,14 @@ object PKValidationProperties extends Properties("PKValidation") {
           
           // No records should be rejected for PK violation
           val noPKRejections = result.rejected.forall { rejectedDf =>
-            rejectedDf.filter($"_rejection_code" === "PK_DUPLICATE").isEmpty
+            rejectedDf.filter(col(REJECTION_CODE) === "PK_DUPLICATE").isEmpty
           }
           
           // All records should be in valid DataFrame
           val allRecordsValid = result.valid.count() == records.size
           
           // Valid records should have warnings column
-          val hasWarningsColumn = result.valid.columns.contains("_warnings")
+          val hasWarningsColumn = result.valid.columns.contains(WARNINGS)
           
           noPKRejections && allRecordsValid && hasWarningsColumn
         }
@@ -314,10 +316,10 @@ object PKValidationProperties extends Properties("PKValidation") {
           // Check that all required metadata fields are present in rejected records
           result.rejected.exists { rejectedDf =>
             val requiredFields = Set(
-              "_rejection_code",
-              "_rejection_reason",
-              "_validation_step",
-              "_rejected_at"
+              REJECTION_CODE,
+              REJECTION_REASON,
+              VALIDATION_STEP,
+              REJECTED_AT
             )
             
             val actualFields = rejectedDf.columns.toSet
@@ -325,14 +327,14 @@ object PKValidationProperties extends Properties("PKValidation") {
             
             // Check that rejection code is correct
             val correctCode = rejectedDf
-              .select("_rejection_code")
+              .select(REJECTION_CODE)
               .distinct()
               .collect()
               .forall(_.getString(0) == "PK_DUPLICATE")
             
             // Check that rejection reason mentions primary key
             val reasonMentionsPK = rejectedDf
-              .select("_rejection_reason")
+              .select(REJECTION_REASON)
               .distinct()
               .collect()
               .forall { row =>
@@ -342,7 +344,7 @@ object PKValidationProperties extends Properties("PKValidation") {
             
             // Check that validation step is correct
             val correctStep = rejectedDf
-              .select("_validation_step")
+              .select(VALIDATION_STEP)
               .distinct()
               .collect()
               .forall(_.getString(0) == "pk_validation")

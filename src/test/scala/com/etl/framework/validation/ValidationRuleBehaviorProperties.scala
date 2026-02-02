@@ -2,6 +2,7 @@ package com.etl.framework.validation
 
 import com.etl.framework.config._
 import com.etl.framework.TestConfig
+import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 import org.scalacheck.{Gen, Properties}
@@ -166,10 +167,10 @@ object ValidationRuleBehaviorProperties extends Properties("ValidationRuleBehavi
           // Rejected records should have rejection metadata
           val hasRejectionMetadata = if (actualInvalidCount > 0) {
             result.rejected.exists { rejectedDf =>
-              rejectedDf.columns.contains("_rejection_code") &&
-              rejectedDf.columns.contains("_rejection_reason") &&
-              rejectedDf.columns.contains("_validation_step") &&
-              rejectedDf.columns.contains("_rejected_at")
+              rejectedDf.columns.contains(REJECTION_CODE) &&
+              rejectedDf.columns.contains(REJECTION_REASON) &&
+              rejectedDf.columns.contains(VALIDATION_STEP) &&
+              rejectedDf.columns.contains(REJECTED_AT)
             }
           } else {
             true // No rejected records expected
@@ -178,7 +179,7 @@ object ValidationRuleBehaviorProperties extends Properties("ValidationRuleBehavi
           // Rejection code should be REGEX_VALIDATION_FAILED
           val correctRejectionCode = if (actualInvalidCount > 0) {
             result.rejected.exists { rejectedDf =>
-              rejectedDf.filter($"_rejection_code" === "REGEX_VALIDATION_FAILED").count() == actualInvalidCount
+              rejectedDf.filter(col(REJECTION_CODE) === "REGEX_VALIDATION_FAILED").count() == actualInvalidCount
             }
           } else {
             true // No rejected records expected
@@ -268,7 +269,7 @@ object ValidationRuleBehaviorProperties extends Properties("ValidationRuleBehavi
           
           // No records should be rejected for regex validation
           val noRegexRejections = result.rejected.forall { rejectedDf =>
-            rejectedDf.filter($"_rejection_code" === "REGEX_VALIDATION_FAILED").isEmpty
+            rejectedDf.filter(col(REJECTION_CODE) === "REGEX_VALIDATION_FAILED").isEmpty
           }
           
           // All records should be in valid DataFrame (may be rejected for other reasons like PK)
@@ -279,7 +280,7 @@ object ValidationRuleBehaviorProperties extends Properties("ValidationRuleBehavi
           }
           
           // Valid DataFrame should have warnings column
-          val hasWarningsColumn = result.valid.columns.contains("_warnings")
+          val hasWarningsColumn = result.valid.columns.contains(WARNINGS)
           
           // Records with invalid emails should have warnings
           val invalidRecordsHaveWarnings = if (actualInvalidCount > 0) {
@@ -291,7 +292,7 @@ object ValidationRuleBehaviorProperties extends Properties("ValidationRuleBehavi
             } else {
               // Check that these records have non-empty warnings
               recordsWithInvalidEmails
-                .filter(size(col("_warnings")) > 0)
+                .filter(size(col(WARNINGS)) > 0)
                 .count() == recordsWithInvalidEmails.count()
             }
           } else {
@@ -333,7 +334,7 @@ object ValidationRuleBehaviorProperties extends Properties("ValidationRuleBehavi
           } else {
             // Check that warnings mention the validation issue
             val warningsAreDescriptive = recordsWithInvalidEmails
-              .select("_warnings")
+              .select(WARNINGS)
               .collect()
               .forall { row =>
                 val warnings = row.getSeq[String](0)
@@ -370,7 +371,7 @@ object ValidationRuleBehaviorProperties extends Properties("ValidationRuleBehavi
       
       // All records should have empty warnings (or only warnings from other validations)
       val allHaveEmptyOrNoRegexWarnings = result.valid
-        .select("_warnings")
+        .select(WARNINGS)
         .collect()
         .forall { row =>
           val warnings = row.getSeq[String](0)
@@ -494,7 +495,7 @@ object ValidationRuleBehaviorProperties extends Properties("ValidationRuleBehavi
       
       // Records with invalid age should be rejected
       val ageRejectionsExist = result.rejected.exists { rejectedDf =>
-        rejectedDf.filter($"_rejection_code" === "RANGE_VALIDATION_FAILED").count() > 0
+        rejectedDf.filter(col(REJECTION_CODE) === "RANGE_VALIDATION_FAILED").count() > 0
       }
       
       // Records with invalid email but valid age should be in valid with warnings
@@ -507,14 +508,14 @@ object ValidationRuleBehaviorProperties extends Properties("ValidationRuleBehavi
           true // No such records
         } else {
           recordsWithInvalidEmailValidAge
-            .filter(size(col("_warnings")) > 0)
+            .filter(size(col(WARNINGS)) > 0)
             .count() == recordsWithInvalidEmailValidAge.count()
         }
       }
       
       // No records should be rejected for email validation
       val noEmailRejections = result.rejected.forall { rejectedDf =>
-        rejectedDf.filter($"_rejection_code" === "REGEX_VALIDATION_FAILED").isEmpty
+        rejectedDf.filter(col(REJECTION_CODE) === "REGEX_VALIDATION_FAILED").isEmpty
       }
       
       // Record count invariant
@@ -565,7 +566,7 @@ object ValidationRuleBehaviorProperties extends Properties("ValidationRuleBehavi
       val noRecords = result.valid.count() == 0 && result.rejected.forall(_.count() == 0)
       
       // Should have warnings column
-      val hasWarningsColumn = result.valid.columns.contains("_warnings")
+      val hasWarningsColumn = result.valid.columns.contains(WARNINGS)
       
       noRecords && hasWarningsColumn
     }.getOrElse(false)

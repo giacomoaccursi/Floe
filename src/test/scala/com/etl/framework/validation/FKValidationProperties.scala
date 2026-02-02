@@ -2,8 +2,10 @@ package com.etl.framework.validation
 
 import com.etl.framework.config._
 import com.etl.framework.TestConfig
+import com.etl.framework.validation.ValidationColumns._
 import com.etl.framework.validation.validators.ForeignKeyValidationException
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions._
 import org.scalacheck.{Gen, Properties}
 import org.scalacheck.Prop.forAll
 import org.scalacheck.Test.Parameters
@@ -174,10 +176,10 @@ object FKValidationProperties extends Properties("FKValidation") {
             
             // Rejected records should have correct metadata
             val hasCorrectMetadata = result.rejected.exists { rejectedDf =>
-              rejectedDf.columns.contains("_rejection_code") &&
-              rejectedDf.columns.contains("_rejection_reason") &&
-              rejectedDf.columns.contains("_validation_step") &&
-              rejectedDf.filter($"_rejection_code" === "FK_VIOLATION").count() == orphanCount
+              rejectedDf.columns.contains(REJECTION_CODE) &&
+              rejectedDf.columns.contains(REJECTION_REASON) &&
+              rejectedDf.columns.contains(VALIDATION_STEP) &&
+              rejectedDf.filter(col(REJECTION_CODE) === "FK_VIOLATION").count() == orphanCount
             }
             
             allOrphansRejected && validHasNoOrphans && hasCorrectMetadata
@@ -210,7 +212,7 @@ object FKValidationProperties extends Properties("FKValidation") {
             
             // No records should be rejected for FK violation
             val noFKRejections = result.rejected.forall { rejectedDf =>
-              rejectedDf.filter($"_rejection_code" === "FK_VIOLATION").isEmpty
+              rejectedDf.filter(col(REJECTION_CODE) === "FK_VIOLATION").isEmpty
             }
             
             // All records should be in valid DataFrame (or rejected for other reasons, not FK)
@@ -369,7 +371,7 @@ object FKValidationProperties extends Properties("FKValidation") {
         
         // All rejections should be FK violations
         val allFKViolations = result.rejected.exists { rejectedDf =>
-          rejectedDf.filter($"_rejection_code" === "FK_VIOLATION").count() == childCount
+          rejectedDf.filter(col(REJECTION_CODE) === "FK_VIOLATION").count() == childCount
         }
         
         allRejected && noValidRecords && allFKViolations
@@ -408,7 +410,7 @@ object FKValidationProperties extends Properties("FKValidation") {
             
             // All records with valid FKs should pass FK validation
             val noFKRejections = result.rejected.forall { rejectedDf =>
-              rejectedDf.filter($"_rejection_code" === "FK_VIOLATION").isEmpty
+              rejectedDf.filter(col(REJECTION_CODE) === "FK_VIOLATION").isEmpty
             }
             
             noFKRejections
@@ -440,10 +442,10 @@ object FKValidationProperties extends Properties("FKValidation") {
             // Check that all required metadata fields are present in rejected records
             result.rejected.exists { rejectedDf =>
               val requiredFields = Set(
-                "_rejection_code",
-                "_rejection_reason",
-                "_validation_step",
-                "_rejected_at"
+                REJECTION_CODE,
+                REJECTION_REASON,
+                VALIDATION_STEP,
+                REJECTED_AT
               )
               
               val actualFields = rejectedDf.columns.toSet
@@ -451,12 +453,12 @@ object FKValidationProperties extends Properties("FKValidation") {
               
               // Check that rejection code is correct
               val correctCode = rejectedDf
-                .filter($"_rejection_code" === "FK_VIOLATION")
+                .filter(col(REJECTION_CODE) === "FK_VIOLATION")
                 .count() > 0
               
               // Check that rejection reason mentions foreign key
               val reasonMentionsFK = rejectedDf
-                .select("_rejection_reason")
+                .select(REJECTION_REASON)
                 .distinct()
                 .collect()
                 .forall { row =>
@@ -466,7 +468,7 @@ object FKValidationProperties extends Properties("FKValidation") {
               
               // Check that validation step is correct
               val correctStep = rejectedDf
-                .select("_validation_step")
+                .select(VALIDATION_STEP)
                 .distinct()
                 .collect()
                 .forall(_.getString(0) == "fk_validation")

@@ -2,6 +2,7 @@ package com.etl.framework.validation
 
 import com.etl.framework.config._
 import com.etl.framework.TestConfig
+import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 import org.scalacheck.{Gen, Properties}
@@ -343,10 +344,10 @@ object CustomValidatorProperties extends Properties("CustomValidator") {
         // If there are rejected records, they should have metadata
         if (result.rejected.exists(_.count() > 0)) {
           val rejectedDf = result.rejected.get
-          val hasRejectionCode = rejectedDf.columns.contains("_rejection_code")
-          val hasRejectionReason = rejectedDf.columns.contains("_rejection_reason")
-          val hasValidationStep = rejectedDf.columns.contains("_validation_step")
-          val hasRejectedAt = rejectedDf.columns.contains("_rejected_at")
+          val hasRejectionCode = rejectedDf.columns.contains(REJECTION_CODE)
+          val hasRejectionReason = rejectedDf.columns.contains(REJECTION_REASON)
+          val hasValidationStep = rejectedDf.columns.contains(VALIDATION_STEP)
+          val hasRejectedAt = rejectedDf.columns.contains(REJECTED_AT)
           
           hasRejectionCode && hasRejectionReason && hasValidationStep && hasRejectedAt
         } else {
@@ -413,10 +414,10 @@ class TestCustomValidator extends Validator with ConfigurableValidator {
     // Reject records where value.length > threshold
     val valid = df.filter(length(col(column)) <= threshold)
     val rejected = df.filter(length(col(column)) > threshold)
-      .withColumn("_rejection_reason", lit(s"Value length exceeds threshold $threshold"))
-      .withColumn("_rejection_code", lit("CUSTOM_VALIDATION_FAILED"))
-      .withColumn("_validation_step", lit(s"custom_${column}"))
-      .withColumn("_rejected_at", current_timestamp())
+      .withColumn(REJECTION_REASON, lit(s"Value length exceeds threshold $threshold"))
+      .withColumn(REJECTION_CODE, lit("CUSTOM_VALIDATION_FAILED"))
+      .withColumn(VALIDATION_STEP, lit(s"custom_${column}"))
+      .withColumn(REJECTED_AT, current_timestamp())
     
     ValidationStepResult(valid, Some(rejected))
   }
@@ -452,10 +453,10 @@ class TestConfigurableValidator extends Validator with ConfigurableValidator {
     
     val valid = df.filter(condition)
     val rejected = df.filter(!condition)
-      .withColumn("_rejection_reason", lit(s"Value doesn't match prefix/suffix pattern"))
-      .withColumn("_rejection_code", lit("CUSTOM_VALIDATION_FAILED"))
-      .withColumn("_validation_step", lit(s"custom_configurable_${column}"))
-      .withColumn("_rejected_at", current_timestamp())
+      .withColumn(REJECTION_REASON, lit(s"Value doesn't match prefix/suffix pattern"))
+      .withColumn(REJECTION_CODE, lit("CUSTOM_VALIDATION_FAILED"))
+      .withColumn(VALIDATION_STEP, lit(s"custom_configurable_${column}"))
+      .withColumn(REJECTED_AT, current_timestamp())
     
     ValidationStepResult(valid, Some(rejected))
   }

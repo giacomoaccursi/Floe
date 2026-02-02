@@ -1,7 +1,9 @@
 package com.etl.framework.validation
 
 import com.etl.framework.config._
+import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.scalacheck.{Gen, Properties}
 import org.scalacheck.Prop.forAll
@@ -146,14 +148,14 @@ object SchemaValidationProperties extends Properties("SchemaValidation") {
         
         // Rejected records should have rejection metadata
         val hasMetadata = result.rejected.exists { rejectedDf =>
-          rejectedDf.columns.contains("_rejection_code") &&
-          rejectedDf.columns.contains("_rejection_reason") &&
-          rejectedDf.columns.contains("_validation_step")
+          rejectedDf.columns.contains(REJECTION_CODE) &&
+          rejectedDf.columns.contains(REJECTION_REASON) &&
+          rejectedDf.columns.contains(VALIDATION_STEP)
         }
         
         // Rejection code should be SCHEMA_VALIDATION_FAILED
         val correctCode = result.rejected.exists { rejectedDf =>
-          rejectedDf.select("_rejection_code").distinct().collect().forall { row =>
+          rejectedDf.select(REJECTION_CODE).distinct().collect().forall { row =>
             row.getString(0) == "SCHEMA_VALIDATION_FAILED"
           }
         }
@@ -179,7 +181,7 @@ object SchemaValidationProperties extends Properties("SchemaValidation") {
       // All records should pass schema validation (may fail other validations, but not schema)
       // Check that no records were rejected due to schema validation
       val noSchemaRejections = result.rejected.forall { rejectedDf =>
-        !rejectedDf.filter($"_rejection_code" === "SCHEMA_VALIDATION_FAILED").isEmpty == false
+        !rejectedDf.filter(col(REJECTION_CODE) === "SCHEMA_VALIDATION_FAILED").isEmpty == false
       }
       
       // Valid records should have warnings column
@@ -223,7 +225,7 @@ object SchemaValidationProperties extends Properties("SchemaValidation") {
         
         // Rejection reason should mention missing columns
         val reasonMentionsMissing = result.rejected.exists { rejectedDf =>
-          rejectedDf.select("_rejection_reason").distinct().collect().forall { row =>
+          rejectedDf.select(REJECTION_REASON).distinct().collect().forall { row =>
             val reason = row.getString(0)
             reason.contains("Missing required columns")
           }
@@ -257,7 +259,7 @@ object SchemaValidationProperties extends Properties("SchemaValidation") {
         
         // Should not reject due to schema validation
         val noSchemaRejections = result.rejected.forall { rejectedDf =>
-          rejectedDf.filter($"_rejection_code" === "SCHEMA_VALIDATION_FAILED").isEmpty
+          rejectedDf.filter(col(REJECTION_CODE) === "SCHEMA_VALIDATION_FAILED").isEmpty
         }
         
         noSchemaRejections
@@ -338,10 +340,10 @@ object SchemaValidationProperties extends Properties("SchemaValidation") {
         // Check that all required metadata fields are present
         result.rejected.exists { rejectedDf =>
           val requiredMetadataFields = Set(
-            "_rejection_code",
-            "_rejection_reason",
-            "_validation_step",
-            "_rejected_at"
+            REJECTION_CODE,
+            REJECTION_REASON,
+            VALIDATION_STEP,
+            REJECTED_AT
           )
           
           val actualFields = rejectedDf.columns.toSet
@@ -382,7 +384,7 @@ object SchemaValidationProperties extends Properties("SchemaValidation") {
         
         // Should not reject due to schema validation when enforcement is disabled
         val noSchemaRejections = result.rejected.forall { rejectedDf =>
-          rejectedDf.filter($"_rejection_code" === "SCHEMA_VALIDATION_FAILED").isEmpty
+          rejectedDf.filter(col(REJECTION_CODE) === "SCHEMA_VALIDATION_FAILED").isEmpty
         }
         
         noSchemaRejections

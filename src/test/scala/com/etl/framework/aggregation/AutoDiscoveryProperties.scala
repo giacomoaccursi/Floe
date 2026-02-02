@@ -223,13 +223,11 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
         nodes = Seq.empty  // No configured nodes
       )
       
-      // Create orchestrator with auto-discovery enabled
-      val orchestrator = new DAGOrchestrator(dagConfig, globalConfig, autoDiscoverAdditionalTables = true)
+      // Create table discovery component
+      val tableDiscovery = new AdditionalTableDiscovery(globalConfig)
       
-      // Use reflection to access private discoverAdditionalTables method
-      val method = orchestrator.getClass.getDeclaredMethod("discoverAdditionalTables")
-      method.setAccessible(true)
-      val discoveredNodes = method.invoke(orchestrator).asInstanceOf[Seq[DAGNode]]
+      // Discover additional tables
+      val discoveredNodes = tableDiscovery.discoverAdditionalTables()
       
       // Verify that all additional tables were discovered
       val discoveredTableNames = discoveredNodes.map(_.sourceFlow).toSet
@@ -287,13 +285,12 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
         nodes = Seq.empty
       )
       
-      // Create orchestrator with auto-discovery enabled
-      val orchestrator = new DAGOrchestrator(dagConfig, globalConfig, autoDiscoverAdditionalTables = true)
+      // Create table discovery component
+      val tableDiscovery = new AdditionalTableDiscovery(globalConfig)
       
-      // Use reflection to access private discoverAdditionalTables method
-      val method = orchestrator.getClass.getDeclaredMethod("discoverAdditionalTables")
-      method.setAccessible(true)
-      val discoveredNodes = method.invoke(orchestrator).asInstanceOf[Seq[DAGNode]]
+      // Discover additional tables
+      val discoveredNodes = tableDiscovery.discoverAdditionalTables()
+      
       
       // Find the discovered node for this table
       val discoveredNode = discoveredNodes.find(_.sourceFlow == additionalTable.tableName)
@@ -339,13 +336,12 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
         nodes = Seq.empty
       )
       
-      // Create orchestrator with auto-discovery enabled
-      val orchestrator = new DAGOrchestrator(dagConfig, globalConfig, autoDiscoverAdditionalTables = true)
+      // Create table discovery component
+      val tableDiscovery = new AdditionalTableDiscovery(globalConfig)
       
-      // Use reflection to access private discoverAdditionalTables method
-      val method = orchestrator.getClass.getDeclaredMethod("discoverAdditionalTables")
-      method.setAccessible(true)
-      val discoveredNodes = method.invoke(orchestrator).asInstanceOf[Seq[DAGNode]]
+      // Discover additional tables
+      val discoveredNodes = tableDiscovery.discoverAdditionalTables()
+      
       
       // Find the discovered node for this table
       val discoveredNode = discoveredNodes.find(_.sourceFlow == additionalTable.tableName)
@@ -395,13 +391,12 @@ object AutoDiscoveryProperties extends Properties("AutoDiscovery") {
           nodes = Seq.empty
         )
         
-        // Create orchestrator with auto-discovery enabled
-        val orchestrator = new DAGOrchestrator(dagConfig, globalConfig, autoDiscoverAdditionalTables = true)
+        // Create table discovery component
+        val tableDiscovery = new AdditionalTableDiscovery(globalConfig)
+      
+      // Discover additional tables
+      val discoveredNodes = tableDiscovery.discoverAdditionalTables()
         
-        // Use reflection to access private discoverAdditionalTables method
-        val method = orchestrator.getClass.getDeclaredMethod("discoverAdditionalTables")
-        method.setAccessible(true)
-        val discoveredNodes = method.invoke(orchestrator).asInstanceOf[Seq[DAGNode]]
         
         // Should return empty list
         discoveredNodes.isEmpty

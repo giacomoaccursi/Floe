@@ -1,6 +1,6 @@
 package com.etl.framework.aggregation
 
-import com.etl.framework.config.{AggregationConfig, DAGNode, GlobalConfig, JoinConfig}
+import com.etl.framework.config.{AggregationConfig, GlobalConfig}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
@@ -52,39 +52,5 @@ class DAGOrchestrator(
     logger.info("Starting DAG execution")
     val plan = buildExecutionPlan()
     dagExecutor.execute(plan)
-  }
-  
-  // Private methods for backward compatibility with tests using reflection
-  
-  private def discoverAdditionalTables(): Seq[DAGNode] = {
-    tableDiscovery.discoverAdditionalTables()
-  }
-  
-  private def buildDependencyGraph(nodes: Seq[DAGNode]): Map[String, Set[String]] = {
-    graphBuilder.buildDependencyGraph(nodes)
-  }
-  
-  private def applyNestJoin(
-    parent: DataFrame,
-    child: DataFrame,
-    joinConfig: JoinConfig
-  ): DataFrame = {
-    joinExecutor.applyJoin(parent, child, joinConfig)
-  }
-  
-  private def applyFlattenJoin(
-    parent: DataFrame,
-    child: DataFrame,
-    joinConfig: JoinConfig
-  ): DataFrame = {
-    joinExecutor.applyJoin(parent, child, joinConfig)
-  }
-  
-  private def applyAggregateJoin(
-    parent: DataFrame,
-    child: DataFrame,
-    joinConfig: JoinConfig
-  ): DataFrame = {
-    joinExecutor.applyJoin(parent, child, joinConfig)
   }
 }

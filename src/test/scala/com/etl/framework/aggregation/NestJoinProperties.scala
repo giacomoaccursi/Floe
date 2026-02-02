@@ -81,38 +81,10 @@ object NestJoinProperties extends Properties("NestJoin") {
     records.toDF("parent_id", "child_name", "child_value")
   }
   
-  // Helper to apply nest join using DAGOrchestrator's private method
+  // Helper to apply nest join using JoinStrategyExecutor directly
   def applyNestJoin(parent: DataFrame, child: DataFrame, joinConfig: JoinConfig): DataFrame = {
-    val globalConfig = GlobalConfig(
-      paths = PathsConfig("/data/validated", "/data/rejected", "/data/metadata"),
-      processing = ProcessingConfig("yyyyMMdd_HHmmss", false, 0.1),
-      performance = PerformanceConfig(false, false)
-    )
-    
-    val dagConfig = AggregationConfig(
-      name = "test",
-      description = "Test",
-      version = "1.0",
-      batchModel = ModelConfig("com.example.BatchModel", None, None),
-      finalModel = ModelConfig("com.example.FinalModel", None, None),
-      output = DAGOutputConfig(
-        batch = OutputConfig(Some("/data/model/batch"), None, "parquet", Seq.empty, "snappy", Map.empty),
-        `final` = OutputConfig(Some("/data/model/final"), None, "parquet", Seq.empty, "snappy", Map.empty)
-      ),
-      nodes = Seq.empty
-    )
-    
-    val orchestrator = new DAGOrchestrator(dagConfig, globalConfig, autoDiscoverAdditionalTables = false)
-    
-    // Use reflection to access private applyNestJoin method
-    val method = orchestrator.getClass.getDeclaredMethod(
-      "applyNestJoin",
-      classOf[DataFrame],
-      classOf[DataFrame],
-      classOf[JoinConfig]
-    )
-    method.setAccessible(true)
-    method.invoke(orchestrator, parent, child, joinConfig).asInstanceOf[DataFrame]
+    val joinExecutor = new JoinStrategyExecutor()
+    joinExecutor.applyJoin(parent, child, joinConfig)
   }
   
   /**

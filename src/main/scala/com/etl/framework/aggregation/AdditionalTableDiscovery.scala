@@ -1,6 +1,6 @@
 package com.etl.framework.aggregation
 
-import com.etl.framework.config.{DAGNode, GlobalConfig, JoinConfig}
+import com.etl.framework.config.{DAGNode, GlobalConfig, JoinCondition, JoinConfig}
 import com.etl.framework.core.AdditionalTableMetadata
 import org.slf4j.LoggerFactory
 
@@ -118,7 +118,7 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
       JoinConfig(
         `type` = "left_outer",
         parent = s"${parentFlow}_node",
-        on = keys.map(key => com.etl.framework.config.JoinCondition(left = key, right = key)),
+        on = keys.map(key => JoinCondition(left = key, right = key)),
         strategy = "nest",
         nestAs = Some(table.tableName),
         aggregations = Seq.empty

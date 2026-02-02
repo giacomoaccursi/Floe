@@ -222,12 +222,10 @@ object DAGNodeExecutionOrderProperties extends Properties("DAGNodeExecutionOrder
   property("dag_dependency_graph_contains_all_edges") = forAll(validNodeDAGGen, globalConfigGen) {
     (nodes, globalConfig) =>
       val dagConfig = aggregationConfigGen(nodes).sample.get
-      val orchestrator = new DAGOrchestrator(dagConfig, globalConfig, autoDiscoverAdditionalTables = false)
+      val graphBuilder = new DAGGraphBuilder(globalConfig)
       
-      // Use reflection to access private buildDependencyGraph method
-      val method = orchestrator.getClass.getDeclaredMethod("buildDependencyGraph", classOf[Seq[DAGNode]])
-      method.setAccessible(true)
-      val dependencyGraph = method.invoke(orchestrator, nodes).asInstanceOf[Map[String, Set[String]]]
+      // Build dependency graph directly
+      val dependencyGraph = graphBuilder.buildDependencyGraph(nodes)
       
       // Verify that all dependencies are in the graph
       val allDepsRepresented = nodes.forall { node =>

@@ -1,5 +1,7 @@
 package com.etl.framework.exceptions
 
+import com.etl.framework.exceptions.ContextKeys._
+
 /**
  * Base exception for all framework errors
  */
@@ -55,10 +57,10 @@ case class YAMLSyntaxException(
 ) {
   override def errorCode: String = "CONFIG_YAML_SYNTAX"
   override def context: Map[String, Any] = Map(
-    "file" -> file,
-    "line" -> line.getOrElse("unknown"),
-    "column" -> column.getOrElse("unknown"),
-    "details" -> details
+    FILE -> file,
+    LINE -> line.getOrElse("unknown"),
+    COLUMN -> column.getOrElse("unknown"),
+    DETAILS -> details
   )
 }
 
@@ -74,9 +76,9 @@ case class MissingConfigFieldException(
 ) {
   override def errorCode: String = "CONFIG_MISSING_FIELD"
   override def context: Map[String, Any] = Map(
-    "file" -> file,
-    "field" -> field,
-    "section" -> section
+    FILE -> file,
+    FIELD -> field,
+    SECTION -> section
   )
 }
 
@@ -93,10 +95,10 @@ case class InvalidConfigTypeException(
 ) {
   override def errorCode: String = "CONFIG_INVALID_TYPE"
   override def context: Map[String, Any] = Map(
-    "file" -> file,
-    "field" -> field,
-    "expectedType" -> expectedType,
-    "actualType" -> actualType
+    FILE -> file,
+    FIELD -> field,
+    EXPECTED_TYPE -> expectedType,
+    ACTUAL_TYPE -> actualType
   )
 }
 
@@ -115,10 +117,10 @@ case class InvalidReferenceException(
 ) {
   override def errorCode: String = "CONFIG_INVALID_REFERENCE"
   override def context: Map[String, Any] = Map(
-    "file" -> file,
-    "referenceType" -> referenceType,
-    "referenceName" -> referenceName,
-    "availableReferences" -> availableReferences.mkString(", ")
+    FILE -> file,
+    REFERENCE_TYPE -> referenceType,
+    REFERENCE_NAME -> referenceName,
+    AVAILABLE_REFERENCES -> availableReferences.mkString(", ")
   )
 }
 
@@ -133,8 +135,8 @@ case class CircularDependencyException(
 ) {
   override def errorCode: String = "CONFIG_CIRCULAR_DEPENDENCY"
   override def context: Map[String, Any] = Map(
-    "graphType" -> graphType,
-    "cycle" -> cycle.mkString(" -> ")
+    GRAPH_TYPE -> graphType,
+    CYCLE -> cycle.mkString(" -> ")
   )
 }
 
@@ -167,9 +169,9 @@ case class SchemaValidationException(
 ) {
   override def errorCode: String = "VALIDATION_SCHEMA"
   override def context: Map[String, Any] = Map(
-    "flowName" -> flowName,
-    "missingColumns" -> missingColumns.mkString(", "),
-    "typeMismatches" -> typeMismatches.toString
+    FLOW_NAME -> flowName,
+    MISSING_COLUMNS -> missingColumns.mkString(", "),
+    TYPE_MISMATCHES -> typeMismatches.toString
   )
 }
 
@@ -185,9 +187,9 @@ case class PrimaryKeyViolationException(
 ) {
   override def errorCode: String = "VALIDATION_PK_VIOLATION"
   override def context: Map[String, Any] = Map(
-    "flowName" -> flowName,
-    "duplicateCount" -> duplicateCount,
-    "keyColumns" -> keyColumns.mkString(", ")
+    FLOW_NAME -> flowName,
+    DUPLICATE_COUNT -> duplicateCount,
+    KEY_COLUMNS -> keyColumns.mkString(", ")
   )
 }
 
@@ -204,10 +206,10 @@ case class ForeignKeyViolationException(
 ) {
   override def errorCode: String = "VALIDATION_FK_VIOLATION"
   override def context: Map[String, Any] = Map(
-    "flowName" -> flowName,
-    "orphanCount" -> orphanCount,
-    "foreignKeyName" -> foreignKeyName,
-    "referencedFlow" -> referencedFlow
+    FLOW_NAME -> flowName,
+    ORPHAN_COUNT -> orphanCount,
+    FOREIGN_KEY_NAME -> foreignKeyName,
+    REFERENCED_FLOW -> referencedFlow
   )
 }
 
@@ -225,11 +227,11 @@ case class MaxRejectionRateExceededException(
 ) {
   override def errorCode: String = "VALIDATION_MAX_REJECTION_RATE"
   override def context: Map[String, Any] = Map(
-    "flowName" -> flowName,
-    "actualRate" -> actualRate,
-    "maxRate" -> maxRate,
-    "rejectedCount" -> rejectedCount,
-    "totalCount" -> totalCount
+    FLOW_NAME -> flowName,
+    ACTUAL_RATE -> actualRate,
+    MAX_RATE -> maxRate,
+    REJECTED_COUNT -> rejectedCount,
+    TOTAL_COUNT -> totalCount
   )
 }
 
@@ -254,11 +256,11 @@ case class InvariantViolationException(
 ) {
   override def errorCode: String = "DATA_INVARIANT_VIOLATION"
   override def context: Map[String, Any] = Map(
-    "flowName" -> flowName,
-    "inputCount" -> inputCount,
-    "validCount" -> validCount,
-    "rejectedCount" -> rejectedCount,
-    "difference" -> (inputCount - (validCount + rejectedCount))
+    FLOW_NAME -> flowName,
+    INPUT_COUNT -> inputCount,
+    VALID_COUNT -> validCount,
+    REJECTED_COUNT -> rejectedCount,
+    DIFFERENCE -> (inputCount - (validCount + rejectedCount))
   )
 }
 
@@ -276,9 +278,9 @@ case class DataSourceException(
 ) {
   override def errorCode: String = "DATA_SOURCE_ERROR"
   override def context: Map[String, Any] = Map(
-    "sourceType" -> sourceType,
-    "sourcePath" -> sourcePath,
-    "details" -> details
+    SOURCE_TYPE -> sourceType,
+    SOURCE_PATH -> sourcePath,
+    DETAILS -> details
   )
 }
 
@@ -296,9 +298,9 @@ case class DataWriteException(
 ) {
   override def errorCode: String = "DATA_WRITE_ERROR"
   override def context: Map[String, Any] = Map(
-    "outputType" -> outputType,
-    "outputPath" -> outputPath,
-    "details" -> details
+    OUTPUT_TYPE -> outputType,
+    OUTPUT_PATH -> outputPath,
+    DETAILS -> details
   )
 }
 
@@ -316,9 +318,9 @@ case class MergeException(
 ) {
   override def errorCode: String = "DATA_MERGE_ERROR"
   override def context: Map[String, Any] = Map(
-    "flowName" -> flowName,
-    "mergeStrategy" -> mergeStrategy,
-    "details" -> details
+    FLOW_NAME -> flowName,
+    MERGE_STRATEGY -> mergeStrategy,
+    DETAILS -> details
   )
 }
 
@@ -343,8 +345,8 @@ case class PreValidationTransformationException(
 ) {
   override def errorCode: String = "TRANSFORM_PRE_VALIDATION"
   override def context: Map[String, Any] = Map(
-    "flowName" -> flowName,
-    "details" -> details
+    FLOW_NAME -> flowName,
+    DETAILS -> details
   )
 }
 
@@ -361,8 +363,8 @@ case class PostValidationTransformationException(
 ) {
   override def errorCode: String = "TRANSFORM_POST_VALIDATION"
   override def context: Map[String, Any] = Map(
-    "flowName" -> flowName,
-    "details" -> details
+    FLOW_NAME -> flowName,
+    DETAILS -> details
   )
 }
 
@@ -407,10 +409,10 @@ case class JoinException(
 ) {
   override def errorCode: String = "DAG_JOIN_ERROR"
   override def context: Map[String, Any] = Map(
-    "parentNode" -> parentNode,
-    "childNode" -> childNode,
-    "joinStrategy" -> joinStrategy,
-    "details" -> details
+    PARENT_NODE -> parentNode,
+    CHILD_NODE -> childNode,
+    JOIN_STRATEGY -> joinStrategy,
+    DETAILS -> details
   )
 }
 

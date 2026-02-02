@@ -25,57 +25,59 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit spa
     validatedFlows: Map[String, DataFrame] = Map.empty
   ): ValidationResult = {
     
-    // Add warnings column to track non-fatal issues
-    var currentDf = df.withColumn("_warnings", array().cast("array<string>"))
-    var rejectedDf: Option[DataFrame] = None
-    val rejectionReasons = scala.collection.mutable.Map[String, Long]()
-    
     val flowName = Some(flowConfig.name)
+    val initialDf = df.withColumn("_warnings", array().cast("array<string>"))
     
-    // Step 1: Schema validation
-    val schemaValidator = new SchemaValidator(flowConfig, flowName)
-    val schemaResult = schemaValidator.validate(currentDf, ValidationRule("schema"))
-    currentDf = schemaResult.valid
-    rejectedDf = ValidationUtils.combineRejected(rejectedDf, schemaResult.rejected)
-    schemaResult.rejected.foreach(r => rejectionReasons("schema_validation") = r.count())
+    val validationSteps: Seq[ValidationStep] = Seq(
+      ValidationStep("schema_validation", shouldExecute = true, new SchemaValidator(flowConfig, flowName), ValidationRule("schema")),
+      ValidationStep("not_null_validation", shouldExecute = true, new NotNullValidator(flowConfig, flowName), ValidationRule("not_null")),
+      ValidationStep("pk_validation", flowConfig.validation.primaryKey.nonEmpty, new PrimaryKeyValidator(flowConfig, flowName), ValidationRule("pk")),
+      ValidationStep("fk_validation", flowConfig.validation.foreignKeys.nonEmpty, new ForeignKeyValidator(flowConfig, validatedFlows, flowName), ValidationRule("fk")),
+      ValidationStep("rules_validation", flowConfig.validation.rules.nonEmpty, new CustomRulesValidator(flowConfig, domainsConfig, flowName), ValidationRule("custom_rules"))
+    )
     
-    // Step 2: Not-null validation
-    val notNullValidator = new NotNullValidator(flowConfig, flowName)
-    val notNullResult = notNullValidator.validate(currentDf, ValidationRule("not_null"))
-    currentDf = notNullResult.valid
-    rejectedDf = ValidationUtils.combineRejected(rejectedDf, notNullResult.rejected)
-    notNullResult.rejected.foreach(r => rejectionReasons("not_null_validation") = r.count())
+    // Execute validation steps
+    val finalState = validationSteps
+      .filter(_.shouldExecute)
+      .foldLeft(ValidationState(initialDf, None, Map.empty)) { (state, step) =>
+        executeValidationStep(state, step)
+      }
     
-    // Step 3: Primary Key validation
-    if (flowConfig.validation.primaryKey.nonEmpty) {
-      val pkValidator = new PrimaryKeyValidator(flowConfig, flowName)
-      val pkResult = pkValidator.validate(currentDf, ValidationRule("pk"))
-      currentDf = pkResult.valid
-      rejectedDf = ValidationUtils.combineRejected(rejectedDf, pkResult.rejected)
-      pkResult.rejected.foreach(r => rejectionReasons("pk_validation") = r.count())
-    }
+    ValidationResult(finalState.valid, finalState.rejected, finalState.rejectionReasons)
+  }
+  
+  /**
+   * Executes a single validation step and updates the state
+   */
+  private def executeValidationStep(state: ValidationState, step: ValidationStep): ValidationState = {
+    val result = step.validator.validate(state.valid, step.rule)
     
-    // Step 4: Foreign Key validation
-    if (flowConfig.validation.foreignKeys.nonEmpty) {
-      val fkValidator = new ForeignKeyValidator(flowConfig, validatedFlows, flowName)
-      val fkResult = fkValidator.validate(currentDf, ValidationRule("fk"))
-      currentDf = fkResult.valid
-      rejectedDf = ValidationUtils.combineRejected(rejectedDf, fkResult.rejected)
-      fkResult.rejected.foreach(r => rejectionReasons("fk_validation") = r.count())
-    }
-    
-    // Step 5: Custom validation rules
-    if (flowConfig.validation.rules.nonEmpty) {
-      val customRulesValidator = new CustomRulesValidator(flowConfig, domainsConfig, flowName)
-      val rulesResult = customRulesValidator.validate(currentDf, ValidationRule("custom_rules"))
-      currentDf = rulesResult.valid
-      rejectedDf = ValidationUtils.combineRejected(rejectedDf, rulesResult.rejected)
-      rulesResult.rejected.foreach(r => rejectionReasons("rules_validation") = r.count())
-    }
-    
-    ValidationResult(currentDf, rejectedDf, rejectionReasons.toMap)
+    ValidationState(
+      valid = result.valid,
+      rejected = ValidationUtils.combineRejected(state.rejected, result.rejected),
+      rejectionReasons = state.rejectionReasons ++ result.rejected.map(r => step.reasonKey -> r.count())
+    )
   }
 }
+
+/**
+ * Represents a single validation step
+ */
+private case class ValidationStep(
+  reasonKey: String,
+  shouldExecute: Boolean,
+  validator: Validator,
+  rule: ValidationRule
+)
+
+/**
+ * Holds the state during validation execution
+ */
+private case class ValidationState(
+  valid: DataFrame,
+  rejected: Option[DataFrame],
+  rejectionReasons: Map[String, Long]
+)
 
 /**
  * Result of validation containing valid and rejected DataFrames

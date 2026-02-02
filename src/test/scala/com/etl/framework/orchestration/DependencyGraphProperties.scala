@@ -176,27 +176,12 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
       ),
       processing = ProcessingConfig(
         batchIdFormat = "yyyyMMdd_HHmmss",
-        executionMode = "batch",
         failOnValidationError = false,
-        maxRejectionRate = 0.1,
+        maxRejectionRate = 0.1
       ),
       performance = PerformanceConfig(
         parallelFlows = false,
-        parallelNodes = false,
-        broadcastThreshold = 10485760L,
-        cacheValidated = false,
-        shufflePartitions = 200
-      ),
-      monitoring = MonitoringConfig(
-        enabled = false,
-        metricsExporter = None,
-        metricsEndpoint = None,
-        logLevel = "INFO"
-      ),
-      security = SecurityConfig(
-        encryptionEnabled = false,
-        kmsKeyId = None,
-        authenticationEnabled = false
+        parallelNodes = false
       )
     )
   )
@@ -342,10 +327,8 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
     
     val globalConfig = GlobalConfig(
       paths = PathsConfig("/data/validated", "/data/rejected", "/data/metadata"),
-      processing = ProcessingConfig("yyyyMMdd_HHmmss", "batch", false, 0.1),
-      performance = PerformanceConfig(false, false, 10485760L, false, 200),
-      monitoring = MonitoringConfig(false, None, None, "INFO"),
-      security = SecurityConfig(false, None, false)
+      processing = ProcessingConfig("yyyyMMdd_HHmmss", false, 0.1),
+      performance = PerformanceConfig(false, false)
     )
     
     val orchestrator = new FlowOrchestrator(globalConfig, Seq(flowA, flowB, flowC))

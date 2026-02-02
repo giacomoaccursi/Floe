@@ -101,27 +101,12 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
       ),
       processing = ProcessingConfig(
         batchIdFormat = batchIdFormat,
-        executionMode = "sequential",
         failOnValidationError = false,
-        maxRejectionRate = 1.0,
+        maxRejectionRate = 1.0
       ),
       performance = PerformanceConfig(
         parallelFlows = false,
-        parallelNodes = false,
-        broadcastThreshold = 10485760L,
-        cacheValidated = false,
-        shufflePartitions = 2
-      ),
-      monitoring = MonitoringConfig(
-        enabled = false,
-        metricsExporter = None,
-        metricsEndpoint = None,
-        logLevel = "INFO"
-      ),
-      security = SecurityConfig(
-        encryptionEnabled = false,
-        kmsKeyId = None,
-        authenticationEnabled = false
+        parallelNodes = false
       )
     )
   }

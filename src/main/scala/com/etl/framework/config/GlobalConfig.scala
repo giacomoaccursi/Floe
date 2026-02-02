@@ -6,9 +6,7 @@ package com.etl.framework.config
 case class GlobalConfig(
                          paths: PathsConfig,
                          processing: ProcessingConfig,
-                         performance: PerformanceConfig,
-                         monitoring: MonitoringConfig,
-                         security: SecurityConfig
+                         performance: PerformanceConfig
                        )
 
 /**
@@ -25,7 +23,6 @@ case class PathsConfig(
  */
 case class ProcessingConfig(
                              batchIdFormat: String,
-                             executionMode: String,
                              failOnValidationError: Boolean,
                              maxRejectionRate: Double
                            )
@@ -35,27 +32,5 @@ case class ProcessingConfig(
  */
 case class PerformanceConfig(
                               parallelFlows: Boolean,
-                              parallelNodes: Boolean,
-                              broadcastThreshold: Long,
-                              cacheValidated: Boolean,
-                              shufflePartitions: Int
+                              parallelNodes: Boolean
                             )
-
-/**
- * Monitoring configuration
- */
-case class MonitoringConfig(
-                             enabled: Boolean,
-                             metricsExporter: Option[String],
-                             metricsEndpoint: Option[String],
-                             logLevel: String
-                           )
-
-/**
- * Security configuration
- */
-case class SecurityConfig(
-                           encryptionEnabled: Boolean,
-                           kmsKeyId: Option[String],
-                           authenticationEnabled: Boolean
-                         )

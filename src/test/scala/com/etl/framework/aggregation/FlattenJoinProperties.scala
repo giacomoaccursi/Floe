@@ -83,10 +83,8 @@ object FlattenJoinProperties extends Properties("FlattenJoin") {
   def applyFlattenJoin(parent: DataFrame, child: DataFrame, joinConfig: JoinConfig): DataFrame = {
     val globalConfig = GlobalConfig(
       paths = PathsConfig("/data/validated", "/data/rejected", "/data/metadata"),
-      processing = ProcessingConfig("yyyyMMdd_HHmmss", "batch", false, 0.1),
-      performance = PerformanceConfig(false, false, 10485760L, false, 200),
-      monitoring = MonitoringConfig(false, None, None, "INFO"),
-      security = SecurityConfig(false, None, false)
+      processing = ProcessingConfig("yyyyMMdd_HHmmss", false, 0.1),
+      performance = PerformanceConfig(false, false)
     )
     
     val dagConfig = AggregationConfig(

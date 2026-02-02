@@ -208,8 +208,6 @@ object ConfigDecoders {
   implicit val pathsConfigDecoder: Decoder[PathsConfig] = deriveDecoder[PathsConfig]
   implicit val processingConfigDecoder: Decoder[ProcessingConfig] = deriveDecoder[ProcessingConfig]
   implicit val performanceConfigDecoder: Decoder[PerformanceConfig] = deriveDecoder[PerformanceConfig]
-  implicit val monitoringConfigDecoder: Decoder[MonitoringConfig] = deriveDecoder[MonitoringConfig]
-  implicit val securityConfigDecoder: Decoder[SecurityConfig] = deriveDecoder[SecurityConfig]
   implicit val globalConfigDecoder: Decoder[GlobalConfig] = deriveDecoder[GlobalConfig]
 
   implicit val domainConfigDecoder: Decoder[DomainConfig] = deriveDecoder[DomainConfig]

@@ -54,27 +54,12 @@ object CustomOutputPathProperties extends Properties("CustomOutputPath") {
       ),
       processing = ProcessingConfig(
         batchIdFormat = "yyyyMMdd_HHmmss",
-        executionMode = "batch",
         failOnValidationError = false,
-        maxRejectionRate = 0.1,
+        maxRejectionRate = 0.1
       ),
       performance = PerformanceConfig(
         parallelFlows = false,
-        parallelNodes = false,
-        broadcastThreshold = 10485760L,
-        cacheValidated = false,
-        shufflePartitions = 200
-      ),
-      monitoring = MonitoringConfig(
-        enabled = true,
-        metricsExporter = Some("prometheus"),
-        metricsEndpoint = Some("http://localhost:9090"),
-        logLevel = "INFO"
-      ),
-      security = SecurityConfig(
-        encryptionEnabled = false,
-        kmsKeyId = None,
-        authenticationEnabled = true
+        parallelNodes = false
       )
     )
   )

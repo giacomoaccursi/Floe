@@ -40,12 +40,10 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
   implicit val arbProcessingConfig: Arbitrary[ProcessingConfig] = Arbitrary {
     for {
       batchIdFormat <- Gen.oneOf("yyyyMMdd_HHmmss", "yyyyMMdd", "timestamp")
-      executionMode <- Gen.oneOf("batch", "streaming")
       failOnValidationError <- Gen.oneOf(true, false)
       maxRejectionRate <- Gen.choose(0.0, 1.0)
     } yield ProcessingConfig(
       batchIdFormat = batchIdFormat,
-      executionMode = executionMode,
       failOnValidationError = failOnValidationError,
       maxRejectionRate = maxRejectionRate
     )
@@ -55,41 +53,9 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
     for {
       parallelFlows <- Gen.oneOf(true, false)
       parallelNodes <- Gen.oneOf(true, false)
-      broadcastThreshold <- Gen.choose(1000000L, 100000000L)
-      cacheValidated <- Gen.oneOf(true, false)
-      shufflePartitions <- Gen.choose(50, 500)
     } yield PerformanceConfig(
       parallelFlows = parallelFlows,
-      parallelNodes = parallelNodes,
-      broadcastThreshold = broadcastThreshold,
-      cacheValidated = cacheValidated,
-      shufflePartitions = shufflePartitions
-    )
-  }
-  
-  implicit val arbMonitoringConfig: Arbitrary[MonitoringConfig] = Arbitrary {
-    for {
-      enabled <- Gen.oneOf(true, false)
-      exporter <- Gen.option(Gen.oneOf("prometheus", "cloudwatch", "datadog"))
-      endpoint <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"http://localhost:9090/$s"))
-      logLevel <- Gen.oneOf("DEBUG", "INFO", "WARN", "ERROR")
-    } yield MonitoringConfig(
-      enabled = enabled,
-      metricsExporter = exporter,
-      metricsEndpoint = endpoint,
-      logLevel = logLevel
-    )
-  }
-  
-  implicit val arbSecurityConfig: Arbitrary[SecurityConfig] = Arbitrary {
-    for {
-      encryptionEnabled <- Gen.oneOf(true, false)
-      kmsKeyId <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty))
-      authenticationEnabled <- Gen.oneOf(true, false)
-    } yield SecurityConfig(
-      encryptionEnabled = encryptionEnabled,
-      kmsKeyId = kmsKeyId,
-      authenticationEnabled = authenticationEnabled
+      parallelNodes = parallelNodes
     )
   }
   
@@ -98,14 +64,10 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       paths <- arbPathsConfig.arbitrary
       processing <- arbProcessingConfig.arbitrary
       performance <- arbPerformanceConfig.arbitrary
-      monitoring <- arbMonitoringConfig.arbitrary
-      security <- arbSecurityConfig.arbitrary
     } yield GlobalConfig(
       paths = paths,
       processing = processing,
-      performance = performance,
-      monitoring = monitoring,
-      security = security
+      performance = performance
     )
   }
   
@@ -396,33 +358,16 @@ object InvalidConfigProperties extends Properties("InvalidConfig") {
     // GlobalConfig missing spark section
     """
 paths:
-  inputBase: /data/input
-  outputBase: /data/output
   validatedPath: /data/validated
   rejectedPath: /data/rejected
   metadataPath: /data/metadata
-  modelPath: /data/model
-  stagingPath: /data/staging
-  checkpointPath: /data/checkpoint
 processing:
   batchIdFormat: yyyyMMdd_HHmmss
-  executionMode: batch
   failOnValidationError: false
   maxRejectionRate: 0.1
-  checkpointEnabled: false
-  checkpointInterval: 5m
 performance:
   parallelFlows: true
   parallelNodes: true
-  broadcastThreshold: 10485760
-  cacheValidated: false
-  shufflePartitions: 200
-monitoring:
-  enabled: false
-  logLevel: INFO
-security:
-  encryptionEnabled: false
-  authenticationEnabled: false
 """,
     // FlowConfig missing name
     """

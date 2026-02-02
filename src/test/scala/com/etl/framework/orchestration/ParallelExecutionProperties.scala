@@ -112,27 +112,12 @@ object ParallelExecutionProperties extends Properties("ParallelExecution") {
       ),
       processing = ProcessingConfig(
         batchIdFormat = "yyyyMMdd_HHmmss",
-        executionMode = if (parallel) "parallel" else "sequential",
         failOnValidationError = false,
-        maxRejectionRate = 1.0,
+        maxRejectionRate = 1.0
       ),
       performance = PerformanceConfig(
         parallelFlows = parallel,
-        parallelNodes = false,
-        broadcastThreshold = 10485760L,
-        cacheValidated = false,
-        shufflePartitions = 2
-      ),
-      monitoring = MonitoringConfig(
-        enabled = false,
-        metricsExporter = None,
-        metricsEndpoint = None,
-        logLevel = "INFO"
-      ),
-      security = SecurityConfig(
-        encryptionEnabled = false,
-        kmsKeyId = None,
-        authenticationEnabled = false
+        parallelNodes = false
       )
     )
   }

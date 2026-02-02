@@ -84,27 +84,12 @@ object AdditionalTablePersistenceProperties extends Properties("AdditionalTableP
       ),
       processing = ProcessingConfig(
         batchIdFormat = "yyyyMMdd_HHmmss",
-        executionMode = "batch",
         failOnValidationError = false,
-        maxRejectionRate = 0.1,
+        maxRejectionRate = 0.1
       ),
       performance = PerformanceConfig(
         parallelFlows = false,
-        parallelNodes = false,
-        broadcastThreshold = 10485760L,
-        cacheValidated = false,
-        shufflePartitions = 2
-      ),
-      monitoring = MonitoringConfig(
-        enabled = false,
-        metricsExporter = None,
-        metricsEndpoint = None,
-        logLevel = "INFO"
-      ),
-      security = SecurityConfig(
-        encryptionEnabled = false,
-        kmsKeyId = None,
-        authenticationEnabled = false
+        parallelNodes = false
       )
     )
     

@@ -24,32 +24,32 @@ class ForeignKeyValidator(
     var rejectedDf: Option[DataFrame] = None
     
     for (fk <- flowConfig.validation.foreignKeys) {
-      val referencedFlow = validatedFlows.get(fk.references.flow)
-      
-      if (referencedFlow.isEmpty) {
-        throw ValidationConfigException(
-          s"Referenced flow '${fk.references.flow}' not found in flow $flowName"
-        )
-      }
-      
-      // Perform left anti join to find orphan records
-      val orphans = currentDf
-        .join(
-          referencedFlow.get.select(fk.references.column),
-          currentDf(fk.column) === referencedFlow.get(fk.references.column),
-          "left_anti"
-        )
-      
-      if (!orphans.isEmpty) {
-        val orphansWithMetadata = ValidationUtils.addRejectionMetadata(
-          orphans,
-          "FK_VIOLATION",
-          s"Foreign key violation in flow $flowName: ${fk.name} (${fk.column} -> ${fk.references.flow}.${fk.references.column})",
-          "fk_validation"
-        )
+      validatedFlows.get(fk.references.flow) match {
+        case None =>
+          throw ValidationConfigException(
+            s"Referenced flow '${fk.references.flow}' not found in flow $flowName"
+          )
         
-        rejectedDf = ValidationUtils.combineRejected(rejectedDf, Some(orphansWithMetadata))
-        currentDf = currentDf.join(orphans.select(fk.column), Seq(fk.column), "left_anti")
+        case Some(referencedFlow) =>
+          // Perform left anti join to find orphan records
+          val orphans = currentDf
+            .join(
+              referencedFlow.select(fk.references.column),
+              currentDf(fk.column) === referencedFlow(fk.references.column),
+              "left_anti"
+            )
+          
+          if (!orphans.isEmpty) {
+            val orphansWithMetadata = ValidationUtils.addRejectionMetadata(
+              orphans,
+              "FK_VIOLATION",
+              s"Foreign key violation in flow $flowName: ${fk.name} (${fk.column} -> ${fk.references.flow}.${fk.references.column})",
+              "fk_validation"
+            )
+            
+            rejectedDf = ValidationUtils.combineRejected(rejectedDf, Some(orphansWithMetadata))
+            currentDf = currentDf.join(orphans.select(fk.column), Seq(fk.column), "left_anti")
+          }
       }
     }
     

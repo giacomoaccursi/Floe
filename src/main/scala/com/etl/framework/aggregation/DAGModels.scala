@@ -17,8 +17,3 @@ case class DAGExecutionGroup(
   nodes: Seq[DAGNode],
   parallel: Boolean
 )
-
-/**
- * Exception thrown when circular dependency is detected in DAG
- */
-class CircularDependencyException(message: String) extends Exception(message)

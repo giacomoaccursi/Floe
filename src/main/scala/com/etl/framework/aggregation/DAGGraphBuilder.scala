@@ -1,6 +1,7 @@
 package com.etl.framework.aggregation
 
 import com.etl.framework.config.{DAGNode, GlobalConfig}
+import com.etl.framework.exceptions.CircularDependencyException
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
@@ -55,21 +56,28 @@ class DAGGraphBuilder(globalConfig: GlobalConfig) {
     val sorted = mutable.ArrayBuffer[String]()
     val visited = mutable.Set[String]()
     val visiting = mutable.Set[String]()
+    val path = mutable.ArrayBuffer[String]()
     
     def visit(nodeId: String): Unit = {
       if (visiting.contains(nodeId)) {
-        throw new CircularDependencyException(
-          s"Circular dependency detected in DAG involving node: $nodeId"
+        // Found a cycle - construct the cycle path
+        val cycleStart = path.indexOf(nodeId)
+        val cycle = path.slice(cycleStart, path.length).toSeq :+ nodeId
+        throw CircularDependencyException(
+          graphType = "DAG",
+          cycle = cycle
         )
       }
       
       if (!visited.contains(nodeId)) {
         visiting.add(nodeId)
+        path.append(nodeId)
         
         dependencyGraph.getOrElse(nodeId, Set.empty).foreach { dependency =>
           visit(dependency)
         }
         
+        path.remove(path.length - 1)
         visiting.remove(nodeId)
         visited.add(nodeId)
         sorted.append(nodeId)

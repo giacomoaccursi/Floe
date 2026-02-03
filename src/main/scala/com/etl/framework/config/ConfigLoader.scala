@@ -6,8 +6,7 @@ import io.circe.yaml.parser
 import io.circe.generic.semiauto._
 
 import scala.io.Source
-import scala.util.{Failure, Success, Try}
-
+import scala.util.Using
 /**
  * Base trait for configuration loaders
  */
@@ -15,19 +14,16 @@ trait ConfigLoader[T] {
   def load(path: String): Either[ConfigurationException, T]
 
   protected def loadYamlFile(path: String): Either[ConfigurationException, String] = {
-    Try {
-      val source = Source.fromFile(path)
-      try source.mkString finally source.close()
-    } match {
-      case Success(content) => Right(content)
-      case Failure(ex) => Left(ConfigFileException(
+    Using(Source.fromFile(path)) { source =>
+      source.mkString
+    }.toEither.left.map { ex =>
+      ConfigFileException(
         file = path,
         message = s"Failed to read configuration file",
         cause = ex
-      ))
+      )
     }
   }
-
   protected def parseYaml[A: Decoder](yaml: String, path: String): Either[ConfigurationException, A] = {
     parser.parse(yaml) match {
       case Right(json) =>

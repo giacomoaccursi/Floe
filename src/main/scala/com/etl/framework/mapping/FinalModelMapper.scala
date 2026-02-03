@@ -1,5 +1,6 @@
 package com.etl.framework.mapping
 
+import com.etl.framework.exceptions.FinalModelMapperLoadException
 import org.apache.spark.sql.{Dataset, Encoder, SparkSession}
 import org.slf4j.LoggerFactory
 
@@ -117,29 +118,26 @@ object FinalModelMapper {
     } catch {
       case e: ClassNotFoundException =>
         logger.error(s"Mapper class not found: $className")
-        throw new FinalModelMapperLoadException(
-          s"Mapper class not found: $className. Ensure the class is in the classpath.",
-          e
+        throw FinalModelMapperLoadException(
+          className = className,
+          details = "Mapper class not found. Ensure the class is in the classpath.",
+          cause = e
         )
       case e: ClassCastException =>
         logger.error(s"Class $className does not implement FinalModelMapper")
-        throw new FinalModelMapperLoadException(
-          s"Class $className does not implement FinalModelMapper[B, F]",
-          e
+        throw FinalModelMapperLoadException(
+          className = className,
+          details = "Class does not implement FinalModelMapper[B, F]",
+          cause = e
         )
       case e: Exception =>
         logger.error(s"Failed to load mapper $className: ${e.getMessage}")
-        throw new FinalModelMapperLoadException(
-          s"Failed to load mapper $className: ${e.getMessage}",
-          e
+        throw FinalModelMapperLoadException(
+          className = className,
+          details = e.getMessage,
+          cause = e
         )
     }
   }
 }
-
-/**
- * Exception thrown when FinalModelMapper loading fails
- */
-class FinalModelMapperLoadException(message: String, cause: Throwable = null) 
-  extends Exception(message, cause)
 

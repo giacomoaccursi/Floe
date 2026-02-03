@@ -360,6 +360,24 @@ case class MappingConfigLoadException(
 }
 
 /**
+ * Final model mapper loading failure
+ */
+case class FinalModelMapperLoadException(
+  className: String,
+  details: String,
+  cause: Throwable = null
+) extends MappingException(
+  s"Failed to load FinalModelMapper '$className': $details",
+  cause
+) {
+  override def errorCode: String = "MAPPING_FINAL_MAPPER_LOAD_ERROR"
+  override def context: Map[String, Any] = Map(
+    "className" -> className,
+    DETAILS -> details
+  )
+}
+
+/**
  * Data source unavailable or unreadable
  */
 case class DataSourceException(

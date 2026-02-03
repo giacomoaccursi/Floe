@@ -25,54 +25,52 @@ trait ConfigLoader[T] {
     }
   }
   protected def parseYaml[A: Decoder](yaml: String, path: String): Either[ConfigurationException, A] = {
-    parser.parse(yaml) match {
-      case Right(json) =>
-        json.as[A] match {
-          case Right(config) => Right(config)
-          case Left(error) => 
-            // Extract detailed error information from Circe's DecodingFailure
-            val detailedMessage = error match {
-              case df: io.circe.DecodingFailure =>
-                val missingField = extractMissingField(df.history)
-                val parentPath = formatParentPath(df.history)
+    for {
+      json <- parser.parse(yaml).left.map { error =>
+        YAMLSyntaxException(
+          file = path,
+          details = error.getMessage,
+          cause = error
+        )
+      }
+      config <- json.as[A].left.map { error =>
+        // Extract detailed error information from Circe's DecodingFailure
+        val detailedMessage = error match {
+          case df: io.circe.DecodingFailure =>
+            val missingField = extractMissingField(df.history)
+            val parentPath = formatParentPath(df.history)
+            
+            // Build a clear error message with context
+            missingField match {
+              case Some(field) =>
+                val location = if (parentPath.nonEmpty) s"$parentPath" else "root"
+                val yamlContext = extractYamlContext(yaml, location, field)
                 
-                // Build a clear error message with context
-                missingField match {
-                  case Some(field) =>
-                    val location = if (parentPath.nonEmpty) s"$parentPath" else "root"
-                    val yamlContext = extractYamlContext(yaml, location, field)
-                    
-                    val contextInfo = if (yamlContext.nonEmpty) {
-                      s"\n\nContext from YAML file:\n$yamlContext\n"
-                    } else ""
-                    
-                    s"Missing required field '$field' in '$location'$contextInfo" +
-                    s"\nHint: Add the field to your YAML configuration.\n" +
-                    s"File: $path"
-                    
-                  case None =>
-                    // Fallback to original message if we can't extract field name
-                    val readablePath = formatFullPath(df.history)
-                    val pathInfo = if (readablePath.nonEmpty) s" at '$readablePath'" else ""
-                    s"${df.message}$pathInfo\nFile: $path"
-                }
+                val contextInfo = if (yamlContext.nonEmpty) {
+                  s"\n\nContext from YAML file:\n$yamlContext\n"
+                } else ""
                 
-              case other => s"${other.getMessage}\nFile: $path"
+                s"Missing required field '$field' in '$location'$contextInfo" +
+                s"\nHint: Add the field to your YAML configuration.\n" +
+                s"File: $path"
+                
+              case None =>
+                // Fallback to original message if we can't extract field name
+                val readablePath = formatFullPath(df.history)
+                val pathInfo = if (readablePath.nonEmpty) s" at '$readablePath'" else ""
+                s"${df.message}$pathInfo\nFile: $path"
             }
-            Left(ConfigFileException(
-              file = path,
-              message = s"Failed to parse configuration:\n$detailedMessage",
-              cause = error
-            ))
+            
+          case other => s"${other.getMessage}\nFile: $path"
         }
-      case Left(error) => Left(YAMLSyntaxException(
-        file = path,
-        details = error.getMessage,
-        cause = error
-      ))
-    }
+        ConfigFileException(
+          file = path,
+          message = s"Failed to parse configuration:\n$detailedMessage",
+          cause = error
+        )
+      }
+    } yield config
   }
-
   /**
    * Extracts the missing field name from Circe's cursor history
    * The first DownField in the history is usually the missing field

@@ -31,12 +31,17 @@ class FlowTransformer(
             currentData = data,
             validatedFlows = Map.empty, // No validated flows available yet
             batchId = batchId,
-            spark = spark,
-            additionalTablesMap = additionalTables
+            spark = spark
           )
           val transformed = transformation(context)
           val outputCount = transformed.count()
           logger.info(s"Pre-validation transformation: $inputCount → $outputCount records")
+          
+          // Store additional tables if any were created
+          context.getAdditionalTables.foreach { case (name, info) =>
+            additionalTables(name) = info
+          }
+          
           transformed
         }
       
@@ -63,13 +68,18 @@ class FlowTransformer(
             currentData = data,
             validatedFlows = validatedFlows,
             batchId = batchId,
-            spark = spark,
-            additionalTablesMap = additionalTables
+            spark = spark
           )
           
           val transformed = transformation(context)
           val outputCount = transformed.count()
           logger.info(s"Post-validation transformation: $inputCount → $outputCount records")
+          
+          // Store additional tables if any were created
+          context.getAdditionalTables.foreach { case (name, info) =>
+            additionalTables(name) = info
+          }
+          
           transformed
         }
       

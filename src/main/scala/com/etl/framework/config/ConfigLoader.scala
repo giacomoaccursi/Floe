@@ -6,7 +6,7 @@ import io.circe.yaml.parser
 import io.circe.generic.semiauto._
 
 import scala.io.Source
-import scala.util.Using
+import scala.util.{Try, Success, Failure, Using}
 /**
  * Base trait for configuration loaders
  */

@@ -85,7 +85,7 @@ object ValidatorFactory {
     } catch {
       case e: ClassNotFoundException =>
         throw ValidationConfigException(s"Custom validator class not found: $className", e)
-      case _: ValidationConfigException => throw _
+      case e: ValidationConfigException => throw e
       case e: Exception =>
         throw ValidationConfigException(s"Failed to instantiate custom validator: $className", e)
     }

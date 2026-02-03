@@ -120,40 +120,19 @@ object BatchModelMapper {
       val yaml = new Yaml()
       
       scala.util.Using(new FileInputStream(mappingFilePath)) { inputStream =>
-        val data = yaml.load(inputStream)
+        // Note: asInstanceOf is required here for Java YAML library interop
+        // The YAML library returns untyped java.util.Map and java.util.List
+        val data = yaml.load(inputStream).asInstanceOf[java.util.Map[String, Any]]
         
-        // Type-safe parsing
-        data match {
-          case map: java.util.Map[_, _] =>
-            Option(map.get("mappings")) match {
-              case Some(mappings: java.util.List[_]) =>
-                mappings.asScala.flatMap { item =>
-                  item match {
-                    case mappingData: java.util.Map[_, _] =>
-                      for {
-                        sourceField <- Option(mappingData.get("sourceField")).collect { case s: String => s }
-                        targetField <- Option(mappingData.get("targetField")).collect { case s: String => s }
-                      } yield {
-                        val expression = Option(mappingData.get("expression")).collect { case s: String => s }
-                        FieldMapping(sourceField, targetField, expression)
-                      }
-                    case _ => None
-                  }
-                }.toSeq
-              case _ =>
-                throw MappingConfigLoadException(
-                  file = mappingFilePath,
-                  details = "Missing or invalid 'mappings' field",
-                  cause = None
-                )
-            }
-          case _ =>
-            throw MappingConfigLoadException(
-              file = mappingFilePath,
-              details = "Invalid YAML structure: expected Map",
-              cause = None
-            )
-        }
+        // Parse mappings
+        val mappingsData = data.get("mappings").asInstanceOf[java.util.List[java.util.Map[String, Any]]]
+        mappingsData.asScala.map { mappingData =>
+          val sourceField = mappingData.get("sourceField").asInstanceOf[String]
+          val targetField = mappingData.get("targetField").asInstanceOf[String]
+          val expression = Option(mappingData.get("expression")).map(_.asInstanceOf[String])
+          
+          FieldMapping(sourceField, targetField, expression)
+        }.toSeq
       } match {
         case scala.util.Success(mappings) =>
           logger.info(s"Loaded ${mappings.size} field mappings")

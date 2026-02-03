@@ -121,7 +121,7 @@ object FinalModelMapper {
           throw FinalModelMapperLoadException(
             className = className,
             details = s"Class does not implement FinalModelMapper. Got: ${other.getClass.getName}",
-            cause = None
+            cause = null
           )
       }
     } catch {
@@ -132,7 +132,7 @@ object FinalModelMapper {
           details = "Mapper class not found. Ensure the class is in the classpath.",
           cause = e
         )
-      case _: FinalModelMapperLoadException => throw _
+      case e: FinalModelMapperLoadException => throw e
       case e: Exception =>
         logger.error(s"Failed to load mapper $className: ${e.getMessage}")
         throw FinalModelMapperLoadException(

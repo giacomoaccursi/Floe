@@ -167,6 +167,19 @@ sealed abstract class ValidationException(
 ) extends FrameworkException(message, cause)
 
 /**
+ * Validation configuration error
+ */
+case class ValidationConfigException(
+  message: String,
+  cause: Throwable = null
+) extends ValidationException(message, cause) {
+  override def errorCode: String = "VALIDATION_CONFIG_ERROR"
+  override def context: Map[String, Any] = Map(
+    MESSAGE -> message
+  )
+}
+
+/**
  * Schema validation failure
  */
 case class SchemaValidationException(

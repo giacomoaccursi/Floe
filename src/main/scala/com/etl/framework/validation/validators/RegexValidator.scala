@@ -1,5 +1,6 @@
 package com.etl.framework.validation.validators
 
+import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.config.ValidationRule
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -27,7 +28,7 @@ class RegexValidator(flowName: Option[String] = None) extends BaseValidator(flow
     column: String
   ): Column = {
     val pattern = rule.pattern.getOrElse {
-      throw new ValidationException(
+      throw ValidationConfigException(
         s"Regex validation error for column '$column'${flowContext}: 'pattern' field is required"
       )
     }
@@ -37,7 +38,7 @@ class RegexValidator(flowName: Option[String] = None) extends BaseValidator(flow
       pattern.r
     } catch {
       case e: Exception =>
-        throw new ValidationException(
+        throw ValidationConfigException(
           s"Invalid regex pattern for column '$column'${flowContext}: '$pattern' - ${e.getMessage}",
           e
         )

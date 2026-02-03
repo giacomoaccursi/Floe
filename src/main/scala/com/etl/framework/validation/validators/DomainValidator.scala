@@ -1,5 +1,6 @@
 package com.etl.framework.validation.validators
 
+import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.config.{DomainsConfig, ValidationRule}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -43,14 +44,14 @@ class DomainValidator(
     column: String
   ): Column = {
     val domainName = rule.domainName.getOrElse {
-      throw new ValidationException(
+      throw ValidationConfigException(
         s"Domain validation error for column '$column'${flowContext}: 'domainName' field is required"
       )
     }
     
     // Validate DomainsConfig is provided
     if (domainsConfig.isEmpty) {
-      throw new ValidationException(
+      throw ValidationConfigException(
         s"DomainsConfig required for domain validation on column '$column' (domain: '$domainName')${flowContext}"
       )
     }
@@ -58,7 +59,7 @@ class DomainValidator(
     // Load domain configuration
     val domainConfig = domainsConfig.get.domains.get(domainName).getOrElse {
       val availableDomains = domainsConfig.get.domains.keys.toSeq.sorted
-      throw new ValidationException(
+      throw ValidationConfigException(
         s"Domain '$domainName' not found for column '$column'${flowContext}. Available: ${availableDomains.mkString(", ")}"
       )
     }
@@ -66,7 +67,7 @@ class DomainValidator(
     // Validate domain has values
     val domainValues = domainConfig.values
     if (domainValues.isEmpty) {
-      throw new ValidationException(
+      throw ValidationConfigException(
         s"Domain '$domainName' has no values defined for column '$column'${flowContext}"
       )
     }

@@ -1,5 +1,6 @@
 package com.etl.framework.validation.validators
 
+import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.config.ValidationRule
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -33,7 +34,7 @@ class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flow
   ): Column = {
     // Validate that at least one of min or max is specified
     if (rule.min.isEmpty && rule.max.isEmpty) {
-      throw new ValidationException(
+      throw ValidationConfigException(
         s"Range validation error for column '$column'${flowContext}: at least one of 'min' or 'max' is required"
       )
     }
@@ -58,7 +59,7 @@ class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flow
     (rule.min, rule.max) match {
       case (Some(min), Some(max)) =>
         if (min.toDouble > max.toDouble) {
-          throw new ValidationException(
+          throw ValidationConfigException(
             s"Range validation error for column '$column'${flowContext}: 'min' ($min) > 'max' ($max)"
           )
         }
@@ -76,7 +77,7 @@ class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flow
       value.toDouble
     } catch {
       case e: NumberFormatException =>
-        throw new ValidationException(
+        throw ValidationConfigException(
           s"Range validation error for column '$column'${flowContext}: '$fieldName' value '$value' is not numeric",
           e
         )

@@ -1,6 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.ValidationRule
+import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.validation.{ValidationStepResult, Validator}
 import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.DataFrame
@@ -46,7 +47,7 @@ abstract class BaseValidator(flowName: Option[String] = None) extends Validator 
    */
   protected def extractColumn(rule: ValidationRule): String = {
     rule.column.getOrElse {
-      throw new ValidationException(
+      throw ValidationConfigException(
         s"${validatorName} validation error${flowContext}: 'column' field is required"
       )
     }
@@ -106,9 +107,3 @@ abstract class BaseValidator(flowName: Option[String] = None) extends Validator 
    */
   protected def validationStep: String
 }
-
-/**
- * Exception thrown when validation configuration is invalid
- */
-class ValidationException(message: String, cause: Throwable = null) 
-  extends RuntimeException(message, cause)

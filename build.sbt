@@ -8,6 +8,7 @@ val sparkVersion = "3.5.8"
 val scalaTestVersion = "3.2.19"
 val scalaCheckVersion = "1.19.0"
 val circeVersion = "0.14.15"
+val json4sVersion = "4.0.7"
 
 libraryDependencies ++= Seq(
   // Spark dependencies
@@ -19,6 +20,9 @@ libraryDependencies ++= Seq(
   "io.circe" %% "circe-generic" % circeVersion,
   "io.circe" %% "circe-parser" % circeVersion,
   "io.circe" %% "circe-yaml" % "1.15.0",
+
+  // JSON serialization for metadata
+  "org.json4s" %% "json4s-jackson" % json4sVersion,
 
   // Logging
   "org.slf4j" % "slf4j-api" % "2.0.17",

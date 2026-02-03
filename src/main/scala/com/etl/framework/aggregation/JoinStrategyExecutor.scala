@@ -1,6 +1,7 @@
 package com.etl.framework.aggregation
 
 import com.etl.framework.config.JoinConfig
+import com.etl.framework.exceptions.ValidationConfigException
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.slf4j.LoggerFactory
@@ -123,6 +124,12 @@ class JoinStrategyExecutor {
         case other => throw new UnsupportedOperationException(s"Unsupported aggregation function: $other")
       }
       aggFunc.as(aggSpec.alias)
+    }
+    
+    if (aggExprs.isEmpty) {
+      throw ValidationConfigException(
+        s"Aggregate join requires at least one aggregation function"
+      )
     }
     
     val aggregatedChild = child

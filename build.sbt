@@ -8,7 +8,7 @@ val sparkVersion = "3.5.8"
 val scalaTestVersion = "3.2.19"
 val scalaCheckVersion = "1.19.0"
 val circeVersion = "0.14.15"
-val json4sVersion = "4.0.7"
+val json4sVersion = "3.7.0-M11"
 
 libraryDependencies ++= Seq(
   // Spark dependencies

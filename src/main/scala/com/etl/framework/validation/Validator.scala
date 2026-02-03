@@ -65,19 +65,27 @@ object ValidatorFactory {
 
     try {
       val clazz = Class.forName(className)
-      val instance = clazz.getDeclaredConstructor().newInstance().asInstanceOf[Validator]
-
-      // Configure the validator if it implements Configurable
+      val instance = clazz.getDeclaredConstructor().newInstance()
+      
+      // Type-safe check
       instance match {
-        case configurable: ConfigurableValidator =>
-          configurable.configure(rule.config.getOrElse(Map.empty))
-        case _ => // No configuration needed
+        case validator: Validator =>
+          // Configure the validator if it implements Configurable
+          validator match {
+            case configurable: ConfigurableValidator =>
+              configurable.configure(rule.config.getOrElse(Map.empty))
+            case _ => // No configuration needed
+          }
+          validator
+        case other =>
+          throw ValidationConfigException(
+            s"Class $className does not implement Validator trait. Got: ${other.getClass.getName}"
+          )
       }
-
-      instance
     } catch {
       case e: ClassNotFoundException =>
         throw ValidationConfigException(s"Custom validator class not found: $className", e)
+      case _: ValidationConfigException => throw _
       case e: Exception =>
         throw ValidationConfigException(s"Failed to instantiate custom validator: $className", e)
     }

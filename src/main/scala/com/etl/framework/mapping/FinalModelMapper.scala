@@ -101,19 +101,28 @@ object FinalModelMapper {
       val mapperClass = Class.forName(className)
       
       // Try to find constructor that accepts SparkSession
-      try {
+      val instance = try {
         val constructor = mapperClass.getConstructor(classOf[SparkSession])
-        val mapper = constructor.newInstance(spark).asInstanceOf[FinalModelMapper[B, F]]
-        logger.info(s"Successfully loaded mapper: $className")
-        mapper
+        constructor.newInstance(spark)
       } catch {
         case _: NoSuchMethodException =>
           // Try no-arg constructor
           logger.debug(s"No SparkSession constructor found, trying no-arg constructor")
           val constructor = mapperClass.getConstructor()
-          val mapper = constructor.newInstance().asInstanceOf[FinalModelMapper[B, F]]
-          logger.info(s"Successfully loaded mapper with no-arg constructor: $className")
+          constructor.newInstance()
+      }
+      
+      // Type-safe check
+      instance match {
+        case mapper: FinalModelMapper[B, F] @unchecked =>
+          logger.info(s"Successfully loaded mapper: $className")
           mapper
+        case other =>
+          throw FinalModelMapperLoadException(
+            className = className,
+            details = s"Class does not implement FinalModelMapper. Got: ${other.getClass.getName}",
+            cause = None
+          )
       }
     } catch {
       case e: ClassNotFoundException =>
@@ -123,13 +132,7 @@ object FinalModelMapper {
           details = "Mapper class not found. Ensure the class is in the classpath.",
           cause = e
         )
-      case e: ClassCastException =>
-        logger.error(s"Class $className does not implement FinalModelMapper")
-        throw FinalModelMapperLoadException(
-          className = className,
-          details = "Class does not implement FinalModelMapper[B, F]",
-          cause = e
-        )
+      case _: FinalModelMapperLoadException => throw _
       case e: Exception =>
         logger.error(s"Failed to load mapper $className: ${e.getMessage}")
         throw FinalModelMapperLoadException(

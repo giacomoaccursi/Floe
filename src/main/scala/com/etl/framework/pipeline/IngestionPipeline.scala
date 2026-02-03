@@ -1,7 +1,7 @@
 package com.etl.framework.pipeline
 
 import com.etl.framework.config.{DomainsConfigLoader, FlowConfig, FlowConfigLoader, GlobalConfig, GlobalConfigLoader}
-import com.etl.framework.core.FlowTransformation.FlowTransformation
+import com.etl.framework.core.FlowTransformation
 import com.etl.framework.exceptions.MissingConfigFieldException
 import com.etl.framework.orchestration.{FlowOrchestrator, IngestionResult}
 import org.apache.spark.sql.SparkSession

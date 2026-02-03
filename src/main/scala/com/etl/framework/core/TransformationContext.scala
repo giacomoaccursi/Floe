@@ -55,10 +55,3 @@ case class AdditionalTableInfo(
   outputPath: Option[String],
   dagMetadata: Option[AdditionalTableMetadata]
 )
-
-/**
- * Function type for transformations
- */
-object FlowTransformation {
-  type FlowTransformation = TransformationContext => DataFrame
-}

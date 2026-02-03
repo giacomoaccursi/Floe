@@ -57,7 +57,7 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
    */
   private def loadAdditionalTablesMetadata(metadataPath: String): Seq[AdditionalTableMetadataFile] = {
     import java.nio.file.{Files, Paths}
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     import org.json4s._
     import org.json4s.jackson.JsonMethods._
     

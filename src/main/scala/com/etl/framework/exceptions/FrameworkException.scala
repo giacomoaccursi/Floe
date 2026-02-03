@@ -296,6 +296,70 @@ case class InvariantViolationException(
 }
 
 /**
+ * Mapping-related errors
+ */
+sealed abstract class MappingException(
+  message: String,
+  cause: Throwable = null
+) extends FrameworkException(message, cause)
+
+/**
+ * DataFrame to Dataset mapping failure
+ */
+case class DataFrameToDatasetMappingException(
+  targetClass: String,
+  details: String,
+  cause: Throwable = null
+) extends MappingException(
+  s"Failed to map DataFrame to Dataset[$targetClass]: $details",
+  cause
+) {
+  override def errorCode: String = "MAPPING_DATAFRAME_TO_DATASET"
+  override def context: Map[String, Any] = Map(
+    "targetClass" -> targetClass,
+    DETAILS -> details
+  )
+}
+
+/**
+ * Mapping expression evaluation failure
+ */
+case class MappingExpressionException(
+  expression: String,
+  field: String,
+  details: String,
+  cause: Throwable = null
+) extends MappingException(
+  s"Failed to evaluate mapping expression for field '$field': $details",
+  cause
+) {
+  override def errorCode: String = "MAPPING_EXPRESSION_ERROR"
+  override def context: Map[String, Any] = Map(
+    "expression" -> expression,
+    FIELD -> field,
+    DETAILS -> details
+  )
+}
+
+/**
+ * Mapping configuration loading failure
+ */
+case class MappingConfigLoadException(
+  file: String,
+  details: String,
+  cause: Throwable = null
+) extends MappingException(
+  s"Failed to load mapping configuration from '$file': $details",
+  cause
+) {
+  override def errorCode: String = "MAPPING_CONFIG_LOAD_ERROR"
+  override def context: Map[String, Any] = Map(
+    FILE -> file,
+    DETAILS -> details
+  )
+}
+
+/**
  * Data source unavailable or unreadable
  */
 case class DataSourceException(
@@ -444,52 +508,6 @@ case class JoinException(
     CHILD_NODE -> childNode,
     JOIN_STRATEGY -> joinStrategy,
     DETAILS -> details
-  )
-}
-
-/**
- * Mapping errors
- */
-sealed abstract class MappingException(
-  message: String,
-  cause: Throwable = null
-) extends FrameworkException(message, cause)
-
-/**
- * DataFrame to Dataset mapping failure
- */
-case class DataFrameToDatasetMappingException(
-  targetType: String,
-  details: String,
-  cause: Throwable = null
-) extends MappingException(
-  s"Failed to map DataFrame to Dataset[$targetType]: $details",
-  cause
-) {
-  override def errorCode: String = "MAPPING_DF_TO_DS"
-  override def context: Map[String, Any] = Map(
-    "targetType" -> targetType,
-    "details" -> details
-  )
-}
-
-/**
- * Batch to Final model mapping failure
- */
-case class ModelMappingException(
-  batchModelType: String,
-  finalModelType: String,
-  details: String,
-  cause: Throwable = null
-) extends MappingException(
-  s"Failed to map BatchModel[$batchModelType] to FinalModel[$finalModelType]: $details",
-  cause
-) {
-  override def errorCode: String = "MAPPING_BATCH_TO_FINAL"
-  override def context: Map[String, Any] = Map(
-    "batchModelType" -> batchModelType,
-    "finalModelType" -> finalModelType,
-    "details" -> details
   )
 }
 

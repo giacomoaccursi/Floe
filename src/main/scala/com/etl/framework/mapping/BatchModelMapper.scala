@@ -1,5 +1,6 @@
 package com.etl.framework.mapping
 
+import com.etl.framework.exceptions.{DataFrameToDatasetMappingException, MappingConfigLoadException, MappingExpressionException}
 import org.apache.spark.sql.{DataFrame, Dataset, Encoder, SparkSession}
 import org.apache.spark.sql.functions._
 import org.slf4j.LoggerFactory
@@ -35,10 +36,10 @@ class BatchModelMapper[T: Encoder](
       case e: Exception =>
         logger.error(s"Failed to convert DataFrame to Dataset: ${e.getMessage}")
         logger.error(s"DataFrame schema: ${mapped.schema.treeString}")
-        throw new DataFrameToDatasetMappingException(
-          s"Failed to map DataFrame to Dataset: ${e.getMessage}. " +
-          s"Ensure the DataFrame schema matches the case class structure.",
-          e
+        throw DataFrameToDatasetMappingException(
+          targetClass = implicitly[Encoder[T]].schema.simpleString,
+          details = s"${e.getMessage}. Ensure the DataFrame schema matches the case class structure.",
+          cause = e
         )
     }
   }
@@ -59,9 +60,11 @@ class BatchModelMapper[T: Encoder](
           } catch {
             case e: Exception =>
               logger.error(s"Failed to apply expression '$exprStr' for field ${mapping.targetField}: ${e.getMessage}")
-              throw new MappingExpressionException(
-                s"Failed to apply expression '$exprStr' for field ${mapping.targetField}: ${e.getMessage}",
-                e
+              throw MappingExpressionException(
+                expression = exprStr,
+                field = mapping.targetField,
+                details = e.getMessage,
+                cause = e
               )
           }
         
@@ -134,18 +137,20 @@ object BatchModelMapper {
           MappingConfig(mappings)
         case scala.util.Failure(e) =>
           logger.error(s"Failed to load mapping configuration from $mappingFilePath: ${e.getMessage}")
-          throw new MappingConfigLoadException(
-            s"Failed to load mapping configuration from $mappingFilePath: ${e.getMessage}",
-            e
+          throw MappingConfigLoadException(
+            file = mappingFilePath,
+            details = e.getMessage,
+            cause = e
           )
       }
     } catch {
       case e: MappingConfigLoadException => throw e
       case e: Exception =>
         logger.error(s"Failed to load mapping configuration from $mappingFilePath: ${e.getMessage}")
-        throw new MappingConfigLoadException(
-          s"Failed to load mapping configuration from $mappingFilePath: ${e.getMessage}",
-          e
+        throw MappingConfigLoadException(
+          file = mappingFilePath,
+          details = e.getMessage,
+          cause = e
         )
     }
   }
@@ -165,21 +170,3 @@ object BatchModelMapper {
     new BatchModelMapper[T](config)
   }
 }
-
-/**
- * Exception thrown when DataFrame to Dataset mapping fails
- */
-class DataFrameToDatasetMappingException(message: String, cause: Throwable = null) 
-  extends Exception(message, cause)
-
-/**
- * Exception thrown when mapping expression fails
- */
-class MappingExpressionException(message: String, cause: Throwable = null) 
-  extends Exception(message, cause)
-
-/**
- * Exception thrown when mapping configuration loading fails
- */
-class MappingConfigLoadException(message: String, cause: Throwable = null) 
-  extends Exception(message, cause)

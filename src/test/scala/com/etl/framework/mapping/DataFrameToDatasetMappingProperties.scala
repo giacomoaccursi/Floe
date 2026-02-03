@@ -1,5 +1,6 @@
 package com.etl.framework.mapping
 
+import com.etl.framework.exceptions.{DataFrameToDatasetMappingException, MappingExpressionException}
 import com.etl.framework.TestConfig
 import org.scalacheck.{Gen, Properties}
 import org.scalacheck.Prop.forAll

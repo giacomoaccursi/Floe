@@ -298,7 +298,7 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       loadedConfig match {
         case Right(loaded) => loaded == config
         case Left(error) =>
-          println(s"Failed to load config: ${error.message}")
+          println(s"Failed to load config: ${error.getMessage}")
           false
       }
     }.getOrElse(false)
@@ -448,7 +448,7 @@ output:
       result match {
         case Left(error) =>
           // Error message should be non-empty and descriptive
-          val message = error.message
+          val message = error.getMessage
           message.nonEmpty && 
           (message.contains("Failed") || 
            message.contains("Invalid") || 
@@ -495,7 +495,7 @@ output:
     
     result match {
       case Left(error) =>
-        val message = error.message
+        val message = error.getMessage
         message.nonEmpty && message.contains("Failed to read")
       case Right(_) => false
     }

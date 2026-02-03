@@ -1,9 +1,9 @@
 package com.etl.framework.validation
 
 import com.etl.framework.config._
+import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.TestConfig
 import com.etl.framework.validation.ValidationColumns._
-import com.etl.framework.validation.validators.ForeignKeyValidationException
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 import org.scalacheck.{Gen, Properties}
@@ -528,13 +528,13 @@ object FKValidationProperties extends Properties("FKValidation") {
         // Don't include the referenced flow in validatedFlows
         val validatedFlows = Map.empty[String, DataFrame]
         
-        // Run validation - should throw ForeignKeyValidationException
+        // Run validation - should throw ValidationConfigException
         try {
           val engine = new ValidationEngine()
           engine.validate(childDf, flowConfig, validatedFlows)
           false // Should not reach here
         } catch {
-          case _: ForeignKeyValidationException => true
+          case _: ValidationConfigException => true
           case _: Throwable => false
         }
       }.getOrElse(false)

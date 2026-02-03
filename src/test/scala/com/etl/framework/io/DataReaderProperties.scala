@@ -1,8 +1,9 @@
 package com.etl.framework.io
 
 import com.etl.framework.config.SourceConfig
+import com.etl.framework.exceptions.UnsupportedOperationException
 import com.etl.framework.TestConfig
-import com.etl.framework.io.readers.{DataReaderFactory, UnsupportedFileFormatException, UnsupportedSourceTypeException}
+import com.etl.framework.io.readers.DataReaderFactory
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.types._
 import org.scalacheck.{Arbitrary, Gen, Properties}
@@ -300,7 +301,7 @@ object DataReaderProperties extends Properties("DataReader") {
   
   /**
    * Property 7: Unsupported source type throws exception
-   * For any unsupported source type, the Framework should throw UnsupportedSourceTypeException
+   * For any unsupported source type, the Framework should throw UnsupportedOperationException
    */
   property("unsupported_source_type_error") = forAll(Gen.alphaNumStr.suchThat(s => s.nonEmpty && s != "file" && s != "jdbc")) { unsupportedType =>
     Try {
@@ -312,12 +313,12 @@ object DataReaderProperties extends Properties("DataReader") {
         filePattern = None
       )
       
-      // Should throw UnsupportedSourceTypeException
+      // Should throw UnsupportedOperationException
       try {
         DataReaderFactory.create(sourceConfig)
         false // Should not reach here
       } catch {
-        case _: UnsupportedSourceTypeException => true
+        case _: UnsupportedOperationException => true
         case _: Throwable => false
       }
     }.getOrElse(false)
@@ -337,13 +338,13 @@ object DataReaderProperties extends Properties("DataReader") {
         filePattern = None
       )
       
-      // Should throw UnsupportedFileFormatException
+      // Should throw UnsupportedOperationException
       try {
         val reader = DataReaderFactory.create(sourceConfig)
         reader.read()
         false // Should not reach here
       } catch {
-        case _: UnsupportedFileFormatException => true
+        case _: UnsupportedOperationException => true
         case _: Throwable => false
       }
     }.getOrElse(false)

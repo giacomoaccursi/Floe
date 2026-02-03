@@ -1,6 +1,7 @@
 package com.etl.framework.validation
 
 import com.etl.framework.config._
+import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.TestConfig
 import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -208,7 +209,7 @@ object CustomValidatorProperties extends Properties("CustomValidator") {
   
   /**
    * Property 32: Custom Validator Dynamic Loading - Invalid Class Name
-   * For any invalid custom validator class name, the Framework should throw CustomValidatorException
+   * For any invalid custom validator class name, the Framework should throw ValidationConfigException
    */
   property("custom_validator_invalid_class_throws_exception") = forAll(Gen.alphaNumStr.suchThat(_.nonEmpty)) { invalidClassName =>
     Try {
@@ -228,7 +229,7 @@ object CustomValidatorProperties extends Properties("CustomValidator") {
         ValidatorFactory.create(rule)
         false // Should have thrown exception
       } catch {
-        case _: CustomValidatorException => true
+        case _: ValidationConfigException => true
         case _: Exception => false
       }
     }.getOrElse(false)
@@ -236,7 +237,7 @@ object CustomValidatorProperties extends Properties("CustomValidator") {
   
   /**
    * Property 32: Custom Validator Dynamic Loading - Missing Class Name
-   * For any custom validator rule without class name, the Framework should throw CustomValidatorException
+   * For any custom validator rule without class name, the Framework should throw ValidationConfigException
    */
   property("custom_validator_missing_class_throws_exception") = forAll(Gen.const(())) { _ =>
     Try {
@@ -256,7 +257,7 @@ object CustomValidatorProperties extends Properties("CustomValidator") {
         ValidatorFactory.create(rule)
         false // Should have thrown exception
       } catch {
-        case _: CustomValidatorException => true
+        case _: ValidationConfigException => true
         case _: Exception => false
       }
     }.getOrElse(false)

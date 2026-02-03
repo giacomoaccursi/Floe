@@ -64,8 +64,3 @@ object FlowResult {
     )
   }
 }
-
-/**
- * Exception thrown when record invariant is violated
- */
-class InvariantViolationException(message: String) extends Exception(message)

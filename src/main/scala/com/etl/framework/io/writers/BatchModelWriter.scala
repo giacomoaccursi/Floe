@@ -1,6 +1,7 @@
 package com.etl.framework.io.writers
 
 import com.etl.framework.config.OutputConfig
+import com.etl.framework.exceptions.DataWriteException
 import org.apache.spark.sql.{Dataset, Encoder, SaveMode, SparkSession}
 import org.slf4j.LoggerFactory
 
@@ -50,9 +51,11 @@ class BatchModelWriter[T: Encoder](
     } catch {
       case e: Exception =>
         logger.error(s"Failed to write Batch Model to $outputPath: ${e.getMessage}")
-        throw new BatchModelWriteException(
-          s"Failed to write Batch Model to $outputPath: ${e.getMessage}",
-          e
+        throw DataWriteException(
+          outputType = "Batch Model",
+          outputPath = outputPath,
+          details = e.getMessage,
+          cause = e
         )
     }
   }
@@ -70,9 +73,3 @@ object BatchModelWriter {
     new BatchModelWriter[T](outputConfig)
   }
 }
-
-/**
- * Exception thrown when writing Batch Model fails
- */
-class BatchModelWriteException(message: String, cause: Throwable = null) 
-  extends Exception(message, cause)

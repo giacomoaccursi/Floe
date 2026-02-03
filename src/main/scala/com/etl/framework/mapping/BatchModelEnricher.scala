@@ -1,5 +1,6 @@
 package com.etl.framework.mapping
 
+import com.etl.framework.exceptions.MappingExpressionException
 import org.apache.spark.sql.{Dataset, Encoder, SparkSession}
 import org.slf4j.LoggerFactory
 
@@ -27,9 +28,11 @@ class BatchModelEnricher[T: Encoder](
     } catch {
       case e: Exception =>
         logger.error(s"Enrichment function failed: ${e.getMessage}")
-        throw new EnrichmentException(
-          s"Failed to apply enrichment function: ${e.getMessage}",
-          e
+        throw MappingExpressionException(
+          expression = "enrichment function",
+          field = "batch model",
+          details = e.getMessage,
+          cause = e
         )
     }
   }
@@ -65,9 +68,3 @@ object BatchModelEnricher {
     new BatchModelEnricher[T]()
   }
 }
-
-/**
- * Exception thrown when enrichment fails
- */
-class EnrichmentException(message: String, cause: Throwable = null) 
-  extends Exception(message, cause)

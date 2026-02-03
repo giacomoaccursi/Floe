@@ -1,6 +1,7 @@
 package com.etl.framework.io.writers
 
 import com.etl.framework.config.OutputConfig
+import com.etl.framework.exceptions.DataWriteException
 import org.apache.spark.sql.{Dataset, Encoder, SaveMode, SparkSession}
 import org.slf4j.LoggerFactory
 
@@ -34,7 +35,7 @@ class FinalModelWriter[F: Encoder](
    * 
    * @param dataset Dataset containing final model records
    * @param outputPath Path where the final model should be written
-   * @throws FinalModelWriteException if writing fails
+   * @throws DataWriteException if writing fails
    */
   def write(dataset: Dataset[F], outputPath: String): Unit = {
     logger.info(s"Writing Final Model to: $outputPath")
@@ -71,9 +72,11 @@ class FinalModelWriter[F: Encoder](
     } catch {
       case e: Exception =>
         logger.error(s"Failed to write Final Model to $outputPath: ${e.getMessage}")
-        throw new FinalModelWriteException(
-          s"Failed to write Final Model to $outputPath: ${e.getMessage}",
-          e
+        throw DataWriteException(
+          outputType = "Final Model",
+          outputPath = outputPath,
+          details = e.getMessage,
+          cause = e
         )
     }
   }
@@ -86,7 +89,7 @@ class FinalModelWriter[F: Encoder](
    * @param dataset Dataset containing final model records
    * @param outputPath Path where the final model should be written
    * @param saveMode Spark SaveMode (Overwrite, Append, ErrorIfExists, Ignore)
-   * @throws FinalModelWriteException if writing fails
+   * @throws DataWriteException if writing fails
    */
   def write(dataset: Dataset[F], outputPath: String, saveMode: SaveMode): Unit = {
     logger.info(s"Writing Final Model to: $outputPath with mode: $saveMode")
@@ -123,9 +126,11 @@ class FinalModelWriter[F: Encoder](
     } catch {
       case e: Exception =>
         logger.error(s"Failed to write Final Model to $outputPath: ${e.getMessage}")
-        throw new FinalModelWriteException(
-          s"Failed to write Final Model to $outputPath: ${e.getMessage}",
-          e
+        throw DataWriteException(
+          outputType = "Final Model",
+          outputPath = outputPath,
+          details = e.getMessage,
+          cause = e
         )
     }
   }
@@ -138,7 +143,7 @@ class FinalModelWriter[F: Encoder](
    * 
    * @param dataset Dataset containing final model records
    * @param outputPaths Sequence of output paths
-   * @throws FinalModelWriteException if any write operation fails
+   * @throws DataWriteException if any write operation fails
    */
   def writeMultiple(dataset: Dataset[F], outputPaths: Seq[String]): Unit = {
     logger.info(s"Writing Final Model to ${outputPaths.size} output paths")
@@ -228,10 +233,3 @@ object FinalModelWriter {
     new FinalModelWriter[F](csvConfig)
   }
 }
-
-/**
- * Exception thrown when writing Final Model fails
- */
-class FinalModelWriteException(message: String, cause: Throwable = null) 
-  extends Exception(message, cause)
-

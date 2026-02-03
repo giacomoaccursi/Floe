@@ -65,19 +65,18 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
     
     if (!Files.exists(additionalTablesDir)) {
       logger.info("No additional tables directory found")
-      return Seq.empty
-    }
-    
-    implicit val formats: Formats = DefaultFormats
-    
-    Files.list(additionalTablesDir)
-      .iterator()
-      .asScala
-      .filter(p => p.toString.endsWith(".json"))
-      .flatMap { metadataFile =>
-        try {
-          val jsonContent = new String(Files.readAllBytes(metadataFile))
-          val json = parse(jsonContent)
+      Seq.empty
+    } else {
+      implicit val formats: Formats = DefaultFormats
+      
+      Files.list(additionalTablesDir)
+        .iterator()
+        .asScala
+        .filter(p => p.toString.endsWith(".json"))
+        .flatMap { metadataFile =>
+          try {
+            val jsonContent = new String(Files.readAllBytes(metadataFile))
+            val json = parse(jsonContent)
           
           val tableName = (json \ "table_name").extract[String]
           val path = (json \ "path").extract[String]
@@ -101,6 +100,7 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
         }
       }
       .toSeq
+    }
   }
   
   /**

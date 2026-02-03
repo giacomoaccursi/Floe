@@ -4,7 +4,7 @@ import org.apache.spark.sql.{DataFrame, Dataset, Encoder, SparkSession}
 import org.apache.spark.sql.functions._
 import org.slf4j.LoggerFactory
 import org.yaml.snakeyaml.Yaml
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import java.io.FileInputStream
 
 /**
@@ -115,23 +115,32 @@ object BatchModelMapper {
     
     try {
       val yaml = new Yaml()
-      val inputStream = new FileInputStream(mappingFilePath)
-      val data = yaml.load(inputStream).asInstanceOf[java.util.Map[String, Any]]
-      inputStream.close()
       
-      // Parse mappings
-      val mappingsData = data.get("mappings").asInstanceOf[java.util.List[java.util.Map[String, Any]]]
-      val mappings = mappingsData.asScala.map { mappingData =>
-        val sourceField = mappingData.get("sourceField").asInstanceOf[String]
-        val targetField = mappingData.get("targetField").asInstanceOf[String]
-        val expression = Option(mappingData.get("expression")).map(_.asInstanceOf[String])
+      scala.util.Using(new FileInputStream(mappingFilePath)) { inputStream =>
+        val data = yaml.load(inputStream).asInstanceOf[java.util.Map[String, Any]]
         
-        FieldMapping(sourceField, targetField, expression)
-      }.toSeq
-      
-      logger.info(s"Loaded ${mappings.size} field mappings")
-      MappingConfig(mappings)
+        // Parse mappings
+        val mappingsData = data.get("mappings").asInstanceOf[java.util.List[java.util.Map[String, Any]]]
+        mappingsData.asScala.map { mappingData =>
+          val sourceField = mappingData.get("sourceField").asInstanceOf[String]
+          val targetField = mappingData.get("targetField").asInstanceOf[String]
+          val expression = Option(mappingData.get("expression")).map(_.asInstanceOf[String])
+          
+          FieldMapping(sourceField, targetField, expression)
+        }.toSeq
+      } match {
+        case scala.util.Success(mappings) =>
+          logger.info(s"Loaded ${mappings.size} field mappings")
+          MappingConfig(mappings)
+        case scala.util.Failure(e) =>
+          logger.error(s"Failed to load mapping configuration from $mappingFilePath: ${e.getMessage}")
+          throw new MappingConfigLoadException(
+            s"Failed to load mapping configuration from $mappingFilePath: ${e.getMessage}",
+            e
+          )
+      }
     } catch {
+      case e: MappingConfigLoadException => throw e
       case e: Exception =>
         logger.error(s"Failed to load mapping configuration from $mappingFilePath: ${e.getMessage}")
         throw new MappingConfigLoadException(

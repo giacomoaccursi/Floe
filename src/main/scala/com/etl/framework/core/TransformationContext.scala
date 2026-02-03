@@ -2,6 +2,8 @@ package com.etl.framework.core
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import scala.collection.mutable
+
 /**
  * Context available during transformations (both pre- and post-validation)
  */
@@ -10,7 +12,8 @@ case class TransformationContext(
                                   currentData: DataFrame,                        // Current flow data
                                   validatedFlows: Map[String, DataFrame],        // All already validated flows
                                   batchId: String,                               // Current batch ID
-                                  spark: SparkSession                            // Spark session
+                                  spark: SparkSession,                           // Spark session
+                                  private val additionalTablesMap: mutable.Map[String, AdditionalTableInfo] = mutable.Map.empty
                                 ) {
 
   /**
@@ -30,9 +33,12 @@ case class TransformationContext(
                 outputPath: Option[String] = None,
                 dagMetadata: Option[AdditionalTableMetadata] = None
               ): Unit = {
-    // Table will be automatically saved by framework
-    // and made available for Transformation if dagMetadata is specified
-    // Implementation will be handled by FlowExecutor
+    additionalTablesMap(tableName) = AdditionalTableInfo(
+      tableName = tableName,
+      data = data,
+      outputPath = outputPath,
+      dagMetadata = dagMetadata
+    )
   }
 }
 

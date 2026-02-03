@@ -31,7 +31,8 @@ class FlowTransformer(
             currentData = data,
             validatedFlows = Map.empty, // No validated flows available yet
             batchId = batchId,
-            spark = spark
+            spark = spark,
+            additionalTablesMap = additionalTables
           )
           val transformed = transformation(context)
           val outputCount = transformed.count()
@@ -57,29 +58,14 @@ class FlowTransformer(
         TimingUtil.timed(logger, "Post-validation transformation") {
           val inputCount = data.count()
           
-          // Create context with custom addTable implementation
-          val context = new TransformationContext(
+          val context = TransformationContext(
             currentFlow = flowConfig.name,
             currentData = data,
             validatedFlows = validatedFlows,
             batchId = batchId,
-            spark = spark
-          ) {
-            override def addTable(
-              tableName: String,
-              data: DataFrame,
-              outputPath: Option[String] = None,
-              dagMetadata: Option[AdditionalTableMetadata] = None
-            ): Unit = {
-              // Store table info for later writing
-              additionalTables(tableName) = AdditionalTableInfo(
-                tableName = tableName,
-                data = data,
-                outputPath = outputPath,
-                dagMetadata = dagMetadata
-              )
-            }
-          }
+            spark = spark,
+            additionalTablesMap = additionalTables
+          )
           
           val transformed = transformation(context)
           val outputCount = transformed.count()

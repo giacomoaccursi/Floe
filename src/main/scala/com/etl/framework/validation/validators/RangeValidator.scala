@@ -39,22 +39,6 @@ class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flow
       )
     }
     
-    var rangeCondition = lit(true)
-    
-    // Add min condition
-    if (rule.min.isDefined) {
-      val minValue = rule.min.get
-      validateNumericValue(minValue, "min", column)
-      rangeCondition = rangeCondition && (col(column) >= lit(minValue))
-    }
-    
-    // Add max condition
-    if (rule.max.isDefined) {
-      val maxValue = rule.max.get
-      validateNumericValue(maxValue, "max", column)
-      rangeCondition = rangeCondition && (col(column) <= lit(maxValue))
-    }
-    
     // Validate that min <= max
     (rule.min, rule.max) match {
       case (Some(min), Some(max)) =>
@@ -66,7 +50,18 @@ class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flow
       case _ => // OK
     }
     
-    rangeCondition
+    // Build conditions functionally
+    val minCondition = rule.min.map { minValue =>
+      validateNumericValue(minValue, "min", column)
+      col(column) >= lit(minValue)
+    }.getOrElse(lit(true))
+    
+    val maxCondition = rule.max.map { maxValue =>
+      validateNumericValue(maxValue, "max", column)
+      col(column) <= lit(maxValue)
+    }.getOrElse(lit(true))
+    
+    minCondition && maxCondition
   }
   
   /**

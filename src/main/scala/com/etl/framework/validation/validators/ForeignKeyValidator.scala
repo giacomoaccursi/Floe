@@ -1,6 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.{FlowConfig, ValidationRule}
+import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
 
@@ -26,7 +27,7 @@ class ForeignKeyValidator(
       val referencedFlow = validatedFlows.get(fk.references.flow)
       
       if (referencedFlow.isEmpty) {
-        throw new ForeignKeyValidationException(
+        throw ValidationConfigException(
           s"Referenced flow '${fk.references.flow}' not found in flow $flowName"
         )
       }
@@ -55,8 +56,3 @@ class ForeignKeyValidator(
     ValidationStepResult(currentDf, rejectedDf)
   }
 }
-
-/**
- * Exception thrown when Foreign Key validation fails
- */
-class ForeignKeyValidationException(message: String) extends RuntimeException(message)

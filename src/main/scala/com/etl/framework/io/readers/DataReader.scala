@@ -1,6 +1,7 @@
 package com.etl.framework.io.readers
 
 import com.etl.framework.config.{SchemaConfig, SourceConfig}
+import com.etl.framework.exceptions.UnsupportedOperationException
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -35,14 +36,10 @@ object DataReaderFactory {
       case "file" => new FileDataReader(sourceConfig, schemaConfig)
       case "jdbc" => new JDBCDataReader(sourceConfig)
       case unsupported =>
-        throw new UnsupportedSourceTypeException(
-          s"Unsupported source type: $unsupported. Supported types: file ('csv', 'parquet', 'json'), jdbc"
+        throw UnsupportedOperationException(
+          operation = s"source type '$unsupported'",
+          details = "Supported types: file ('csv', 'parquet', 'json'), jdbc"
         )
     }
   }
 }
-
-/**
- * Exception thrown when an unsupported source type is encountered
- */
-class UnsupportedSourceTypeException(message: String) extends RuntimeException(message)

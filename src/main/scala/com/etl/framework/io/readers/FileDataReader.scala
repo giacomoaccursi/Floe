@@ -1,6 +1,7 @@
 package com.etl.framework.io.readers
 
 import com.etl.framework.config.{SchemaConfig, SourceConfig}
+import com.etl.framework.exceptions.UnsupportedOperationException
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -78,8 +79,9 @@ class FileDataReader(
       case "byte" | "tinyint" => ByteType
       case "short" | "smallint" => ShortType
       case other => 
-        throw new UnsupportedTypeException(
-          s"Unsupported type: $other. Supported types: string, int, long, float, double, boolean, date, timestamp, decimal, binary, byte, short"
+        throw UnsupportedOperationException(
+          operation = s"type '$other'",
+          details = "Supported types: string, int, long, float, double, boolean, date, timestamp, decimal, binary, byte, short"
         )
     }
   }
@@ -92,19 +94,10 @@ class FileDataReader(
   private def validateFormat(format: String): Unit = {
     val supportedFormats = Set("csv", "parquet", "json")
     if (!supportedFormats.contains(format.toLowerCase)) {
-      throw new UnsupportedFileFormatException(
-        s"Unsupported file format: $format. Supported formats: ${supportedFormats.mkString(", ")}"
+      throw UnsupportedOperationException(
+        operation = s"file format '$format'",
+        details = s"Supported formats: ${supportedFormats.mkString(", ")}"
       )
     }
   }
 }
-
-/**
- * Exception thrown when an unsupported file format is encountered
- */
-class UnsupportedFileFormatException(message: String) extends RuntimeException(message)
-
-/**
- * Exception thrown when an unsupported type is encountered
- */
-class UnsupportedTypeException(message: String) extends RuntimeException(message)

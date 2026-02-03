@@ -1,6 +1,7 @@
 package com.etl.framework.validation
 
 import com.etl.framework.config.{DomainsConfig, ValidationRule}
+import com.etl.framework.exceptions.{UnsupportedOperationException, ValidationConfigException}
 import com.etl.framework.validation.validators.{DomainValidator, RangeValidator, RegexValidator}
 import org.apache.spark.sql.DataFrame
 
@@ -43,8 +44,9 @@ object ValidatorFactory {
       case "custom" => createCustomValidator(rule, flowName)
       case unsupported =>
         val flowContext = flowName.map(f => s" in flow '$f'").getOrElse("")
-        throw new UnsupportedValidatorException(
-          s"Unsupported validator type: '$unsupported'$flowContext. Supported: regex, range, domain, custom"
+        throw UnsupportedOperationException(
+          operation = s"validator type '$unsupported'",
+          details = s"Supported validators: regex, range, domain, custom$flowContext"
         )
     }
   }
@@ -56,7 +58,7 @@ object ValidatorFactory {
     val flowContext = flowName.map(f => s" in flow '$f'").getOrElse("")
     
     val className = rule.`class`.getOrElse {
-      throw new CustomValidatorException(
+      throw ValidationConfigException(
         s"Custom validator error$flowContext: 'class' field is required"
       )
     }
@@ -75,9 +77,9 @@ object ValidatorFactory {
       instance
     } catch {
       case e: ClassNotFoundException =>
-        throw new CustomValidatorException(s"Custom validator class not found: $className", e)
+        throw ValidationConfigException(s"Custom validator class not found: $className", e)
       case e: Exception =>
-        throw new CustomValidatorException(s"Failed to instantiate custom validator: $className", e)
+        throw ValidationConfigException(s"Failed to instantiate custom validator: $className", e)
     }
   }
 }
@@ -88,14 +90,3 @@ object ValidatorFactory {
 trait ConfigurableValidator {
   def configure(config: Map[String, String]): Unit
 }
-
-/**
- * Exception thrown when an unsupported validator type is encountered
- */
-class UnsupportedValidatorException(message: String) extends RuntimeException(message)
-
-/**
- * Exception thrown when custom validator fails
- */
-class CustomValidatorException(message: String, cause: Throwable = null)
-  extends RuntimeException(message, cause)

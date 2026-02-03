@@ -1,6 +1,7 @@
 package com.etl.framework.orchestration.planning
 
 import com.etl.framework.config.FlowConfig
+import com.etl.framework.exceptions.CircularDependencyException
 import com.etl.framework.orchestration.ExecutionGroup
 import org.slf4j.LoggerFactory
 
@@ -49,22 +50,29 @@ class DependencyGraphBuilder(flowConfigs: Seq[FlowConfig]) {
     val sorted = mutable.ArrayBuffer[String]()
     val visited = mutable.Set[String]()
     val visiting = mutable.Set[String]()
+    val path = mutable.ArrayBuffer[String]()
     
     def visit(flowName: String): Unit = {
       if (visiting.contains(flowName)) {
-        throw new CircularDependencyException(
-          s"Circular dependency detected involving flow: $flowName"
+        // Found a cycle - construct the cycle path
+        val cycleStart = path.indexOf(flowName)
+        val cycle = path.slice(cycleStart, path.length).toSeq :+ flowName
+        throw CircularDependencyException(
+          graphType = "flow dependency graph",
+          cycle = cycle
         )
       }
       
       if (!visited.contains(flowName)) {
         visiting.add(flowName)
+        path.append(flowName)
         
         // Visit all dependencies first
         dependencyGraph.getOrElse(flowName, Set.empty).foreach { dependency =>
           visit(dependency)
         }
         
+        path.remove(path.length - 1)
         visiting.remove(flowName)
         visited.add(flowName)
         sorted.append(flowName)
@@ -130,8 +138,3 @@ class DependencyGraphBuilder(flowConfigs: Seq[FlowConfig]) {
     groups
   }
 }
-
-/**
- * Exception thrown when circular dependency is detected
- */
-class CircularDependencyException(message: String) extends Exception(message)

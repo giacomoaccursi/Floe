@@ -1,6 +1,6 @@
 package com.etl.framework.config
 
-import com.etl.framework.exceptions.DataSourceException
+import com.etl.framework.exceptions.{ConfigFileException, ConfigurationException, YAMLSyntaxException}
 import io.circe.{Decoder, HCursor}
 import io.circe.yaml.parser
 import io.circe.generic.semiauto._
@@ -20,9 +20,10 @@ trait ConfigLoader[T] {
       try source.mkString finally source.close()
     } match {
       case Success(content) => Right(content)
-      case Failure(ex) => Left(ConfigurationException(
-        s"Failed to read configuration file: $path",
-        Some(ex)
+      case Failure(ex) => Left(ConfigFileException(
+        file = path,
+        message = s"Failed to read configuration file",
+        cause = ex
       ))
     }
   }
@@ -62,14 +63,16 @@ trait ConfigLoader[T] {
                 
               case other => s"${other.getMessage}\nFile: $path"
             }
-            Left(ConfigurationException(
-              s"Failed to parse configuration from $path:\n$detailedMessage",
-              Some(error)
+            Left(ConfigFileException(
+              file = path,
+              message = s"Failed to parse configuration:\n$detailedMessage",
+              cause = error
             ))
         }
-      case Left(error) => Left(ConfigurationException(
-        s"Invalid YAML syntax in $path: ${error.getMessage}",
-        Some(error)
+      case Left(error) => Left(YAMLSyntaxException(
+        file = path,
+        details = error.getMessage,
+        cause = error
       ))
     }
   }
@@ -194,14 +197,6 @@ trait ConfigLoader[T] {
 }
 
 /**
- * Configuration exception
- */
-case class ConfigurationException(
-                                   message: String,
-                                   cause: Option[Throwable] = None
-                                 ) extends Exception(message, cause.orNull)
-
-/**
  * Circe decoders for configuration classes
  */
 object ConfigDecoders {
@@ -309,10 +304,9 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
     Try {
       val dir = new File(directory)
       if (!dir.exists() || !dir.isDirectory) {
-        throw DataSourceException(
-          sourceType = "directory",
-          sourcePath = directory,
-          details = "Directory does not exist or is not a directory"
+        throw ConfigFileException(
+          file = directory,
+          message = "Directory does not exist or is not a directory"
         )
       }
 
@@ -332,9 +326,10 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
           Right(configs.map(_.right.get))
         }
       case Failure(ex) =>
-        Left(ConfigurationException(
-          s"Failed to load flow configurations from directory: $directory",
-          Some(ex)
+        Left(ConfigFileException(
+          file = directory,
+          message = s"Failed to load flow configurations from directory",
+          cause = ex
         ))
     }
   }

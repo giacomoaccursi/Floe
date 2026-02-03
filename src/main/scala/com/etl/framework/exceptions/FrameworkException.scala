@@ -103,6 +103,24 @@ case class InvalidConfigTypeException(
 }
 
 /**
+ * Generic configuration file error (I/O, parsing, etc.)
+ */
+case class ConfigFileException(
+  file: String,
+  message: String,
+  cause: Throwable = null
+) extends ConfigurationException(
+  s"Configuration file error in '$file': $message",
+  cause
+) {
+  override def errorCode: String = "CONFIG_FILE_ERROR"
+  override def context: Map[String, Any] = Map(
+    FILE -> file,
+    MESSAGE -> message
+  )
+}
+
+/**
  * Reference to non-existent entity in configuration
  */
 case class InvalidReferenceException(

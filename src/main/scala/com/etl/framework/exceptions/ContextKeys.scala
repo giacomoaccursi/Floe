@@ -18,6 +18,9 @@ object ContextKeys {
   // Reference information
   val REFERENCE_TYPE = "referenceType"
   val REFERENCE_NAME = "referenceName"
+  
+  // General information
+  val MESSAGE = "message"
   val AVAILABLE_REFERENCES = "availableReferences"
   
   // Flow and validation

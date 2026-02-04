@@ -1,6 +1,6 @@
 package com.etl.framework.validation.validators
 
-import com.etl.framework.config.ValidationRule
+import com.etl.framework.config._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.{SparkSession, Row}
@@ -19,11 +19,23 @@ class NotNullValidatorTest extends AnyFlatSpec with Matchers {
   import spark.implicits._
 
   def createRule(columnName: String): ValidationRule = {
-    // Assuming NotNull rule structure. Often applies to multiple columns or single 'column' in generic rule.
-    // If NotNullValidator processes generic rule with 'column'.
     ValidationRule(
       `type` = "not_null",
       column = Some(columnName)
+    )
+  }
+
+  def createDummyConfig(): FlowConfig = {
+    FlowConfig(
+      name = "test_flow",
+      description = "desc",
+      version = "1.0",
+      owner = "me",
+      source = SourceConfig("file", "/path", "csv", Map.empty, None),
+      schema = SchemaConfig(true, false, Seq.empty),
+      loadMode = LoadModeConfig("full"),
+      validation = ValidationConfig(Seq.empty, Seq.empty, Seq.empty),
+      output = OutputConfig()
     )
   }
 
@@ -33,7 +45,7 @@ class NotNullValidatorTest extends AnyFlatSpec with Matchers {
     val df = spark.createDataFrame(data.asJava, schema)
 
     val rule = createRule("id")
-    val validator = new NotNullValidator()
+    val validator = new NotNullValidator(createDummyConfig())
 
     val result = validator.validate(df, rule)
 
@@ -47,7 +59,7 @@ class NotNullValidatorTest extends AnyFlatSpec with Matchers {
     val df = spark.createDataFrame(data.asJava, schema)
 
     val rule = createRule("id")
-    val result = new NotNullValidator().validate(df, rule)
+    val result = new NotNullValidator(createDummyConfig()).validate(df, rule)
 
     result.valid.count() shouldBe 2
     result.valid.select("id").as[String].collect() should contain allOf (
@@ -57,6 +69,5 @@ class NotNullValidatorTest extends AnyFlatSpec with Matchers {
 
     val rejected = result.rejected.get
     rejected.count() shouldBe 1
-    // row with null id
   }
 }

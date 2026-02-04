@@ -1,7 +1,7 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.TestConfig
-import com.etl.framework.orchestration.flow.InvariantViolationException
+import com.etl.framework.exceptions.InvariantViolationException
 import org.apache.spark.sql.SparkSession
 import org.scalacheck.{Gen, Properties}
 import org.scalacheck.Prop.forAll
@@ -73,7 +73,10 @@ object RecordInvariantProperties extends Properties("RecordInvariant") {
       try {
         if (inputCount != validCount + rejectedCount) {
           throw new InvariantViolationException(
-            s"Invariant violation: input_count ($inputCount) != valid_count ($validCount) + rejected_count ($rejectedCount)"
+            flowName = "test_flow",
+            inputCount = inputCount,
+            validCount = validCount,
+            rejectedCount = rejectedCount
           )
         }
         false // Should not reach here
@@ -199,7 +202,10 @@ object RecordInvariantProperties extends Properties("RecordInvariant") {
     if (inputCount != validCount + rejectedCount) {
       try {
         throw new InvariantViolationException(
-          s"Invariant violation: input_count ($inputCount) != valid_count ($validCount) + rejected_count ($rejectedCount)"
+          flowName = "test_flow",
+          inputCount = inputCount,
+          validCount = validCount,
+          rejectedCount = rejectedCount
         )
       } catch {
         case e: InvariantViolationException =>

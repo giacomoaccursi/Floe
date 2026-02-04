@@ -40,7 +40,7 @@ class IngestionPipeline private(
     }
 
     // Create and execute orchestrator with DomainsConfig
-    val orchestrator = new FlowOrchestrator(globalConfig, enrichedFlowConfigs, domainsConfig)
+    val orchestrator = FlowOrchestrator(globalConfig, enrichedFlowConfigs, domainsConfig)
     orchestrator.execute()
   }
 

@@ -4,9 +4,8 @@ import com.etl.framework.exceptions.{DataFrameToDatasetMappingException, Mapping
 import org.apache.spark.sql.{DataFrame, Dataset, Encoder, SparkSession}
 import org.apache.spark.sql.functions._
 import org.slf4j.LoggerFactory
-import org.yaml.snakeyaml.Yaml
-import scala.jdk.CollectionConverters._
-import java.io.FileInputStream
+
+import scala.io.Source
 
 /**
  * Maps DataFrame to typed Dataset[BatchModel]
@@ -116,38 +115,35 @@ object BatchModelMapper {
   def loadMappingConfig(mappingFilePath: String): MappingConfig = {
     logger.info(s"Loading mapping configuration from: $mappingFilePath")
     
-    try {
-      val yaml = new Yaml()
+    import io.circe.yaml.parser
+    import io.circe.generic.auto._
+    
+    scala.util.Using(Source.fromFile(mappingFilePath)) { source =>
+      val yamlContent = source.mkString
       
-      scala.util.Using(new FileInputStream(mappingFilePath)) { inputStream =>
-        // Note: asInstanceOf is required here for Java YAML library interop
-        // The YAML library returns untyped java.util.Map and java.util.List
-        val data = yaml.load(inputStream).asInstanceOf[java.util.Map[String, Any]]
-        
-        // Parse mappings
-        val mappingsData = data.get("mappings").asInstanceOf[java.util.List[java.util.Map[String, Any]]]
-        mappingsData.asScala.map { mappingData =>
-          val sourceField = mappingData.get("sourceField").asInstanceOf[String]
-          val targetField = mappingData.get("targetField").asInstanceOf[String]
-          val expression = Option(mappingData.get("expression")).map(_.asInstanceOf[String])
-          
-          FieldMapping(sourceField, targetField, expression)
-        }.toSeq
-      } match {
-        case scala.util.Success(mappings) =>
-          logger.info(s"Loaded ${mappings.size} field mappings")
-          MappingConfig(mappings)
-        case scala.util.Failure(e) =>
-          logger.error(s"Failed to load mapping configuration from $mappingFilePath: ${e.getMessage}")
+      parser.parse(yamlContent) match {
+        case Right(json) =>
+          json.as[MappingConfig] match {
+            case Right(config) =>
+              logger.info(s"Loaded ${config.mappings.size} field mappings")
+              config
+            case Left(error) =>
+              throw MappingConfigLoadException(
+                file = mappingFilePath,
+                details = s"Failed to decode mapping config: ${error.getMessage}",
+                cause = error
+              )
+          }
+        case Left(error) =>
           throw MappingConfigLoadException(
             file = mappingFilePath,
-            details = e.getMessage,
-            cause = e
+            details = s"Failed to parse YAML: ${error.getMessage}",
+            cause = error
           )
       }
-    } catch {
-      case e: MappingConfigLoadException => throw e
-      case e: Exception =>
+    } match {
+      case scala.util.Success(config) => config
+      case scala.util.Failure(e) =>
         logger.error(s"Failed to load mapping configuration from $mappingFilePath: ${e.getMessage}")
         throw MappingConfigLoadException(
           file = mappingFilePath,

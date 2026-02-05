@@ -1,7 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.ValidationRule
-import com.etl.framework.TestConfig
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.{SparkSession, Row}
@@ -89,34 +89,20 @@ class RangeValidatorTest extends AnyFlatSpec with Matchers {
     val rule = createRule(Some("5"), Some("15"))
     val result = new RangeValidator().validate(df, rule)
 
-    // Null should pass (remain in valid) unless rule says otherwise
-    // RangeValidator impl creates conditions like `col >= min`.
-    // In Spark SQL, `null >= 5` is null (false for filter).
-    // So nulls might be rejected if the logic is `filter(minCondition && maxCondition)`.
+    // By default skipNull is true, so null values are considered valid (skipped by the check)
+    result.valid.count() shouldBe 2
 
-    // Looking at RangeValidator source:
-    // minCondition = col >= lit(min)
-    // condition = minCondition && maxCondition
-    // validate returns valid = df.filter(condition), rejected = df.filter(not(condition))
+    // Verify specific values are present
+    val values = result.valid
+      .select("value")
+      .collect()
+      .map(r => if (r.isNullAt(0)) null else r.getInt(0))
+    values should contain(10)
+    values should contain(null)
 
-    // If condition is null, filter(condition) drops it.
-    // filter(not(condition)) also drops it (not(null) is null).
-    // BaseValidator usually handles nulls by keeping them or splitting explicitly using specific null handling logic.
-    // Let's see BaseValidator implementation if possible, or assume behavior.
-
-    // If RangeValidator just builds a condition and BaseValidator uses it:
-    // valid = df.filter(condition)
-    // rejected = df.filter(not(condition))
-
-    // For nulls: condition is null. Not(null) is null. Both filters drop it!
-    // So nulls are lost?! That would be a bug or I misunderstand BaseValidator.
-    // Or maybe BaseValidator uses `coalesce(condition, lit(false))`?
-
-    // Let's assert based on behavior: nulls should likely be considered valid for Range check
-    // (NotNull check is separate). But if code drops them, tests will fail if I expect them.
-    // I'll skip specific null assertion or expect them to be in NEITHER if that's the behavior,
-    // or expect them in rejected if `coalesce(cond, false)` is used.
-
-    // Better to test what it *does* for invalid values primarily.
+    result.rejected match {
+      case Some(r) => r.count() shouldBe 0
+      case None    => succeed
+    }
   }
 }

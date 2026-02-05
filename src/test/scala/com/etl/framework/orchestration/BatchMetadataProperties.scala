@@ -183,7 +183,7 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
         val flow = createFlow("test_flow", tempDir)
         val globalConfig = createGlobalConfig(tempDir, format)
 
-        val orchestrator = new FlowOrchestrator(globalConfig, Seq(flow))
+        val orchestrator = FlowOrchestrator(globalConfig, Seq(flow))
         val result = orchestrator.execute()
 
         val batchId = result.batchId
@@ -285,7 +285,7 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
       val flow = createFlow("test_flow", tempDir)
       val globalConfig = createGlobalConfig(tempDir, "yyyyMMdd_HHmmss")
 
-      val orchestrator = new FlowOrchestrator(globalConfig, Seq(flow))
+      val orchestrator = FlowOrchestrator(globalConfig, Seq(flow))
       val result = orchestrator.execute()
 
       // Check that per-flow metadata file exists
@@ -333,14 +333,14 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
       val globalConfig = createGlobalConfig(tempDir, "timestamp")
 
       // Execute first batch
-      val orchestrator1 = new FlowOrchestrator(globalConfig, Seq(flow))
+      val orchestrator1 = FlowOrchestrator(globalConfig, Seq(flow))
       val result1 = orchestrator1.execute()
 
       // Small delay
       Thread.sleep(50)
 
       // Execute second batch
-      val orchestrator2 = new FlowOrchestrator(globalConfig, Seq(flow))
+      val orchestrator2 = FlowOrchestrator(globalConfig, Seq(flow))
       val result2 = orchestrator2.execute()
 
       // Check that latest symlink exists and points to second batch
@@ -419,7 +419,7 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
 
       val globalConfig = createGlobalConfig(tempDir, "yyyyMMdd_HHmmss")
 
-      val orchestrator = new FlowOrchestrator(globalConfig, Seq(flow))
+      val orchestrator = FlowOrchestrator(globalConfig, Seq(flow))
       val result = orchestrator.execute()
 
       // Check that metadata contains rejection reasons

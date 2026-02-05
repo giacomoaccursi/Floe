@@ -1,10 +1,9 @@
 package com.etl.framework.config
 
+import com.etl.framework.config.ConfigDecoders._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import io.circe.parser.decode
-import io.circe.generic.auto._
-import com.etl.framework.config.ConfigDecoders._
+import io.circe.yaml.parser._
 
 class GlobalConfigTest extends AnyFlatSpec with Matchers {
 
@@ -24,27 +23,13 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
         |  parallelNodes: false
       """.stripMargin
 
-    val config = decode[GlobalConfig](convertYamlToJson(yaml))
+    val config = parse(yaml).flatMap(_.as[GlobalConfig])
     config.isRight shouldBe true
     val c = config.right.get
 
     c.paths.validatedPath shouldBe "/data/validated"
     c.processing.maxRejectionRate shouldBe 0.05
     c.performance.parallelFlows shouldBe true
-  }
-
-  // Helper to convert simple YAML to JSON for Circe decoding test without full loader
-  // (In real app we use circe-yaml, here we simulate or use the real loader if available in test scope)
-  // Actually, let's use the GlobalConfigLoader directly which is better.
-
-  it should "load using GlobalConfigLoader with env substitution" in {
-    // We can't easily mock env vars in Java process, but we can test the substitution logic
-    // if we expose it or use a property that doesn't depend on env vars for this test
-
-    val loader = new GlobalConfigLoader()
-    // We rely on integration test for file loading, here we check structure via mocked file or string parsing
-    // But GlobalConfigLoader only takes a path.
-    // Let's stick to unit testing the case class behavior or extend Loader to parse string for testing.
   }
 }
 

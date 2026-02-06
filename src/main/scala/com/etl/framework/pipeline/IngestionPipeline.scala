@@ -1,11 +1,12 @@
 package com.etl.framework.pipeline
 
-import com.etl.framework.config.{DomainsConfigLoader, FlowConfig, FlowConfigLoader, GlobalConfig, GlobalConfigLoader}
+import com.etl.framework.config.{DomainsConfig, DomainsConfigLoader, FlowConfig, FlowConfigLoader, GlobalConfig, GlobalConfigLoader}
 import com.etl.framework.core.FlowTransformation
 import com.etl.framework.exceptions.MissingConfigFieldException
 import com.etl.framework.orchestration.{FlowOrchestrator, IngestionResult}
 import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
+import scala.collection._
 
 /**
  * Fluent API builder for Ingestion pipeline (Extract, Load & Validation)
@@ -14,7 +15,7 @@ class IngestionPipeline private(
                                  globalConfig: GlobalConfig,
                                  flowConfigs: Seq[FlowConfig],
                                  flowTransformations: Map[String, FlowTransformations],
-                                 domainsConfig: Option[com.etl.framework.config.DomainsConfig]
+                                 domainsConfig: Option[DomainsConfig]
                                )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -64,8 +65,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private var configDirectory: Option[String] = None
   private var globalConfigOpt: Option[GlobalConfig] = None
   private var flowConfigsOpt: Option[Seq[FlowConfig]] = None
-  private var domainsConfigOpt: Option[com.etl.framework.config.DomainsConfig] = None
-  private val flowTransformations = scala.collection.mutable.Map[String, FlowTransformations]()
+  private var domainsConfigOpt: Option[DomainsConfig] = None
+  private val flowTransformations = mutable.Map[String, FlowTransformations]()
 
   /**
    * Sets the configuration directory path
@@ -100,7 +101,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
    * @param config Domains configuration
    * @return This builder for chaining
    */
-  def withDomainsConfig(config: com.etl.framework.config.DomainsConfig): IngestionPipelineBuilder = {
+  def withDomainsConfig(config: DomainsConfig): IngestionPipelineBuilder = {
     logger.info(s"Setting domains config directly with ${config.domains.size} domains")
     this.domainsConfigOpt = Some(config)
     this
@@ -252,7 +253,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
    */
   private def loadGlobalConfigFromDirectory(directory: String): GlobalConfig = {
     logger.info(s"Loading global config from directory: $directory")
-    val loader = new com.etl.framework.config.GlobalConfigLoader()
+    val loader = new GlobalConfigLoader()
     loader.load(s"$directory/global.yaml") match {
       case Right(config) => config
       case Left(error) => throw error
@@ -264,8 +265,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
    */
   private def loadFlowConfigsFromDirectory(directory: String): Seq[FlowConfig] = {
     logger.info(s"Loading flow configs from directory: $directory")
-    val domainsLoader = new com.etl.framework.config.DomainsConfigLoader()
-    val flowLoader = new com.etl.framework.config.FlowConfigLoader()
+    val domainsLoader = new DomainsConfigLoader()
+    val flowLoader = new FlowConfigLoader()
 
     val domainsConfig = domainsLoader.load(s"$directory/domains.yaml") match {
       case Right(config) => 
@@ -298,7 +299,7 @@ object IngestionPipeline {
                                 globalConfig: GlobalConfig,
                                 flowConfigs: Seq[FlowConfig],
                                 flowTransformations: Map[String, FlowTransformations],
-                                domainsConfig: Option[com.etl.framework.config.DomainsConfig]
+                                domainsConfig: Option[DomainsConfig]
                               )(implicit spark: SparkSession): IngestionPipeline = {
     new IngestionPipeline(globalConfig, flowConfigs, flowTransformations, domainsConfig)
   }

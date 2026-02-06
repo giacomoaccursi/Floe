@@ -1,228 +1,214 @@
 package com.etl.framework.config
 
-import com.etl.framework.exceptions.{ConfigFileException, ConfigurationException, YAMLSyntaxException}
-import io.circe.{CursorOp, Decoder, DecodingFailure, HCursor}
-import io.circe.yaml.parser
-import io.circe.generic.semiauto._
+import com.etl.framework.exceptions.{
+  ConfigFileException,
+  ConfigurationException,
+  YAMLSyntaxException
+}
+import pureconfig._
+import pureconfig.error.{
+  ConfigReaderFailures,
+  ConvertFailure,
+  KeyNotFound,
+  ThrowableFailure
+}
+import pureconfig.generic.auto._
+import pureconfig.module.yaml._
 
+import java.io.File
 import scala.io.Source
 import scala.util.{Failure, Success, Try, Using}
-/**
- * Base trait for configuration loaders
- */
+
+/** Base trait for configuration loaders using PureConfig
+  */
 trait ConfigLoader[T] {
   def load(path: String): Either[ConfigurationException, T]
 
-  protected def loadYamlFile(path: String): Either[ConfigurationException, String] = {
+  /** Load configuration from a YAML file using PureConfig
+    */
+  protected def loadFromYamlFile(
+      path: String
+  )(implicit reader: ConfigReader[T]): Either[ConfigurationException, T] = {
+    for {
+      yaml <- loadYamlFile(path)
+      substituted = substituteEnvVars(yaml)
+      config <- parseYaml(substituted, path)
+    } yield config
+  }
+
+  /** Read raw YAML content from file
+    */
+  protected def loadYamlFile(
+      path: String
+  ): Either[ConfigurationException, String] = {
     Using(Source.fromFile(path)) { source =>
       source.mkString
     }.toEither.left.map { ex =>
       ConfigFileException(
         file = path,
-        message = s"Failed to read configuration file",
+        message = "Failed to read configuration file",
         cause = ex
       )
     }
   }
-  protected def parseYaml[A: Decoder](yaml: String, path: String): Either[ConfigurationException, A] = {
-    for {
-      json <- parser.parse(yaml).left.map { error =>
-        YAMLSyntaxException(
-          file = path,
-          details = error.getMessage,
-          cause = error
-        )
-      }
-      config <- json.as[A].left.map { error =>
-        // Extract detailed error information from Circe's DecodingFailure
-        val detailedMessage = error match {
-          case df: DecodingFailure =>
-            val missingField = extractMissingField(df.history)
-            val parentPath = formatParentPath(df.history)
-            
-            // Build a clear error message with context
-            missingField match {
-              case Some(field) =>
-                val location = if (parentPath.nonEmpty) s"$parentPath" else "root"
-                s"File: $path, Missing required field '$field' in '$location"
-              case None =>
-                // Fallback to original message if we can't extract field name
-                val readablePath = formatFullPath(df.history)
-                val pathInfo = if (readablePath.nonEmpty) s" at '$readablePath'" else ""
-                s"${df.message}$pathInfo\nFile: $path"
-            }
-            
-          case other => s"${other.getMessage}\nFile: $path"
-        }
+
+  /** Parse YAML string to configuration type using PureConfig
+    */
+  protected def parseYaml(yaml: String, path: String)(implicit
+      reader: ConfigReader[T]
+  ): Either[ConfigurationException, T] = {
+    YamlConfigSource.string(yaml).load[T].left.map { failures =>
+      convertPureConfigError(failures, path)
+    }
+  }
+
+  /** Convert PureConfig errors to our custom exception hierarchy
+    */
+  private def convertPureConfigError(
+      failures: ConfigReaderFailures,
+      path: String
+  ): ConfigurationException = {
+    val firstFailure = failures.head
+
+    firstFailure match {
+      case ConvertFailure(KeyNotFound(key, _), _, configPath) =>
+        val location = if (configPath.isEmpty) "root" else configPath.toString
         ConfigFileException(
           file = path,
-          message = s"Failed to parse configuration:\n$detailedMessage",
-          cause = error
+          message = s"Missing required field '$key' at '$location'"
         )
-      }
-    } yield config
-  }
-  /**
-   * Extracts the missing field name from Circe's cursor history
-   * The first DownField in the history is usually the missing field
-   */
-  private def extractMissingField(history: List[CursorOp]): Option[String] = {
-    history.collectFirst {
-      case CursorOp.DownField(field) => field
+
+      case ThrowableFailure(throwable, _)
+          if throwable.getMessage != null &&
+            throwable.getMessage.contains("while parsing") =>
+        YAMLSyntaxException(
+          file = path,
+          details = throwable.getMessage,
+          cause = throwable
+        )
+
+      case other =>
+        val location =
+          other.origin.map(_.description).getOrElse("unknown location")
+        val description = other.description
+        ConfigFileException(
+          file = path,
+          message = s"Configuration error at $location: $description"
+        )
     }
   }
 
-  /**
-   * Formats the parent path (excluding the missing field) like "validation.rules[*]"
-   */
-  private def formatParentPath(history: List[CursorOp]): String = {
-    // Skip the first DownField which is the missing field itself
-    val withoutMissingField = history.reverse.dropWhile {
-      case CursorOp.DownField(_) => true
-      case _ => false
-    }
-    
-    val pathParts = withoutMissingField.map {
-      case CursorOp.DownField(field) => s".$field"
-      case CursorOp.DownArray => "[*]"
-      case CursorOp.DownN(n) => s"[$n]"
-      case _ => ""
-    }.mkString("").stripPrefix(".")
-    
-    pathParts
-  }
-
-  /**
-   * Formats the full path including all fields
-   */
-  private def formatFullPath(history: List[CursorOp]): String = {
-    history.reverse.map {
-      case CursorOp.DownField(field) => s".$field"
-      case CursorOp.DownArray => "[*]"
-      case CursorOp.DownN(n) => s"[$n]"
-      case _ => ""
-    }.mkString("").stripPrefix(".")
-  }
-
-  /**
-   * Substitutes environment variables in the format ${VAR_NAME} or $VAR_NAME
-   */
+  /** Substitutes environment variables in the format ${VAR_NAME} or $VAR_NAME
+    */
   protected def substituteEnvVars(text: String): String = {
-    // Pattern to match ${VAR_NAME} or $VAR_NAME
     val pattern = """\$\{([^}]+)\}|\$([A-Za-z_][A-Za-z0-9_]*)""".r
 
-    pattern.replaceAllIn(text, m => {
-      val varName = Option(m.group(1)).getOrElse(m.group(2))
-      sys.env.getOrElse(varName, m.matched)
-    })
-  }
-}
-
-/**
- * Circe decoders for configuration classes
- */
-object ConfigDecoders {
-  implicit val pathsConfigDecoder: Decoder[PathsConfig] = deriveDecoder[PathsConfig]
-  implicit val processingConfigDecoder: Decoder[ProcessingConfig] = deriveDecoder[ProcessingConfig]
-  implicit val performanceConfigDecoder: Decoder[PerformanceConfig] = deriveDecoder[PerformanceConfig]
-  implicit val globalConfigDecoder: Decoder[GlobalConfig] = deriveDecoder[GlobalConfig]
-
-  implicit val domainConfigDecoder: Decoder[DomainConfig] = deriveDecoder[DomainConfig]
-  implicit val domainsConfigDecoder: Decoder[DomainsConfig] = deriveDecoder[DomainsConfig]
-
-  implicit val sourceConfigDecoder: Decoder[SourceConfig] = deriveDecoder[SourceConfig]
-  implicit val columnConfigDecoder: Decoder[ColumnConfig] = deriveDecoder[ColumnConfig]
-  implicit val schemaConfigDecoder: Decoder[SchemaConfig] = deriveDecoder[SchemaConfig]
-  implicit val loadModeConfigDecoder: Decoder[LoadModeConfig] = deriveDecoder[LoadModeConfig]
-  implicit val referenceConfigDecoder: Decoder[ReferenceConfig] = deriveDecoder[ReferenceConfig]
-  implicit val foreignKeyConfigDecoder: Decoder[ForeignKeyConfig] = deriveDecoder[ForeignKeyConfig]
-  implicit val validationRuleDecoder: Decoder[ValidationRule] = deriveDecoder[ValidationRule]
-  implicit val validationConfigDecoder: Decoder[ValidationConfig] = deriveDecoder[ValidationConfig]
-  implicit val outputConfigDecoder: Decoder[OutputConfig] = deriveDecoder[OutputConfig]
-
-  // Custom decoder for FlowConfig that excludes transformation fields (they are set programmatically, not from YAML)
-  implicit val flowConfigDecoder: Decoder[FlowConfig] = (c: HCursor) => {
-    for {
-      name <- c.downField("name").as[String]
-      description <- c.downField("description").as[String]
-      version <- c.downField("version").as[String]
-      owner <- c.downField("owner").as[String]
-      source <- c.downField("source").as[SourceConfig]
-      schema <- c.downField("schema").as[SchemaConfig]
-      loadMode <- c.downField("loadMode").as[LoadModeConfig]
-      validation <- c.downField("validation").as[ValidationConfig]
-      output <- c.downField("output").as[OutputConfig]
-    } yield FlowConfig(
-      name = name,
-      description = description,
-      version = version,
-      owner = owner,
-      source = source,
-      schema = schema,
-      loadMode = loadMode,
-      validation = validation,
-      output = output,
-      preValidationTransformation = None,  // Set programmatically
-      postValidationTransformation = None  // Set programmatically
+    pattern.replaceAllIn(
+      text,
+      m => {
+        val varName = Option(m.group(1)).getOrElse(m.group(2))
+        sys.env.getOrElse(varName, m.matched)
+      }
     )
   }
-
-  implicit val modelConfigDecoder: Decoder[ModelConfig] = deriveDecoder[ModelConfig]
-  implicit val dagOutputConfigDecoder: Decoder[DAGOutputConfig] = deriveDecoder[DAGOutputConfig]
-  implicit val joinConditionDecoder: Decoder[JoinCondition] = deriveDecoder[JoinCondition]
-  implicit val aggregationSpecDecoder: Decoder[AggregationSpec] = deriveDecoder[AggregationSpec]
-  implicit val joinConfigDecoder: Decoder[JoinConfig] = deriveDecoder[JoinConfig]
-  implicit val dagNodeDecoder: Decoder[DAGNode] = deriveDecoder[DAGNode]
-  implicit val aggregationConfigDecoder: Decoder[AggregationConfig] = deriveDecoder[AggregationConfig]
 }
 
-/**
- * Global configuration loader
- */
+/** Global configuration loader
+  */
 class GlobalConfigLoader extends ConfigLoader[GlobalConfig] {
-  import ConfigDecoders._
 
-  override def load(path: String): Either[ConfigurationException, GlobalConfig] = {
-    for {
-      yaml <- loadYamlFile(path)
-      substituted = substituteEnvVars(yaml)
-      config <- parseYaml[GlobalConfig](substituted, path)
-    } yield config
+  override def load(
+      path: String
+  ): Either[ConfigurationException, GlobalConfig] = {
+    loadFromYamlFile(path)
   }
 }
 
-/**
- * Domains configuration loader
- */
+/** Domains configuration loader
+  */
 class DomainsConfigLoader extends ConfigLoader[DomainsConfig] {
-  import ConfigDecoders._
 
-  override def load(path: String): Either[ConfigurationException, DomainsConfig] = {
+  override def load(
+      path: String
+  ): Either[ConfigurationException, DomainsConfig] = {
     for {
       yaml <- loadYamlFile(path)
-      config <- parseYaml[DomainsConfig](yaml, path)
+      config <- parseYaml(yaml, path)
     } yield config
   }
 }
 
-/**
- * Flow configuration loader
- */
-class FlowConfigLoader extends ConfigLoader[FlowConfig] {
-  import ConfigDecoders._
-  import java.io.File
+/** Internal case class for parsing FlowConfig from YAML Excludes
+  * FlowTransformation fields which cannot be deserialized from YAML
+  */
+private[config] case class FlowConfigYaml(
+    name: String,
+    description: String,
+    version: String,
+    owner: String,
+    source: SourceConfig,
+    schema: SchemaConfig,
+    loadMode: LoadModeConfig,
+    validation: ValidationConfig,
+    output: OutputConfig
+) {
+  def toFlowConfig: FlowConfig = FlowConfig(
+    name = name,
+    description = description,
+    version = version,
+    owner = owner,
+    source = source,
+    schema = schema,
+    loadMode = loadMode,
+    validation = validation,
+    output = output,
+    preValidationTransformation = None,
+    postValidationTransformation = None
+  )
+}
 
-  override def load(path: String): Either[ConfigurationException, FlowConfig] = {
+/** Flow configuration loader
+  */
+class FlowConfigLoader extends ConfigLoader[FlowConfig] {
+
+  override def load(
+      path: String
+  ): Either[ConfigurationException, FlowConfig] = {
     for {
       yaml <- loadYamlFile(path)
-      config <- parseYaml[FlowConfig](yaml, path)
-    } yield config
+      configYaml <- parseYamlToFlowConfigYaml(yaml, path)
+    } yield configYaml.toFlowConfig
   }
 
-  /**
-   * Loads all flow configurations from a directory
-   */
-  def loadAll(directory: String): Either[ConfigurationException, Seq[FlowConfig]] = {
+  private def parseYamlToFlowConfigYaml(
+      yaml: String,
+      path: String
+  ): Either[ConfigurationException, FlowConfigYaml] = {
+    YamlConfigSource.string(yaml).load[FlowConfigYaml].left.map { failures =>
+      val firstFailure = failures.head
+      firstFailure match {
+        case ConvertFailure(KeyNotFound(key, _), _, configPath) =>
+          val location = if (configPath.isEmpty) "root" else configPath.toString
+          ConfigFileException(
+            file = path,
+            message = s"Missing required field '$key' at '$location'"
+          )
+        case other =>
+          val location =
+            other.origin.map(_.description).getOrElse("unknown location")
+          ConfigFileException(
+            file = path,
+            message = s"Configuration error at $location: ${other.description}"
+          )
+      }
+    }
+  }
+
+  /** Loads all flow configurations from a directory
+    */
+  def loadAll(
+      directory: String
+  ): Either[ConfigurationException, Seq[FlowConfig]] = {
     Try {
       val dir = new File(directory)
       if (!dir.exists() || !dir.isDirectory) {
@@ -232,7 +218,8 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
         )
       }
 
-      val yamlFiles = dir.listFiles()
+      val yamlFiles = dir
+        .listFiles()
         .filter(_.isFile)
         .filter(f => f.getName.endsWith(".yaml") || f.getName.endsWith(".yml"))
         .toSeq
@@ -240,33 +227,34 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
       yamlFiles.map(f => load(f.getAbsolutePath))
     } match {
       case Success(results) =>
-        // Collect all errors or return all configs
         val (errors, configs) = results.partition(_.isLeft)
         if (errors.nonEmpty) {
           Left(errors.head.left.get)
         } else {
-          Right(configs.map(_.right.get))
+          Right(configs.map(_.toOption.get))
         }
       case Failure(ex) =>
-        Left(ConfigFileException(
-          file = directory,
-          message = s"Failed to load flow configurations from directory",
-          cause = ex
-        ))
+        Left(
+          ConfigFileException(
+            file = directory,
+            message = "Failed to load flow configurations from directory",
+            cause = ex
+          )
+        )
     }
   }
 }
 
-/**
- * DAG configuration loader
- */
+/** DAG configuration loader
+  */
 class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
-  import ConfigDecoders._
 
-  override def load(path: String): Either[ConfigurationException, AggregationConfig] = {
+  override def load(
+      path: String
+  ): Either[ConfigurationException, AggregationConfig] = {
     for {
       yaml <- loadYamlFile(path)
-      config <- parseYaml[AggregationConfig](yaml, path)
+      config <- parseYaml(yaml, path)
     } yield config
   }
 }

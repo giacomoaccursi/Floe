@@ -15,11 +15,9 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
 
-  // YAML parsing
-  "io.circe" %% "circe-core" % circeVersion,
-  "io.circe" %% "circe-generic" % circeVersion,
-  "io.circe" %% "circe-parser" % circeVersion,
-  "io.circe" %% "circe-yaml" % "1.15.0",
+  // Configuration loading with YAML support (supports case class defaults natively)
+  "com.github.pureconfig" %% "pureconfig" % "0.17.4",
+  "com.github.pureconfig" %% "pureconfig-yaml" % "0.17.4",
 
   // JSON serialization for metadata
   "org.json4s" %% "json4s-jackson" % json4sVersion,
@@ -31,13 +29,18 @@ libraryDependencies ++= Seq(
   // Testing
   "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
   "org.scalacheck" %% "scalacheck" % scalaCheckVersion % Test,
-  "org.scalatestplus" %% "scalacheck-1-17" % "3.2.18.0" % Test
+  "org.scalatestplus" %% "scalacheck-1-17" % "3.2.18.0" % Test,
+  // Circe for YAML serialization in property-based tests (round-trip testing)
+  "io.circe" %% "circe-core" % circeVersion % Test,
+  "io.circe" %% "circe-generic" % circeVersion % Test,
+  "io.circe" %% "circe-yaml" % "1.15.0" % Test
 )
 
 // Compiler options
 scalacOptions ++= Seq(
   "-deprecation",
-  "-encoding", "UTF-8",
+  "-encoding",
+  "UTF-8",
   "-feature",
   "-unchecked",
   "-Xlint:_",

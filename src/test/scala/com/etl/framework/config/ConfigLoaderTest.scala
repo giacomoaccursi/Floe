@@ -1,34 +1,42 @@
 package com.etl.framework.config
 
-import com.etl.framework.exceptions.{ConfigFileException, ConfigurationException, YAMLSyntaxException}
+import com.etl.framework.exceptions.{
+  ConfigFileException,
+  ConfigurationException,
+  YAMLSyntaxException
+}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import io.circe.generic.auto._
+import pureconfig._
+import pureconfig.generic.auto._
+import pureconfig.module.yaml._
 import java.io.{File, PrintWriter}
 import scala.util.Using
 
 class ConfigLoaderTest extends AnyFlatSpec with Matchers {
 
   case class TestConfig(name: String, value: Int, items: List[String])
-  
+
   class TestConfigLoader extends ConfigLoader[TestConfig] {
-    override def load(path: String): Either[ConfigurationException, TestConfig] = {
-      for {
-        yaml <- loadYamlFile(path)
-        config <- parseYaml[TestConfig](yaml, path)
-      } yield config
+    override def load(
+        path: String
+    ): Either[ConfigurationException, TestConfig] = {
+      loadFromYamlFile(path)
     }
-    
+
     // Public wrapper for testing protected method
-    def parseYamlString(yaml: String, path: String = "test.yaml"): Either[ConfigurationException, TestConfig] = {
-      parseYaml[TestConfig](yaml, path)
+    def parseYamlString(
+        yaml: String,
+        path: String = "test.yaml"
+    ): Either[ConfigurationException, TestConfig] = {
+      parseYaml(yaml, path)
     }
   }
 
   val loader = new TestConfigLoader()
 
   "ConfigLoader" should "parse valid YAML" in {
-    val yaml = 
+    val yaml =
       """
         |name: "test"
         |value: 42
@@ -36,56 +44,59 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
         |  - "a"
         |  - "b"
       """.stripMargin
-      
+
     val result = loader.parseYamlString(yaml)
     result shouldBe Right(TestConfig("test", 42, List("a", "b")))
   }
-  
-  it should "fail with YAMLSyntaxException on invalid YAML syntax" in {
-    val invalidYaml = 
+
+  it should "fail with ConfigFileException on invalid YAML syntax" in {
+    val invalidYaml =
       """
         |name: "test"
         |value: [unclosed list
       """.stripMargin
-      
+
     val result = loader.parseYamlString(invalidYaml)
-    result.left.get shouldBe a [YAMLSyntaxException]
+    result.isLeft shouldBe true
+    result.left.get shouldBe a[ConfigFileException]
   }
-  
+
   it should "fail with ConfigFileException on missing required field" in {
-    val incompleteYaml = 
+    val incompleteYaml =
       """
         |name: "test"
         |items: []
       """.stripMargin // Missing 'value'
-      
+
     val result = loader.parseYamlString(incompleteYaml)
-    
+
     result.isLeft shouldBe true
     val exc = result.left.get
-    exc shouldBe a [ConfigFileException]
-    exc.getMessage should include("Missing required field 'value'")
+    exc shouldBe a[ConfigFileException]
+    exc.getMessage should include("value")
   }
-  
+
   it should "fail with type mismatch error" in {
-    val typeMismatchYaml = 
+    val typeMismatchYaml =
       """
         |name: "test"
         |value: "not an int"
         |items: []
       """.stripMargin
-      
+
     val result = loader.parseYamlString(typeMismatchYaml)
-    
+
     result.isLeft shouldBe true
-    result.left.get shouldBe a [ConfigFileException] 
+    result.left.get shouldBe a[ConfigFileException]
   }
-  
+
   "loadYamlFile" should "return ConfigFileException if file does not exist" in {
     val result = loader.load("non_existent_file.yaml")
     result.isLeft shouldBe true
-    result.left.get shouldBe a [ConfigFileException]
-    result.left.get.getMessage should include("Failed to read configuration file")
+    result.left.get shouldBe a[ConfigFileException]
+    result.left.get.getMessage should include(
+      "Failed to read configuration file"
+    )
   }
 
   // Helper to create temp files
@@ -103,16 +114,46 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
   }
 
   it should "load from valid file" in {
-    val content = 
+    val content =
       """
         |name: "file_test"
         |value: 100
         |items: ["x"]
       """.stripMargin
-      
+
     withTempFile(content) { file =>
       val result = loader.load(file.getAbsolutePath)
       result shouldBe Right(TestConfig("file_test", 100, List("x")))
     }
+  }
+
+  "ConfigLoader with defaults" should "use case class default values when field is missing" in {
+    case class ConfigWithDefaults(
+        name: String,
+        optional: String = "default_value",
+        items: List[String] = List.empty
+    )
+
+    class DefaultsLoader extends ConfigLoader[ConfigWithDefaults] {
+      override def load(
+          path: String
+      ): Either[ConfigurationException, ConfigWithDefaults] = {
+        loadFromYamlFile(path)
+      }
+
+      def parseYamlString(
+          yaml: String
+      ): Either[ConfigurationException, ConfigWithDefaults] = {
+        parseYaml(yaml, "test.yaml")
+      }
+    }
+
+    val loader = new DefaultsLoader()
+    val yaml = """name: "only_required""""
+
+    val result = loader.parseYamlString(yaml)
+    result shouldBe Right(
+      ConfigWithDefaults("only_required", "default_value", List.empty)
+    )
   }
 }

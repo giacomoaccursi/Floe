@@ -74,8 +74,7 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
         )
       ),
       loadMode = LoadModeConfig(
-        `type` = "full",
-        keyColumns = Seq.empty
+        `type` = "full"
       ),
       validation = ValidationConfig(
         primaryKey = Seq("id"),
@@ -405,7 +404,7 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
             ColumnConfig("value", "string", true, None, "Value")
           )
         ),
-        loadMode = LoadModeConfig("full", Seq.empty),
+        loadMode = LoadModeConfig("full"),
         validation = ValidationConfig(Seq("id"), Seq.empty, Seq.empty),
         output = OutputConfig(
           Some(s"$tempDir/output/test_flow"),

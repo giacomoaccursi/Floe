@@ -132,7 +132,6 @@ object CustomOutputPathProperties extends Properties("CustomOutputPath") {
       ),
       loadMode = LoadModeConfig(
         `type` = "full",
-        keyColumns = Seq.empty,
         mergeStrategy = None,
         updateTimestampColumn = None,
         validFromColumn = None,
@@ -237,7 +236,6 @@ object CustomOutputPathProperties extends Properties("CustomOutputPath") {
       ),
       loadMode = LoadModeConfig(
         `type` = "full",
-        keyColumns = Seq.empty,
         mergeStrategy = None,
         updateTimestampColumn = None,
         validFromColumn = None,

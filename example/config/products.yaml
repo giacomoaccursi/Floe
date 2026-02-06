@@ -1,0 +1,86 @@
+name: "products"
+description: "Product catalog"
+version: "1.0"
+owner: "data-team"
+
+source:
+  type: "file"
+  path: "example/data/products.csv"
+  format: "csv"
+  options:
+    header: "true"
+    delimiter: ","
+
+schema:
+  enforceSchema: true
+  allowExtraColumns: true
+  columns:
+    - name: "product_id"
+      type: "integer"
+      nullable: false
+      description: "Unique product identifier"
+    - name: "product_name"
+      type: "string"
+      nullable: false
+      description: "Product name"
+    - name: "category"
+      type: "string"
+      nullable: false
+      description: "Product category"
+    - name: "price"
+      type: "double"
+      nullable: false
+      description: "Product unit price"
+    - name: "stock_quantity"
+      type: "integer"
+      nullable: false
+      description: "Available stock quantity"
+    - name: "supplier_code"
+      type: "string"
+      nullable: true
+      description: "Supplier reference code"
+
+loadMode:
+  type: "delta"
+  mergeStrategy: "upsert"
+  updateTimestampColumn: "last_updated"
+
+validation:
+  primaryKey:
+    - "product_id"
+  foreignKeys: []
+  rules:
+    - type: "not_null"
+      field: "product_name"
+      onFailure: "reject"
+    - type: "domain"
+      field: "category"
+      domainName: "product_category"
+      onFailure: "reject"
+    - type: "range"
+      field: "price"
+      min: 0.01
+      max: 999999.99
+      onFailure: "reject"
+    - type: "range"
+      field: "stock_quantity"
+      min: 0
+      onFailure: "reject"
+
+transformations:
+  preValidation:
+    - type: "sql"
+      query: |
+        SELECT
+          product_id,
+          TRIM(product_name) as product_name,
+          UPPER(TRIM(category)) as category,
+          ROUND(price, 2) as price,
+          stock_quantity,
+          TRIM(supplier_code) as supplier_code,
+          current_timestamp() as last_updated
+        FROM __input__
+
+output:
+  format: "parquet"
+  compression: "snappy"

@@ -99,8 +99,7 @@ object PKValidationProperties extends Properties("PKValidation") {
       )
     ),
     loadMode = LoadModeConfig(
-      `type` = "full",
-      keyColumns = Seq.empty
+      `type` = "full"
     ),
     validation = ValidationConfig(
       primaryKey = pkColumns,
@@ -235,8 +234,7 @@ object PKValidationProperties extends Properties("PKValidation") {
           )
         ),
         loadMode = LoadModeConfig(
-          `type` = "full",
-          keyColumns = Seq.empty
+          `type` = "full"
         ),
         validation = ValidationConfig(
           primaryKey = Seq("id", "name"),
@@ -397,8 +395,7 @@ object PKValidationProperties extends Properties("PKValidation") {
           )
         ),
         loadMode = LoadModeConfig(
-          `type` = "full",
-          keyColumns = Seq.empty
+          `type` = "full"
         ),
         validation = ValidationConfig(
           primaryKey = Seq("id"),

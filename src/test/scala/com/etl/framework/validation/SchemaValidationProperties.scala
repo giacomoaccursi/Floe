@@ -73,8 +73,7 @@ object SchemaValidationProperties extends Properties("SchemaValidation") {
     ),
     schema = schema,
     loadMode = LoadModeConfig(
-      `type` = "full",
-      keyColumns = Seq.empty
+      `type` = "full"
     ),
     validation = ValidationConfig(
       primaryKey = Seq.empty,

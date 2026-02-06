@@ -140,7 +140,7 @@ class FlowExecutor(
     )
     
     val existingData = loadExistingData(outputPath)
-    val merger = DeltaMergerFactory.create(flowConfig.loadMode)
+    val merger = DeltaMergerFactory.create(flowConfig.loadMode, flowConfig.validation.primaryKey)
     val result = merger.merge(newData, existingData)
     
     logMergeStats(newData.count(), existingData.map(_.count()).getOrElse(0L), result.count())

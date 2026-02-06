@@ -104,8 +104,7 @@ object ValidationRuleBehaviorProperties extends Properties("ValidationRuleBehavi
         )
       ),
       loadMode = LoadModeConfig(
-        `type` = "full",
-        keyColumns = Seq.empty
+        `type` = "full"
       ),
       validation = ValidationConfig(
         primaryKey = Seq("id"),
@@ -453,8 +452,7 @@ object ValidationRuleBehaviorProperties extends Properties("ValidationRuleBehavi
           )
         ),
         loadMode = LoadModeConfig(
-          `type` = "full",
-          keyColumns = Seq.empty
+          `type` = "full"
         ),
         validation = ValidationConfig(
           primaryKey = Seq("id"),

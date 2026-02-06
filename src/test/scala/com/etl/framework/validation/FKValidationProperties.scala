@@ -110,8 +110,7 @@ object FKValidationProperties extends Properties("FKValidation") {
       )
     ),
     loadMode = LoadModeConfig(
-      `type` = "full",
-      keyColumns = Seq.empty
+      `type` = "full"
     ),
     validation = ValidationConfig(
       primaryKey = Seq("child_id"),
@@ -287,8 +286,7 @@ object FKValidationProperties extends Properties("FKValidation") {
               )
             ),
             loadMode = LoadModeConfig(
-              `type` = "full",
-              keyColumns = Seq.empty
+              `type` = "full"
             ),
             validation = ValidationConfig(
               primaryKey = Seq("child_id"),
@@ -590,8 +588,7 @@ object FKValidationProperties extends Properties("FKValidation") {
           )
         ),
         loadMode = LoadModeConfig(
-          `type` = "full",
-          keyColumns = Seq.empty
+          `type` = "full"
         ),
         validation = ValidationConfig(
           primaryKey = Seq("child_id"),

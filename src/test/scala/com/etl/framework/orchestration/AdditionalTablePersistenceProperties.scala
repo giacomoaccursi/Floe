@@ -117,7 +117,6 @@ object AdditionalTablePersistenceProperties extends Properties("AdditionalTableP
       ),
       loadMode = LoadModeConfig(
         `type` = "full",
-        keyColumns = Seq.empty,
         mergeStrategy = None,
         updateTimestampColumn = None,
         validFromColumn = None,

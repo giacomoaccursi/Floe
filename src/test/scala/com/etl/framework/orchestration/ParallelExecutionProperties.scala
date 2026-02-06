@@ -85,8 +85,7 @@ object ParallelExecutionProperties extends Properties("ParallelExecution") {
         )
       ),
       loadMode = LoadModeConfig(
-        `type` = "full",
-        keyColumns = Seq.empty
+        `type` = "full"
       ),
       validation = ValidationConfig(
         primaryKey = Seq("id"),
@@ -263,8 +262,7 @@ object ParallelExecutionProperties extends Properties("ParallelExecution") {
           )
         ),
         loadMode = LoadModeConfig(
-          `type` = "full",
-          keyColumns = Seq.empty
+          `type` = "full"
         ),
         validation = ValidationConfig(
           primaryKey = Seq("id"),

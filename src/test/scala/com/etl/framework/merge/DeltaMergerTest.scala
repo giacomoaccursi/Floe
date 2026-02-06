@@ -21,16 +21,15 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
   // --- Factory tests ---
 
   "DeltaMergerFactory" should "create FullReplaceMerger for full load mode" in {
-    val merger = DeltaMergerFactory.create(LoadModeConfig(`type` = "full"))
+    val merger = DeltaMergerFactory.create(LoadModeConfig(`type` = "full"), Seq.empty)
     merger shouldBe a[FullReplaceMerger]
   }
 
   it should "create UpsertMerger for delta upsert strategy" in {
     val merger = DeltaMergerFactory.create(LoadModeConfig(
       `type` = "delta",
-      mergeStrategy = Some("upsert"),
-      keyColumns = Seq("id")
-    ))
+      mergeStrategy = Some("upsert")
+    ), primaryKey = Seq("id"))
     merger shouldBe a[UpsertMerger]
   }
 
@@ -38,19 +37,18 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
     val merger = DeltaMergerFactory.create(LoadModeConfig(
       `type` = "delta",
       mergeStrategy = Some("append")
-    ))
+    ), Seq.empty)
     merger shouldBe a[AppendMerger]
   }
 
   it should "create SCD2Merger for scd2 load mode" in {
     val merger = DeltaMergerFactory.create(LoadModeConfig(
       `type` = "scd2",
-      keyColumns = Seq("id"),
       compareColumns = Seq("name", "value"),
       validFromColumn = Some("valid_from"),
       validToColumn = Some("valid_to"),
       isCurrentColumn = Some("is_current")
-    ))
+    ), primaryKey = Seq("id"))
     merger shouldBe a[SCD2Merger]
   }
 
@@ -59,14 +57,14 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
       DeltaMergerFactory.create(LoadModeConfig(
         `type` = "delta",
         mergeStrategy = Some("invalid")
-      ))
+      ), Seq.empty)
     }
     ex.mergeStrategy shouldBe "invalid"
   }
 
   it should "throw UnsupportedOperationException for unknown load mode type" in {
     intercept[UnsupportedOperationException] {
-      DeltaMergerFactory.create(LoadModeConfig(`type` = "unknown"))
+      DeltaMergerFactory.create(LoadModeConfig(`type` = "unknown"), Seq.empty)
     }
   }
 
@@ -74,12 +72,11 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
     intercept[IllegalArgumentException] {
       DeltaMergerFactory.create(LoadModeConfig(
         `type` = "scd2",
-        keyColumns = Seq("id"),
         compareColumns = Seq("name"),
         validFromColumn = None,
         validToColumn = Some("valid_to"),
         isCurrentColumn = Some("is_current")
-      ))
+      ), primaryKey = Seq("id"))
     }
   }
 

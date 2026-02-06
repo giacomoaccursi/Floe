@@ -27,16 +27,17 @@ object DeltaMergerFactory {
   
   /**
    * Creates a DeltaMerger based on the load mode configuration
-   * 
+   *
    * @param loadMode The load mode configuration
+   * @param primaryKey The primary key columns to use for merge operations
    * @return A DeltaMerger instance
    */
-  def create(loadMode: LoadModeConfig): DeltaMerger = {
+  def create(loadMode: LoadModeConfig, primaryKey: Seq[String]): DeltaMerger = {
     loadMode.`type` match {
       case "delta" =>
         loadMode.mergeStrategy match {
           case Some("upsert") =>
-            new UpsertMerger(loadMode.keyColumns, loadMode.updateTimestampColumn)
+            new UpsertMerger(primaryKey, loadMode.updateTimestampColumn)
           case Some("append") =>
             new AppendMerger()
           case other =>
@@ -51,11 +52,11 @@ object DeltaMergerFactory {
         require(loadMode.validFromColumn.isDefined, "validFromColumn is required for SCD2 mode")
         require(loadMode.validToColumn.isDefined, "validToColumn is required for SCD2 mode")
         require(loadMode.isCurrentColumn.isDefined, "isCurrentColumn is required for SCD2 mode")
-        require(loadMode.keyColumns.nonEmpty, "keyColumns are required for SCD2 mode")
+        require(primaryKey.nonEmpty, "primaryKey is required for SCD2 mode")
         require(loadMode.compareColumns.nonEmpty, "compareColumns are required for SCD2 mode")
-        
+
         new SCD2Merger(
-          loadMode.keyColumns,
+          primaryKey,
           loadMode.compareColumns,
           loadMode.validFromColumn.get,
           loadMode.validToColumn.get,

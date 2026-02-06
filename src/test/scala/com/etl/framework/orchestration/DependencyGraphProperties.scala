@@ -81,8 +81,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
       )
     ),
     loadMode = LoadModeConfig(
-      `type` = "full",
-      keyColumns = Seq.empty
+      `type` = "full"
     ),
     validation = ValidationConfig(
       primaryKey = Seq(pkColumn),
@@ -153,8 +152,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
         )
     ),
     loadMode = LoadModeConfig(
-      `type` = "full",
-      keyColumns = Seq.empty
+      `type` = "full"
     ),
     validation = ValidationConfig(
       primaryKey = Seq(pkColumn),
@@ -315,7 +313,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
           ColumnConfig("c_id", "string", false, None, "FK to C")
         )
       ),
-      loadMode = LoadModeConfig("full", Seq.empty),
+      loadMode = LoadModeConfig("full"),
       validation = ValidationConfig(
         primaryKey = Seq("id"),
         foreignKeys = Seq(
@@ -341,7 +339,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
           ColumnConfig("a_id", "string", false, None, "FK to A")
         )
       ),
-      loadMode = LoadModeConfig("full", Seq.empty),
+      loadMode = LoadModeConfig("full"),
       validation = ValidationConfig(
         primaryKey = Seq("id"),
         foreignKeys = Seq(
@@ -367,7 +365,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
           ColumnConfig("b_id", "string", false, None, "FK to B")
         )
       ),
-      loadMode = LoadModeConfig("full", Seq.empty),
+      loadMode = LoadModeConfig("full"),
       validation = ValidationConfig(
         primaryKey = Seq("id"),
         foreignKeys = Seq(
@@ -435,7 +433,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
             false,
             Seq(ColumnConfig("id", "string", false, None, "PK"))
           ),
-          loadMode = LoadModeConfig("full", Seq.empty),
+          loadMode = LoadModeConfig("full"),
           validation = ValidationConfig(Seq("id"), Seq.empty, Seq.empty),
           output =
             OutputConfig(None, None, "parquet", Seq.empty, "snappy", Map.empty)

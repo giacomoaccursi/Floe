@@ -145,8 +145,6 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
   implicit val arbLoadModeConfig: Arbitrary[LoadModeConfig] = Arbitrary {
     for {
       loadType <- Gen.oneOf("full", "delta", "scd2")
-      keyCount <- Gen.choose(0, 3)
-      keyColumns <- Gen.listOfN(keyCount, Gen.alphaNumStr.suchThat(_.nonEmpty))
       mergeStrategy <- Gen.option(Gen.oneOf("upsert", "append"))
       updateTimestampColumn <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty))
       validFromColumn <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty))
@@ -156,7 +154,6 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       compareColumns <- Gen.listOfN(compareCount, Gen.alphaNumStr.suchThat(_.nonEmpty))
     } yield LoadModeConfig(
       `type` = loadType,
-      keyColumns = keyColumns,
       mergeStrategy = mergeStrategy,
       updateTimestampColumn = updateTimestampColumn,
       validFromColumn = validFromColumn,
@@ -385,7 +382,7 @@ schema:
   columns: []
 loadMode:
   type: full
-  keyColumns: []
+
 validation:
   primaryKey: []
   foreignKeys: []
@@ -413,7 +410,7 @@ schema:
   columns: []
 loadMode:
   type: full
-  keyColumns: []
+
 validation:
   primaryKey: []
   foreignKeys: []

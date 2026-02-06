@@ -1,12 +1,12 @@
 package com.etl.framework.config
 
 import com.etl.framework.exceptions.{ConfigFileException, ConfigurationException, YAMLSyntaxException}
-import io.circe.{Decoder, HCursor}
+import io.circe.{CursorOp, Decoder, DecodingFailure, HCursor}
 import io.circe.yaml.parser
 import io.circe.generic.semiauto._
 
 import scala.io.Source
-import scala.util.{Try, Success, Failure, Using}
+import scala.util.{Failure, Success, Try, Using}
 /**
  * Base trait for configuration loaders
  */
@@ -36,7 +36,7 @@ trait ConfigLoader[T] {
       config <- json.as[A].left.map { error =>
         // Extract detailed error information from Circe's DecodingFailure
         val detailedMessage = error match {
-          case df: io.circe.DecodingFailure =>
+          case df: DecodingFailure =>
             val missingField = extractMissingField(df.history)
             val parentPath = formatParentPath(df.history)
             
@@ -44,16 +44,7 @@ trait ConfigLoader[T] {
             missingField match {
               case Some(field) =>
                 val location = if (parentPath.nonEmpty) s"$parentPath" else "root"
-                val yamlContext = extractYamlContext(yaml, location, field)
-                
-                val contextInfo = if (yamlContext.nonEmpty) {
-                  s"\n\nContext from YAML file:\n$yamlContext\n"
-                } else ""
-                
-                s"Missing required field '$field' in '$location'$contextInfo" +
-                s"\nHint: Add the field to your YAML configuration.\n" +
-                s"File: $path"
-                
+                s"File: $path, Missing required field '$field' in '$location"
               case None =>
                 // Fallback to original message if we can't extract field name
                 val readablePath = formatFullPath(df.history)
@@ -75,26 +66,26 @@ trait ConfigLoader[T] {
    * Extracts the missing field name from Circe's cursor history
    * The first DownField in the history is usually the missing field
    */
-  private def extractMissingField(history: List[io.circe.CursorOp]): Option[String] = {
+  private def extractMissingField(history: List[CursorOp]): Option[String] = {
     history.collectFirst {
-      case io.circe.CursorOp.DownField(field) => field
+      case CursorOp.DownField(field) => field
     }
   }
 
   /**
    * Formats the parent path (excluding the missing field) like "validation.rules[*]"
    */
-  private def formatParentPath(history: List[io.circe.CursorOp]): String = {
+  private def formatParentPath(history: List[CursorOp]): String = {
     // Skip the first DownField which is the missing field itself
     val withoutMissingField = history.reverse.dropWhile {
-      case io.circe.CursorOp.DownField(_) => true
+      case CursorOp.DownField(_) => true
       case _ => false
     }
     
     val pathParts = withoutMissingField.map {
-      case io.circe.CursorOp.DownField(field) => s".$field"
-      case io.circe.CursorOp.DownArray => "[*]"
-      case io.circe.CursorOp.DownN(n) => s"[$n]"
+      case CursorOp.DownField(field) => s".$field"
+      case CursorOp.DownArray => "[*]"
+      case CursorOp.DownN(n) => s"[$n]"
       case _ => ""
     }.mkString("").stripPrefix(".")
     
@@ -104,76 +95,13 @@ trait ConfigLoader[T] {
   /**
    * Formats the full path including all fields
    */
-  private def formatFullPath(history: List[io.circe.CursorOp]): String = {
+  private def formatFullPath(history: List[CursorOp]): String = {
     history.reverse.map {
-      case io.circe.CursorOp.DownField(field) => s".$field"
-      case io.circe.CursorOp.DownArray => "[*]"
-      case io.circe.CursorOp.DownN(n) => s"[$n]"
+      case CursorOp.DownField(field) => s".$field"
+      case CursorOp.DownArray => "[*]"
+      case CursorOp.DownN(n) => s"[$n]"
       case _ => ""
     }.mkString("").stripPrefix(".")
-  }
-
-  /**
-   * Extracts relevant YAML context around the error location
-   * Shows the parent section where the field is missing
-   */
-  private def extractYamlContext(yaml: String, parentPath: String, missingField: String): String = {
-    val lines = yaml.split("\n")
-    
-    // Try to find the parent section in YAML
-    val pathParts = parentPath.split("\\.").filter(_.nonEmpty).filterNot(_.contains("["))
-    
-    if (pathParts.isEmpty) {
-      // Root level - show first few lines
-      val preview = lines.take(10).mkString("\n")
-      s"$preview\n... (missing field '$missingField' at root level)"
-    } else {
-      // Find the section
-      var currentIndent = 0
-      var sectionStart = -1
-      var sectionEnd = -1
-      var foundSection = false
-      
-      // Look for the last path part (the immediate parent)
-      val targetSection = pathParts.last
-      
-      for (i <- lines.indices if !foundSection) {
-        val line = lines(i)
-        val trimmed = line.trim
-        
-        if (trimmed.startsWith(s"$targetSection:") || trimmed.startsWith(s"- $targetSection:")) {
-          sectionStart = i
-          currentIndent = line.takeWhile(_.isWhitespace).length
-          foundSection = true
-          
-          // Find end of section (next line with same or less indentation)
-          var j = i + 1
-          while (j < lines.length && sectionEnd == -1) {
-            val nextLine = lines(j)
-            if (nextLine.trim.nonEmpty) {
-              val nextIndent = nextLine.takeWhile(_.isWhitespace).length
-              if (nextIndent <= currentIndent && !nextLine.trim.startsWith("-")) {
-                sectionEnd = j - 1
-              }
-            }
-            j += 1
-          }
-          if (sectionEnd == -1) sectionEnd = lines.length - 1
-        }
-      }
-      
-      if (foundSection && sectionStart >= 0) {
-        val contextLines = lines.slice(sectionStart, Math.min(sectionEnd + 1, sectionStart + 15))
-        val lineNumbers = (sectionStart + 1) to Math.min(sectionEnd + 1, sectionStart + 15)
-        val numbered = contextLines.zip(lineNumbers).map { case (line, num) =>
-          f"  $num%4d | $line"
-        }.mkString("\n")
-        
-        s"$numbered\n  ^^^^ Missing field '$missingField' should be added here"
-      } else {
-        s"Could not locate section '$parentPath' in YAML (missing field: '$missingField')"
-      }
-    }
   }
 
   /**

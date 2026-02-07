@@ -1,17 +1,18 @@
 package com.etl.framework.config
 
 import com.etl.framework.TestConfig
-import com.etl.framework.config.TestEncoders._
-import io.circe.generic.auto._
-import io.circe.syntax._
-import io.circe.yaml.syntax._
 import org.scalacheck.Prop.forAll
 import org.scalacheck.Test.Parameters
 import org.scalacheck.{Arbitrary, Gen, Properties}
+import org.yaml.snakeyaml.{DumperOptions, Yaml}
+import pureconfig.ConfigWriter
+import pureconfig.generic.auto._
 
 import java.io.PrintWriter
 import java.nio.file.Files
 import scala.util.Try
+
+import ConfigHints._
 
 /** Property-based tests for configuration loading Feature: spark-etl-framework,
   * Property 1: Configuration Loading Round Trip Validates: Requirements 1.1,
@@ -305,21 +306,42 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
     )
   }
 
+  // Custom ConfigWriter for FlowConfig that delegates to FlowConfigYaml
+  // (FlowTransformation is a function type and cannot be serialized)
+  implicit val flowConfigWriter: ConfigWriter[FlowConfig] =
+    ConfigWriter[FlowConfigYaml].contramap(fc =>
+      FlowConfigYaml(
+        fc.name,
+        fc.description,
+        fc.version,
+        fc.owner,
+        fc.source,
+        fc.schema,
+        fc.loadMode,
+        fc.validation,
+        fc.output
+      )
+    )
+
   // Helper function to write config to temp file and load it back
   def roundTripConfig[T](config: T, loader: ConfigLoader[T])(implicit
-      encoder: io.circe.Encoder[T]
+      writer: ConfigWriter[T]
   ): Boolean = {
     Try {
-      // Create temp file
       val tempFile = Files.createTempFile("config-test-", ".yaml")
       val file = tempFile.toFile
       file.deleteOnExit()
 
-      // Write config to YAML
-      val yaml = config.asJson.asYaml.spaces2
-      val writer = new PrintWriter(file)
-      try writer.write(yaml)
-      finally writer.close()
+      // Serialize using PureConfig writer + SnakeYAML
+      val configValue = writer.to(config)
+      val options = new DumperOptions()
+      options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK)
+      val yamlDumper = new Yaml(options)
+      val yamlString = yamlDumper.dump(configValue.unwrapped())
+
+      val pw = new PrintWriter(file)
+      try pw.write(yamlString)
+      finally pw.close()
 
       // Load config back
       val loadedConfig = loader.load(file.getAbsolutePath)
@@ -348,7 +370,6 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
   }
 
   // Property 1: Configuration Loading Round Trip for FlowConfig
-  // Uncommented after fixing Encoders
   property("flowconfig_roundtrip") = forAll { (config: FlowConfig) =>
     roundTripConfig(config, new FlowConfigLoader())
   }

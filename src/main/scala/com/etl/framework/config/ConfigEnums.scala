@@ -1,6 +1,6 @@
 package com.etl.framework.config
 
-import pureconfig.ConfigReader
+import pureconfig.{ConfigReader, ConfigWriter}
 import pureconfig.error.CannotConvert
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -32,6 +32,9 @@ object JoinStrategy {
     ConfigReader.fromString[JoinStrategy](s =>
       fromString(s).left.map(msg => CannotConvert(s, "JoinStrategy", msg))
     )
+
+  implicit val writer: ConfigWriter[JoinStrategy] =
+    ConfigWriter[String].contramap(_.name)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -74,6 +77,9 @@ object JoinType {
     ConfigReader.fromString[JoinType](s =>
       fromString(s).left.map(msg => CannotConvert(s, "JoinType", msg))
     )
+
+  implicit val writer: ConfigWriter[JoinType] =
+    ConfigWriter[String].contramap(_.name)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -102,6 +108,9 @@ object SourceType {
     ConfigReader.fromString[SourceType](s =>
       fromString(s).left.map(msg => CannotConvert(s, "SourceType", msg))
     )
+
+  implicit val writer: ConfigWriter[SourceType] =
+    ConfigWriter[String].contramap(_.name)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -143,6 +152,9 @@ object FileFormat {
     ConfigReader.fromString[FileFormat](s =>
       fromString(s).left.map(msg => CannotConvert(s, "FileFormat", msg))
     )
+
+  implicit val writer: ConfigWriter[FileFormat] =
+    ConfigWriter[String].contramap(_.name)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -173,6 +185,9 @@ object LoadMode {
     ConfigReader.fromString[LoadMode](s =>
       fromString(s).left.map(msg => CannotConvert(s, "LoadMode", msg))
     )
+
+  implicit val writer: ConfigWriter[LoadMode] =
+    ConfigWriter[String].contramap(_.name)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -228,6 +243,9 @@ object ValidationRuleType {
     ConfigReader.fromString[ValidationRuleType](s =>
       fromString(s).left.map(msg => CannotConvert(s, "ValidationRuleType", msg))
     )
+
+  implicit val writer: ConfigWriter[ValidationRuleType] =
+    ConfigWriter[String].contramap(_.name)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -259,6 +277,9 @@ object OnFailureAction {
     ConfigReader.fromString[OnFailureAction](s =>
       fromString(s).left.map(msg => CannotConvert(s, "OnFailureAction", msg))
     )
+
+  implicit val writer: ConfigWriter[OnFailureAction] =
+    ConfigWriter[String].contramap(_.name)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -309,6 +330,9 @@ object AggregationFunction {
         CannotConvert(s, "AggregationFunction", msg)
       )
     )
+
+  implicit val writer: ConfigWriter[AggregationFunction] =
+    ConfigWriter[String].contramap(_.name)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -340,4 +364,7 @@ object MergeStrategy {
     ConfigReader.fromString[MergeStrategy](s =>
       fromString(s).left.map(msg => CannotConvert(s, "MergeStrategy", msg))
     )
+
+  implicit val writer: ConfigWriter[MergeStrategy] =
+    ConfigWriter[String].contramap(_.name)
 }

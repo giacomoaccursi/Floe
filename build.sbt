@@ -7,7 +7,6 @@ scalaVersion := "2.12.18"
 val sparkVersion = "3.5.8"
 val scalaTestVersion = "3.2.19"
 val scalaCheckVersion = "1.19.0"
-val circeVersion = "0.14.15"
 val json4sVersion = "3.7.0-M11"
 
 libraryDependencies ++= Seq(
@@ -29,11 +28,7 @@ libraryDependencies ++= Seq(
   // Testing
   "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
   "org.scalacheck" %% "scalacheck" % scalaCheckVersion % Test,
-  "org.scalatestplus" %% "scalacheck-1-17" % "3.2.18.0" % Test,
-  // Circe for YAML serialization in property-based tests (round-trip testing)
-  "io.circe" %% "circe-core" % circeVersion % Test,
-  "io.circe" %% "circe-generic" % circeVersion % Test,
-  "io.circe" %% "circe-yaml" % "1.15.0" % Test
+  "org.scalatestplus" %% "scalacheck-1-17" % "3.2.18.0" % Test
 )
 
 // Compiler options

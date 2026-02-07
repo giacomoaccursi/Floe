@@ -92,7 +92,12 @@ class FlowResultProcessor(
       .flatMap(_.output.path)
       .getOrElse(s"${globalConfig.paths.validatedPath}/${result.flowName}")
 
-    validatedFlows(result.flowName) = spark.read.parquet(validatedPath)
+    try {
+      validatedFlows(result.flowName) = spark.read.parquet(validatedPath)
+    } catch {
+      case e: Exception =>
+        logger.warn(s"Could not load validated data for ${result.flowName} from $validatedPath: ${e.getMessage}")
+    }
   }
 
   /**

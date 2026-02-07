@@ -30,7 +30,8 @@ class SchemaValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
         )
       } else if (!flowConfig.schema.allowExtraColumns) {
         // 2. Check for extra columns (if not allowed)
-        val extraColumns = actualColumns -- requiredColumns
+        // Exclude internal validation columns (prefixed with _)
+        val extraColumns = (actualColumns -- requiredColumns).filterNot(_.startsWith("_"))
         if (extraColumns.nonEmpty) {
           ValidationUtils.resultWithRejections(
             df.limit(0),

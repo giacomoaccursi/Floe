@@ -11,6 +11,7 @@ import com.etl.framework.exceptions.InvariantViolationException
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.merge.DeltaMergerFactory
 import com.etl.framework.util.TimingUtil
+import com.etl.framework.validation.ValidationColumns._
 import com.etl.framework.validation.{ValidationEngine, ValidationResult}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
@@ -168,7 +169,7 @@ class FlowExecutor(
     */
   private def loadExistingData(path: String): Option[DataFrame] = {
     try {
-      Some(spark.read.parquet(path))
+      Some(spark.read.parquet(path).drop(WARNINGS))
     } catch {
       case _: Exception =>
         logger.info(

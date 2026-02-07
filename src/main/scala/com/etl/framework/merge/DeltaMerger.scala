@@ -1,12 +1,10 @@
 package com.etl.framework.merge
 
 import com.etl.framework.config.{LoadMode, LoadModeConfig, MergeStrategy}
-import com.etl.framework.exceptions.{
-  MergeException,
-  UnsupportedOperationException
-}
+import com.etl.framework.exceptions.{MergeException, UnsupportedOperationException}
 import com.etl.framework.merge.MergeColumns._
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 
 /** Handles merge of incremental data with existing data
@@ -145,10 +143,10 @@ class UpsertMerger(
       tsCol: String
   ): DataFrame = {
     // Union both datasets
-    val combined = existing.union(newData)
+    val combined = existing.unionByName(newData)
 
     // Create window partitioned by key columns, ordered by timestamp descending
-    val windowSpec = org.apache.spark.sql.expressions.Window
+    val windowSpec = Window
       .partitionBy(keyColumns.map(col): _*)
       .orderBy(col(tsCol).desc)
 
@@ -173,7 +171,7 @@ class UpsertMerger(
     )
 
     // Union with all new records (which will overwrite any matching keys)
-    unchangedRecords.union(newData)
+    unchangedRecords.unionByName(newData)
   }
 }
 
@@ -191,7 +189,7 @@ class AppendMerger extends DeltaMerger {
         newData
       case Some(existing) =>
         // Append new records to existing data
-        existing.union(newData)
+        existing.unionByName(newData)
     }
   }
 }
@@ -320,9 +318,9 @@ class SCD2Merger(
 
     // Union all parts together
     historicalRecords
-      .union(closedRecords)
-      .union(unchangedRecords)
-      .union(newVersions)
-      .union(newRecords)
+      .unionByName(closedRecords)
+      .unionByName(unchangedRecords)
+      .unionByName(newVersions)
+      .unionByName(newRecords)
   }
 }

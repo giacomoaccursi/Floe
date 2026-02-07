@@ -116,7 +116,7 @@ trait ConfigLoader[T] {
   /** Substitutes environment variables in the format ${VAR_NAME} or $VAR_NAME
     */
   protected def substituteEnvVars(text: String): String = {
-    val pattern = """\$\{([^}]+)\}|\$([A-Za-z_][A-Za-z0-9_]*)""".r
+    val pattern = """\$\{([^}]+)}|\$([A-Za-z_][A-Za-z0-9_]*)""".r
 
     pattern.replaceAllIn(
       text,

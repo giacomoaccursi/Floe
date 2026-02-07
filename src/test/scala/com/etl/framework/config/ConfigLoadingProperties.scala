@@ -1,42 +1,50 @@
 package com.etl.framework.config
 
 import com.etl.framework.TestConfig
-import org.scalacheck.{Arbitrary, Gen, Properties}
-import org.scalacheck.Prop.forAll
-import org.scalacheck.Test.Parameters
+import com.etl.framework.config.TestEncoders._
+import io.circe.generic.auto._
 import io.circe.syntax._
 import io.circe.yaml.syntax._
-import io.circe.generic.auto._
-import java.io.{File, PrintWriter}
-import java.nio.file.{Files, Path}
+import org.scalacheck.Prop.forAll
+import org.scalacheck.Test.Parameters
+import org.scalacheck.{Arbitrary, Gen, Properties}
+
+import java.io.PrintWriter
+import java.nio.file.Files
 import scala.util.Try
 
-/**
- * Property-based tests for configuration loading
- * Feature: spark-etl-framework, Property 1: Configuration Loading Round Trip
- * Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5
- * 
- * Test configuration: Uses expensiveTestCount (10 cases) due to file I/O
- */
+/** Property-based tests for configuration loading Feature: spark-etl-framework,
+  * Property 1: Configuration Loading Round Trip Validates: Requirements 1.1,
+  * 1.2, 1.3, 1.4, 1.5
+  *
+  * Test configuration: Uses expensiveTestCount (10 cases) due to file I/O
+  */
 object ConfigLoadingProperties extends Properties("ConfigLoading") {
-  
+
   // Configure test parameters for expensive I/O operations
-  override def overrideParameters(p: Parameters): Parameters = TestConfig.expensiveParams
-  
+  override def overrideParameters(p: Parameters): Parameters =
+    TestConfig.expensiveParams
+
   // Generators for configuration objects
-  
+
   implicit val arbPathsConfig: Arbitrary[PathsConfig] = Arbitrary {
     for {
-      validated <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/validated/$s")
-      rejected <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/rejected/$s")
-      metadata <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/metadata/$s")
+      validated <- Gen.alphaNumStr
+        .suchThat(_.nonEmpty)
+        .map(s => s"/data/validated/$s")
+      rejected <- Gen.alphaNumStr
+        .suchThat(_.nonEmpty)
+        .map(s => s"/data/rejected/$s")
+      metadata <- Gen.alphaNumStr
+        .suchThat(_.nonEmpty)
+        .map(s => s"/data/metadata/$s")
     } yield PathsConfig(
       validatedPath = validated,
       rejectedPath = rejected,
       metadataPath = metadata
     )
   }
-  
+
   implicit val arbProcessingConfig: Arbitrary[ProcessingConfig] = Arbitrary {
     for {
       batchIdFormat <- Gen.oneOf("yyyyMMdd_HHmmss", "yyyyMMdd", "timestamp")
@@ -48,7 +56,7 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       maxRejectionRate = maxRejectionRate
     )
   }
-  
+
   implicit val arbPerformanceConfig: Arbitrary[PerformanceConfig] = Arbitrary {
     for {
       parallelFlows <- Gen.oneOf(true, false)
@@ -58,7 +66,7 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       parallelNodes = parallelNodes
     )
   }
-  
+
   implicit val arbGlobalConfig: Arbitrary[GlobalConfig] = Arbitrary {
     for {
       paths <- arbPathsConfig.arbitrary
@@ -70,7 +78,7 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       performance = performance
     )
   }
-  
+
   implicit val arbDomainConfig: Arbitrary[DomainConfig] = Arbitrary {
     for {
       name <- Gen.alphaNumStr.suchThat(_.nonEmpty)
@@ -85,7 +93,7 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       caseSensitive = caseSensitive
     )
   }
-  
+
   implicit val arbDomainsConfig: Arbitrary[DomainsConfig] = Arbitrary {
     for {
       domainCount <- Gen.choose(0, 5)
@@ -94,16 +102,21 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       domains = domains.map(d => d.name -> d).toMap
     )
   }
-  
+
   implicit val arbSourceConfig: Arbitrary[SourceConfig] = Arbitrary {
     for {
-      sourceType <- Gen.oneOf("file", "jdbc")
+      sourceType <- Gen.oneOf(SourceType.values)
       path <- Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/input/$s")
-      format <- Gen.oneOf("csv", "parquet", "json")
+      format <- Gen.oneOf(FileFormat.values)
       optionCount <- Gen.choose(0, 3)
-      optionKeys <- Gen.listOfN(optionCount, Gen.alphaNumStr.suchThat(_.nonEmpty))
+      optionKeys <- Gen.listOfN(
+        optionCount,
+        Gen.alphaNumStr.suchThat(_.nonEmpty)
+      )
       optionValues <- Gen.listOfN(optionCount, Gen.alphaNumStr)
-      filePattern <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"*.csv"))
+      filePattern <- Gen.option(
+        Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"*.csv")
+      )
     } yield SourceConfig(
       `type` = sourceType,
       path = path,
@@ -112,11 +125,18 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       filePattern = filePattern
     )
   }
-  
+
   implicit val arbColumnConfig: Arbitrary[ColumnConfig] = Arbitrary {
     for {
       name <- Gen.alphaNumStr.suchThat(_.nonEmpty)
-      colType <- Gen.oneOf("string", "int", "long", "double", "date", "timestamp")
+      colType <- Gen.oneOf(
+        "string",
+        "int",
+        "long",
+        "double",
+        "date",
+        "timestamp"
+      )
       nullable <- Gen.oneOf(true, false)
       default <- Gen.option(Gen.alphaNumStr)
       description <- Gen.alphaNumStr
@@ -128,7 +148,7 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       description = description
     )
   }
-  
+
   implicit val arbSchemaConfig: Arbitrary[SchemaConfig] = Arbitrary {
     for {
       enforceSchema <- Gen.oneOf(true, false)
@@ -141,17 +161,20 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       columns = columns
     )
   }
-  
+
   implicit val arbLoadModeConfig: Arbitrary[LoadModeConfig] = Arbitrary {
     for {
-      loadType <- Gen.oneOf("full", "delta", "scd2")
-      mergeStrategy <- Gen.option(Gen.oneOf("upsert", "append"))
+      loadType <- Gen.oneOf(LoadMode.values)
+      mergeStrategy <- Gen.option(Gen.oneOf(MergeStrategy.values))
       updateTimestampColumn <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty))
       validFromColumn <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty))
       validToColumn <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty))
       isCurrentColumn <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty))
       compareCount <- Gen.choose(0, 3)
-      compareColumns <- Gen.listOfN(compareCount, Gen.alphaNumStr.suchThat(_.nonEmpty))
+      compareColumns <- Gen.listOfN(
+        compareCount,
+        Gen.alphaNumStr.suchThat(_.nonEmpty)
+      )
     } yield LoadModeConfig(
       `type` = loadType,
       mergeStrategy = mergeStrategy,
@@ -162,7 +185,7 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       compareColumns = compareColumns
     )
   }
-  
+
   implicit val arbReferenceConfig: Arbitrary[ReferenceConfig] = Arbitrary {
     for {
       flow <- Gen.alphaNumStr.suchThat(_.nonEmpty)
@@ -172,7 +195,7 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       column = column
     )
   }
-  
+
   implicit val arbForeignKeyConfig: Arbitrary[ForeignKeyConfig] = Arbitrary {
     for {
       name <- Gen.alphaNumStr.suchThat(_.nonEmpty)
@@ -184,10 +207,10 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       references = references
     )
   }
-  
+
   implicit val arbValidationRule: Arbitrary[ValidationRule] = Arbitrary {
     for {
-      ruleType <- Gen.oneOf("regex", "range", "domain", "custom")
+      ruleType <- Gen.oneOf(ValidationRuleType.values)
       column <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty))
       pattern <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty))
       min <- Gen.option(Gen.choose(0, 100).map(_.toString))
@@ -196,7 +219,7 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       className <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty))
       description <- Gen.option(Gen.alphaNumStr)
       skipNull <- Gen.option(Gen.oneOf(true, false))
-      onFailure <- Gen.oneOf("reject", "warn")
+      onFailure <- Gen.oneOf(OnFailureAction.values)
     } yield ValidationRule(
       `type` = ruleType,
       column = column,
@@ -211,7 +234,7 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       onFailure = onFailure
     )
   }
-  
+
   implicit val arbValidationConfig: Arbitrary[ValidationConfig] = Arbitrary {
     for {
       pkCount <- Gen.choose(1, 3)
@@ -226,17 +249,27 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       rules = rules
     )
   }
-  
+
   implicit val arbOutputConfig: Arbitrary[OutputConfig] = Arbitrary {
     for {
-      path <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/output/$s"))
-      rejectedPath <- Gen.option(Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/rejected/$s"))
-      format <- Gen.oneOf("parquet", "csv", "json")
+      path <- Gen.option(
+        Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/output/$s")
+      )
+      rejectedPath <- Gen.option(
+        Gen.alphaNumStr.suchThat(_.nonEmpty).map(s => s"/data/rejected/$s")
+      )
+      format <- Gen.oneOf(FileFormat.values)
       partitionCount <- Gen.choose(0, 2)
-      partitionBy <- Gen.listOfN(partitionCount, Gen.alphaNumStr.suchThat(_.nonEmpty))
+      partitionBy <- Gen.listOfN(
+        partitionCount,
+        Gen.alphaNumStr.suchThat(_.nonEmpty)
+      )
       compression <- Gen.oneOf("snappy", "gzip", "none")
       optionCount <- Gen.choose(0, 2)
-      optionKeys <- Gen.listOfN(optionCount, Gen.alphaNumStr.suchThat(_.nonEmpty))
+      optionKeys <- Gen.listOfN(
+        optionCount,
+        Gen.alphaNumStr.suchThat(_.nonEmpty)
+      )
       optionValues <- Gen.listOfN(optionCount, Gen.alphaNumStr)
     } yield OutputConfig(
       path = path,
@@ -247,7 +280,7 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       options = optionKeys.zip(optionValues).toMap
     )
   }
-  
+
   implicit val arbFlowConfig: Arbitrary[FlowConfig] = Arbitrary {
     for {
       name <- Gen.alphaNumStr.suchThat(_.nonEmpty)
@@ -271,65 +304,69 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
       output = output
     )
   }
-  
+
   // Helper function to write config to temp file and load it back
-  def roundTripConfig[T](config: T, loader: ConfigLoader[T])(implicit encoder: io.circe.Encoder[T]): Boolean = {
+  def roundTripConfig[T](config: T, loader: ConfigLoader[T])(implicit
+      encoder: io.circe.Encoder[T]
+  ): Boolean = {
     Try {
       // Create temp file
       val tempFile = Files.createTempFile("config-test-", ".yaml")
       val file = tempFile.toFile
       file.deleteOnExit()
-      
+
       // Write config to YAML
       val yaml = config.asJson.asYaml.spaces2
       val writer = new PrintWriter(file)
-      try writer.write(yaml) finally writer.close()
-      
+      try writer.write(yaml)
+      finally writer.close()
+
       // Load config back
       val loadedConfig = loader.load(file.getAbsolutePath)
-      
+
       // Clean up
       Files.deleteIfExists(tempFile)
-      
+
       // Compare
       loadedConfig match {
         case Right(loaded) => loaded == config
-        case Left(error) =>
+        case Left(error)   =>
           println(s"Failed to load config: ${error.getMessage}")
           false
       }
     }.getOrElse(false)
   }
-  
+
   // Property 1: Configuration Loading Round Trip for GlobalConfig
   property("globalconfig_roundtrip") = forAll { (config: GlobalConfig) =>
     roundTripConfig(config, new GlobalConfigLoader())
   }
-  
+
   // Property 1: Configuration Loading Round Trip for DomainsConfig
   property("domainsconfig_roundtrip") = forAll { (config: DomainsConfig) =>
     roundTripConfig(config, new DomainsConfigLoader())
   }
-  
+
   // Property 1: Configuration Loading Round Trip for FlowConfig
-  // Temporarily commented out due to missing encoder
-  // property("flowconfig_roundtrip") = forAll { (config: FlowConfig) =>
-  //   roundTripConfig(config, new FlowConfigLoader())
-  // }
+  // Uncommented after fixing Encoders
+  property("flowconfig_roundtrip") = forAll { (config: FlowConfig) =>
+    roundTripConfig(config, new FlowConfigLoader())
+  }
 }
 
-/**
- * Property-based tests for invalid configuration error messages
- * Feature: spark-etl-framework, Property 2: Invalid Configuration Error Messages
- * Validates: Requirements 1.6
- * 
- * Test configuration: Uses minimalTestCount (5 cases) - error message tests are simple
- */
+/** Property-based tests for invalid configuration error messages Feature:
+  * spark-etl-framework, Property 2: Invalid Configuration Error Messages
+  * Validates: Requirements 1.6
+  *
+  * Test configuration: Uses minimalTestCount (5 cases) - error message tests
+  * are simple
+  */
 object InvalidConfigProperties extends Properties("InvalidConfig") {
-  
+
   // Configure test parameters for simple error message tests
-  override def overrideParameters(p: Parameters): Parameters = TestConfig.minimalParams
-  
+  override def overrideParameters(p: Parameters): Parameters =
+    TestConfig.minimalParams
+
   // Generator for invalid YAML syntax
   val invalidYamlGen: Gen[String] = Gen.oneOf(
     // Missing closing bracket
@@ -349,15 +386,11 @@ object InvalidConfigProperties extends Properties("InvalidConfig") {
     // Tab character (YAML doesn't allow tabs)
     "spark:\n\tappName: test"
   )
-  
+
   // Generator for YAML with missing required fields
   val missingFieldsYamlGen: Gen[String] = Gen.oneOf(
     // GlobalConfig missing spark section
     """
-paths:
-  validatedPath: /data/validated
-  rejectedPath: /data/rejected
-  metadataPath: /data/metadata
 processing:
   batchIdFormat: yyyyMMdd_HHmmss
   failOnValidationError: false
@@ -422,7 +455,7 @@ output:
   options: {}
 """
   )
-  
+
   // Helper function to test that invalid config produces error message
   def testInvalidConfig[T](yaml: String, loader: ConfigLoader[T]): Boolean = {
     Try {
@@ -430,71 +463,82 @@ output:
       val tempFile = Files.createTempFile("invalid-config-test-", ".yaml")
       val file = tempFile.toFile
       file.deleteOnExit()
-      
+
       // Write invalid YAML
       val writer = new PrintWriter(file)
-      try writer.write(yaml) finally writer.close()
-      
+      try writer.write(yaml)
+      finally writer.close()
+
       // Try to load config
       val result = loader.load(file.getAbsolutePath)
-      
+
       // Clean up
       Files.deleteIfExists(tempFile)
-      
+
       // Should return Left with descriptive error
       result match {
         case Left(error) =>
           // Error message should be non-empty and descriptive
           val message = error.getMessage
-          message.nonEmpty && 
-          (message.contains("Failed") || 
-           message.contains("Invalid") || 
-           message.contains("Error") ||
-           message.contains("parse") ||
-           message.contains("syntax"))
-        case Right(_) =>
+          if (!message.contains("Error") && !message.contains("Missing"))
+            println(s"DEBUG: Validation failed for message: '$message'")
+          message.nonEmpty &&
+          (message.contains("Failed") ||
+            message.contains("Invalid") ||
+            message.contains("Error") ||
+            message.contains("Missing") ||
+            message.contains("parse") ||
+            message.contains("syntax"))
+        case Right(c) =>
           // Should not succeed with invalid config
+          println(s"DEBUG: Config loaded unexpectedly: $c")
           false
       }
     }.getOrElse(false)
   }
-  
+
   // Property 2: Invalid YAML syntax produces descriptive error for GlobalConfig
-  property("globalconfig_invalid_syntax_error") = forAll(invalidYamlGen) { yaml =>
-    testInvalidConfig(yaml, new GlobalConfigLoader())
+  property("globalconfig_invalid_syntax_error") = forAll(invalidYamlGen) {
+    yaml =>
+      testInvalidConfig(yaml, new GlobalConfigLoader())
   }
-  
+
   // Property 2: Missing required fields produces descriptive error for GlobalConfig
-  property("globalconfig_missing_fields_error") = forAll(missingFieldsYamlGen) { yaml =>
-    testInvalidConfig(yaml, new GlobalConfigLoader())
+  property("globalconfig_missing_fields_error") = forAll(missingFieldsYamlGen) {
+    yaml =>
+      testInvalidConfig(yaml, new GlobalConfigLoader())
   }
-  
+
   // Property 2: Invalid YAML syntax produces descriptive error for FlowConfig
   property("flowconfig_invalid_syntax_error") = forAll(invalidYamlGen) { yaml =>
     testInvalidConfig(yaml, new FlowConfigLoader())
   }
-  
+
   // Property 2: Missing required fields produces descriptive error for FlowConfig
-  property("flowconfig_missing_fields_error") = forAll(missingFieldsYamlGen) { yaml =>
-    testInvalidConfig(yaml, new FlowConfigLoader())
+  property("flowconfig_missing_fields_error") = forAll(missingFieldsYamlGen) {
+    yaml =>
+      testInvalidConfig(yaml, new FlowConfigLoader())
   }
-  
+
   // Property 2: Invalid YAML syntax produces descriptive error for DomainsConfig
-  property("domainsconfig_invalid_syntax_error") = forAll(invalidYamlGen) { yaml =>
-    testInvalidConfig(yaml, new DomainsConfigLoader())
+  property("domainsconfig_invalid_syntax_error") = forAll(invalidYamlGen) {
+    yaml =>
+      testInvalidConfig(yaml, new DomainsConfigLoader())
   }
-  
+
   // Property 2: Non-existent file produces descriptive error
-  property("nonexistent_file_error") = forAll(Gen.alphaNumStr.suchThat(_.nonEmpty)) { filename =>
-    val nonExistentPath = s"/tmp/nonexistent_${filename}_${System.currentTimeMillis()}.yaml"
-    val loader = new GlobalConfigLoader()
-    val result = loader.load(nonExistentPath)
-    
-    result match {
-      case Left(error) =>
-        val message = error.getMessage
-        message.nonEmpty && message.contains("Failed to read")
-      case Right(_) => false
+  property("nonexistent_file_error") =
+    forAll(Gen.alphaNumStr.suchThat(_.nonEmpty)) { filename =>
+      val nonExistentPath =
+        s"/tmp/nonexistent_${filename}_${System.currentTimeMillis()}.yaml"
+      val loader = new GlobalConfigLoader()
+      val result = loader.load(nonExistentPath)
+
+      result match {
+        case Left(error) =>
+          val message = error.getMessage
+          message.nonEmpty && message.contains("Failed to read")
+        case Right(_) => false
+      }
     }
-  }
 }

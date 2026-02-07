@@ -20,20 +20,21 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
   import spark.implicits._
 
   def createFlowConfig(
-    name: String = "test_flow",
-    schemaFields: Seq[ColumnConfig] = Seq.empty,
-    primaryKey: Seq[String] = Seq.empty,
-    foreignKeys: Seq[ForeignKeyConfig] = Seq.empty,
-    rules: Seq[ValidationRule] = Seq.empty
+      name: String = "test_flow",
+      schemaFields: Seq[ColumnConfig] = Seq.empty,
+      primaryKey: Seq[String] = Seq.empty,
+      foreignKeys: Seq[ForeignKeyConfig] = Seq.empty,
+      rules: Seq[ValidationRule] = Seq.empty
   ): FlowConfig = {
     FlowConfig(
       name = name,
       description = "Test flow",
       version = "1.0",
       owner = "test",
-      source = SourceConfig("file", "/path", "csv", Map.empty, None),
+      source =
+        SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
       schema = SchemaConfig(true, true, schemaFields),
-      loadMode = LoadModeConfig("full"),
+      loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(primaryKey, foreignKeys, rules),
       output = OutputConfig()
     )
@@ -45,7 +46,8 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
     val df = spark.createDataFrame(data.asJava, schema)
 
     val flowConfig = createFlowConfig(
-      schemaFields = Seq(ColumnConfig("id", "string", nullable = false, description = ""))
+      schemaFields =
+        Seq(ColumnConfig("id", "string", nullable = false, description = ""))
     )
     val engine = new ValidationEngine()
 
@@ -55,14 +57,16 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
   }
 
   it should "chain multiple validators sequentially" in {
-    val schema = StructType(Seq(
-      StructField("id", IntegerType, true),
-      StructField("name", StringType, true)
-    ))
+    val schema = StructType(
+      Seq(
+        StructField("id", IntegerType, true),
+        StructField("name", StringType, true)
+      )
+    )
     val data = Seq(
       Row(1, "Alice"),
-      Row(null, "Bob"),    // fails not_null for id
-      Row(3, null)         // fails not_null for name
+      Row(null, "Bob"), // fails not_null for id
+      Row(3, null) // fails not_null for name
     )
     val df = spark.createDataFrame(data.asJava, schema)
 
@@ -86,14 +90,16 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
   }
 
   it should "aggregate rejection reasons from multiple validation steps" in {
-    val schema = StructType(Seq(
-      StructField("id", StringType, true),
-      StructField("age", IntegerType, true)
-    ))
+    val schema = StructType(
+      Seq(
+        StructField("id", StringType, true),
+        StructField("age", IntegerType, true)
+      )
+    )
     val data = Seq(
       Row("1", 25),
-      Row("INVALID", 30),  // fails schema validation (id should be integer)
-      Row(null, 35)         // fails not_null validation
+      Row("INVALID", 30), // fails schema validation (id should be integer)
+      Row(null, 35) // fails not_null validation
     )
     val df = spark.createDataFrame(data.asJava, schema)
 
@@ -109,18 +115,20 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
 
     // Check that rejectionReasons map contains counts for each step
     result.rejectionReasons should not be empty
-    result.rejectionReasons.values.sum shouldBe > (0L)
+    result.rejectionReasons.values.sum shouldBe >(0L)
   }
 
   it should "combine rejected DataFrames using union" in {
-    val schema = StructType(Seq(
-      StructField("id", IntegerType, true),
-      StructField("value", StringType, true)
-    ))
+    val schema = StructType(
+      Seq(
+        StructField("id", IntegerType, true),
+        StructField("value", StringType, true)
+      )
+    )
     val data = Seq(
       Row(1, "valid"),
-      Row(null, "invalid1"),  // rejected by not_null on id
-      Row(2, null)            // rejected by not_null on value
+      Row(null, "invalid1"), // rejected by not_null on id
+      Row(2, null) // rejected by not_null on value
     )
     val df = spark.createDataFrame(data.asJava, schema)
 
@@ -156,10 +164,11 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
 
     // Config without primary key, foreign keys, or custom rules
     val flowConfig = createFlowConfig(
-      schemaFields = Seq(ColumnConfig("id", "string", nullable = false, description = "")),
-      primaryKey = Seq.empty,  // PK validation should be skipped
+      schemaFields =
+        Seq(ColumnConfig("id", "string", nullable = false, description = "")),
+      primaryKey = Seq.empty, // PK validation should be skipped
       foreignKeys = Seq.empty, // FK validation should be skipped
-      rules = Seq.empty        // Custom rules validation should be skipped
+      rules = Seq.empty // Custom rules validation should be skipped
     )
     val engine = new ValidationEngine()
 
@@ -171,14 +180,16 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
   }
 
   it should "propagate state correctly through validation chain" in {
-    val schema = StructType(Seq(
-      StructField("id", IntegerType, true),
-      StructField("name", StringType, true)
-    ))
+    val schema = StructType(
+      Seq(
+        StructField("id", IntegerType, true),
+        StructField("name", StringType, true)
+      )
+    )
     val data = Seq(
       Row(1, "Alice"),
       Row(2, "Bob"),
-      Row(null, "Charlie")  // Should be rejected early by not_null
+      Row(null, "Charlie") // Should be rejected early by not_null
     )
     val df = spark.createDataFrame(data.asJava, schema)
 
@@ -187,7 +198,7 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
         ColumnConfig("id", "integer", nullable = false, description = ""),
         ColumnConfig("name", "string", nullable = false, description = "")
       ),
-      primaryKey = Seq("id")  // PK validation should only run on valid records
+      primaryKey = Seq("id") // PK validation should only run on valid records
     )
     val engine = new ValidationEngine()
 
@@ -207,7 +218,8 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
     val df = spark.createDataFrame(data.asJava, schema)
 
     val flowConfig = createFlowConfig(
-      schemaFields = Seq(ColumnConfig("id", "string", nullable = false, description = ""))
+      schemaFields =
+        Seq(ColumnConfig("id", "string", nullable = false, description = ""))
     )
     val engine = new ValidationEngine()
 
@@ -222,16 +234,18 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
   }
 
   it should "accumulate rejection reasons across multiple steps" in {
-    val schema = StructType(Seq(
-      StructField("id", IntegerType, true),
-      StructField("name", StringType, true),
-      StructField("age", IntegerType, true)
-    ))
+    val schema = StructType(
+      Seq(
+        StructField("id", IntegerType, true),
+        StructField("name", StringType, true),
+        StructField("age", IntegerType, true)
+      )
+    )
     val data = Seq(
       Row(1, "Alice", 25),
-      Row(null, "Bob", 30),    // rejected by not_null (id)
-      Row(2, null, 35),        // rejected by not_null (name)
-      Row(3, "Charlie", null)  // rejected by not_null (age)
+      Row(null, "Bob", 30), // rejected by not_null (id)
+      Row(2, null, 35), // rejected by not_null (name)
+      Row(3, "Charlie", null) // rejected by not_null (age)
     )
     val df = spark.createDataFrame(data.asJava, schema)
 

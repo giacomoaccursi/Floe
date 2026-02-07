@@ -70,9 +70,9 @@ object ParallelExecutionProperties extends Properties("ParallelExecution") {
       version = "1.0",
       owner = "test",
       source = SourceConfig(
-        `type` = "file",
+        `type` = SourceType.File,
         path = inputPath,
-        format = "csv",
+        format = FileFormat.CSV,
         options = Map("header" -> "true"),
         filePattern = None
       ),
@@ -85,7 +85,7 @@ object ParallelExecutionProperties extends Properties("ParallelExecution") {
         )
       ),
       loadMode = LoadModeConfig(
-        `type` = "full"
+        `type` = LoadMode.Full
       ),
       validation = ValidationConfig(
         primaryKey = Seq("id"),
@@ -95,7 +95,7 @@ object ParallelExecutionProperties extends Properties("ParallelExecution") {
       output = OutputConfig(
         path = Some(s"$tempDir/output/$flowName"),
         rejectedPath = Some(s"$tempDir/rejected/$flowName"),
-        format = "parquet",
+        format = FileFormat.Parquet,
         partitionBy = Seq.empty,
         compression = "snappy",
         options = Map.empty
@@ -240,9 +240,9 @@ object ParallelExecutionProperties extends Properties("ParallelExecution") {
         version = "1.0",
         owner = "test",
         source = SourceConfig(
-          `type` = "file",
+          `type` = SourceType.File,
           path = inputPathB,
-          format = "csv",
+          format = FileFormat.CSV,
           options = Map("header" -> "true"),
           filePattern = None
         ),
@@ -262,7 +262,7 @@ object ParallelExecutionProperties extends Properties("ParallelExecution") {
           )
         ),
         loadMode = LoadModeConfig(
-          `type` = "full"
+          `type` = LoadMode.Full
         ),
         validation = ValidationConfig(
           primaryKey = Seq("id"),
@@ -274,7 +274,7 @@ object ParallelExecutionProperties extends Properties("ParallelExecution") {
         output = OutputConfig(
           path = Some(s"$tempDir/output/flow_b"),
           rejectedPath = Some(s"$tempDir/rejected/flow_b"),
-          format = "parquet",
+          format = FileFormat.Parquet,
           partitionBy = Seq.empty,
           compression = "snappy",
           options = Map.empty

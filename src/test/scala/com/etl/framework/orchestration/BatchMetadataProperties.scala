@@ -59,9 +59,9 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
       version = "1.0",
       owner = "test",
       source = SourceConfig(
-        `type` = "file",
+        `type` = SourceType.File,
         path = inputPath,
-        format = "csv",
+        format = FileFormat.CSV,
         options = Map("header" -> "true"),
         filePattern = None
       ),
@@ -74,7 +74,7 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
         )
       ),
       loadMode = LoadModeConfig(
-        `type` = "full"
+        `type` = LoadMode.Full
       ),
       validation = ValidationConfig(
         primaryKey = Seq("id"),
@@ -84,7 +84,7 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
       output = OutputConfig(
         path = Some(s"$tempDir/output/$flowName"),
         rejectedPath = Some(s"$tempDir/rejected/$flowName"),
-        format = "parquet",
+        format = FileFormat.Parquet,
         partitionBy = Seq.empty,
         compression = "snappy",
         options = Map.empty
@@ -394,8 +394,13 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
         description = "Test flow",
         version = "1.0",
         owner = "test",
-        source =
-          SourceConfig("file", inputPath, "csv", Map("header" -> "true"), None),
+        source = SourceConfig(
+          SourceType.File,
+          inputPath,
+          FileFormat.CSV,
+          Map("header" -> "true"),
+          None
+        ),
         schema = SchemaConfig(
           true,
           false,
@@ -404,12 +409,12 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
             ColumnConfig("value", "string", true, None, "Value")
           )
         ),
-        loadMode = LoadModeConfig("full"),
+        loadMode = LoadModeConfig(LoadMode.Full),
         validation = ValidationConfig(Seq("id"), Seq.empty, Seq.empty),
         output = OutputConfig(
           Some(s"$tempDir/output/test_flow"),
           Some(s"$tempDir/rejected/test_flow"),
-          "parquet",
+          FileFormat.Parquet,
           Seq.empty,
           "snappy",
           Map.empty

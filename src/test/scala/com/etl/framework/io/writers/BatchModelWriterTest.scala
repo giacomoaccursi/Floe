@@ -1,10 +1,12 @@
 package com.etl.framework.io.writers
 
-import com.etl.framework.config.OutputConfig
+import com.etl.framework.config.FileFormat.Parquet
+import com.etl.framework.config.{FileFormat, OutputConfig}
 import com.etl.framework.exceptions.DataWriteException
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.SparkSession
+
 import java.nio.file.{Files, Path}
 
 case class WriterTestModel(id: Long, name: String, category: String)
@@ -28,7 +30,7 @@ class BatchModelWriterTest extends AnyFlatSpec with Matchers {
     val tempDir = createTempDir()
     val outputPath = tempDir.resolve("output").toString
     try {
-      val outputConfig = OutputConfig(format = "parquet")
+      val outputConfig = OutputConfig(format = FileFormat.Parquet)
       val writer = new BatchModelWriter[WriterTestModel](outputConfig)
 
       val data = Seq(
@@ -51,7 +53,7 @@ class BatchModelWriterTest extends AnyFlatSpec with Matchers {
     val outputPath = tempDir.resolve("partitioned").toString
     try {
       val outputConfig = OutputConfig(
-        format = "parquet",
+        format = Parquet,
         partitionBy = Seq("category")
       )
       val writer = new BatchModelWriter[WriterTestModel](outputConfig)
@@ -82,7 +84,7 @@ class BatchModelWriterTest extends AnyFlatSpec with Matchers {
     val outputPath = tempDir.resolve("compressed").toString
     try {
       val outputConfig = OutputConfig(
-        format = "parquet",
+        format = Parquet,
         compression = "snappy"
       )
       val writer = new BatchModelWriter[WriterTestModel](outputConfig)
@@ -102,7 +104,7 @@ class BatchModelWriterTest extends AnyFlatSpec with Matchers {
     val outputPath = tempDir.resolve("with_options").toString
     try {
       val outputConfig = OutputConfig(
-        format = "parquet",
+        format = Parquet,
         options = Map("mergeSchema" -> "true")
       )
       val writer = new BatchModelWriter[WriterTestModel](outputConfig)
@@ -121,7 +123,7 @@ class BatchModelWriterTest extends AnyFlatSpec with Matchers {
     val tempDir = createTempDir()
     val outputPath = tempDir.resolve("overwrite").toString
     try {
-      val outputConfig = OutputConfig(format = "parquet")
+      val outputConfig = OutputConfig(format = FileFormat.Parquet)
       val writer = new BatchModelWriter[WriterTestModel](outputConfig)
 
       // Write first batch
@@ -143,7 +145,7 @@ class BatchModelWriterTest extends AnyFlatSpec with Matchers {
   }
 
   it should "create writer using companion object" in {
-    val outputConfig = OutputConfig(format = "parquet")
+    val outputConfig = OutputConfig(format = FileFormat.Parquet)
     val writer = BatchModelWriter[WriterTestModel](outputConfig)
     writer should not be null
   }
@@ -152,7 +154,7 @@ class BatchModelWriterTest extends AnyFlatSpec with Matchers {
     val tempDir = createTempDir()
     val outputPath = tempDir.resolve("empty").toString
     try {
-      val outputConfig = OutputConfig(format = "parquet")
+      val outputConfig = OutputConfig(format = FileFormat.Parquet)
       val writer = new BatchModelWriter[WriterTestModel](outputConfig)
 
       val emptyData = spark.emptyDataset[WriterTestModel]

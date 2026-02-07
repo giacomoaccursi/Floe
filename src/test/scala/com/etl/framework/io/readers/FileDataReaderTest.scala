@@ -1,6 +1,12 @@
 package com.etl.framework.io.readers
 
-import com.etl.framework.config.{ColumnConfig, SchemaConfig, SourceConfig}
+import com.etl.framework.config.{
+  ColumnConfig,
+  SchemaConfig,
+  SourceConfig,
+  SourceType,
+  FileFormat
+}
 import com.etl.framework.exceptions.UnsupportedOperationException
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -27,9 +33,9 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
     val csvFile = createTempCsv("id,name\n1,Alice\n2,Bob")
     try {
       val sourceConfig = SourceConfig(
-        `type` = "file",
+        `type` = SourceType.File,
         path = csvFile.toString,
-        format = "csv",
+        format = FileFormat.CSV,
         options = Map("header" -> "true")
       )
       val reader = new FileDataReader(sourceConfig)
@@ -47,9 +53,9 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
     val csvFile = createTempCsv("id,name\n1,Alice\n2,Bob")
     try {
       val sourceConfig = SourceConfig(
-        `type` = "file",
+        `type` = SourceType.File,
         path = csvFile.toString,
-        format = "csv",
+        format = FileFormat.CSV,
         options = Map("header" -> "true")
       )
       val schemaConfig = SchemaConfig(
@@ -72,25 +78,19 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
     }
   }
 
-  it should "throw exception for unsupported format" in {
-    val sourceConfig = SourceConfig(
-      `type` = "file",
-      path = "/tmp/test",
-      format = "xlsx",
-      options = Map.empty
-    )
-    val reader = new FileDataReader(sourceConfig)
-
-    intercept[UnsupportedOperationException] {
-      reader.read()
-    }
-  }
+  // Removed obsolete test "throw exception for unsupported format"
+  // because strong typing with Enums prevents invalid values at compile time.
 
   it should "support csv, parquet and json formats" in {
     // CSV
     val csvFile = createTempCsv("id\n1")
     try {
-      val csvConfig = SourceConfig("file", csvFile.toString, "csv", Map("header" -> "true"))
+      val csvConfig = SourceConfig(
+        SourceType.File,
+        csvFile.toString,
+        FileFormat.CSV,
+        Map("header" -> "true")
+      )
       val csvReader = new FileDataReader(csvConfig)
       csvReader.read().count() shouldBe 1
     } finally {
@@ -103,9 +103,9 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
     val csvFile = createTempCsv("id;name\n1;Alice")
     try {
       val sourceConfig = SourceConfig(
-        `type` = "file",
+        `type` = SourceType.File,
         path = csvFile.toString,
-        format = "csv",
+        format = FileFormat.CSV,
         options = Map("header" -> "true", "delimiter" -> ";")
       )
       val reader = new FileDataReader(sourceConfig)
@@ -126,9 +126,9 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       Files.write(tempDir.resolve("data_2025.csv"), "id,name\n2,Bob".getBytes)
 
       val sourceConfig = SourceConfig(
-        `type` = "file",
+        `type` = SourceType.File,
         path = tempDir.toString,
-        format = "csv",
+        format = FileFormat.CSV,
         options = Map("header" -> "true"),
         filePattern = Some("data_*.csv")
       )
@@ -147,13 +147,25 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
     try {
       // Types that are compatible with CSV reading (binary is excluded as CSV doesn't support it)
       val supportedTypes = Seq(
-        "string", "varchar", "text",
-        "int", "integer",
-        "long", "bigint",
-        "float", "double",
-        "boolean", "bool",
-        "date", "timestamp", "datetime",
-        "decimal", "byte", "tinyint", "short", "smallint"
+        "string",
+        "varchar",
+        "text",
+        "int",
+        "integer",
+        "long",
+        "bigint",
+        "float",
+        "double",
+        "boolean",
+        "bool",
+        "date",
+        "timestamp",
+        "datetime",
+        "decimal",
+        "byte",
+        "tinyint",
+        "short",
+        "smallint"
       )
 
       // Verify schema enforcement doesn't throw for all supported types
@@ -161,10 +173,20 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
         val schemaConfig = SchemaConfig(
           enforceSchema = true,
           allowExtraColumns = true,
-          columns = Seq(ColumnConfig("col1", typeName, nullable = true, description = ""))
+          columns = Seq(
+            ColumnConfig("col1", typeName, nullable = true, description = "")
+          )
         )
-        val sourceConfig = SourceConfig("file", csvFile.toString, "csv", Map("header" -> "true"))
-        noException should be thrownBy new FileDataReader(sourceConfig, Some(schemaConfig)).read()
+        val sourceConfig = SourceConfig(
+          SourceType.File,
+          csvFile.toString,
+          FileFormat.CSV,
+          Map("header" -> "true")
+        )
+        noException should be thrownBy new FileDataReader(
+          sourceConfig,
+          Some(schemaConfig)
+        ).read()
       }
     } finally {
       Files.deleteIfExists(csvFile)
@@ -176,15 +198,16 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
     val csvFile = createTempCsv("id,name\n1,Alice")
     try {
       val sourceConfig = SourceConfig(
-        `type` = "file",
+        `type` = SourceType.File,
         path = csvFile.toString,
-        format = "csv",
+        format = FileFormat.CSV,
         options = Map("header" -> "true")
       )
       val schemaConfig = SchemaConfig(
         enforceSchema = false,
         allowExtraColumns = true,
-        columns = Seq(ColumnConfig("id", "integer", nullable = false, description = ""))
+        columns =
+          Seq(ColumnConfig("id", "integer", nullable = false, description = ""))
       )
       val reader = new FileDataReader(sourceConfig, Some(schemaConfig))
       val df = reader.read()

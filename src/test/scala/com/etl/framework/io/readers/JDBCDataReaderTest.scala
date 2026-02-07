@@ -1,6 +1,6 @@
 package com.etl.framework.io.readers
 
-import com.etl.framework.config.SourceConfig
+import com.etl.framework.config.{SourceConfig, SourceType, FileFormat}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.SparkSession
@@ -16,9 +16,9 @@ class JDBCDataReaderTest extends AnyFlatSpec with Matchers {
 
   "JDBCDataReader" should "be created with source config" in {
     val sourceConfig = SourceConfig(
-      `type` = "jdbc",
+      `type` = SourceType.JDBC,
       path = "",
-      format = "jdbc",
+      format = FileFormat.JDBC,
       options = Map(
         "url" -> "jdbc:postgresql://localhost:5432/testdb",
         "dbtable" -> "users",
@@ -42,9 +42,9 @@ class JDBCDataReaderTest extends AnyFlatSpec with Matchers {
     )
 
     val sourceConfig = SourceConfig(
-      `type` = "jdbc",
+      `type` = SourceType.JDBC,
       path = "",
-      format = "jdbc",
+      format = FileFormat.JDBC,
       options = options
     )
 
@@ -62,9 +62,9 @@ class JDBCDataReaderTest extends AnyFlatSpec with Matchers {
 
     urls.foreach { url =>
       val sourceConfig = SourceConfig(
-        `type` = "jdbc",
+        `type` = SourceType.JDBC,
         path = "",
-        format = "jdbc",
+        format = FileFormat.JDBC,
         options = Map("url" -> url, "dbtable" -> "test")
       )
 
@@ -75,9 +75,9 @@ class JDBCDataReaderTest extends AnyFlatSpec with Matchers {
 
   it should "accept query option instead of dbtable" in {
     val sourceConfig = SourceConfig(
-      `type` = "jdbc",
+      `type` = SourceType.JDBC,
       path = "",
-      format = "jdbc",
+      format = FileFormat.JDBC,
       options = Map(
         "url" -> "jdbc:postgresql://localhost:5432/testdb",
         "query" -> "SELECT * FROM users WHERE active = true"

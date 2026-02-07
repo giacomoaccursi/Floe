@@ -1,6 +1,11 @@
 package com.etl.framework.validation.validators
 
-import com.etl.framework.config.{ValidationRule, DomainsConfig, DomainConfig}
+import com.etl.framework.config.{
+  ValidationRule,
+  DomainsConfig,
+  DomainConfig,
+  ValidationRuleType
+}
 import com.etl.framework.TestConfig
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -38,7 +43,7 @@ class DomainValidatorTest extends AnyFlatSpec with Matchers {
 
   def createRule(domainName: String): ValidationRule = {
     ValidationRule(
-      `type` = "domain",
+      `type` = ValidationRuleType.Domain,
       column = Some("status"),
       domainName = Some(domainName)
     )

@@ -67,9 +67,9 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
     version = version,
     owner = owner,
     source = SourceConfig(
-      `type` = "file",
+      `type` = SourceType.File,
       path = s"/data/input/$flowName",
-      format = "csv",
+      format = FileFormat.CSV,
       options = Map.empty,
       filePattern = None
     ),
@@ -81,7 +81,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
       )
     ),
     loadMode = LoadModeConfig(
-      `type` = "full"
+      `type` = LoadMode.Full
     ),
     validation = ValidationConfig(
       primaryKey = Seq(pkColumn),
@@ -91,7 +91,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
     output = OutputConfig(
       path = None,
       rejectedPath = None,
-      format = "parquet",
+      format = FileFormat.Parquet,
       partitionBy = Seq.empty,
       compression = "snappy",
       options = Map.empty
@@ -125,9 +125,9 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
     version = version,
     owner = owner,
     source = SourceConfig(
-      `type` = "file",
+      `type` = SourceType.File,
       path = s"/data/input/$flowName",
-      format = "csv",
+      format = FileFormat.CSV,
       options = Map.empty,
       filePattern = None
     ),
@@ -152,7 +152,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
         )
     ),
     loadMode = LoadModeConfig(
-      `type` = "full"
+      `type` = LoadMode.Full
     ),
     validation = ValidationConfig(
       primaryKey = Seq(pkColumn),
@@ -162,7 +162,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
     output = OutputConfig(
       path = None,
       rejectedPath = None,
-      format = "parquet",
+      format = FileFormat.Parquet,
       partitionBy = Seq.empty,
       compression = "snappy",
       options = Map.empty
@@ -304,7 +304,13 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
       description = "Flow A",
       version = "1.0",
       owner = "test",
-      source = SourceConfig("file", "/data/input/a", "csv", Map.empty, None),
+      source = SourceConfig(
+        SourceType.File,
+        "/data/input/a",
+        FileFormat.CSV,
+        Map.empty,
+        None
+      ),
       schema = SchemaConfig(
         true,
         false,
@@ -313,7 +319,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
           ColumnConfig("c_id", "string", false, None, "FK to C")
         )
       ),
-      loadMode = LoadModeConfig("full"),
+      loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(
         primaryKey = Seq("id"),
         foreignKeys = Seq(
@@ -321,8 +327,14 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
         ),
         rules = Seq.empty
       ),
-      output =
-        OutputConfig(None, None, "parquet", Seq.empty, "snappy", Map.empty)
+      output = OutputConfig(
+        None,
+        None,
+        FileFormat.Parquet,
+        Seq.empty,
+        "snappy",
+        Map.empty
+      )
     )
 
     val flowB = FlowConfig(
@@ -330,7 +342,13 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
       description = "Flow B",
       version = "1.0",
       owner = "test",
-      source = SourceConfig("file", "/data/input/b", "csv", Map.empty, None),
+      source = SourceConfig(
+        SourceType.File,
+        "/data/input/b",
+        FileFormat.CSV,
+        Map.empty,
+        None
+      ),
       schema = SchemaConfig(
         true,
         false,
@@ -339,7 +357,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
           ColumnConfig("a_id", "string", false, None, "FK to A")
         )
       ),
-      loadMode = LoadModeConfig("full"),
+      loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(
         primaryKey = Seq("id"),
         foreignKeys = Seq(
@@ -347,8 +365,14 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
         ),
         rules = Seq.empty
       ),
-      output =
-        OutputConfig(None, None, "parquet", Seq.empty, "snappy", Map.empty)
+      output = OutputConfig(
+        None,
+        None,
+        FileFormat.Parquet,
+        Seq.empty,
+        "snappy",
+        Map.empty
+      )
     )
 
     val flowC = FlowConfig(
@@ -356,7 +380,13 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
       description = "Flow C",
       version = "1.0",
       owner = "test",
-      source = SourceConfig("file", "/data/input/c", "csv", Map.empty, None),
+      source = SourceConfig(
+        SourceType.File,
+        "/data/input/c",
+        FileFormat.CSV,
+        Map.empty,
+        None
+      ),
       schema = SchemaConfig(
         true,
         false,
@@ -365,7 +395,7 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
           ColumnConfig("b_id", "string", false, None, "FK to B")
         )
       ),
-      loadMode = LoadModeConfig("full"),
+      loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(
         primaryKey = Seq("id"),
         foreignKeys = Seq(
@@ -373,8 +403,14 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
         ),
         rules = Seq.empty
       ),
-      output =
-        OutputConfig(None, None, "parquet", Seq.empty, "snappy", Map.empty)
+      output = OutputConfig(
+        None,
+        None,
+        FileFormat.Parquet,
+        Seq.empty,
+        "snappy",
+        Map.empty
+      )
     )
 
     val globalConfig = GlobalConfig(
@@ -422,9 +458,9 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
           version = "1.0",
           owner = "test",
           source = SourceConfig(
-            "file",
+            SourceType.File,
             s"/data/input/$flowName",
-            "csv",
+            FileFormat.CSV,
             Map.empty,
             None
           ),
@@ -433,10 +469,16 @@ object DependencyGraphProperties extends Properties("DependencyGraph") {
             false,
             Seq(ColumnConfig("id", "string", false, None, "PK"))
           ),
-          loadMode = LoadModeConfig("full"),
+          loadMode = LoadModeConfig(LoadMode.Full),
           validation = ValidationConfig(Seq("id"), Seq.empty, Seq.empty),
-          output =
-            OutputConfig(None, None, "parquet", Seq.empty, "snappy", Map.empty)
+          output = OutputConfig(
+            None,
+            None,
+            FileFormat.Parquet,
+            Seq.empty,
+            "snappy",
+            Map.empty
+          )
         )
       )
 

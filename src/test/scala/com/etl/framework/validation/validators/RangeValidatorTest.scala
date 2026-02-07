@@ -1,6 +1,6 @@
 package com.etl.framework.validation.validators
 
-import com.etl.framework.config.ValidationRule
+import com.etl.framework.config.{ValidationRule, ValidationRuleType}
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -22,7 +22,7 @@ class RangeValidatorTest extends AnyFlatSpec with Matchers {
   // Helper to create rule
   def createRule(min: Option[String], max: Option[String]): ValidationRule = {
     ValidationRule(
-      `type` = "range",
+      `type` = ValidationRuleType.Range,
       column = Some("value"),
       min = min,
       max = max

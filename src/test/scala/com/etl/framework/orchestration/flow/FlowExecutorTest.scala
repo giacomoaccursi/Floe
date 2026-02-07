@@ -17,39 +17,66 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
 
   import spark.implicits._
 
-  def createGlobalConfig(validatedPath: String = "/tmp/flow_executor_test/validated"): GlobalConfig = {
+  def createGlobalConfig(
+      validatedPath: String = "/tmp/flow_executor_test/validated"
+  ): GlobalConfig = {
     GlobalConfig(
-      paths = PathsConfig(validatedPath, "/tmp/flow_executor_test/rejected", "/tmp/flow_executor_test/metadata"),
-      processing = ProcessingConfig("yyyyMMdd", failOnValidationError = false, maxRejectionRate = 0.1),
-      performance = PerformanceConfig(parallelFlows = false, parallelNodes = false)
+      paths = PathsConfig(
+        validatedPath,
+        "/tmp/flow_executor_test/rejected",
+        "/tmp/flow_executor_test/metadata"
+      ),
+      processing = ProcessingConfig(
+        "yyyyMMdd",
+        failOnValidationError = false,
+        maxRejectionRate = 0.1
+      ),
+      performance =
+        PerformanceConfig(parallelFlows = false, parallelNodes = false)
     )
   }
 
   def createFlowConfig(
-    name: String,
-    sourceType: String = "file",
-    loadMode: String = "full"
+      name: String,
+      sourceType: SourceType = SourceType.File,
+      loadMode: LoadMode = LoadMode.Full
   ): FlowConfig = {
     FlowConfig(
       name = name,
       description = "Test flow",
       version = "1.0",
       owner = "test",
-      source = SourceConfig(sourceType, "/tmp/test_source", "csv", Map.empty, None),
-      schema = SchemaConfig(enforceSchema = false, allowExtraColumns = true, Seq.empty),
+      source = SourceConfig(
+        sourceType,
+        "/tmp/test_source",
+        FileFormat.CSV,
+        Map.empty,
+        None
+      ),
+      schema = SchemaConfig(
+        enforceSchema = false,
+        allowExtraColumns = true,
+        Seq.empty
+      ),
       loadMode = LoadModeConfig(loadMode),
       validation = ValidationConfig(Seq.empty, Seq.empty, Seq.empty),
-      output = OutputConfig(path = Some(s"/tmp/flow_executor_test/output/$name"))
+      output =
+        OutputConfig(path = Some(s"/tmp/flow_executor_test/output/$name"))
     )
   }
 
   // Test helper to create a mock executor that exposes internal logic
   class TestableFlowExecutor(
-    flowConfig: FlowConfig,
-    globalConfig: GlobalConfig,
-    validatedFlows: Map[String, DataFrame] = Map.empty,
-    domainsConfig: Option[DomainsConfig] = None
-  ) extends FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig) {
+      flowConfig: FlowConfig,
+      globalConfig: GlobalConfig,
+      validatedFlows: Map[String, DataFrame] = Map.empty,
+      domainsConfig: Option[DomainsConfig] = None
+  ) extends FlowExecutor(
+        flowConfig,
+        globalConfig,
+        validatedFlows,
+        domainsConfig
+      ) {
 
     // We can't easily override private methods, but we can test through public interface
     // This class serves as documentation of what we'd like to test if methods were protected
@@ -64,11 +91,11 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
   }
 
   it should "use correct load mode from config" in {
-    val flowConfig = createFlowConfig("test_flow", loadMode = "full")
-    flowConfig.loadMode.`type` shouldBe "full"
+    val flowConfig = createFlowConfig("test_flow", loadMode = LoadMode.Full)
+    flowConfig.loadMode.`type` shouldBe LoadMode.Full
 
-    val deltaConfig = createFlowConfig("delta_flow", loadMode = "delta")
-    deltaConfig.loadMode.`type` shouldBe "delta"
+    val deltaConfig = createFlowConfig("delta_flow", loadMode = LoadMode.Delta)
+    deltaConfig.loadMode.`type` shouldBe LoadMode.Delta
   }
 
   it should "configure output path correctly" in {
@@ -88,7 +115,7 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
   }
 
   it should "preserve flow config properties in executor" in {
-    val flowConfig = createFlowConfig("test_flow", sourceType = "file")
+    val flowConfig = createFlowConfig("test_flow", sourceType = SourceType.File)
     val globalConfig = createGlobalConfig()
     val executor = new TestableFlowExecutor(flowConfig, globalConfig)
 
@@ -99,7 +126,8 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
   it should "handle empty validated flows map" in {
     val flowConfig = createFlowConfig("test_flow")
     val globalConfig = createGlobalConfig()
-    val executor = new TestableFlowExecutor(flowConfig, globalConfig, Map.empty, None)
+    val executor =
+      new TestableFlowExecutor(flowConfig, globalConfig, Map.empty, None)
 
     executor should not be null
   }
@@ -112,7 +140,8 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
       "flow_a" -> Seq((1, "data")).toDF("id", "value")
     )
 
-    val executor = new TestableFlowExecutor(flowConfig, globalConfig, validatedFlows, None)
+    val executor =
+      new TestableFlowExecutor(flowConfig, globalConfig, validatedFlows, None)
 
     executor should not be null
   }
@@ -122,7 +151,12 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
     val globalConfig = createGlobalConfig()
 
     val domainsConfig = Some(DomainsConfig(Map.empty))
-    val executor = new TestableFlowExecutor(flowConfig, globalConfig, Map.empty, domainsConfig)
+    val executor = new TestableFlowExecutor(
+      flowConfig,
+      globalConfig,
+      Map.empty,
+      domainsConfig
+    )
 
     executor should not be null
   }
@@ -192,15 +226,17 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
   }
 
   it should "preserve execution time when set" in {
-    val result = FlowResult.success(
-      flowName = "test_flow",
-      batchId = "batch123",
-      inputRecords = 100,
-      mergedRecords = 100,
-      validRecords = 100,
-      rejectedRecords = 0,
-      rejectionReasons = Map.empty
-    ).copy(executionTimeMs = 5000L)
+    val result = FlowResult
+      .success(
+        flowName = "test_flow",
+        batchId = "batch123",
+        inputRecords = 100,
+        mergedRecords = 100,
+        validRecords = 100,
+        rejectedRecords = 0,
+        rejectionReasons = Map.empty
+      )
+      .copy(executionTimeMs = 5000L)
 
     result.executionTimeMs shouldBe 5000L
   }

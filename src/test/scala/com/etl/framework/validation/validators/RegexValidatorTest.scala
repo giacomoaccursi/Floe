@@ -1,6 +1,6 @@
 package com.etl.framework.validation.validators
 
-import com.etl.framework.config.ValidationRule
+import com.etl.framework.config.{ValidationRule, ValidationRuleType}
 import com.etl.framework.exceptions.ValidationConfigException
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -21,7 +21,7 @@ class RegexValidatorTest extends AnyFlatSpec with Matchers {
 
   def createRule(pattern: String): ValidationRule = {
     ValidationRule(
-      `type` = "regex",
+      `type` = ValidationRuleType.Regex,
       column = Some("email"),
       pattern = Some(pattern)
     )
@@ -72,7 +72,11 @@ class RegexValidatorTest extends AnyFlatSpec with Matchers {
 
   it should "throw exception if pattern is missing" in {
     val rule =
-      ValidationRule(`type` = "regex", column = Some("email"), pattern = None)
+      ValidationRule(
+        `type` = ValidationRuleType.Regex,
+        column = Some("email"),
+        pattern = None
+      )
     val df = spark.createDataFrame(
       Seq(Row("test")).asJava,
       StructType(Seq(StructField("email", StringType, true)))

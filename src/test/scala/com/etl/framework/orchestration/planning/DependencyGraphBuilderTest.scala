@@ -8,23 +8,29 @@ import org.scalatest.matchers.should.Matchers
 class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
 
   def createFlowConfig(
-    name: String,
-    foreignKeys: Seq[ForeignKeyConfig] = Seq.empty
+      name: String,
+      foreignKeys: Seq[ForeignKeyConfig] = Seq.empty
   ): FlowConfig = {
     FlowConfig(
       name = name,
       description = "Test flow",
       version = "1.0",
       owner = "test",
-      source = SourceConfig("file", "/path", "csv", Map.empty, None),
+      source =
+        SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
       schema = SchemaConfig(true, true, Seq.empty),
-      loadMode = LoadModeConfig("full"),
+      loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(Seq.empty, foreignKeys, Seq.empty),
       output = OutputConfig()
     )
   }
 
-  def createForeignKey(name: String, column: String, refFlow: String, refColumn: String): ForeignKeyConfig = {
+  def createForeignKey(
+      name: String,
+      column: String,
+      refFlow: String,
+      refColumn: String
+  ): ForeignKeyConfig = {
     ForeignKeyConfig(name, column, ReferenceConfig(refFlow, refColumn))
   }
 
@@ -175,7 +181,8 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
     val graph = builder.buildGraph()
     val sorted = builder.topologicalSort(graph)
 
-    val groups = builder.groupForParallelExecution(sorted, graph, parallelEnabled = true)
+    val groups =
+      builder.groupForParallelExecution(sorted, graph, parallelEnabled = true)
 
     groups.size shouldBe 1
     groups.head.flows.size shouldBe 3
@@ -198,7 +205,8 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
     val graph = builder.buildGraph()
     val sorted = builder.topologicalSort(graph)
 
-    val groups = builder.groupForParallelExecution(sorted, graph, parallelEnabled = true)
+    val groups =
+      builder.groupForParallelExecution(sorted, graph, parallelEnabled = true)
 
     // Should create 3 groups (one for each flow, executed sequentially)
     groups.size shouldBe 3
@@ -230,7 +238,8 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
     val graph = builder.buildGraph()
     val sorted = builder.topologicalSort(graph)
 
-    val groups = builder.groupForParallelExecution(sorted, graph, parallelEnabled = true)
+    val groups =
+      builder.groupForParallelExecution(sorted, graph, parallelEnabled = true)
 
     // Should create 3 groups: [flow_a], [flow_b, flow_c], [flow_d]
     groups.size shouldBe 3
@@ -259,7 +268,8 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
     val graph = builder.buildGraph()
     val sorted = builder.topologicalSort(graph)
 
-    val groups = builder.groupForParallelExecution(sorted, graph, parallelEnabled = false)
+    val groups =
+      builder.groupForParallelExecution(sorted, graph, parallelEnabled = false)
 
     groups.size shouldBe 1
     groups.head.flows.size shouldBe 3
@@ -295,7 +305,8 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
     val graph = builder.buildGraph()
     val sorted = builder.topologicalSort(graph)
 
-    val groups = builder.groupForParallelExecution(sorted, graph, parallelEnabled = true)
+    val groups =
+      builder.groupForParallelExecution(sorted, graph, parallelEnabled = true)
 
     // Expected groups:
     // Group 1: [flow_a, flow_b] - parallel

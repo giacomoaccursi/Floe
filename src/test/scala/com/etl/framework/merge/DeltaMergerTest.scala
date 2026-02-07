@@ -1,7 +1,10 @@
 package com.etl.framework.merge
 
-import com.etl.framework.config.LoadModeConfig
-import com.etl.framework.exceptions.{MergeException, UnsupportedOperationException}
+import com.etl.framework.config.{LoadMode, LoadModeConfig, MergeStrategy}
+import com.etl.framework.exceptions.{
+  MergeException,
+  UnsupportedOperationException
+}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.SparkSession
@@ -21,62 +24,64 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
   // --- Factory tests ---
 
   "DeltaMergerFactory" should "create FullReplaceMerger for full load mode" in {
-    val merger = DeltaMergerFactory.create(LoadModeConfig(`type` = "full"), Seq.empty)
+    val merger = DeltaMergerFactory.create(
+      LoadModeConfig(`type` = LoadMode.Full),
+      Seq.empty
+    )
     merger shouldBe a[FullReplaceMerger]
   }
 
   it should "create UpsertMerger for delta upsert strategy" in {
-    val merger = DeltaMergerFactory.create(LoadModeConfig(
-      `type` = "delta",
-      mergeStrategy = Some("upsert")
-    ), primaryKey = Seq("id"))
+    val merger = DeltaMergerFactory.create(
+      LoadModeConfig(
+        `type` = LoadMode.Delta,
+        mergeStrategy = Some(MergeStrategy.Upsert)
+      ),
+      primaryKey = Seq("id")
+    )
     merger shouldBe a[UpsertMerger]
   }
 
   it should "create AppendMerger for delta append strategy" in {
-    val merger = DeltaMergerFactory.create(LoadModeConfig(
-      `type` = "delta",
-      mergeStrategy = Some("append")
-    ), Seq.empty)
+    val merger = DeltaMergerFactory.create(
+      LoadModeConfig(
+        `type` = LoadMode.Delta,
+        mergeStrategy = Some(MergeStrategy.Append)
+      ),
+      Seq.empty
+    )
     merger shouldBe a[AppendMerger]
   }
 
   it should "create SCD2Merger for scd2 load mode" in {
-    val merger = DeltaMergerFactory.create(LoadModeConfig(
-      `type` = "scd2",
-      compareColumns = Seq("name", "value"),
-      validFromColumn = Some("valid_from"),
-      validToColumn = Some("valid_to"),
-      isCurrentColumn = Some("is_current")
-    ), primaryKey = Seq("id"))
+    val merger = DeltaMergerFactory.create(
+      LoadModeConfig(
+        `type` = LoadMode.SCD2,
+        compareColumns = Seq("name", "value"),
+        validFromColumn = Some("valid_from"),
+        validToColumn = Some("valid_to"),
+        isCurrentColumn = Some("is_current")
+      ),
+      primaryKey = Seq("id")
+    )
     merger shouldBe a[SCD2Merger]
   }
 
-  it should "throw MergeException for invalid merge strategy" in {
-    val ex = intercept[MergeException] {
-      DeltaMergerFactory.create(LoadModeConfig(
-        `type` = "delta",
-        mergeStrategy = Some("invalid")
-      ), Seq.empty)
-    }
-    ex.mergeStrategy shouldBe "invalid"
-  }
-
-  it should "throw UnsupportedOperationException for unknown load mode type" in {
-    intercept[UnsupportedOperationException] {
-      DeltaMergerFactory.create(LoadModeConfig(`type` = "unknown"), Seq.empty)
-    }
-  }
+  // Removed invalid merge strategy test and unknown load mode test
+  // because strong typing with Enums prevents invalid values at compile time.
 
   it should "throw for scd2 without required fields" in {
     intercept[IllegalArgumentException] {
-      DeltaMergerFactory.create(LoadModeConfig(
-        `type` = "scd2",
-        compareColumns = Seq("name"),
-        validFromColumn = None,
-        validToColumn = Some("valid_to"),
-        isCurrentColumn = Some("is_current")
-      ), primaryKey = Seq("id"))
+      DeltaMergerFactory.create(
+        LoadModeConfig(
+          `type` = LoadMode.SCD2,
+          compareColumns = Seq("name"),
+          validFromColumn = None,
+          validToColumn = Some("valid_to"),
+          isCurrentColumn = Some("is_current")
+        ),
+        primaryKey = Seq("id")
+      )
     }
   }
 
@@ -89,7 +94,10 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
 
     val result = merger.merge(newData, Some(existing))
     result.count() shouldBe 2
-    result.collect().map(_.getAs[String]("name")).sorted shouldBe Array("Alice", "Bob")
+    result.collect().map(_.getAs[String]("name")).sorted shouldBe Array(
+      "Alice",
+      "Bob"
+    )
   }
 
   it should "return new data when no existing data" in {
@@ -153,8 +161,10 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
 
   it should "keep most recent record when using timestamp" in {
     val merger = new UpsertMerger(Seq("id"), Some("ts"))
-    val existing = Seq((1, "Alice_old", 1L), (2, "Bob", 1L)).toDF("id", "name", "ts")
-    val newData = Seq((1, "Alice_new", 2L), (3, "Charlie", 1L)).toDF("id", "name", "ts")
+    val existing =
+      Seq((1, "Alice_old", 1L), (2, "Bob", 1L)).toDF("id", "name", "ts")
+    val newData =
+      Seq((1, "Alice_new", 2L), (3, "Charlie", 1L)).toDF("id", "name", "ts")
 
     val result = merger.merge(newData, Some(existing))
     result.count() shouldBe 3
@@ -171,23 +181,33 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
 
   it should "handle composite key columns" in {
     val merger = new UpsertMerger(Seq("id", "category"), None)
-    val existing = Seq((1, "A", "old"), (1, "B", "old")).toDF("id", "category", "value")
-    val newData = Seq((1, "A", "new"), (2, "A", "new")).toDF("id", "category", "value")
+    val existing =
+      Seq((1, "A", "old"), (1, "B", "old")).toDF("id", "category", "value")
+    val newData =
+      Seq((1, "A", "new"), (2, "A", "new")).toDF("id", "category", "value")
 
     val result = merger.merge(newData, Some(existing))
     result.count() shouldBe 3
 
-    val updated = result.filter(col("id") === 1 && col("category") === "A").collect().head
+    val updated =
+      result.filter(col("id") === 1 && col("category") === "A").collect().head
     updated.getAs[String]("value") shouldBe "new"
 
-    val unchanged = result.filter(col("id") === 1 && col("category") === "B").collect().head
+    val unchanged =
+      result.filter(col("id") === 1 && col("category") === "B").collect().head
     unchanged.getAs[String]("value") shouldBe "old"
   }
 
   // --- SCD2Merger tests ---
 
   "SCD2Merger" should "add SCD2 columns on first load" in {
-    val merger = new SCD2Merger(Seq("id"), Seq("name"), "valid_from", "valid_to", "is_current")
+    val merger = new SCD2Merger(
+      Seq("id"),
+      Seq("name"),
+      "valid_from",
+      "valid_to",
+      "is_current"
+    )
     val newData = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
 
     val result = merger.merge(newData, None)
@@ -200,10 +220,24 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
   }
 
   it should "close old version and add new version for changed records" in {
-    val merger = new SCD2Merger(Seq("id"), Seq("name"), "valid_from", "valid_to", "is_current")
+    val merger = new SCD2Merger(
+      Seq("id"),
+      Seq("name"),
+      "valid_from",
+      "valid_to",
+      "is_current"
+    )
 
     // Existing data with SCD2 columns
-    val existing = Seq((1, "Alice", java.sql.Timestamp.valueOf("2024-01-01 00:00:00"), null.asInstanceOf[java.sql.Timestamp], true))
+    val existing = Seq(
+      (
+        1,
+        "Alice",
+        java.sql.Timestamp.valueOf("2024-01-01 00:00:00"),
+        null.asInstanceOf[java.sql.Timestamp],
+        true
+      )
+    )
       .toDF("id", "name", "valid_from", "valid_to", "is_current")
 
     val newData = Seq((1, "Alice_updated")).toDF("id", "name")
@@ -221,9 +255,23 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
   }
 
   it should "keep unchanged records as-is" in {
-    val merger = new SCD2Merger(Seq("id"), Seq("name"), "valid_from", "valid_to", "is_current")
+    val merger = new SCD2Merger(
+      Seq("id"),
+      Seq("name"),
+      "valid_from",
+      "valid_to",
+      "is_current"
+    )
 
-    val existing = Seq((1, "Alice", java.sql.Timestamp.valueOf("2024-01-01 00:00:00"), null.asInstanceOf[java.sql.Timestamp], true))
+    val existing = Seq(
+      (
+        1,
+        "Alice",
+        java.sql.Timestamp.valueOf("2024-01-01 00:00:00"),
+        null.asInstanceOf[java.sql.Timestamp],
+        true
+      )
+    )
       .toDF("id", "name", "valid_from", "valid_to", "is_current")
 
     // Same data - no changes
@@ -235,9 +283,23 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
   }
 
   it should "add new records that don't exist in existing data" in {
-    val merger = new SCD2Merger(Seq("id"), Seq("name"), "valid_from", "valid_to", "is_current")
+    val merger = new SCD2Merger(
+      Seq("id"),
+      Seq("name"),
+      "valid_from",
+      "valid_to",
+      "is_current"
+    )
 
-    val existing = Seq((1, "Alice", java.sql.Timestamp.valueOf("2024-01-01 00:00:00"), null.asInstanceOf[java.sql.Timestamp], true))
+    val existing = Seq(
+      (
+        1,
+        "Alice",
+        java.sql.Timestamp.valueOf("2024-01-01 00:00:00"),
+        null.asInstanceOf[java.sql.Timestamp],
+        true
+      )
+    )
       .toDF("id", "name", "valid_from", "valid_to", "is_current")
 
     // Include existing record + new record (SCD2 expects full snapshot)
@@ -252,10 +314,22 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
 
   it should "require non-empty key and compare columns" in {
     intercept[IllegalArgumentException] {
-      new SCD2Merger(Seq.empty, Seq("name"), "valid_from", "valid_to", "is_current")
+      new SCD2Merger(
+        Seq.empty,
+        Seq("name"),
+        "valid_from",
+        "valid_to",
+        "is_current"
+      )
     }
     intercept[IllegalArgumentException] {
-      new SCD2Merger(Seq("id"), Seq.empty, "valid_from", "valid_to", "is_current")
+      new SCD2Merger(
+        Seq("id"),
+        Seq.empty,
+        "valid_from",
+        "valid_to",
+        "is_current"
+      )
     }
   }
 }

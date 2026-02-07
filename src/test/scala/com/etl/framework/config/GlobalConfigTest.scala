@@ -1,9 +1,10 @@
 package com.etl.framework.config
 
-import com.etl.framework.config.ConfigDecoders._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import io.circe.yaml.parser._
+import pureconfig._
+import pureconfig.generic.auto._
+import pureconfig.module.yaml._
 
 class GlobalConfigTest extends AnyFlatSpec with Matchers {
 
@@ -23,9 +24,10 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
         |  parallelNodes: false
       """.stripMargin
 
-    val config = parse(yaml).flatMap(_.as[GlobalConfig])
+    import ConfigHints._
+    val config = YamlConfigSource.string(yaml).load[GlobalConfig]
     config.isRight shouldBe true
-    val c = config.right.get
+    val c = config.toOption.get
 
     c.paths.validatedPath shouldBe "/data/validated"
     c.processing.maxRejectionRate shouldBe 0.05
@@ -37,16 +39,13 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
 // We should test GlobalConfigLoader logic specifically.
 
 class GlobalConfigLoaderLogicTest extends AnyFlatSpec with Matchers {
+  import ConfigHints._
 
   class TestGlobalLoader extends GlobalConfigLoader {
     // Expose protected methods for testing
     def testSubstitute(text: String): String = substituteEnvVars(text)
     def testParse(yaml: String): Either[Exception, GlobalConfig] =
-      parseYaml[GlobalConfig](yaml, "test")
-        .asInstanceOf[Either[
-          Exception,
-          GlobalConfig
-        ]] // Cast for test simplicity if needed
+      parseYaml(yaml, "test").left.map(e => e: Exception)
   }
 
   val loader = new TestGlobalLoader()
@@ -84,7 +83,7 @@ class GlobalConfigLoaderLogicTest extends AnyFlatSpec with Matchers {
 
     val result = loader.testParse(yaml)
     result.isRight shouldBe true
-    val config = result.right.get
+    val config = result.toOption.get
 
     config.paths.validatedPath shouldBe "/out/val"
     config.performance.parallelNodes shouldBe true

@@ -10,29 +10,39 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
   def createGlobalConfig(parallelFlows: Boolean = true): GlobalConfig = {
     GlobalConfig(
       paths = PathsConfig("/validated", "/rejected", "/metadata"),
-      processing = ProcessingConfig("yyyyMMdd", failOnValidationError = false, maxRejectionRate = 0.1),
+      processing = ProcessingConfig(
+        "yyyyMMdd",
+        failOnValidationError = false,
+        maxRejectionRate = 0.1
+      ),
       performance = PerformanceConfig(parallelFlows, parallelNodes = true)
     )
   }
 
   def createFlowConfig(
-    name: String,
-    foreignKeys: Seq[ForeignKeyConfig] = Seq.empty
+      name: String,
+      foreignKeys: Seq[ForeignKeyConfig] = Seq.empty
   ): FlowConfig = {
     FlowConfig(
       name = name,
       description = "Test flow",
       version = "1.0",
       owner = "test",
-      source = SourceConfig("file", "/path", "csv", Map.empty, None),
+      source =
+        SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
       schema = SchemaConfig(true, true, Seq.empty),
-      loadMode = LoadModeConfig("full"),
+      loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(Seq.empty, foreignKeys, Seq.empty),
       output = OutputConfig()
     )
   }
 
-  def createForeignKey(name: String, column: String, refFlow: String, refColumn: String): ForeignKeyConfig = {
+  def createForeignKey(
+      name: String,
+      column: String,
+      refFlow: String,
+      refColumn: String
+  ): ForeignKeyConfig = {
     ForeignKeyConfig(name, column, ReferenceConfig(refFlow, refColumn))
   }
 

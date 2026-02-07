@@ -1,6 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config._
+import com.etl.framework.config.ValidationRuleType
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.{SparkSession, Row}
@@ -20,7 +21,7 @@ class NotNullValidatorTest extends AnyFlatSpec with Matchers {
 
   def createRule(columnName: String): ValidationRule = {
     ValidationRule(
-      `type` = "not_null",
+      `type` = ValidationRuleType.NotNull,
       column = Some(columnName)
     )
   }
@@ -31,9 +32,10 @@ class NotNullValidatorTest extends AnyFlatSpec with Matchers {
       description = "desc",
       version = "1.0",
       owner = "me",
-      source = SourceConfig("file", "/path", "csv", Map.empty, None),
+      source =
+        SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
       schema = SchemaConfig(true, false, columns),
-      loadMode = LoadModeConfig("full"),
+      loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(Seq.empty, Seq.empty, Seq.empty),
       output = OutputConfig()
     )
@@ -65,7 +67,8 @@ class NotNullValidatorTest extends AnyFlatSpec with Matchers {
       ColumnConfig("id", "string", nullable = false, description = "ID column")
     )
     val rule = createRule("id")
-    val result = new NotNullValidator(createDummyConfig(columns)).validate(df, rule)
+    val result =
+      new NotNullValidator(createDummyConfig(columns)).validate(df, rule)
 
     result.valid.count() shouldBe 2
     result.valid.select("id").as[String].collect() should contain allOf (
@@ -97,15 +100,17 @@ class NotNullValidatorTest extends AnyFlatSpec with Matchers {
   }
 
   it should "validate multiple non-nullable columns" in {
-    val schema = StructType(Seq(
-      StructField("id", StringType, true),
-      StructField("name", StringType, true),
-      StructField("email", StringType, true)
-    ))
+    val schema = StructType(
+      Seq(
+        StructField("id", StringType, true),
+        StructField("name", StringType, true),
+        StructField("email", StringType, true)
+      )
+    )
     val data = Seq(
       Row("1", "Alice", "alice@example.com"),
-      Row("2", null, "bob@example.com"),  // null name
-      Row("3", "Charlie", null),           // null email
+      Row("2", null, "bob@example.com"), // null name
+      Row("3", "Charlie", null), // null email
       Row("4", "Dave", "dave@example.com")
     )
     val df = spark.createDataFrame(data.asJava, schema)
@@ -115,7 +120,7 @@ class NotNullValidatorTest extends AnyFlatSpec with Matchers {
       ColumnConfig("name", "string", nullable = false, description = "Name"),
       ColumnConfig("email", "string", nullable = false, description = "Email")
     )
-    val rule = createRule("id")  // rule parameter is ignored by validator
+    val rule = createRule("id") // rule parameter is ignored by validator
     val validator = new NotNullValidator(createDummyConfig(columns))
 
     val result = validator.validate(df, rule)

@@ -1,10 +1,13 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config._
+import com.etl.framework.config.ValidationRuleType
+import com.etl.framework.config.ValidationRuleType.Schema
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.apache.spark.sql.{SparkSession, Row}
+import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.types._
+
 import scala.collection.JavaConverters._
 
 class SchemaValidatorTest extends AnyFlatSpec with Matchers {
@@ -28,9 +31,10 @@ class SchemaValidatorTest extends AnyFlatSpec with Matchers {
       description = "desc",
       version = "1.0",
       owner = "me",
-      source = SourceConfig("file", "/path", "csv", Map.empty, None),
+      source =
+        SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
       schema = SchemaConfig(enforceSchema, false, columns),
-      loadMode = LoadModeConfig("full"),
+      loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(Seq("id"), Seq.empty, Seq.empty),
       output = OutputConfig()
     )
@@ -54,11 +58,13 @@ class SchemaValidatorTest extends AnyFlatSpec with Matchers {
     val config = createConfig(columns)
     val validator = new SchemaValidator(config, Some("test_flow"))
 
-    val result = validator.validate(df, ValidationRule("schema"))
+    val result =
+      validator.validate(df, ValidationRule(ValidationRuleType.Schema))
 
     result.rejected match {
-      case Some(rejectedDf) => rejectedDf.count() shouldBe 0
-      case None             => succeed
+      case Some(rejectedDf: org.apache.spark.sql.DataFrame) =>
+        rejectedDf.count() shouldBe 0
+      case _ => succeed
     }
     result.valid.count() shouldBe 2
   }
@@ -82,7 +88,7 @@ class SchemaValidatorTest extends AnyFlatSpec with Matchers {
     val config = createConfig(columns, enforceSchema = true)
     val validator = new SchemaValidator(config, Some("test_flow"))
 
-    val result = validator.validate(df, ValidationRule("schema"))
+    val result = validator.validate(df, ValidationRule(Schema))
 
     // SchemaValidator fails ALL rows if schema is invalid
     result.valid.count() shouldBe 0
@@ -110,7 +116,7 @@ class SchemaValidatorTest extends AnyFlatSpec with Matchers {
     val config = createConfig(columns, enforceSchema = true)
     val validator = new SchemaValidator(config, Some("test_flow"))
 
-    val result = validator.validate(df, ValidationRule("schema"))
+    val result = validator.validate(df, ValidationRule(Schema))
 
     result.valid.count() shouldBe 0
     result.rejected.get.count() shouldBe 1

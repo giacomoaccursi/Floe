@@ -14,10 +14,25 @@ import pureconfig.error.{
 }
 import pureconfig.generic.auto._
 import pureconfig.module.yaml._
+// Import ConfigHints at top level to ensure all derived readers in this file use CamelCase
+import ConfigHints._
 
 import java.io.File
 import scala.io.Source
 import scala.util.{Failure, Success, Try, Using}
+import java.util.regex.Matcher
+
+/** Global configuration hints to enforce CamelCase naming strategy (e.g.
+  * "validatedPath" in YAML matches "validatedPath" in case class)
+  */
+object ConfigHints {
+  import pureconfig.ConfigFieldMapping
+  import pureconfig.generic.ProductHint
+  import pureconfig.CamelCase
+
+  implicit def productHint[T]: ProductHint[T] =
+    ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
+}
 
 /** Base trait for configuration loaders using PureConfig
   */
@@ -72,7 +87,7 @@ trait ConfigLoader[T] {
 
     firstFailure match {
       case ConvertFailure(KeyNotFound(key, _), _, configPath) =>
-        val location = if (configPath.isEmpty) "root" else configPath.toString
+        val location = if (configPath.isEmpty) "root" else configPath
         ConfigFileException(
           file = path,
           message = s"Missing required field '$key' at '$location'"
@@ -93,7 +108,7 @@ trait ConfigLoader[T] {
         val description = other.description
         ConfigFileException(
           file = path,
-          message = s"Configuration error at $location: $description"
+          message = s"Configuration Error at $location: $description"
         )
     }
   }
@@ -107,7 +122,10 @@ trait ConfigLoader[T] {
       text,
       m => {
         val varName = Option(m.group(1)).getOrElse(m.group(2))
-        sys.env.getOrElse(varName, m.matched)
+        // Escape the replacement string if we are returning the original match
+        // to avoid issues with $ and {} being interpreted as groups
+        val replacement = sys.env.getOrElse(varName, m.matched)
+        Matcher.quoteReplacement(replacement)
       }
     )
   }
@@ -184,11 +202,12 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
       yaml: String,
       path: String
   ): Either[ConfigurationException, FlowConfigYaml] = {
+    import ConfigHints._
     YamlConfigSource.string(yaml).load[FlowConfigYaml].left.map { failures =>
       val firstFailure = failures.head
       firstFailure match {
         case ConvertFailure(KeyNotFound(key, _), _, configPath) =>
-          val location = if (configPath.isEmpty) "root" else configPath.toString
+          val location = if (configPath.isEmpty) "root" else configPath
           ConfigFileException(
             file = path,
             message = s"Missing required field '$key' at '$location'"
@@ -198,7 +217,7 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
             other.origin.map(_.description).getOrElse("unknown location")
           ConfigFileException(
             file = path,
-            message = s"Configuration error at $location: ${other.description}"
+            message = s"Configuration Error at $location: ${other.description}"
           )
       }
     }

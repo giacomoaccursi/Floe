@@ -1,5 +1,7 @@
 package com.etl.framework.aggregation
 
+import com.etl.framework.config.JoinStrategy.Nest
+import com.etl.framework.config.JoinType.LeftOuter
 import com.etl.framework.config.{DAGNode, GlobalConfig, JoinCondition, JoinConfig}
 import com.etl.framework.core.AdditionalTableMetadata
 import org.slf4j.LoggerFactory
@@ -116,10 +118,10 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
   private def inferJoinConfig(table: AdditionalTableMetadataFile): Option[JoinConfig] = {
     table.dagMetadata.joinKeys.headOption.map { case (parentFlow, keys) =>
       JoinConfig(
-        `type` = "left_outer",
+        `type` = LeftOuter,
         parent = s"${parentFlow}_node",
         on = keys.map(key => JoinCondition(left = key, right = key)),
-        strategy = "nest",
+        strategy = Nest,
         nestAs = Some(table.tableName),
         aggregations = Seq.empty
       )

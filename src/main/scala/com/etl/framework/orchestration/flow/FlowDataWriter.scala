@@ -10,19 +10,17 @@ import org.slf4j.LoggerFactory
 
 import java.time.Instant
 
-/**
- * Handles writing of validated, rejected, and additional table data
- */
+/** Handles writing of validated, rejected, and additional table data
+  */
 class FlowDataWriter(
-  flowConfig: FlowConfig,
-  globalConfig: GlobalConfig
+    flowConfig: FlowConfig,
+    globalConfig: GlobalConfig
 )(implicit spark: SparkSession) {
-  
+
   private val logger = LoggerFactory.getLogger(getClass)
-  
-  /**
-   * Writes validated data
-   */
+
+  /** Writes validated data
+    */
   def writeValidated(validData: DataFrame, batchId: String): Unit = {
     val outputPath = flowConfig.output.path.getOrElse(
       s"${globalConfig.paths.validatedPath}/${flowConfig.name}"
@@ -33,7 +31,7 @@ class FlowDataWriter(
 
       var writer = validData.write
         .mode(SaveMode.Overwrite)
-        .format(flowConfig.output.format)
+        .format(flowConfig.output.format.name) // Use .name for enum
         .option("compression", flowConfig.output.compression)
 
       // Apply additional options
@@ -51,9 +49,8 @@ class FlowDataWriter(
     }
   }
 
-  /**
-   * Writes rejected data
-   */
+  /** Writes rejected data
+    */
   def writeRejected(rejectedData: DataFrame, batchId: String): Unit = {
     val rejectedPath = flowConfig.output.rejectedPath.getOrElse(
       s"${globalConfig.paths.rejectedPath}/${flowConfig.name}"
@@ -77,14 +74,13 @@ class FlowDataWriter(
     }
   }
 
-  /**
-   * Writes an additional table
-   */
+  /** Writes an additional table
+    */
   def writeAdditionalTable(
-    tableName: String,
-    data: DataFrame,
-    outputPath: Option[String],
-    dagMetadata: Option[AdditionalTableMetadata]
+      tableName: String,
+      data: DataFrame,
+      outputPath: Option[String],
+      dagMetadata: Option[AdditionalTableMetadata]
   ): Unit = {
     val path = outputPath.getOrElse(
       s"${globalConfig.paths.validatedPath}/${flowConfig.name}_${tableName}"

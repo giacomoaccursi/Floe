@@ -1,74 +1,67 @@
 package com.etl.framework.config
 
-/**
- * Configuration for DAG-based aggregation
- */
+/** Configuration for DAG-based aggregation
+  */
 case class AggregationConfig(
-  name: String,
-  description: String,
-  version: String,
-  batchModel: ModelConfig,
-  finalModel: ModelConfig,
-  output: DAGOutputConfig,
-  nodes: Seq[DAGNode]
+    name: String,
+    description: String,
+    version: String,
+    batchModel: ModelConfig,
+    finalModel: ModelConfig,
+    output: DAGOutputConfig,
+    nodes: Seq[DAGNode]
 )
 
-/**
- * Model configuration
- */
+/** Model configuration
+  */
 case class ModelConfig(
-  `class`: String,
-  mappingFile: Option[String] = None,
-  mapperClass: Option[String] = None
+    `class`: String,
+    mappingFile: Option[String] = None,
+    mapperClass: Option[String] = None
 )
 
-/**
- * DAG output configuration
- */
+/** DAG output configuration
+  */
 case class DAGOutputConfig(
-  batch: OutputConfig,
-  `final`: OutputConfig
+    batch: OutputConfig,
+    `final`: OutputConfig
 )
 
-/**
- * DAG node configuration
- */
+/** DAG node configuration
+  */
 case class DAGNode(
-  id: String,
-  description: String,
-  sourceFlow: String,
-  sourcePath: String,
-  dependencies: Seq[String],
-  join: Option[JoinConfig] = None,
-  select: Seq[String] = Seq.empty,
-  filters: Seq[String] = Seq.empty
+    id: String,
+    description: String,
+    sourceFlow: String,
+    sourcePath: String,
+    dependencies: Seq[String],
+    join: Option[JoinConfig] = None,
+    select: Seq[String] = Seq.empty,
+    filters: Seq[String] = Seq.empty
 )
 
-/**
- * Join configuration
- */
+/** Join configuration
+  */
 case class JoinConfig(
-  `type`: String,  // "inner" | "left_outer" | "right_outer" | "full_outer"
-  parent: String,
-  on: Seq[JoinCondition],
-  strategy: String,  // "nest" | "flatten" | "aggregate"
-  nestAs: Option[String] = None,
-  aggregations: Seq[AggregationSpec] = Seq.empty
+    `type`: JoinType,
+    parent: String,
+    on: Seq[JoinCondition],
+    strategy: JoinStrategy,
+    nestAs: Option[String] = None,
+    aggregations: Seq[AggregationSpec] = Seq.empty
 )
 
-/**
- * Join condition
- */
+/** Join condition
+  */
 case class JoinCondition(
-  left: String,
-  right: String
+    left: String,
+    right: String
 )
 
-/**
- * Aggregation specification
- */
+/** Aggregation specification
+  */
 case class AggregationSpec(
-  column: String,
-  function: String,  // "sum" | "count" | "avg" | "min" | "max"
-  alias: String
+    column: String,
+    function: AggregationFunction,
+    alias: String
 )

@@ -35,6 +35,48 @@ object JoinStrategy {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// JOIN TYPE
+// ═══════════════════════════════════════════════════════════════════════════
+sealed trait JoinType extends Product with Serializable {
+  def name: String
+  def sparkType: String
+}
+
+object JoinType {
+  case object Inner extends JoinType {
+    val name = "inner"; val sparkType = "inner"
+  }
+  case object LeftOuter extends JoinType {
+    val name = "left_outer"; val sparkType = "left"
+  }
+  case object RightOuter extends JoinType {
+    val name = "right_outer"; val sparkType = "right"
+  }
+  case object FullOuter extends JoinType {
+    val name = "full_outer"; val sparkType = "full"
+  }
+
+  val values: Seq[JoinType] = Seq(Inner, LeftOuter, RightOuter, FullOuter)
+
+  def fromString(s: String): Either[String, JoinType] =
+    s.toLowerCase match {
+      case "inner"                 => Right(Inner)
+      case "left" | "left_outer"   => Right(LeftOuter)
+      case "right" | "right_outer" => Right(RightOuter)
+      case "full" | "full_outer"   => Right(FullOuter)
+      case other                   =>
+        Left(
+          s"Unknown join type: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"
+        )
+    }
+
+  implicit val reader: ConfigReader[JoinType] =
+    ConfigReader.fromString[JoinType](s =>
+      fromString(s).left.map(msg => CannotConvert(s, "JoinType", msg))
+    )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // SOURCE TYPE
 // ═══════════════════════════════════════════════════════════════════════════
 sealed trait SourceType extends Product with Serializable {
@@ -80,13 +122,17 @@ object FileFormat {
   case object JSON extends FileFormat {
     val name = "json"; val sparkFormat = "json"
   }
+  case object JDBC extends FileFormat {
+    val name = "jdbc"; val sparkFormat = "jdbc"
+  }
 
-  val values: Seq[FileFormat] = Seq(CSV, Parquet, JSON)
+  val values: Seq[FileFormat] = Seq(CSV, Parquet, JSON, JDBC)
 
   def fromString(s: String): Either[String, FileFormat] = s.toLowerCase match {
     case "csv"     => Right(CSV)
     case "parquet" => Right(Parquet)
     case "json"    => Right(JSON)
+    case "jdbc"    => Right(JDBC)
     case other     =>
       Left(
         s"Unknown file format: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"
@@ -148,9 +194,19 @@ object ValidationRuleType {
   case object Domain extends ValidationRuleType { val name = "domain" }
   case object NotNull extends ValidationRuleType { val name = "not_null" }
   case object Custom extends ValidationRuleType { val name = "custom" }
+  case object Schema extends ValidationRuleType { val name = "schema" }
 
   val values: Seq[ValidationRuleType] =
-    Seq(PKUniqueness, FKIntegrity, Regex, Range, Domain, NotNull, Custom)
+    Seq(
+      PKUniqueness,
+      FKIntegrity,
+      Regex,
+      Range,
+      Domain,
+      NotNull,
+      Custom,
+      Schema
+    )
 
   def fromString(s: String): Either[String, ValidationRuleType] =
     s.toLowerCase match {
@@ -161,6 +217,7 @@ object ValidationRuleType {
       case "domain"        => Right(Domain)
       case "not_null"      => Right(NotNull)
       case "custom"        => Right(Custom)
+      case "schema"        => Right(Schema)
       case other           =>
         Left(
           s"Unknown validation rule type: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"

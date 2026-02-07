@@ -1,0 +1,34 @@
+domains:
+  country_codes:
+    name: "country_codes"
+    description: "ISO 3166-1 alpha-2 country codes"
+    caseSensitive: false
+    values:
+      - "IT"
+      - "US"
+      - "GB"
+      - "FR"
+      - "DE"
+      - "ES"
+
+  order_status:
+    name: "order_status"
+    description: "Valid order statuses"
+    caseSensitive: true
+    values:
+      - "PENDING"
+      - "CONFIRMED"
+      - "SHIPPED"
+      - "DELIVERED"
+      - "CANCELLED"
+
+  product_category:
+    name: "product_category"
+    description: "Product categories"
+    caseSensitive: false
+    values:
+      - "ELECTRONICS"
+      - "CLOTHING"
+      - "BOOKS"
+      - "FOOD"
+      - "SPORTS"

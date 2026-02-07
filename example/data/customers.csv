@@ -1,0 +1,11 @@
+customer_id,email,first_name,last_name,country,registration_date,credit_limit
+1,mario.rossi@email.it,mario,rossi,it,2023-01-15,5000.00
+2,john.smith@email.com,john,smith,us,2023-02-20,10000.00
+3,jean.dupont@email.fr,jean,dupont,fr,2023-03-10,7500.50
+4,anna.mueller@email.de,anna,mueller,de,2023-04-05,6000.00
+5,pedro.garcia@email.es,pedro,garcia,es,2023-05-12,4500.00
+6,invalid.email,sarah,connor,gb,2023-06-18,8000.00
+7,luigi.verdi@email.it,luigi,verdi,it,2023-07-22,3000.00
+8,mike.brown@email.com,mike,brown,us,2023-08-30,12000.00
+9,sophie.martin@email.fr,sophie,martin,fr,2023-09-14,5500.00
+10,hans.schmidt@email.de,hans,schmidt,xx,2023-10-25,9000.00

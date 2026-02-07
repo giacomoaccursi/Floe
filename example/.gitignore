@@ -1,0 +1,8 @@
+# Ignore generated output
+output/
+
+# Keep directory structure
+!output/.gitkeep
+!output/validated/.gitkeep
+!output/rejected/.gitkeep
+!output/metadata/.gitkeep

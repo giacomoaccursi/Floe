@@ -1,0 +1,88 @@
+name: "customers"
+description: "Customer master data"
+version: "1.0"
+owner: "data-team"
+
+source:
+  type: "file"
+  path: "example/data/customers.csv"
+  format: "csv"
+  options:
+    header: "true"
+    delimiter: ","
+    encoding: "UTF-8"
+
+schema:
+  enforceSchema: true
+  allowExtraColumns: false
+  columns:
+    - name: "customer_id"
+      type: "integer"
+      nullable: false
+      description: "Unique customer identifier"
+    - name: "email"
+      type: "string"
+      nullable: false
+      description: "Customer email address"
+    - name: "first_name"
+      type: "string"
+      nullable: false
+      description: "Customer first name"
+    - name: "last_name"
+      type: "string"
+      nullable: false
+      description: "Customer last name"
+    - name: "country"
+      type: "string"
+      nullable: false
+      description: "Customer country code"
+    - name: "registration_date"
+      type: "date"
+      nullable: false
+      description: "Date of registration"
+    - name: "credit_limit"
+      type: "decimal"
+      nullable: true
+      description: "Credit limit for customer"
+
+loadMode:
+  type: "full"
+
+validation:
+  primaryKey:
+    - "customer_id"
+  foreignKeys: []
+  rules:
+    - type: "regex"
+      field: "email"
+      pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+      onFailure: "reject"
+    - type: "domain"
+      field: "country"
+      domainName: "country_codes"
+      onFailure: "reject"
+    - type: "range"
+      field: "credit_limit"
+      min: 0
+      max: 100000
+      onFailure: "reject"
+
+transformations:
+  preValidation:
+    - type: "sql"
+      query: |
+        SELECT
+          customer_id,
+          LOWER(TRIM(email)) as email,
+          INITCAP(TRIM(first_name)) as first_name,
+          INITCAP(TRIM(last_name)) as last_name,
+          UPPER(TRIM(country)) as country,
+          registration_date,
+          credit_limit
+        FROM __input__
+
+output:
+  format: "parquet"
+  partitionBy:
+    - "country"
+  compression: "snappy"

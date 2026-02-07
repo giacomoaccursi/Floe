@@ -1,0 +1,11 @@
+product_id,product_name,category,price,stock_quantity,supplier_code
+101,Laptop Dell XPS 13,electronics,1299.99,25,SUP-001
+102,iPhone 15 Pro,electronics,1099.00,50,SUP-002
+103,Running Shoes Nike,sports,89.99,100,SUP-003
+104,Winter Jacket,clothing,149.50,75,SUP-004
+105,Python Programming Book,books,45.99,200,SUP-005
+106,Organic Coffee Beans,food,12.99,500,SUP-006
+107,Samsung Galaxy S24,electronics,999.00,30,SUP-007
+108,Tennis Racket Wilson,sports,199.99,40,SUP-008
+109,Summer Dress,clothing,59.99,120,SUP-009
+110,Invalid Product,invalid_category,19.99,10,SUP-010

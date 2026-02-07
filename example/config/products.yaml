@@ -39,6 +39,10 @@ schema:
       type: "string"
       nullable: true
       description: "Supplier reference code"
+    - name: "last_updated"
+      type: "timestamp"
+      nullable: false
+      description: "Last update timestamp"
 
 loadMode:
   type: "delta"
@@ -50,36 +54,19 @@ validation:
     - "product_id"
   foreignKeys: []
   rules:
-    - type: "not_null"
-      field: "product_name"
-      onFailure: "reject"
     - type: "domain"
-      field: "category"
+      column: "category"
       domainName: "product_category"
       onFailure: "reject"
     - type: "range"
-      field: "price"
+      column: "price"
       min: 0.01
       max: 999999.99
       onFailure: "reject"
     - type: "range"
-      field: "stock_quantity"
+      column: "stock_quantity"
       min: 0
       onFailure: "reject"
-
-transformations:
-  preValidation:
-    - type: "sql"
-      query: |
-        SELECT
-          product_id,
-          TRIM(product_name) as product_name,
-          UPPER(TRIM(category)) as category,
-          ROUND(price, 2) as price,
-          stock_quantity,
-          TRIM(supplier_code) as supplier_code,
-          current_timestamp() as last_updated
-        FROM __input__
 
 output:
   format: "parquet"

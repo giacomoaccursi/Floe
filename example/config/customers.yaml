@@ -54,15 +54,15 @@ validation:
   foreignKeys: []
   rules:
     - type: "regex"
-      field: "email"
+      column: "email"
       pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
       onFailure: "reject"
     - type: "domain"
-      field: "country"
+      column: "country"
       domainName: "country_codes"
       onFailure: "reject"
     - type: "range"
-      field: "credit_limit"
+      column: "credit_limit"
       min: 0
       max: 100000
       onFailure: "reject"

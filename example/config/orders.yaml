@@ -53,47 +53,29 @@ validation:
     - "order_id"
   foreignKeys:
     - name: "fk_customer"
-      columns:
-        - "customer_id"
-      reference:
+      column: "customer_id"
+      references:
         flow: "customers"
-        columns:
-          - "customer_id"
+        column: "customer_id"
     - name: "fk_product"
-      columns:
-        - "product_id"
-      reference:
+      column: "product_id"
+      references:
         flow: "products"
-        columns:
-          - "product_id"
+        column: "product_id"
   rules:
     - type: "domain"
-      field: "status"
+      column: "status"
       domainName: "order_status"
       onFailure: "reject"
     - type: "range"
-      field: "quantity"
-      min: 1
-      max: 1000
+      column: "quantity"
+      min: "1"
+      max: "1000"
       onFailure: "reject"
     - type: "range"
-      field: "total_amount"
-      min: 0.01
+      column: "total_amount"
+      min: "0.01"
       onFailure: "reject"
-
-transformations:
-  postValidation:
-    - type: "sql"
-      query: |
-        SELECT
-          o.*,
-          c.first_name || ' ' || c.last_name as customer_name,
-          c.country as customer_country,
-          p.product_name,
-          p.category as product_category
-        FROM __input__ o
-        INNER JOIN customers c ON o.customer_id = c.customer_id
-        INNER JOIN products p ON o.product_id = p.product_id
 
 output:
   format: "parquet"

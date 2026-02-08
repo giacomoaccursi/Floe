@@ -83,9 +83,7 @@ trait ConfigLoader[T] {
       failures: ConfigReaderFailures,
       path: String
   ): ConfigurationException = {
-    val firstFailure = failures.head
-
-    firstFailure match {
+    failures.head match {
       case ConvertFailure(KeyNotFound(key, _), _, configPath) =>
         val location = if (configPath.isEmpty) "root" else configPath
         ConfigFileException(
@@ -247,10 +245,9 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
     } match {
       case Success(results) =>
         val (errors, configs) = results.partition(_.isLeft)
-        if (errors.nonEmpty) {
-          Left(errors.head.left.get)
-        } else {
-          Right(configs.map(_.toOption.get))
+        errors.collectFirst { case Left(err) => err } match {
+          case Some(err) => Left(err)
+          case None      => Right(configs.map(_.toOption.get))
         }
       case Failure(ex) =>
         Left(

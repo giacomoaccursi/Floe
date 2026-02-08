@@ -144,14 +144,14 @@ class DAGGraphBuilder(globalConfig: GlobalConfig) {
     val allDependencies = dependencyGraph.values.flatten.toSet
     val rootNodes = nodes.map(_.id).filterNot(allDependencies.contains)
     
-    if (rootNodes.isEmpty) {
-      throw new IllegalStateException("No root node found in DAG - all nodes are dependencies of others")
+    rootNodes match {
+      case Seq() =>
+        throw new IllegalStateException("No root node found in DAG - all nodes are dependencies of others")
+      case Seq(single) =>
+        single
+      case multiple =>
+        logger.warn(s"Multiple root nodes found: ${multiple.mkString(", ")}. Using first one: ${multiple.head}")
+        multiple.head
     }
-    
-    if (rootNodes.size > 1) {
-      logger.warn(s"Multiple root nodes found: ${rootNodes.mkString(", ")}. Using first one: ${rootNodes.head}")
-    }
-    
-    rootNodes.head
   }
 }

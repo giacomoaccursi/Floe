@@ -1,6 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.{FlowConfig, ValidationRule}
+import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -16,7 +17,9 @@ class PrimaryKeyValidator(flowConfig: FlowConfig, flowName: Option[String] = Non
     val pkColumns = flowConfig.validation.primaryKey
     
     if (pkColumns.isEmpty) {
-      ValidationUtils.validResult(df)
+      throw ValidationConfigException(
+        s"Primary key is not defined for flow ${flowName.getOrElse("unknown")}"
+      )
     } else {
       // Find duplicates using groupBy and count
       val duplicates = df

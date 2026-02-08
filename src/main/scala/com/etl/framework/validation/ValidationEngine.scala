@@ -53,7 +53,7 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit
       ),
       ValidationStep(
         "pk_validation",
-        flowConfig.validation.primaryKey.nonEmpty,
+        shouldExecute = true,
         new PrimaryKeyValidator(flowConfig, flowName),
         ValidationRule(ValidationRuleType.PKUniqueness)
       ),

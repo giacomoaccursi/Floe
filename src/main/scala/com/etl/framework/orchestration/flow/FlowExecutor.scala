@@ -119,7 +119,7 @@ class FlowExecutor(
 
   /** Reads data from source
     */
-  private def readData(): DataFrame = {
+  protected def readData(): DataFrame = {
     logger.debug(
       s"Creating reader for source type: ${flowConfig.source.`type`.name}"
     )
@@ -167,7 +167,7 @@ class FlowExecutor(
 
   /** Loads existing data if available
     */
-  private def loadExistingData(path: String): Option[DataFrame] = {
+  protected def loadExistingData(path: String): Option[DataFrame] = {
     try {
       Some(spark.read.parquet(path).drop(WARNINGS))
     } catch {
@@ -181,7 +181,7 @@ class FlowExecutor(
 
   /** Validates data
     */
-  private def validateData(data: DataFrame): ValidationResult = {
+  protected def validateData(data: DataFrame): ValidationResult = {
     logger.debug(s"Starting validation on ${data.count()} records")
     val engine = new ValidationEngine(domainsConfig)
     engine.validate(data, flowConfig, validatedFlows)

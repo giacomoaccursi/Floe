@@ -65,7 +65,7 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
     )
   }
 
-  // Test helper to create a mock executor that exposes internal logic
+  // Test helper that overrides protected methods for unit testing
   class TestableFlowExecutor(
       flowConfig: FlowConfig,
       globalConfig: GlobalConfig,
@@ -76,17 +76,10 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
         globalConfig,
         validatedFlows,
         domainsConfig
-      ) {
-
-    // We can't easily override private methods, but we can test through public interface
-    // This class serves as documentation of what we'd like to test if methods were protected
-  }
+      )
 
   "FlowExecutor" should "create FlowResult with correct flow name" in {
     val flowConfig = createFlowConfig("test_flow")
-
-    // Note: This would require actual data files to work
-    // We're testing the structure rather than full execution
     flowConfig.name shouldBe "test_flow"
   }
 

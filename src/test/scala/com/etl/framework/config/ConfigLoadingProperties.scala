@@ -309,19 +309,7 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
   // Custom ConfigWriter for FlowConfig that delegates to FlowConfigYaml
   // (FlowTransformation is a function type and cannot be serialized)
   implicit val flowConfigWriter: ConfigWriter[FlowConfig] =
-    ConfigWriter[FlowConfigYaml].contramap(fc =>
-      FlowConfigYaml(
-        fc.name,
-        fc.description,
-        fc.version,
-        fc.owner,
-        fc.source,
-        fc.schema,
-        fc.loadMode,
-        fc.validation,
-        fc.output
-      )
-    )
+    ConfigWriter[FlowConfigYaml].contramap(FlowConfigYaml.fromFlowConfig)
 
   // Helper function to write config to temp file and load it back
   def roundTripConfig[T](config: T, loader: ConfigLoader[T])(implicit

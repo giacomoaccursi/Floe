@@ -183,6 +183,20 @@ private[config] case class FlowConfigYaml(
   )
 }
 
+private[config] object FlowConfigYaml {
+  def fromFlowConfig(fc: FlowConfig): FlowConfigYaml = FlowConfigYaml(
+    name = fc.name,
+    description = fc.description,
+    version = fc.version,
+    owner = fc.owner,
+    source = fc.source,
+    schema = fc.schema,
+    loadMode = fc.loadMode,
+    validation = fc.validation,
+    output = fc.output
+  )
+}
+
 /** Flow configuration loader
   */
 class FlowConfigLoader extends ConfigLoader[FlowConfig] {

@@ -3,11 +3,9 @@ package com.etl.framework.aggregation
 import com.etl.framework.config.JoinStrategy.{Aggregate, Flatten, Nest}
 import com.etl.framework.config.{AggregationSpec, JoinCondition, JoinConfig}
 import com.etl.framework.exceptions.ValidationConfigException
-import org.apache.spark.executor
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.SparkSession
-import org.scalatest.matchers.must.Matchers.contain
 
 class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
@@ -237,49 +235,4 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     }
   }
 
-    import com.etl.framework.config.JoinType._
-    import com.etl.framework.config.JoinStrategy._
-
-    // This test now becomes tricky because we can't pass an "unsupported" enum easily 
-    // unless we use a string that fails to decode, but JoinConfig now uses the Enum.
-    // In code we still have a "case other" in JoinStrategyExecutor, which is good for safety.
-    // We'll skip or adapt this test. 
-    // Actually, AggregationSpec uses AggregationFunction enum.
-    // Let's just remove this test as it's now a compile-time check for valid enums if loaded via PureConfig.
-    // However, for manual construction, it still exists. 
-    // I'll leave it as is for now if I can't easily trigger it.
-    // Wait, I can't even compile this if I change the type to enum.
-    
-    // Removing these tests as they are now handled by type safety.
-
-/*
-  it should "throw exception for unsupported aggregation function" in {
-*/
-
-  // --- General ---
-
-    // Similar to above, this is now type-safe.
-
-/*
-  "JoinStrategyExecutor" should "throw exception for unsupported strategy" in {
-*/
-
-//  it should "support multiple join conditions" in {
-//    val parent = Seq((1, "A", "data1"), (2, "B", "data2")).toDF("id", "code", "info")
-//    val child = Seq((1, "A", 100), (2, "B", 200)).toDF("p_id", "p_code", "value")
-//
-//    import com.etl.framework.config.JoinType._
-//
-//    val joinConfig = JoinConfig(
-//      `type` = Inner,
-//      parent = "parent",
-//      on = Seq(JoinCondition("id", "parent_id"), JoinCondition("code", "p_code")),
-//      strategy = Flatten
-//    )
-//
-//    val result = executor.applyJoin(parent, child, joinConfig)
-//
-//    result.count() shouldBe 2
-//    result.columns should contain("value")
-//  }
 }

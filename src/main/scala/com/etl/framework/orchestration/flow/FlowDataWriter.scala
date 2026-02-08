@@ -5,7 +5,7 @@ import com.etl.framework.core.AdditionalTableMetadata
 import com.etl.framework.util.TimingUtil
 import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode}
 import org.slf4j.LoggerFactory
 
 import java.time.Instant
@@ -15,7 +15,7 @@ import java.time.Instant
 class FlowDataWriter(
     flowConfig: FlowConfig,
     globalConfig: GlobalConfig
-)(implicit spark: SparkSession) {
+) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 

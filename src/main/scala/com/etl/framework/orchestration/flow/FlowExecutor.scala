@@ -171,7 +171,7 @@ class FlowExecutor(
     try {
       Some(spark.read.parquet(path).drop(WARNINGS))
     } catch {
-      case _: Exception =>
+      case _: org.apache.spark.sql.AnalysisException =>
         logger.info(
           s"No existing data found at $path, treating as initial load"
         )

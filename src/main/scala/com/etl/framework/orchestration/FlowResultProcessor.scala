@@ -95,7 +95,7 @@ class FlowResultProcessor(
     try {
       validatedFlows(result.flowName) = spark.read.parquet(validatedPath)
     } catch {
-      case e: Exception =>
+      case e: org.apache.spark.sql.AnalysisException =>
         logger.warn(s"Could not load validated data for ${result.flowName} from $validatedPath: ${e.getMessage}")
     }
   }

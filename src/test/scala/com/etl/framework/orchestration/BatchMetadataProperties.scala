@@ -99,7 +99,9 @@ object BatchMetadataProperties extends Properties("BatchMetadata") {
   ): GlobalConfig = {
     GlobalConfig(
       paths = PathsConfig(
-        validatedPath = s"$tempDir/validated",
+        fullPath = s"$tempDir/full",
+        deltaPath = s"$tempDir/delta",
+        inputPath = s"$tempDir/input",
         rejectedPath = s"$tempDir/rejected",
         metadataPath = s"$tempDir/metadata"
       ),

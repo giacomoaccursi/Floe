@@ -52,6 +52,7 @@ case class LoadModeConfig(
     `type`: LoadMode, // "full" | "delta" | "scd2"
     mergeStrategy: Option[MergeStrategy] = None, // "upsert" | "append"
     updateTimestampColumn: Option[String] = None,
+    inputPath: Option[String] = None,
     validFromColumn: Option[String] = None,
     validToColumn: Option[String] = None,
     isCurrentColumn: Option[String] = None,

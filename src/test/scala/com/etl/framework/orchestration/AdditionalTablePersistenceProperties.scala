@@ -91,7 +91,9 @@ object AdditionalTablePersistenceProperties
   ): (FlowConfig, GlobalConfig) = {
     val globalConfig = GlobalConfig(
       paths = PathsConfig(
-        validatedPath = s"$tempDir/validated",
+        fullPath = s"$tempDir/full",
+        deltaPath = s"$tempDir/delta",
+        inputPath = s"$tempDir/input",
         rejectedPath = s"$tempDir/rejected",
         metadataPath = s"$tempDir/metadata"
       ),
@@ -211,7 +213,7 @@ object AdditionalTablePersistenceProperties
 
     // Verify the additional table was persisted
     val expectedPath =
-      s"${globalConfig.paths.validatedPath}/${flowName}_${tableName}"
+      s"${globalConfig.paths.fullPath}/${flowName}_${tableName}"
     val tableExists = Try {
       val persistedDf = spark.read.parquet(expectedPath)
       persistedDf.count() > 0
@@ -523,9 +525,9 @@ object AdditionalTablePersistenceProperties
 
     // Verify both tables were persisted
     val table1Path =
-      s"${globalConfig.paths.validatedPath}/${flowName}_${table1Name}"
+      s"${globalConfig.paths.fullPath}/${flowName}_${table1Name}"
     val table2Path =
-      s"${globalConfig.paths.validatedPath}/${flowName}_${table2Name}"
+      s"${globalConfig.paths.fullPath}/${flowName}_${table2Name}"
 
     val table1Exists = Try {
       spark.read.parquet(table1Path).count() > 0

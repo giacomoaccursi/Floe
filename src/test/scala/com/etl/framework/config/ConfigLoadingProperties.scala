@@ -30,9 +30,15 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
 
   implicit val arbPathsConfig: Arbitrary[PathsConfig] = Arbitrary {
     for {
-      validated <- Gen.alphaNumStr
+      full <- Gen.alphaNumStr
         .suchThat(_.nonEmpty)
-        .map(s => s"/data/validated/$s")
+        .map(s => s"/data/full/$s")
+      delta <- Gen.alphaNumStr
+        .suchThat(_.nonEmpty)
+        .map(s => s"/data/delta/$s")
+      input <- Gen.alphaNumStr
+        .suchThat(_.nonEmpty)
+        .map(s => s"/data/input/$s")
       rejected <- Gen.alphaNumStr
         .suchThat(_.nonEmpty)
         .map(s => s"/data/rejected/$s")
@@ -40,7 +46,9 @@ object ConfigLoadingProperties extends Properties("ConfigLoading") {
         .suchThat(_.nonEmpty)
         .map(s => s"/data/metadata/$s")
     } yield PathsConfig(
-      validatedPath = validated,
+      fullPath = full,
+      deltaPath = delta,
+      inputPath = input,
       rejectedPath = rejected,
       metadataPath = metadata
     )

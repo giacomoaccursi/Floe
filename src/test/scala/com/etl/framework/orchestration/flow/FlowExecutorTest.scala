@@ -17,12 +17,12 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
 
   import spark.implicits._
 
-  def createGlobalConfig(
-      validatedPath: String = "/tmp/flow_executor_test/validated"
-  ): GlobalConfig = {
+  def createGlobalConfig(): GlobalConfig = {
     GlobalConfig(
       paths = PathsConfig(
-        validatedPath,
+        "/tmp/flow_executor_test/full",
+        "/tmp/flow_executor_test/delta",
+        "/tmp/flow_executor_test/input",
         "/tmp/flow_executor_test/rejected",
         "/tmp/flow_executor_test/metadata"
       ),

@@ -9,7 +9,7 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
 
   def createGlobalConfig(parallelFlows: Boolean = true): GlobalConfig = {
     GlobalConfig(
-      paths = PathsConfig("/validated", "/rejected", "/metadata"),
+      paths = PathsConfig("/full", "/delta", "/input", "/rejected", "/metadata"),
       processing = ProcessingConfig(
         "yyyyMMdd",
         failOnValidationError = false,

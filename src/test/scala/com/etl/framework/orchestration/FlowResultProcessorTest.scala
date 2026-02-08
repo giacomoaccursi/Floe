@@ -25,7 +25,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
       rejectionThreshold: Double = 0.1
   ) extends FlowGroupExecutor(
         GlobalConfig(
-          paths = PathsConfig("/validated", "/rejected", "/metadata"),
+          paths = PathsConfig("/full", "/delta", "/input", "/rejected", "/metadata"),
           processing = ProcessingConfig(
             "yyyyMMdd",
             failOnValidationError = false,
@@ -60,11 +60,10 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
   }
 
   def createGlobalConfig(
-      validatedPath: String = "/tmp/validated",
       rejectionThreshold: Double = 0.1
   ): GlobalConfig = {
     GlobalConfig(
-      paths = PathsConfig(validatedPath, "/tmp/rejected", "/tmp/metadata"),
+      paths = PathsConfig("/tmp/full", "/tmp/delta", "/tmp/input", "/tmp/rejected", "/tmp/metadata"),
       processing = ProcessingConfig(
         "yyyyMMdd",
         failOnValidationError = false,

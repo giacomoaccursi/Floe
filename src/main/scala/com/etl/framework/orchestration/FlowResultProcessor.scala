@@ -1,6 +1,6 @@
 package com.etl.framework.orchestration
 
-import com.etl.framework.config.{FlowConfig, GlobalConfig}
+import com.etl.framework.config.{FlowConfig, GlobalConfig, LoadMode}
 import com.etl.framework.orchestration.batch.FlowGroupExecutor
 import com.etl.framework.orchestration.flow.FlowResult
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -88,15 +88,13 @@ class FlowResultProcessor(
     result: FlowResult,
     validatedFlows: scala.collection.mutable.Map[String, DataFrame]
   ): Unit = {
-    val validatedPath = flowConfigs.find(_.name == result.flowName)
-      .flatMap(_.output.path)
-      .getOrElse(s"${globalConfig.paths.validatedPath}/${result.flowName}")
+    val outputPath = resolveOutputPath(result.flowName)
 
     try {
-      validatedFlows(result.flowName) = spark.read.parquet(validatedPath)
+      validatedFlows(result.flowName) = spark.read.parquet(outputPath)
     } catch {
       case e: org.apache.spark.sql.AnalysisException =>
-        logger.warn(s"Could not load validated data for ${result.flowName} from $validatedPath: ${e.getMessage}")
+        logger.warn(s"Could not load validated data for ${result.flowName} from $outputPath: ${e.getMessage}")
     }
   }
 
@@ -104,11 +102,19 @@ class FlowResultProcessor(
    * Loads validated data and returns Option for immutable operations.
    */
   def loadValidatedDataOpt(result: FlowResult): Option[DataFrame] = {
-    val validatedPath = flowConfigs.find(_.name == result.flowName)
-      .flatMap(_.output.path)
-      .getOrElse(s"${globalConfig.paths.validatedPath}/${result.flowName}")
+    val outputPath = resolveOutputPath(result.flowName)
+    scala.util.Try(spark.read.parquet(outputPath)).toOption
+  }
 
-    scala.util.Try(spark.read.parquet(validatedPath)).toOption
+  private def resolveOutputPath(flowName: String): String = {
+    val flowConfig = flowConfigs.find(_.name == flowName)
+    flowConfig.flatMap(_.output.path).getOrElse {
+      val basePath = flowConfig.map(_.loadMode.`type`) match {
+        case Some(LoadMode.Full) => globalConfig.paths.fullPath
+        case _                   => globalConfig.paths.deltaPath
+      }
+      s"$basePath/$flowName"
+    }
   }
 }
 

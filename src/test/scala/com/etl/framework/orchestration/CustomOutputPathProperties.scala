@@ -51,7 +51,9 @@ object CustomOutputPathProperties extends Properties("CustomOutputPath") {
   val globalConfigGen: Gen[GlobalConfig] = Gen.const(
     GlobalConfig(
       paths = PathsConfig(
-        validatedPath = "/tmp/validated",
+        fullPath = "/tmp/full",
+        deltaPath = "/tmp/delta",
+        inputPath = "/tmp/input",
         rejectedPath = "/tmp/rejected",
         metadataPath = "/tmp/metadata"
       ),
@@ -76,11 +78,11 @@ object CustomOutputPathProperties extends Properties("CustomOutputPath") {
     globalConfigGen
   ) { (customPath, globalConfig) =>
     val flowName = "test_flow"
-    val defaultPath = s"${globalConfig.paths.validatedPath}/$flowName"
+    val defaultPath = s"${globalConfig.paths.fullPath}/$flowName"
 
     // Verify custom path is different from default
     customPath != defaultPath &&
-    !customPath.contains(globalConfig.paths.validatedPath)
+    !customPath.contains(globalConfig.paths.fullPath)
   }
 
   /** Property: Custom rejected path is respected For any flow with custom
@@ -106,7 +108,7 @@ object CustomOutputPathProperties extends Properties("CustomOutputPath") {
   property("default_path_used_when_no_custom_path") = forAll(globalConfigGen) {
     globalConfig =>
       val flowName = "test_flow"
-      val expectedDefaultPath = s"${globalConfig.paths.validatedPath}/$flowName"
+      val expectedDefaultPath = s"${globalConfig.paths.fullPath}/$flowName"
 
       // Create flow config without custom path
       val flowConfig = FlowConfig(
@@ -170,7 +172,7 @@ object CustomOutputPathProperties extends Properties("CustomOutputPath") {
   ) { (env, tenant, globalConfig) =>
     val customPathWithVars = s"/tmp/custom_output/$${env}/$${tenant_id}"
     val flowName = "test_flow"
-    val defaultPath = s"${globalConfig.paths.validatedPath}/$flowName"
+    val defaultPath = s"${globalConfig.paths.fullPath}/$flowName"
 
     // Verify custom path with variables is different from default
     customPathWithVars != defaultPath &&
@@ -193,7 +195,7 @@ object CustomOutputPathProperties extends Properties("CustomOutputPath") {
     }
 
     val flowName = "test_flow"
-    val defaultPath = s"${globalConfig.paths.validatedPath}/$flowName"
+    val defaultPath = s"${globalConfig.paths.fullPath}/$flowName"
 
     // Verify custom path is different from default
     customPath != defaultPath &&

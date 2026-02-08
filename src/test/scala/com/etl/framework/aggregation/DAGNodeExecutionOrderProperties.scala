@@ -169,7 +169,9 @@ object DAGNodeExecutionOrderProperties
   val globalConfigGen: Gen[GlobalConfig] = Gen.const(
     GlobalConfig(
       paths = PathsConfig(
-        validatedPath = "/data/validated",
+        fullPath = "/data/full",
+        deltaPath = "/data/delta",
+        inputPath = "/data/input",
         rejectedPath = "/data/rejected",
         metadataPath = "/data/metadata"
       ),
@@ -331,7 +333,7 @@ object DAGNodeExecutionOrderProperties
 
     val globalConfig = GlobalConfig(
       paths =
-        PathsConfig("/data/validated", "/data/rejected", "/data/metadata"),
+        PathsConfig("/data/full", "/data/delta", "/data/input", "/data/rejected", "/data/metadata"),
       processing = ProcessingConfig("yyyyMMdd_HHmmss", false, 0.1),
       performance = PerformanceConfig(false, false)
     )

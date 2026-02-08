@@ -1,6 +1,6 @@
 package com.etl.framework.orchestration.flow
 
-import com.etl.framework.config.{FlowConfig, GlobalConfig}
+import com.etl.framework.config.{FlowConfig, GlobalConfig, LoadMode}
 import com.etl.framework.core.AdditionalTableMetadata
 import com.etl.framework.util.TimingUtil
 import com.etl.framework.validation.ValidationColumns._
@@ -22,8 +22,12 @@ class FlowDataWriter(
   /** Writes validated data
     */
   def writeValidated(validData: DataFrame, batchId: String): Unit = {
+    val defaultBasePath = flowConfig.loadMode.`type` match {
+      case LoadMode.Full => globalConfig.paths.fullPath
+      case _             => globalConfig.paths.deltaPath
+    }
     val outputPath = flowConfig.output.path.getOrElse(
-      s"${globalConfig.paths.validatedPath}/${flowConfig.name}"
+      s"${defaultBasePath}/${flowConfig.name}"
     )
 
     TimingUtil.timed(logger, s"Write validated data to $outputPath") {
@@ -82,8 +86,12 @@ class FlowDataWriter(
       outputPath: Option[String],
       dagMetadata: Option[AdditionalTableMetadata]
   ): Unit = {
+    val defaultBasePath = flowConfig.loadMode.`type` match {
+      case LoadMode.Full => globalConfig.paths.fullPath
+      case _             => globalConfig.paths.deltaPath
+    }
     val path = outputPath.getOrElse(
-      s"${globalConfig.paths.validatedPath}/${flowConfig.name}_${tableName}"
+      s"${defaultBasePath}/${flowConfig.name}_${tableName}"
     )
 
     val recordCount = data.count()

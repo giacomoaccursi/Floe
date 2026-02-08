@@ -145,11 +145,11 @@ class FlowExecutor(
   /** Merges new data with existing data
     */
   private def mergeWithExisting(newData: DataFrame): DataFrame = {
-    val outputPath = flowConfig.output.path.getOrElse(
-      s"${globalConfig.paths.validatedPath}/${flowConfig.name}"
+    val inputPath = flowConfig.loadMode.inputPath.getOrElse(
+      s"${globalConfig.paths.inputPath}/${flowConfig.name}"
     )
 
-    val existingData = loadExistingData(outputPath)
+    val existingData = loadExistingData(inputPath)
     val merger = DeltaMergerFactory.create(
       flowConfig.loadMode,
       flowConfig.validation.primaryKey
@@ -229,8 +229,12 @@ class FlowExecutor(
     */
   private def writeAdditionalTables(batchId: String): Unit = {
     additionalTables.foreach { case (tableName, tableInfo) =>
+      val defaultBasePath = flowConfig.loadMode.`type` match {
+        case LoadMode.Full => globalConfig.paths.fullPath
+        case _             => globalConfig.paths.deltaPath
+      }
       val outputPath = tableInfo.outputPath.getOrElse(
-        s"${globalConfig.paths.validatedPath}/${flowConfig.name}_${tableName}"
+        s"${defaultBasePath}/${flowConfig.name}_${tableName}"
       )
 
       dataWriter.writeAdditionalTable(

@@ -9,7 +9,7 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
 
   def createGlobalConfig(parallelNodes: Boolean = true): GlobalConfig = {
     GlobalConfig(
-      paths = PathsConfig("/validated", "/rejected", "/metadata"),
+      paths = PathsConfig("/full", "/delta", "/input", "/rejected", "/metadata"),
       processing = ProcessingConfig("yyyyMMdd", failOnValidationError = false, maxRejectionRate = 0.1),
       performance = PerformanceConfig(parallelFlows = true, parallelNodes = parallelNodes)
     )

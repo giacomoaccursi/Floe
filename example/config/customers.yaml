@@ -56,33 +56,17 @@ validation:
     - type: "regex"
       column: "email"
       pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-      onFailure: "reject"
+      onFailure: "warn"
     - type: "domain"
       column: "country"
       domainName: "country_codes"
-      onFailure: "reject"
+      onFailure: "warn"
     - type: "range"
       column: "credit_limit"
       min: 0
       max: 100000
-      onFailure: "reject"
-
-transformations:
-  preValidation:
-    - type: "sql"
-      query: |
-        SELECT
-          customer_id,
-          LOWER(TRIM(email)) as email,
-          INITCAP(TRIM(first_name)) as first_name,
-          INITCAP(TRIM(last_name)) as last_name,
-          UPPER(TRIM(country)) as country,
-          registration_date,
-          credit_limit
-        FROM __input__
+      onFailure: "warn"
 
 output:
   format: "parquet"
-  partitionBy:
-    - "country"
   compression: "snappy"

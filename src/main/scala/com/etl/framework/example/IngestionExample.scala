@@ -59,6 +59,7 @@ object IngestionExample {
       )
 
       val result = orchestrator.execute()
+      result
 
       // Print results
       //printResults(result)
@@ -193,7 +194,8 @@ object IngestionExample {
     // Print output locations
     if (result.success) {
       logger.info("Output locations:")
-      logger.info(s"  Validated: example/output/validated/")
+      logger.info(s"  Full:      example/output/full/")
+      logger.info(s"  Delta:     example/output/delta/")
       logger.info(s"  Rejected:  example/output/rejected/")
       logger.info(s"  Metadata:  example/output/metadata/")
       logger.info("")

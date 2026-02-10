@@ -1,6 +1,6 @@
 name: "orders"
-description: "Customer orders"
-version: "1.0"
+description: "Customer orders - delta append with FK validation against customers and products"
+version: "2.0"
 owner: "data-team"
 
 source:
@@ -66,15 +66,18 @@ validation:
     - type: "domain"
       column: "status"
       domainName: "order_status"
+      description: "Status must be a valid order status"
       onFailure: "reject"
     - type: "range"
       column: "quantity"
       min: "1"
       max: "1000"
+      description: "Quantity must be between 1 and 1000"
       onFailure: "reject"
     - type: "range"
       column: "total_amount"
       min: "0.01"
+      description: "Total amount must be positive"
       onFailure: "reject"
 
 output:

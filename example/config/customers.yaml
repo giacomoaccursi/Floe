@@ -1,6 +1,6 @@
 name: "customers"
-description: "Customer master data"
-version: "1.0"
+description: "Customer master data - full load with comprehensive validation"
+version: "2.0"
 owner: "data-team"
 
 source:
@@ -35,7 +35,7 @@ schema:
     - name: "country"
       type: "string"
       nullable: false
-      description: "Customer country code"
+      description: "Customer country code (ISO 3166-1 alpha-2)"
     - name: "registration_date"
       type: "date"
       nullable: false
@@ -43,6 +43,7 @@ schema:
     - name: "credit_limit"
       type: "decimal"
       nullable: true
+      default: "0.00"
       description: "Credit limit for customer"
 
 loadMode:
@@ -56,15 +57,19 @@ validation:
     - type: "regex"
       column: "email"
       pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-      onFailure: "warn"
+      description: "Email must be a valid format"
+      onFailure: "reject"
     - type: "domain"
       column: "country"
       domainName: "country_codes"
-      onFailure: "warn"
+      description: "Country must be a valid ISO code"
+      onFailure: "reject"
     - type: "range"
       column: "credit_limit"
       min: 0
       max: 100000
+      skipNull: true
+      description: "Credit limit must be between 0 and 100,000"
       onFailure: "warn"
 
 output:

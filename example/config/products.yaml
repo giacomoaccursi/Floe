@@ -1,6 +1,6 @@
 name: "products"
-description: "Product catalog"
-version: "1.0"
+description: "Product catalog - delta upsert by last_updated timestamp"
+version: "2.0"
 owner: "data-team"
 
 source:
@@ -57,16 +57,25 @@ validation:
     - type: "domain"
       column: "category"
       domainName: "product_category"
+      description: "Category must be a valid product category"
       onFailure: "reject"
     - type: "range"
       column: "price"
       min: 0.01
       max: 999999.99
+      description: "Price must be between 0.01 and 999,999.99"
       onFailure: "reject"
     - type: "range"
       column: "stock_quantity"
       min: 0
+      description: "Stock quantity cannot be negative"
       onFailure: "reject"
+    - type: "regex"
+      column: "supplier_code"
+      pattern: "^SUP-\\d{3}$"
+      skipNull: true
+      description: "Supplier code must match SUP-NNN format"
+      onFailure: "warn"
 
 output:
   format: "parquet"

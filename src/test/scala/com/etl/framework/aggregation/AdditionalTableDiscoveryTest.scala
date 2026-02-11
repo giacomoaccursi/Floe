@@ -137,9 +137,9 @@ class AdditionalTableDiscoveryTest extends AnyFlatSpec with Matchers {
 
       node.join shouldBe defined
       val joinConfig = node.join.get
-      joinConfig.`type` shouldBe "left_outer"
+      joinConfig.`type` shouldBe JoinType.LeftOuter
       joinConfig.parent shouldBe "orders_node"
-      joinConfig.strategy shouldBe "nest"
+      joinConfig.strategy shouldBe JoinStrategy.Nest
       joinConfig.nestAs shouldBe Some("line_items")
       joinConfig.on should have size 1
       joinConfig.on.head.left shouldBe "order_id"

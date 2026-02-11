@@ -6,7 +6,6 @@ import com.etl.framework.config.{
   DomainConfig,
   ValidationRuleType
 }
-import com.etl.framework.TestConfig
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.{SparkSession, Row}

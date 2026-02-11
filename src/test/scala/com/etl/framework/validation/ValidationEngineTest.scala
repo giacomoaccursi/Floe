@@ -22,7 +22,7 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
   def createFlowConfig(
       name: String = "test_flow",
       schemaFields: Seq[ColumnConfig] = Seq.empty,
-      primaryKey: Seq[String] = Seq.empty,
+      primaryKey: Seq[String] = Seq("id"),
       foreignKeys: Seq[ForeignKeyConfig] = Seq.empty,
       rules: Seq[ValidationRule] = Seq.empty
   ): FlowConfig = {
@@ -162,11 +162,10 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
     val data = Seq(Row("1"), Row("2"))
     val df = spark.createDataFrame(data.asJava, schema)
 
-    // Config without primary key, foreign keys, or custom rules
+    // Config without foreign keys or custom rules — these should be skipped
     val flowConfig = createFlowConfig(
       schemaFields =
         Seq(ColumnConfig("id", "string", nullable = false, description = "")),
-      primaryKey = Seq.empty, // PK validation should be skipped
       foreignKeys = Seq.empty, // FK validation should be skipped
       rules = Seq.empty // Custom rules validation should be skipped
     )
@@ -174,7 +173,7 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
 
     val result = engine.validate(df, flowConfig)
 
-    // Should only execute schema and not_null validation
+    // Should execute schema, not_null, and pk validation — all pass
     result.valid.count() shouldBe 2
     result.rejected shouldBe None
   }

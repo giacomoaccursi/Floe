@@ -1,8 +1,9 @@
 package com.etl.framework.pipeline
 
-import com.etl.framework.config.{DomainsConfig, DomainsConfigLoader, FlowConfig, FlowConfigLoader, GlobalConfig, GlobalConfigLoader}
+import com.etl.framework.config.{DomainsConfig, DomainsConfigLoader, FlowConfig, FlowConfigLoader, GlobalConfig, GlobalConfigLoader, IcebergConfig}
 import com.etl.framework.core.FlowTransformation
 import com.etl.framework.exceptions.MissingConfigFieldException
+import com.etl.framework.iceberg.catalog.CatalogFactory
 import com.etl.framework.orchestration.{FlowOrchestrator, IngestionResult}
 import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
@@ -27,6 +28,9 @@ class IngestionPipeline private(
   def execute(): IngestionResult = {
     logger.info("Executing Ingestion pipeline")
 
+    // Configure Spark for Iceberg if enabled
+    globalConfig.iceberg.foreach(configureSparkForIceberg)
+
     // Apply transformations to flow configs
     val enrichedFlowConfigs = flowConfigs.map { flowConfig =>
       flowTransformations.get(flowConfig.name) match {
@@ -43,6 +47,26 @@ class IngestionPipeline private(
     // Create and execute orchestrator with DomainsConfig
     val orchestrator = FlowOrchestrator(globalConfig, enrichedFlowConfigs, domainsConfig)
     orchestrator.execute()
+  }
+
+  private def configureSparkForIceberg(config: IcebergConfig): Unit = {
+    CatalogFactory.createCatalogProvider(config.catalogType) match {
+      case Right(provider) =>
+        provider.validateConfig(config) match {
+          case Right(_) =>
+            provider.configureCatalog(spark, config)
+            logger.info(
+              s"Iceberg configured: catalog=${config.catalogName}, " +
+                s"type=${config.catalogType}, warehouse=${config.warehouse}"
+            )
+          case Left(error) =>
+            throw new IllegalArgumentException(
+              s"Invalid Iceberg catalog config: $error"
+            )
+        }
+      case Left(error) =>
+        throw new IllegalArgumentException(error)
+    }
   }
 
   /**

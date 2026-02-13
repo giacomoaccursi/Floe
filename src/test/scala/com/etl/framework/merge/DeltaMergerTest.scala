@@ -1,6 +1,6 @@
 package com.etl.framework.merge
 
-import com.etl.framework.config.{LoadMode, LoadModeConfig, MergeStrategy}
+import com.etl.framework.config.{LoadMode, LoadModeConfig}
 import com.etl.framework.exceptions.{
   MergeException,
   UnsupportedOperationException
@@ -31,26 +31,12 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
     merger shouldBe a[FullReplaceMerger]
   }
 
-  it should "create UpsertMerger for delta upsert strategy" in {
+  it should "create UpsertMerger for delta load mode" in {
     val merger = DeltaMergerFactory.create(
-      LoadModeConfig(
-        `type` = LoadMode.Delta,
-        mergeStrategy = Some(MergeStrategy.Upsert)
-      ),
+      LoadModeConfig(`type` = LoadMode.Delta),
       primaryKey = Seq("id")
     )
     merger shouldBe a[UpsertMerger]
-  }
-
-  it should "create AppendMerger for delta append strategy" in {
-    val merger = DeltaMergerFactory.create(
-      LoadModeConfig(
-        `type` = LoadMode.Delta,
-        mergeStrategy = Some(MergeStrategy.Append)
-      ),
-      Seq.empty
-    )
-    merger shouldBe a[AppendMerger]
   }
 
   it should "create SCD2Merger for scd2 load mode" in {

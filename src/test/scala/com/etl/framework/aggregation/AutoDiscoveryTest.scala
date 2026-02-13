@@ -24,9 +24,7 @@ class AutoDiscoveryTest extends AnyFlatSpec with Matchers {
 
   private def createGlobalConfig(tempDir: String): GlobalConfig = GlobalConfig(
     paths = PathsConfig(
-      fullPath = "/data/full",
-      deltaPath = "/data/delta",
-      inputPath = "/data/input",
+      outputPath = "/data/output",
       rejectedPath = "/data/rejected",
       metadataPath = tempDir
     ),

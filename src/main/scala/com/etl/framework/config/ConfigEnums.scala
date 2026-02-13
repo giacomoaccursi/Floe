@@ -334,37 +334,3 @@ object AggregationFunction {
   implicit val writer: ConfigWriter[AggregationFunction] =
     ConfigWriter[String].contramap(_.name)
 }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// MERGE STRATEGY
-// ═══════════════════════════════════════════════════════════════════════════
-sealed trait MergeStrategy extends Product with Serializable {
-  def name: String
-}
-
-object MergeStrategy {
-  case object Upsert extends MergeStrategy { val name = "upsert" }
-  case object Append extends MergeStrategy { val name = "append" }
-  case object Replace extends MergeStrategy { val name = "replace" }
-
-  val values: Seq[MergeStrategy] = Seq(Upsert, Append, Replace)
-
-  def fromString(s: String): Either[String, MergeStrategy] =
-    s.toLowerCase match {
-      case "upsert"  => Right(Upsert)
-      case "append"  => Right(Append)
-      case "replace" => Right(Replace)
-      case other     =>
-        Left(
-          s"Unknown merge strategy: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"
-        )
-    }
-
-  implicit val reader: ConfigReader[MergeStrategy] =
-    ConfigReader.fromString[MergeStrategy](s =>
-      fromString(s).left.map(msg => CannotConvert(s, "MergeStrategy", msg))
-    )
-
-  implicit val writer: ConfigWriter[MergeStrategy] =
-    ConfigWriter[String].contramap(_.name)
-}

@@ -75,9 +75,7 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
       parallel: Boolean
   ): GlobalConfig = GlobalConfig(
     paths = PathsConfig(
-      fullPath = s"$tempDir/full",
-      deltaPath = s"$tempDir/delta",
-      inputPath = s"$tempDir/input",
+      outputPath = s"$tempDir/output",
       rejectedPath = s"$tempDir/rejected",
       metadataPath = s"$tempDir/metadata"
     ),

@@ -79,9 +79,7 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
   ): GlobalConfig = {
     GlobalConfig(
       paths = PathsConfig(
-        fullPath = s"$tempDir/full",
-        deltaPath = s"$tempDir/delta",
-        inputPath = s"$tempDir/input",
+        outputPath = s"$tempDir/output",
         rejectedPath = s"$tempDir/rejected",
         metadataPath = s"$tempDir/metadata"
       ),

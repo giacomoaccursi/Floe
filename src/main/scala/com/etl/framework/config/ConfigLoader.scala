@@ -23,7 +23,7 @@ import scala.util.{Failure, Success, Try, Using}
 import java.util.regex.Matcher
 
 /** Global configuration hints to enforce CamelCase naming strategy (e.g.
-  * "fullPath" in YAML matches "fullPath" in case class)
+  * "outputPath" in YAML matches "outputPath" in case class)
   */
 object ConfigHints {
   import pureconfig.ConfigFieldMapping

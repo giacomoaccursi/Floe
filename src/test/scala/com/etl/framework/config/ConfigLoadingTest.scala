@@ -54,9 +54,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
 
   private val sampleGlobalConfig = GlobalConfig(
     paths = PathsConfig(
-      fullPath = "/data/full/warehouse",
-      deltaPath = "/data/delta/warehouse",
-      inputPath = "/data/input/source",
+      outputPath = "/data/output/warehouse",
       rejectedPath = "/data/rejected/errors",
       metadataPath = "/data/metadata/meta"
     ),

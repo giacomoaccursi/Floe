@@ -1,7 +1,5 @@
 paths:
-  fullPath: "example/output/full"
-  deltaPath: "example/output/delta"
-  inputPath: "example/input"
+  outputPath: "example/output"
   rejectedPath: "example/output/rejected"
   metadataPath: "example/output/metadata"
 

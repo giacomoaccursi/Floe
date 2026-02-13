@@ -18,9 +18,7 @@ class DependencyGraphTest extends AnyFlatSpec with Matchers {
 
   private val globalConfig = GlobalConfig(
     paths = PathsConfig(
-      "/data/full",
-      "/data/delta",
-      "/data/input",
+      "/data/output",
       "/data/rejected",
       "/data/metadata"
     ),

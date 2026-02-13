@@ -50,9 +50,7 @@ case class ColumnConfig(
   */
 case class LoadModeConfig(
     `type`: LoadMode, // "full" | "delta" | "scd2"
-    mergeStrategy: Option[MergeStrategy] = None, // "upsert" | "append"
     updateTimestampColumn: Option[String] = None,
-    inputPath: Option[String] = None,
     validFromColumn: Option[String] = None,
     validToColumn: Option[String] = None,
     isCurrentColumn: Option[String] = None,
@@ -106,5 +104,8 @@ case class OutputConfig(
     format: FileFormat = FileFormat.Parquet,
     partitionBy: Seq[String] = Seq.empty,
     compression: String = "snappy",
-    options: Map[String, String] = Map.empty
+    options: Map[String, String] = Map.empty,
+    sortOrder: Seq[String] = Seq.empty,
+    icebergPartitions: Seq[String] = Seq.empty,
+    tableProperties: Map[String, String] = Map.empty
 )

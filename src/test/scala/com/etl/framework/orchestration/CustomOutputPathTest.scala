@@ -8,9 +8,7 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
 
   private val globalConfig = GlobalConfig(
     paths = PathsConfig(
-      fullPath = "/tmp/full",
-      deltaPath = "/tmp/delta",
-      inputPath = "/tmp/input",
+      outputPath = "/tmp/output",
       rejectedPath = "/tmp/rejected",
       metadataPath = "/tmp/metadata"
     ),
@@ -27,10 +25,10 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
 
   "Custom output path" should "be different from default path" in {
     val customPath = "/tmp/custom_output/prod/tenant_a"
-    val defaultPath = s"${globalConfig.paths.fullPath}/test_flow"
+    val defaultPath = s"${globalConfig.paths.outputPath}/test_flow"
 
     customPath should not be defaultPath
-    customPath should not include globalConfig.paths.fullPath
+    customPath should not include globalConfig.paths.outputPath
   }
 
   it should "support custom rejected path different from default" in {
@@ -72,7 +70,7 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
 
     flowConfig.output.path shouldBe empty
     val expectedDefaultPath =
-      s"${globalConfig.paths.fullPath}/${flowConfig.name}"
+      s"${globalConfig.paths.outputPath}/${flowConfig.name}"
     expectedDefaultPath should include("test_flow")
   }
 
@@ -80,7 +78,7 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
     val customPathWithVars = "/tmp/custom_output/${env}/${tenant_id}"
 
     customPathWithVars should include("${")
-    customPathWithVars should not be s"${globalConfig.paths.fullPath}/test_flow"
+    customPathWithVars should not be s"${globalConfig.paths.outputPath}/test_flow"
   }
 
   it should "support different storage protocols" in {
@@ -90,7 +88,7 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
       val customPath =
         if (protocol == "/") "/tmp/local_storage/bucket"
         else s"${protocol}bucket/data"
-      val defaultPath = s"${globalConfig.paths.fullPath}/test_flow"
+      val defaultPath = s"${globalConfig.paths.outputPath}/test_flow"
 
       customPath should not be defaultPath
       if (protocol == "/") {

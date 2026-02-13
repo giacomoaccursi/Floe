@@ -20,9 +20,7 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
   def createGlobalConfig(): GlobalConfig = {
     GlobalConfig(
       paths = PathsConfig(
-        "/tmp/flow_executor_test/full",
-        "/tmp/flow_executor_test/delta",
-        "/tmp/flow_executor_test/input",
+        "/tmp/flow_executor_test/output",
         "/tmp/flow_executor_test/rejected",
         "/tmp/flow_executor_test/metadata"
       ),

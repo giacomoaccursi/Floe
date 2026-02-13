@@ -1,6 +1,6 @@
 package com.etl.framework.orchestration
 
-import com.etl.framework.config.{FlowConfig, GlobalConfig, LoadMode}
+import com.etl.framework.config.{FlowConfig, GlobalConfig}
 import com.etl.framework.orchestration.batch.FlowGroupExecutor
 import com.etl.framework.orchestration.flow.FlowResult
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -109,11 +109,7 @@ class FlowResultProcessor(
   private def resolveOutputPath(flowName: String): String = {
     val flowConfig = flowConfigs.find(_.name == flowName)
     flowConfig.flatMap(_.output.path).getOrElse {
-      val basePath = flowConfig.map(_.loadMode.`type`) match {
-        case Some(LoadMode.Full) => globalConfig.paths.fullPath
-        case _                   => globalConfig.paths.deltaPath
-      }
-      s"$basePath/$flowName"
+      s"${globalConfig.paths.outputPath}/$flowName"
     }
   }
 }

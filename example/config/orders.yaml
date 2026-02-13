@@ -1,5 +1,5 @@
 name: "orders"
-description: "Customer orders - delta append with FK validation against customers and products"
+description: "Customer orders - delta upsert with FK validation against customers and products"
 version: "2.0"
 owner: "data-team"
 
@@ -46,7 +46,6 @@ schema:
 
 loadMode:
   type: "delta"
-  mergeStrategy: "append"
 
 validation:
   primaryKey:

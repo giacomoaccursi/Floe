@@ -1,7 +1,7 @@
 package com.etl.framework.merge
 
-import com.etl.framework.config.{LoadMode, LoadModeConfig, MergeStrategy}
-import com.etl.framework.exceptions.{MergeException, UnsupportedOperationException}
+import com.etl.framework.config.{LoadMode, LoadModeConfig}
+import com.etl.framework.exceptions.UnsupportedOperationException
 import com.etl.framework.merge.MergeColumns._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
@@ -39,19 +39,7 @@ object DeltaMergerFactory {
   def create(loadMode: LoadModeConfig, primaryKey: Seq[String]): DeltaMerger = {
     loadMode.`type` match {
       case LoadMode.Delta =>
-        loadMode.mergeStrategy match {
-          case Some(MergeStrategy.Upsert) =>
-            new UpsertMerger(primaryKey, loadMode.updateTimestampColumn)
-          case Some(MergeStrategy.Append) =>
-            new AppendMerger()
-          case other =>
-            throw MergeException(
-              flowName = "unknown",
-              mergeStrategy = other.map(_.name).getOrElse("none"),
-              details =
-                s"Invalid merge strategy. Valid values are: upsert, append"
-            )
-        }
+        new UpsertMerger(primaryKey, loadMode.updateTimestampColumn)
 
       case LoadMode.SCD2 =>
         require(

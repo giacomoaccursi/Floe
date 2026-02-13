@@ -9,7 +9,7 @@ class AdditionalTableDiscoveryTest extends AnyFlatSpec with Matchers {
 
   def createGlobalConfig(metadataPath: String): GlobalConfig = {
     GlobalConfig(
-      paths = PathsConfig("/full", "/delta", "/input", "/rejected", metadataPath),
+      paths = PathsConfig("/output", "/rejected", metadataPath),
       processing = ProcessingConfig("yyyyMMdd", failOnValidationError = false, maxRejectionRate = 0.1),
       performance = PerformanceConfig(parallelFlows = true, parallelNodes = true)
     )

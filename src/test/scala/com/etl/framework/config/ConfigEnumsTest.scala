@@ -94,12 +94,4 @@ class ConfigEnumsTest extends AnyFlatSpec with Matchers {
     AggregationFunction.fromString("collect_list") shouldBe Right(AggregationFunction.CollectList)
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // MERGE STRATEGY
-  // ═══════════════════════════════════════════════════════════════════════════
-  "MergeStrategy.fromString" should "parse valid strategies" in {
-    MergeStrategy.fromString("upsert") shouldBe Right(MergeStrategy.Upsert)
-    MergeStrategy.fromString("append") shouldBe Right(MergeStrategy.Append)
-    MergeStrategy.fromString("replace") shouldBe Right(MergeStrategy.Replace)
-  }
 }

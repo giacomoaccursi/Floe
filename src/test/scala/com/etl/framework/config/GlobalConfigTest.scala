@@ -12,9 +12,7 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
     val yaml =
       """
         |paths:
-        |  fullPath: "/data/full"
-        |  deltaPath: "/data/delta"
-        |  inputPath: "/data/input"
+        |  outputPath: "/data/output"
         |  rejectedPath: "/data/rejected"
         |  metadataPath: "/data/metadata"
         |processing:
@@ -31,9 +29,7 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
     config.isRight shouldBe true
     val c = config.toOption.get
 
-    c.paths.fullPath shouldBe "/data/full"
-    c.paths.deltaPath shouldBe "/data/delta"
-    c.paths.inputPath shouldBe "/data/input"
+    c.paths.outputPath shouldBe "/data/output"
     c.processing.maxRejectionRate shouldBe 0.05
     c.performance.parallelFlows shouldBe true
   }
@@ -73,9 +69,7 @@ class GlobalConfigLoaderLogicTest extends AnyFlatSpec with Matchers {
     val yaml =
       """
         |paths:
-        |  fullPath: "/out/full"
-        |  deltaPath: "/out/delta"
-        |  inputPath: "/out/input"
+        |  outputPath: "/out/output"
         |  rejectedPath: "/out/rej"
         |  metadataPath: "/out/meta"
         |processing:
@@ -91,7 +85,7 @@ class GlobalConfigLoaderLogicTest extends AnyFlatSpec with Matchers {
     result.isRight shouldBe true
     val config = result.toOption.get
 
-    config.paths.fullPath shouldBe "/out/full"
+    config.paths.outputPath shouldBe "/out/output"
     config.performance.parallelNodes shouldBe true
   }
 }

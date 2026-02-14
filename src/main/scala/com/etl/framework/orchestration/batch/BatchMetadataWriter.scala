@@ -50,7 +50,7 @@ class BatchMetadataWriter(
       "total_rejected_records" -> totalRejected,
       "overall_rejection_rate" -> overallRejectionRate,
       "flows" -> flowResults.map { result =>
-        Map(
+        val baseFlowMetadata = Map[String, Any](
           "flow_name" -> result.flowName,
           "success" -> result.success,
           "load_mode" -> flowConfigs.find(_.name == result.flowName).map(_.loadMode.`type`).getOrElse("unknown"),
@@ -63,6 +63,21 @@ class BatchMetadataWriter(
           "rejection_reasons" -> result.rejectionReasons,
           "error" -> result.error.getOrElse("")
         )
+
+        result.icebergMetadata match {
+          case Some(iceberg) =>
+            baseFlowMetadata + ("iceberg_metadata" -> Map(
+              "table_name" -> iceberg.tableName,
+              "snapshot_id" -> iceberg.snapshotId,
+              "snapshot_tag" -> iceberg.snapshotTag.getOrElse(""),
+              "parent_snapshot_id" -> iceberg.parentSnapshotId.getOrElse(""),
+              "snapshot_timestamp_ms" -> iceberg.snapshotTimestampMs,
+              "records_written" -> iceberg.recordsWritten,
+              "manifest_list_location" -> iceberg.manifestListLocation,
+              "summary" -> iceberg.summary
+            ))
+          case None => baseFlowMetadata
+        }
       }
     )
     

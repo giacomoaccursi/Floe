@@ -46,7 +46,6 @@ class FlowDataWriter(
       case LoadMode.SCD2  => writer.writeSCD2Load(validData, flowConfig)
     }
     writer.tagBatchSnapshot(flowConfig, result, batchId)
-    result
   }
 
   private def writeParquet(

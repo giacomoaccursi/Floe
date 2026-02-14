@@ -6,7 +6,8 @@ import org.slf4j.LoggerFactory
 
 case class WriteResult(
     recordsWritten: Long,
-    snapshotId: Option[Long]
+    snapshotId: Option[Long],
+    icebergMetadata: Option[IcebergFlowMetadata] = None
 )
 
 class IcebergTableWriter(
@@ -202,9 +203,19 @@ class IcebergTableWriter(
       flowConfig: FlowConfig,
       writeResult: WriteResult,
       batchId: String
-  ): Unit = {
-    writeResult.snapshotId.foreach { sid =>
-      tableManager.tagSnapshot(flowConfig, sid, batchId)
+  ): WriteResult = {
+    writeResult.snapshotId match {
+      case Some(sid) =>
+        tableManager.tagSnapshot(flowConfig, sid, batchId)
+        val metadata = tableManager.getSnapshotMetadata(
+          flowConfig,
+          sid,
+          writeResult.recordsWritten,
+          batchId
+        )
+        writeResult.copy(icebergMetadata = metadata)
+      case None =>
+        writeResult
     }
   }
 }

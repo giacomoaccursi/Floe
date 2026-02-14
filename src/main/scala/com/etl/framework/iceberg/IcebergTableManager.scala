@@ -159,6 +159,52 @@ class IcebergTableManager(
     }
   }
 
+  def getSnapshotMetadata(
+      flowConfig: FlowConfig,
+      snapshotId: Long,
+      recordsWritten: Long,
+      batchId: String
+  ): Option[IcebergFlowMetadata] = {
+    val tableName = resolveTableName(flowConfig)
+    try {
+      val row = spark
+        .sql(
+          s"SELECT parent_id, committed_at, manifest_list, summary " +
+            s"FROM $tableName.snapshots WHERE snapshot_id = $snapshotId"
+        )
+        .first()
+
+      val parentId =
+        if (row.isNullAt(0)) None else Some(row.getLong(0))
+      val committedAt = row.getTimestamp(1).getTime
+      val manifestList = row.getString(2)
+      val summary = row.getMap[String, String](3).toMap
+
+      val tag =
+        if (icebergConfig.enableSnapshotTagging) Some(s"batch_$batchId")
+        else None
+
+      Some(
+        IcebergFlowMetadata(
+          tableName = tableName,
+          snapshotId = snapshotId,
+          snapshotTag = tag,
+          parentSnapshotId = parentId,
+          snapshotTimestampMs = committedAt,
+          recordsWritten = recordsWritten,
+          manifestListLocation = manifestList,
+          summary = summary
+        )
+      )
+    } catch {
+      case e: Exception =>
+        logger.warn(
+          s"Failed to get snapshot metadata for $tableName: ${e.getMessage}"
+        )
+        None
+    }
+  }
+
   def rollbackToSnapshot(
       flowConfig: FlowConfig,
       snapshotId: Long

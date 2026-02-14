@@ -1,5 +1,7 @@
 package com.etl.framework.orchestration.flow
 
+import com.etl.framework.iceberg.IcebergFlowMetadata
+
 /**
  * Result of flow execution
  */
@@ -14,7 +16,8 @@ case class FlowResult(
   rejectionRate: Double = 0.0,
   executionTimeMs: Long = 0,
   rejectionReasons: Map[String, Long] = Map.empty,
-  error: Option[String] = None
+  error: Option[String] = None,
+  icebergMetadata: Option[IcebergFlowMetadata] = None
 )
 
 /**
@@ -32,7 +35,8 @@ object FlowResult {
     mergedRecords: Long,
     validRecords: Long,
     rejectedRecords: Long,
-    rejectionReasons: Map[String, Long]
+    rejectionReasons: Map[String, Long],
+    icebergMetadata: Option[IcebergFlowMetadata] = None
   ): FlowResult = {
     FlowResult(
       flowName = flowName,
@@ -44,7 +48,8 @@ object FlowResult {
       rejectedRecords = rejectedRecords,
       rejectionRate = if (inputRecords > 0) rejectedRecords.toDouble / inputRecords else 0.0,
       executionTimeMs = 0L, // Will be set by caller
-      rejectionReasons = rejectionReasons
+      rejectionReasons = rejectionReasons,
+      icebergMetadata = icebergMetadata
     )
   }
   

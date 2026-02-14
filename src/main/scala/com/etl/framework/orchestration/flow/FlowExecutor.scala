@@ -8,7 +8,7 @@ import com.etl.framework.config.{
 }
 import com.etl.framework.core.AdditionalTableInfo
 import com.etl.framework.exceptions.InvariantViolationException
-import com.etl.framework.iceberg.{IcebergTableManager, IcebergTableWriter}
+import com.etl.framework.iceberg.{IcebergFlowMetadata, IcebergTableManager, IcebergTableWriter, WriteResult}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.merge.DeltaMergerFactory
 import com.etl.framework.util.TimingUtil
@@ -121,14 +121,15 @@ class FlowExecutor(
 
     verifyInvariant(inputCount, validCount, rejectedCount)
 
-    writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
+    val writeResult = writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
 
     FlowMetrics(
       inputCount = inputCount,
       mergedCount = inputCount,
       validCount = validCount,
       rejectedCount = rejectedCount,
-      rejectionReasons = validationResult.rejectionReasons
+      rejectionReasons = validationResult.rejectionReasons,
+      icebergMetadata = writeResult.icebergMetadata
     )
   }
 
@@ -159,14 +160,15 @@ class FlowExecutor(
 
     verifyInvariant(inputCount, validCount, rejectedCount)
 
-    writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
+    val writeResult = writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
 
     FlowMetrics(
       inputCount = inputCount,
       mergedCount = mergedCount,
       validCount = validCount,
       rejectedCount = rejectedCount,
-      rejectionReasons = validationResult.rejectionReasons
+      rejectionReasons = validationResult.rejectionReasons,
+      icebergMetadata = writeResult.icebergMetadata
     )
   }
 
@@ -251,14 +253,15 @@ class FlowExecutor(
       validationResult: ValidationResult,
       batchId: String,
       rejectedCount: Long
-  ): Unit = {
-    dataWriter.writeValidated(validatedData, batchId)
+  ): WriteResult = {
+    val writeResult = dataWriter.writeValidated(validatedData, batchId)
 
     if (rejectedCount > 0) {
       dataWriter.writeRejected(validationResult.rejected.get, batchId)
     }
 
     writeAdditionalTables(batchId)
+    writeResult
   }
 
   private def writeAdditionalTables(batchId: String): Unit = {
@@ -314,7 +317,8 @@ class FlowExecutor(
       metrics.mergedCount,
       metrics.validCount,
       metrics.rejectedCount,
-      metrics.rejectionReasons
+      metrics.rejectionReasons,
+      metrics.icebergMetadata
     )
   }
 
@@ -354,5 +358,6 @@ private case class FlowMetrics(
     mergedCount: Long,
     validCount: Long,
     rejectedCount: Long,
-    rejectionReasons: Map[String, Long]
+    rejectionReasons: Map[String, Long],
+    icebergMetadata: Option[IcebergFlowMetadata] = None
 )

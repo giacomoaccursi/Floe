@@ -1,7 +1,6 @@
 package com.etl.framework.merge
 
 import com.etl.framework.config.{LoadMode, LoadModeConfig}
-import com.etl.framework.exceptions.UnsupportedOperationException
 import com.etl.framework.merge.MergeColumns._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
@@ -23,19 +22,11 @@ trait DeltaMerger {
   def merge(newData: DataFrame, existingData: Option[DataFrame]): DataFrame
 }
 
-/** Factory for creating DeltaMerger instances based on load mode configuration
+/** Factory for creating DeltaMerger instances based on load mode configuration.
+  * Used only for the Parquet fallback pipeline (non-Iceberg).
   */
 object DeltaMergerFactory {
 
-  /** Creates a DeltaMerger based on the load mode configuration
-    *
-    * @param loadMode
-    *   The load mode configuration
-    * @param primaryKey
-    *   The primary key columns to use for merge operations
-    * @return
-    *   A DeltaMerger instance
-    */
   def create(loadMode: LoadModeConfig, primaryKey: Seq[String]): DeltaMerger = {
     loadMode.`type` match {
       case LoadMode.Delta =>
@@ -69,25 +60,10 @@ object DeltaMergerFactory {
         )
 
       case LoadMode.Full =>
-        new FullReplaceMerger()
-
-      case other =>
-        throw UnsupportedOperationException(
-          operation = s"load mode type: ${other.name}",
-          details = "Valid values are: full, delta, scd2"
+        throw new IllegalArgumentException(
+          "Full load mode does not use merge - merge is skipped entirely"
         )
     }
-  }
-}
-
-/** Full replace merger - simply replaces all existing data with new data
-  */
-class FullReplaceMerger extends DeltaMerger {
-  override def merge(
-      newData: DataFrame,
-      existingData: Option[DataFrame]
-  ): DataFrame = {
-    newData
   }
 }
 
@@ -160,25 +136,6 @@ class UpsertMerger(
 
     // Union with all new records (which will overwrite any matching keys)
     unchangedRecords.unionByName(newData)
-  }
-}
-
-/** Append merger - simply appends new records to existing data without
-  * modification
-  */
-class AppendMerger extends DeltaMerger {
-  override def merge(
-      newData: DataFrame,
-      existingData: Option[DataFrame]
-  ): DataFrame = {
-    existingData match {
-      case None =>
-        // First load - return new data as-is
-        newData
-      case Some(existing) =>
-        // Append new records to existing data
-        existing.unionByName(newData)
-    }
   }
 }
 

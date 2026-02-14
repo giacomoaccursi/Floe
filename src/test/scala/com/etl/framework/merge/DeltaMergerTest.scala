@@ -1,10 +1,6 @@
 package com.etl.framework.merge
 
 import com.etl.framework.config.{LoadMode, LoadModeConfig}
-import com.etl.framework.exceptions.{
-  MergeException,
-  UnsupportedOperationException
-}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.SparkSession
@@ -23,15 +19,7 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
 
   // --- Factory tests ---
 
-  "DeltaMergerFactory" should "create FullReplaceMerger for full load mode" in {
-    val merger = DeltaMergerFactory.create(
-      LoadModeConfig(`type` = LoadMode.Full),
-      Seq.empty
-    )
-    merger shouldBe a[FullReplaceMerger]
-  }
-
-  it should "create UpsertMerger for delta load mode" in {
+  "DeltaMergerFactory" should "create UpsertMerger for delta load mode" in {
     val merger = DeltaMergerFactory.create(
       LoadModeConfig(`type` = LoadMode.Delta),
       primaryKey = Seq("id")
@@ -53,8 +41,14 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
     merger shouldBe a[SCD2Merger]
   }
 
-  // Removed invalid merge strategy test and unknown load mode test
-  // because strong typing with Enums prevents invalid values at compile time.
+  it should "throw for full load mode" in {
+    intercept[IllegalArgumentException] {
+      DeltaMergerFactory.create(
+        LoadModeConfig(`type` = LoadMode.Full),
+        Seq.empty
+      )
+    }
+  }
 
   it should "throw for scd2 without required fields" in {
     intercept[IllegalArgumentException] {
@@ -69,58 +63,6 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
         primaryKey = Seq("id")
       )
     }
-  }
-
-  // --- FullReplaceMerger tests ---
-
-  "FullReplaceMerger" should "return new data ignoring existing" in {
-    val merger = new FullReplaceMerger()
-    val newData = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
-    val existing = Seq((3, "Charlie")).toDF("id", "name")
-
-    val result = merger.merge(newData, Some(existing))
-    result.count() shouldBe 2
-    result.collect().map(_.getAs[String]("name")).sorted shouldBe Array(
-      "Alice",
-      "Bob"
-    )
-  }
-
-  it should "return new data when no existing data" in {
-    val merger = new FullReplaceMerger()
-    val newData = Seq((1, "Alice")).toDF("id", "name")
-
-    val result = merger.merge(newData, None)
-    result.count() shouldBe 1
-  }
-
-  // --- AppendMerger tests ---
-
-  "AppendMerger" should "append new data to existing" in {
-    val merger = new AppendMerger()
-    val existing = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
-    val newData = Seq((3, "Charlie")).toDF("id", "name")
-
-    val result = merger.merge(newData, Some(existing))
-    result.count() shouldBe 3
-  }
-
-  it should "return new data when no existing data" in {
-    val merger = new AppendMerger()
-    val newData = Seq((1, "Alice")).toDF("id", "name")
-
-    val result = merger.merge(newData, None)
-    result.count() shouldBe 1
-  }
-
-  it should "allow duplicate keys when appending" in {
-    val merger = new AppendMerger()
-    val existing = Seq((1, "Alice")).toDF("id", "name")
-    val newData = Seq((1, "Alice_updated")).toDF("id", "name")
-
-    val result = merger.merge(newData, Some(existing))
-    result.count() shouldBe 2
-    result.filter(col("id") === 1).count() shouldBe 2
   }
 
   // --- UpsertMerger tests ---

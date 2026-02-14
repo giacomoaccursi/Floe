@@ -18,10 +18,15 @@ class HadoopCatalogProvider extends ICatalogProvider {
     )
     spark.conf.set(s"$catalogPrefix.type", "hadoop")
     spark.conf.set(s"$catalogPrefix.warehouse", config.warehouse)
-    spark.conf.set(
-      "spark.sql.extensions",
-      "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
-    )
+    try {
+      spark.conf.set(
+        "spark.sql.extensions",
+        "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+      )
+    } catch {
+      case _: org.apache.spark.sql.AnalysisException =>
+      // spark.sql.extensions is a static config, already set at session creation
+    }
 
     config.catalogProperties.foreach { case (key, value) =>
       spark.conf.set(s"$catalogPrefix.$key", value)

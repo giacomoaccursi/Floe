@@ -172,10 +172,10 @@ class IcebergTableWriter(
       spark.sql(closeSql)
 
       // Step 2: Insert new versions of changed records + brand new records
-      val sourceCols = df.columns.mkString(", ")
+      val sourceColsQualified = df.columns.map(c => s"source.$c").mkString(", ")
       val insertSql =
         s"""INSERT INTO $tableName
-           |SELECT source.$sourceCols,
+           |SELECT $sourceColsQualified,
            |  current_timestamp() AS $validFromCol,
            |  CAST(NULL AS TIMESTAMP) AS $validToCol,
            |  true AS $isCurrentCol

@@ -1,10 +1,12 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
+import com.etl.framework.iceberg.IcebergTableManager
 import com.etl.framework.orchestration.batch.{BatchMetadataWriter, FlowGroupExecutor}
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.ExecutionPlanBuilder
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
 
@@ -37,6 +39,8 @@ class FlowOrchestrator(
   metadataWriter: BatchMetadataWriter,
   executionLogger: ExecutionLogger
 )(implicit spark: SparkSession) {
+
+  private val logger = LoggerFactory.getLogger(getClass)
 
   /**
    * Builds execution plan based on FK dependencies.
@@ -110,6 +114,9 @@ class FlowOrchestrator(
       success = true
     )
 
+    // Run Iceberg table maintenance post-batch
+    runPostBatchMaintenance()
+
     executionLogger.logBatchSummary(batchId, flowResults, executionTimeMs)
 
     IngestionResult(
@@ -137,6 +144,26 @@ class FlowOrchestrator(
       success = false,
       error = Some(error.getMessage)
     )
+  }
+  /**
+   * Runs Iceberg table maintenance on all flow tables after batch completion.
+   */
+  private def runPostBatchMaintenance(): Unit = {
+    globalConfig.iceberg.foreach { icebergConfig =>
+      val tableManager = new IcebergTableManager(spark, icebergConfig)
+      logger.info("Running post-batch Iceberg table maintenance")
+
+      flowConfigs.foreach { flowConfig =>
+        try {
+          tableManager.runMaintenance(flowConfig, icebergConfig.maintenance)
+        } catch {
+          case e: Exception =>
+            logger.warn(
+              s"Maintenance failed for flow ${flowConfig.name}: ${e.getMessage}"
+            )
+        }
+      }
+    }
   }
 }
 

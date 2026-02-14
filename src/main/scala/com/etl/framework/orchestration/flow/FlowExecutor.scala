@@ -8,6 +8,7 @@ import com.etl.framework.config.{
 }
 import com.etl.framework.core.AdditionalTableInfo
 import com.etl.framework.exceptions.InvariantViolationException
+import com.etl.framework.iceberg.{IcebergTableManager, IcebergTableWriter}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.merge.DeltaMergerFactory
 import com.etl.framework.util.TimingUtil
@@ -19,8 +20,9 @@ import org.slf4j.LoggerFactory
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-/** Executes a single flow through Read → Merge → Validate → Transform → Write
-  * Focused on orchestrating the flow execution pipeline
+/** Executes a single flow through Read -> Validate -> Transform -> Write
+  * With Iceberg: validation on new data only, merge via MERGE INTO during write
+  * Without Iceberg: Read -> Merge -> Validate -> Transform -> Write (Parquet fallback)
   */
 class FlowExecutor(
     flowConfig: FlowConfig,
@@ -31,11 +33,18 @@ class FlowExecutor(
 
   private val logger = LoggerFactory.getLogger(getClass)
 
-  // Storage for additional tables created during transformations
   private val additionalTables = mutable.Map[String, AdditionalTableInfo]()
 
-  // Specialized components
-  private val dataWriter = new FlowDataWriter(flowConfig, globalConfig)
+  private val icebergEnabled = globalConfig.iceberg.isDefined
+
+  private val icebergTableWriter: Option[IcebergTableWriter] =
+    globalConfig.iceberg.map { icebergConfig =>
+      val tableManager = new IcebergTableManager(spark, icebergConfig)
+      new IcebergTableWriter(spark, icebergConfig, tableManager)
+    }
+
+  private val dataWriter =
+    new FlowDataWriter(flowConfig, globalConfig, icebergTableWriter)
   private val metadataWriter = new FlowMetadataWriter(flowConfig, globalConfig)
   private val transformer = new FlowTransformer(flowConfig, additionalTables)
 
@@ -50,21 +59,20 @@ class FlowExecutor(
         }
       }
 
-    // Update result with actual execution time
     val finalResult = result.copy(executionTimeMs = executionTimeMs)
 
-    // Write metadata and log summary
     metadataWriter.writeFlowMetadata(finalResult, batchId)
     logFlowSummary(finalResult)
 
     finalResult
   }
 
-  /** Core flow execution logic - returns Try[FlowMetrics]
+  /** Core flow execution logic
     */
   private def executeFlow(batchId: String): Try[FlowMetrics] = Try {
     logger.info(
-      s"Starting flow ${flowConfig.name} - batchId: $batchId, loadMode: ${flowConfig.loadMode.`type`.name}"
+      s"Starting flow ${flowConfig.name} - batchId: $batchId, " +
+        s"loadMode: ${flowConfig.loadMode.`type`.name}, iceberg: $icebergEnabled"
     )
 
     // 1. Read data from source
@@ -80,34 +88,79 @@ class FlowExecutor(
       transformer.applyPreValidationTransformation(rawData, batchId)
     val inputCount = preTransformedData.count()
 
-    // 3. Merge with existing data (delta mode only)
-    val mergedData = applyMerge(preTransformedData)
-    val mergedCount = mergedData.count()
+    if (icebergEnabled) {
+      // Iceberg pipeline: validate new data only, merge happens during write
+      executeIcebergPipeline(preTransformedData, inputCount, batchId)
+    } else {
+      // Parquet fallback: merge in-memory, then validate merged data
+      executeParquetPipeline(preTransformedData, inputCount, batchId)
+    }
+  }
 
-    // 4. Validate data
+  /** Iceberg pipeline: Read -> PreTransform -> Validate (new only) -> PostTransform -> Write (MERGE INTO)
+    */
+  private def executeIcebergPipeline(
+      preTransformedData: DataFrame,
+      inputCount: Long,
+      batchId: String
+  ): FlowMetrics = {
+    // Validate new data only (existing data in Iceberg table was already validated)
     val validationResult = TimingUtil.timed(logger, "Validate data") {
-      validateData(mergedData)
+      validateData(preTransformedData)
     }
     val validCount = validationResult.valid.count()
     val rejectedCount = validationResult.rejected.map(_.count()).getOrElse(0L)
 
-    // Log validation results
-    logValidationResults(validationResult, mergedCount, rejectedCount)
+    logValidationResults(validationResult, inputCount, rejectedCount)
 
-    // 5. Apply post-validation transformations
     val postTransformedData = transformer.applyPostValidationTransformation(
       validationResult.valid,
       batchId,
       validatedFlows
     )
 
-    // 6. Verify invariant: input = valid + rejected
     verifyInvariant(inputCount, validCount, rejectedCount)
 
-    // 7. Write all data
     writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
 
-    // 8. Return metrics
+    FlowMetrics(
+      inputCount = inputCount,
+      mergedCount = inputCount,
+      validCount = validCount,
+      rejectedCount = rejectedCount,
+      rejectionReasons = validationResult.rejectionReasons
+    )
+  }
+
+  /** Parquet fallback pipeline: Read -> PreTransform -> Merge -> Validate -> PostTransform -> Write
+    */
+  private def executeParquetPipeline(
+      preTransformedData: DataFrame,
+      inputCount: Long,
+      batchId: String
+  ): FlowMetrics = {
+    // Merge with existing data (delta/scd2 mode only)
+    val mergedData = applyMerge(preTransformedData)
+    val mergedCount = mergedData.count()
+
+    val validationResult = TimingUtil.timed(logger, "Validate data") {
+      validateData(mergedData)
+    }
+    val validCount = validationResult.valid.count()
+    val rejectedCount = validationResult.rejected.map(_.count()).getOrElse(0L)
+
+    logValidationResults(validationResult, mergedCount, rejectedCount)
+
+    val postTransformedData = transformer.applyPostValidationTransformation(
+      validationResult.valid,
+      batchId,
+      validatedFlows
+    )
+
+    verifyInvariant(inputCount, validCount, rejectedCount)
+
+    writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
+
     FlowMetrics(
       inputCount = inputCount,
       mergedCount = mergedCount,
@@ -117,8 +170,6 @@ class FlowExecutor(
     )
   }
 
-  /** Reads data from source
-    */
   protected def readData(): DataFrame = {
     logger.debug(
       s"Creating reader for source type: ${flowConfig.source.`type`.name}"
@@ -128,8 +179,6 @@ class FlowExecutor(
     reader.read()
   }
 
-  /** Applies merge logic based on load mode
-    */
   private def applyMerge(data: DataFrame): DataFrame = {
     flowConfig.loadMode.`type` match {
       case LoadMode.Full =>
@@ -142,8 +191,6 @@ class FlowExecutor(
     }
   }
 
-  /** Merges new data with existing data
-    */
   private def mergeWithExisting(newData: DataFrame): DataFrame = {
     val existingPath = flowConfig.output.path.getOrElse(
       s"${globalConfig.paths.outputPath}/${flowConfig.name}"
@@ -165,8 +212,6 @@ class FlowExecutor(
     result
   }
 
-  /** Loads existing data if available
-    */
   protected def loadExistingData(path: String): Option[DataFrame] = {
     try {
       Some(spark.read.parquet(path).drop(WARNINGS))
@@ -179,25 +224,21 @@ class FlowExecutor(
     }
   }
 
-  /** Validates data
-    */
   protected def validateData(data: DataFrame): ValidationResult = {
     logger.debug(s"Starting validation on ${data.count()} records")
     val engine = new ValidationEngine(domainsConfig)
     engine.validate(data, flowConfig, validatedFlows)
   }
 
-  /** Logs validation results
-    */
   private def logValidationResults(
       validationResult: ValidationResult,
-      mergedCount: Long,
+      totalCount: Long,
       rejectedCount: Long
   ): Unit = {
     if (rejectedCount > 0) {
-      val rejectionRate = (rejectedCount.toDouble / mergedCount * 100)
+      val rejectionRate = (rejectedCount.toDouble / totalCount * 100)
       logger.warn(
-        f"Validation rejected $rejectedCount/$mergedCount records ($rejectionRate%.2f%%)"
+        f"Validation rejected $rejectedCount/$totalCount records ($rejectionRate%.2f%%)"
       )
       validationResult.rejectionReasons.foreach { case (reason, count) =>
         logger.warn(s"  - $reason: $count records")
@@ -205,28 +246,21 @@ class FlowExecutor(
     }
   }
 
-  /** Writes all data (validated, rejected, additional tables)
-    */
   private def writeAllData(
       validatedData: DataFrame,
       validationResult: ValidationResult,
       batchId: String,
       rejectedCount: Long
   ): Unit = {
-    // Write validated data
     dataWriter.writeValidated(validatedData, batchId)
 
-    // Write rejected data if any
     if (rejectedCount > 0) {
       dataWriter.writeRejected(validationResult.rejected.get, batchId)
     }
 
-    // Write additional tables
     writeAdditionalTables(batchId)
   }
 
-  /** Writes additional tables created during transformations
-    */
   private def writeAdditionalTables(batchId: String): Unit = {
     additionalTables.foreach { case (tableName, tableInfo) =>
       val outputPath = tableInfo.outputPath.getOrElse(
@@ -250,8 +284,6 @@ class FlowExecutor(
     }
   }
 
-  /** Verifies invariant: input = valid + rejected
-    */
   private def verifyInvariant(
       input: Long,
       valid: Long,
@@ -271,8 +303,6 @@ class FlowExecutor(
     logger.debug(s"Invariant verified: $input = $valid + $rejected")
   }
 
-  /** Creates a success result from metrics
-    */
   private def createSuccessResult(
       batchId: String,
       metrics: FlowMetrics
@@ -288,8 +318,6 @@ class FlowExecutor(
     )
   }
 
-  /** Creates a failure result from exception
-    */
   private def createFailureResult(
       batchId: String,
       error: Throwable
@@ -298,8 +326,6 @@ class FlowExecutor(
     FlowResult.failure(flowConfig.name, batchId, error.getMessage)
   }
 
-  /** Logs flow summary
-    */
   private def logFlowSummary(result: FlowResult): Unit = {
     val rejectionRate = if (result.inputRecords > 0) {
       (result.rejectedRecords.toDouble / result.inputRecords * 100)
@@ -312,21 +338,17 @@ class FlowExecutor(
     )
   }
 
-  /** Logs merge statistics
-    */
   private def logMergeStats(
       newCount: Long,
       existingCount: Long,
       resultCount: Long
   ): Unit = {
     logger.info(
-      s"Merge ${flowConfig.loadMode.`type`.name}: existing $existingCount + new $newCount → result $resultCount records"
+      s"Merge ${flowConfig.loadMode.`type`.name}: existing $existingCount + new $newCount -> result $resultCount records"
     )
   }
 }
 
-/** Holds metrics collected during flow execution
-  */
 private case class FlowMetrics(
     inputCount: Long,
     mergedCount: Long,

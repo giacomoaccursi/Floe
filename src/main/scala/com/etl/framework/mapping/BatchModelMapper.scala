@@ -128,7 +128,11 @@ object BatchModelMapper {
 
     import pureconfig._
     import pureconfig.generic.auto._
+    import pureconfig.generic.ProductHint
     import pureconfig.module.yaml._
+
+    implicit def productHint[T]: ProductHint[T] =
+      ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
 
     scala.util.Using(Source.fromFile(mappingFilePath)) { source =>
       val yamlContent = source.mkString

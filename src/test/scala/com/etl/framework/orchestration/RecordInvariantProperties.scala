@@ -214,7 +214,7 @@ object RecordInvariantProperties extends Properties("RecordInvariant") {
           message.contains(inputCount.toString) &&
           message.contains(validCount.toString) &&
           message.contains(rejectedCount.toString) &&
-          message.contains("Invariant violation")
+          message.contains("invariant violated")
         case _: Exception => false
       }
     } else {

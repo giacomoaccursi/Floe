@@ -283,6 +283,40 @@ object OnFailureAction {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// ORPHAN ACTION
+// ═══════════════════════════════════════════════════════════════════════════
+sealed trait OrphanAction extends Product with Serializable {
+  def name: String
+}
+
+object OrphanAction {
+  case object Warn extends OrphanAction { val name = "warn" }
+  case object Delete extends OrphanAction { val name = "delete" }
+  case object Ignore extends OrphanAction { val name = "ignore" }
+
+  val values: Seq[OrphanAction] = Seq(Warn, Delete, Ignore)
+
+  def fromString(s: String): Either[String, OrphanAction] =
+    s.toLowerCase match {
+      case "warn"   => Right(Warn)
+      case "delete" => Right(Delete)
+      case "ignore" => Right(Ignore)
+      case other    =>
+        Left(
+          s"Unknown orphan action: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"
+        )
+    }
+
+  implicit val reader: ConfigReader[OrphanAction] =
+    ConfigReader.fromString[OrphanAction](s =>
+      fromString(s).left.map(msg => CannotConvert(s, "OrphanAction", msg))
+    )
+
+  implicit val writer: ConfigWriter[OrphanAction] =
+    ConfigWriter[String].contramap(_.name)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // AGGREGATION FUNCTION
 // ═══════════════════════════════════════════════════════════════════════════
 sealed trait AggregationFunction extends Product with Serializable {

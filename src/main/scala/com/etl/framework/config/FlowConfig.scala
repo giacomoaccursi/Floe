@@ -54,7 +54,9 @@ case class LoadModeConfig(
     validFromColumn: Option[String] = None,
     validToColumn: Option[String] = None,
     isCurrentColumn: Option[String] = None,
-    compareColumns: Seq[String] = Seq.empty
+    compareColumns: Seq[String] = Seq.empty,
+    detectDeletes: Boolean = false,
+    isActiveColumn: Option[String] = None
 )
 
 /** Validation configuration
@@ -70,7 +72,8 @@ case class ValidationConfig(
 case class ForeignKeyConfig(
     name: String,
     column: String,
-    references: ReferenceConfig
+    references: ReferenceConfig,
+    onOrphan: OrphanAction = OrphanAction.Warn
 )
 
 /** Reference configuration

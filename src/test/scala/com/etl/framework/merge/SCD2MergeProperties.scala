@@ -511,7 +511,7 @@ object SCD2MergeProperties extends Properties("SCD2Merge") {
         } else {
           val existingDf = existingRecords.toDF()
           val newDf = newRecords.toDF()
-          
+
           val merger = new SCD2Merger(
             keyColumns = Seq("id"),
             compareColumns = Seq("name", "value"),
@@ -519,12 +519,12 @@ object SCD2MergeProperties extends Properties("SCD2Merge") {
             validToCol = "valid_to",
             isCurrentCol = "is_current"
           )
-          
+
           val result = merger.merge(newDf, Some(existingDf))
-          
+
           // For all closed records, valid_to should be after valid_from
           val closedRecords = result.filter($"is_current" === false && $"valid_to".isNotNull)
-          
+
           if (closedRecords.count() > 0) {
             closedRecords
               .filter($"valid_to" > $"valid_from")
@@ -534,5 +534,68 @@ object SCD2MergeProperties extends Properties("SCD2Merge") {
           }
         }
       }.getOrElse(false)
+  }
+
+  // SCD2 record with is_active for detectDeletes tests
+  case class SCD2RecordActive(
+    id: Int,
+    name: String,
+    value: Double,
+    valid_from: Timestamp,
+    valid_to: Timestamp,
+    is_current: Boolean,
+    is_active: Boolean
+  )
+
+  /**
+   * Property: SCD2 Detect Deletes - Deleted Records Are Closed
+   * When detectDeletes=true, records present in existing but missing from new data
+   * should be closed with is_current=false, is_active=false
+   */
+  property("scd2_deleted_records_are_closed") = forAll(existingSCD2RecordsGen) { existingRecords =>
+    Try {
+      if (existingRecords.size < 2) {
+        true // Skip too small test cases
+      } else {
+        // Create existing records with is_active column
+        val existingWithActive = existingRecords.map(r =>
+          SCD2RecordActive(r.id, r.name, r.value, r.valid_from, r.valid_to, r.is_current, true)
+        )
+        val existingDf = existingWithActive.toDF()
+
+        // Remove some records from the new data (simulate deletes)
+        val toKeep = existingRecords.take(existingRecords.size / 2)
+        val toDelete = existingRecords.drop(existingRecords.size / 2)
+        val newDf = toKeep.map(r => SimpleRecord(r.id, r.name, r.value)).toDF()
+
+        val merger = new SCD2Merger(
+          keyColumns = Seq("id"),
+          compareColumns = Seq("name", "value"),
+          validFromCol = "valid_from",
+          validToCol = "valid_to",
+          isCurrentCol = "is_current",
+          detectDeletes = true,
+          isActiveCol = Some("is_active")
+        )
+
+        val result = merger.merge(newDf, Some(existingDf))
+
+        // Kept records should still be current and active
+        val keptIds = toKeep.map(_.id).toSet
+        val keptCorrect = keptIds.forall { id =>
+          val current = result.filter($"id" === id && $"is_current" === true)
+          current.count() == 1
+        }
+
+        // Deleted records should be closed and inactive
+        val deletedIds = toDelete.map(_.id).toSet
+        val deletedCorrect = deletedIds.forall { id =>
+          val closed = result.filter($"id" === id && $"is_current" === false && $"is_active" === false)
+          closed.count() >= 1
+        }
+
+        keptCorrect && deletedCorrect
+      }
+    }.getOrElse(false)
   }
 }

@@ -260,4 +260,85 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
       )
     }
   }
+
+  // --- SCD2Merger detectDeletes tests ---
+
+  "SCD2Merger with detectDeletes" should "close records missing from source" in {
+    val merger = new SCD2Merger(
+      Seq("id"),
+      Seq("name"),
+      "valid_from",
+      "valid_to",
+      "is_current",
+      detectDeletes = true,
+      isActiveCol = Some("is_active")
+    )
+
+    val existing = Seq(
+      (1, "Alice", java.sql.Timestamp.valueOf("2024-01-01 00:00:00"),
+        null.asInstanceOf[java.sql.Timestamp], true, true),
+      (2, "Bob", java.sql.Timestamp.valueOf("2024-01-01 00:00:00"),
+        null.asInstanceOf[java.sql.Timestamp], true, true),
+      (3, "Charlie", java.sql.Timestamp.valueOf("2024-01-01 00:00:00"),
+        null.asInstanceOf[java.sql.Timestamp], true, true)
+    ).toDF("id", "name", "valid_from", "valid_to", "is_current", "is_active")
+
+    // Charlie removed from source
+    val newData = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
+
+    val result = merger.merge(newData, Some(existing))
+
+    // Alice + Bob unchanged (2) + Charlie soft-deleted (1) = 3
+    result.count() shouldBe 3
+    result.filter(col("is_current") === true).count() shouldBe 2
+
+    // Charlie should be soft-deleted
+    val charlie = result.filter(col("id") === 3).collect().head
+    charlie.getAs[Boolean]("is_current") shouldBe false
+    charlie.getAs[Boolean]("is_active") shouldBe false
+  }
+
+  it should "not close missing records when detectDeletes is false" in {
+    val merger = new SCD2Merger(
+      Seq("id"),
+      Seq("name"),
+      "valid_from",
+      "valid_to",
+      "is_current",
+      detectDeletes = false
+    )
+
+    val existing = Seq(
+      (1, "Alice", java.sql.Timestamp.valueOf("2024-01-01 00:00:00"),
+        null.asInstanceOf[java.sql.Timestamp], true),
+      (2, "Bob", java.sql.Timestamp.valueOf("2024-01-01 00:00:00"),
+        null.asInstanceOf[java.sql.Timestamp], true)
+    ).toDF("id", "name", "valid_from", "valid_to", "is_current")
+
+    // Bob removed from source
+    val newData = Seq((1, "Alice")).toDF("id", "name")
+
+    val result = merger.merge(newData, Some(existing))
+
+    // Both should remain current (Bob not closed because detectDeletes=false)
+    result.filter(col("is_current") === true).count() shouldBe 2
+  }
+
+  it should "add is_active column on first load when configured" in {
+    val merger = new SCD2Merger(
+      Seq("id"),
+      Seq("name"),
+      "valid_from",
+      "valid_to",
+      "is_current",
+      detectDeletes = true,
+      isActiveCol = Some("is_active")
+    )
+
+    val newData = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
+    val result = merger.merge(newData, None)
+
+    result.columns should contain("is_active")
+    result.filter(col("is_active") === true).count() shouldBe 2
+  }
 }

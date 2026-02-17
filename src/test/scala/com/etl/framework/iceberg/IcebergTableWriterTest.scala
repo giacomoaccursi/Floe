@@ -62,7 +62,9 @@ class IcebergTableWriterTest
       compareColumns: Seq[String] = Seq.empty,
       validFromColumn: Option[String] = None,
       validToColumn: Option[String] = None,
-      isCurrentColumn: Option[String] = None
+      isCurrentColumn: Option[String] = None,
+      detectDeletes: Boolean = false,
+      isActiveColumn: Option[String] = None
   ): FlowConfig = {
     FlowConfig(
       name = name,
@@ -86,7 +88,9 @@ class IcebergTableWriterTest
         compareColumns = compareColumns,
         validFromColumn = validFromColumn,
         validToColumn = validToColumn,
-        isCurrentColumn = isCurrentColumn
+        isCurrentColumn = isCurrentColumn,
+        detectDeletes = detectDeletes,
+        isActiveColumn = isActiveColumn
       ),
       validation = ValidationConfig(
         primaryKey = primaryKey,
@@ -239,6 +243,81 @@ class IcebergTableWriterTest
     aliceRecords.count() shouldBe 2
   }
 
+  // --- SCD2 Detect Deletes Tests ---
+
+  "IcebergTableWriter.writeSCD2Load with detectDeletes" should "soft-delete records missing from source" in {
+    val fc = flowConfig(
+      "scd2_detect_del",
+      loadMode = LoadMode.SCD2,
+      compareColumns = Seq("name"),
+      validFromColumn = Some("valid_from"),
+      validToColumn = Some("valid_to"),
+      isCurrentColumn = Some("is_current"),
+      detectDeletes = true,
+      isActiveColumn = Some("is_active")
+    )
+
+    // Day 1: initial load
+    val day1 = Seq((1, "Alice"), (2, "Bob"), (3, "Charlie")).toDF("id", "name")
+    writer.writeSCD2Load(day1, fc)
+
+    val afterDay1 = spark.sql("SELECT * FROM writer_catalog.default.scd2_detect_del")
+    afterDay1.count() shouldBe 3
+    afterDay1.filter("is_current = true AND is_active = true").count() shouldBe 3
+
+    // Day 2: Alice changes, Charlie removed from source
+    val day2 = Seq((1, "Alice_v2"), (2, "Bob")).toDF("id", "name")
+    writer.writeSCD2Load(day2, fc)
+
+    val afterDay2 = spark.sql("SELECT * FROM writer_catalog.default.scd2_detect_del")
+
+    // Alice: old closed + new current = 2
+    // Bob: unchanged = 1
+    // Charlie: soft-deleted (is_current=false, is_active=false) = 1
+    // Total = 4
+    afterDay2.count() shouldBe 4
+    afterDay2.filter("is_current = true").count() shouldBe 2
+
+    // Verify Charlie is soft-deleted
+    val charlie = afterDay2.filter("id = 3").collect()
+    charlie.length shouldBe 1
+    charlie.head.getAs[Boolean]("is_current") shouldBe false
+    charlie.head.getAs[Boolean]("is_active") shouldBe false
+
+    // Verify Alice has 2 versions
+    afterDay2.filter("id = 1").count() shouldBe 2
+    val aliceCurrent = afterDay2.filter("id = 1 AND is_current = true").collect().head
+    aliceCurrent.getAs[String]("name") shouldBe "Alice_v2"
+    aliceCurrent.getAs[Boolean]("is_active") shouldBe true
+  }
+
+  it should "not affect missing records when detectDeletes is false" in {
+    val fc = flowConfig(
+      "scd2_no_detect_del",
+      loadMode = LoadMode.SCD2,
+      compareColumns = Seq("name"),
+      validFromColumn = Some("valid_from"),
+      validToColumn = Some("valid_to"),
+      isCurrentColumn = Some("is_current"),
+      detectDeletes = false
+    )
+
+    // Day 1: initial load
+    val day1 = Seq((1, "Alice"), (2, "Bob"), (3, "Charlie")).toDF("id", "name")
+    writer.writeSCD2Load(day1, fc)
+
+    // Day 2: Charlie removed from source (but detectDeletes=false)
+    val day2 = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
+    writer.writeSCD2Load(day2, fc)
+
+    val afterDay2 = spark.sql("SELECT * FROM writer_catalog.default.scd2_no_detect_del")
+
+    // Charlie should still be is_current=true (not soft-deleted)
+    afterDay2.filter("is_current = true").count() shouldBe 3
+    val charlie = afterDay2.filter("id = 3 AND is_current = true").collect()
+    charlie.length shouldBe 1
+  }
+
   // --- Snapshot Tagging ---
 
   "IcebergTableWriter.tagBatchSnapshot" should "tag snapshot and return metadata" in {
@@ -269,6 +348,8 @@ class IcebergTableWriterTest
     "delta_ts",
     "scd2_first",
     "scd2_change",
+    "scd2_detect_del",
+    "scd2_no_detect_del",
     "tag_result_test"
   )
 

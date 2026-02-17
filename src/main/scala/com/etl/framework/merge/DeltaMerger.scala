@@ -51,12 +51,20 @@ object DeltaMergerFactory {
           "compareColumns are required for SCD2 mode"
         )
 
+        val isActiveCol =
+          if (loadMode.detectDeletes)
+            Some(loadMode.isActiveColumn.getOrElse("is_active"))
+          else
+            loadMode.isActiveColumn
+
         new SCD2Merger(
           primaryKey,
           loadMode.compareColumns,
           loadMode.validFromColumn.get,
           loadMode.validToColumn.get,
-          loadMode.isCurrentColumn.get
+          loadMode.isCurrentColumn.get,
+          loadMode.detectDeletes,
+          isActiveCol
         )
 
       case LoadMode.Full =>
@@ -147,7 +155,9 @@ class SCD2Merger(
     compareColumns: Seq[String],
     validFromCol: String,
     validToCol: String,
-    isCurrentCol: String
+    isCurrentCol: String,
+    detectDeletes: Boolean = false,
+    isActiveCol: Option[String] = None
 ) extends DeltaMerger {
 
   require(keyColumns.nonEmpty, "keyColumns cannot be empty for SCD2 merge")
@@ -162,11 +172,12 @@ class SCD2Merger(
   ): DataFrame = {
     existingData match {
       case None =>
-        // First load - all records are current
-        newData
+        // First load - all records are current and active
+        val base = newData
           .withColumn(validFromCol, current_timestamp())
           .withColumn(validToCol, lit(null).cast("timestamp"))
           .withColumn(isCurrentCol, lit(true))
+        isActiveCol.fold(base)(c => base.withColumn(c, lit(true)))
 
       case Some(existing) =>
         // Identify changed records, close old versions, add new versions
@@ -221,7 +232,7 @@ class SCD2Merger(
       .select(keyColumns.map(c => col(s"existing.$c").alias(c)): _*)
 
     // 2. New records: key doesn't exist in existing
-    val newRecords = joined
+    val baseNewRecords = joined
       .filter(col(s"existing.$COMPARE_KEY").isNull)
       .select(
         newData.columns.map(c => col(s"new.$c").alias(c)): _*
@@ -229,6 +240,10 @@ class SCD2Merger(
       .withColumn(validFromCol, batchTimestamp)
       .withColumn(validToCol, lit(null).cast("timestamp"))
       .withColumn(isCurrentCol, lit(true))
+    val newRecords =
+      isActiveCol.fold(baseNewRecords)(c =>
+        baseNewRecords.withColumn(c, lit(true))
+      )
 
     // 3. Unchanged records: key matches and compare key matches
     val unchangedKeys = joined
@@ -239,6 +254,21 @@ class SCD2Merger(
       )
       .select(keyColumns.map(c => col(s"existing.$c").alias(c)): _*)
 
+    // 4. Deleted records: key exists in existing but not in new (detectDeletes only)
+    val deletedKeys =
+      if (detectDeletes) {
+        Some(
+          joined
+            .filter(
+              col(s"new.$COMPARE_KEY").isNull &&
+                col(s"existing.$COMPARE_KEY").isNotNull
+            )
+            .select(
+              keyColumns.map(c => col(s"existing.$c").alias(c)): _*
+            )
+        )
+      } else None
+
     // Close old versions of changed records
     val closedRecords = existing
       .join(changedRecords, keyColumns, "inner")
@@ -247,11 +277,15 @@ class SCD2Merger(
       .withColumn(isCurrentCol, lit(false))
 
     // Add new versions of changed records
-    val newVersions = newData
+    val baseNewVersions = newData
       .join(changedRecords, keyColumns, "inner")
       .withColumn(validFromCol, batchTimestamp)
       .withColumn(validToCol, lit(null).cast("timestamp"))
       .withColumn(isCurrentCol, lit(true))
+    val newVersions =
+      isActiveCol.fold(baseNewVersions)(c =>
+        baseNewVersions.withColumn(c, lit(true))
+      )
 
     // Keep unchanged current records as-is
     val unchangedRecords = existing
@@ -261,11 +295,27 @@ class SCD2Merger(
     // Keep all historical (non-current) records
     val historicalRecords = existing.filter(col(isCurrentCol) === false)
 
+    // Soft-delete records missing from source (if detectDeletes=true)
+    val softDeletedRecords = deletedKeys.map { dk =>
+      val closed = existing
+        .join(dk, keyColumns, "inner")
+        .filter(col(isCurrentCol) === true)
+        .withColumn(validToCol, batchTimestamp)
+        .withColumn(isCurrentCol, lit(false))
+      isActiveCol.fold(closed)(c => closed.withColumn(c, lit(false)))
+    }
+
     // Union all parts together
-    historicalRecords
+    var result = historicalRecords
       .unionByName(closedRecords)
       .unionByName(unchangedRecords)
       .unionByName(newVersions)
       .unionByName(newRecords)
+
+    softDeletedRecords.foreach { sd =>
+      result = result.unionByName(sd)
+    }
+
+    result
   }
 }

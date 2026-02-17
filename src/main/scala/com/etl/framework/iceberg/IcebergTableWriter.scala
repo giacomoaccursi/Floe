@@ -116,77 +116,138 @@ class IcebergTableWriter(
     val validToCol = flowConfig.loadMode.validToColumn.getOrElse("valid_to")
     val isCurrentCol =
       flowConfig.loadMode.isCurrentColumn.getOrElse("is_current")
+    val detectDeletes = flowConfig.loadMode.detectDeletes
+    val isActiveCol: Option[String] =
+      if (detectDeletes)
+        Some(flowConfig.loadMode.isActiveColumn.getOrElse("is_active"))
+      else
+        flowConfig.loadMode.isActiveColumn
 
-    // For SCD2, the schema includes the SCD2 columns
-    val scd2Schema = df.schema
+    // Build SCD2 schema
+    val baseScd2Schema = df.schema
       .add(validFromCol, "timestamp")
       .add(validToCol, "timestamp")
       .add(isCurrentCol, "boolean")
+    val scd2Schema = isActiveCol.fold(baseScd2Schema)(c =>
+      baseScd2Schema.add(c, "boolean")
+    )
 
     tableManager.createOrUpdateTable(flowConfig, scd2Schema)
 
     val recordCount = df.count()
-
-    // Check if table has data
-    val existingCount = spark.sql(s"SELECT COUNT(*) FROM $tableName").first().getLong(0)
+    val existingCount =
+      spark.sql(s"SELECT COUNT(*) FROM $tableName").first().getLong(0)
 
     if (existingCount == 0) {
-      // First load: all records are current
+      // First load: all records are current and active
       logger.info(s"SCD2 initial load to $tableName: $recordCount records")
 
       df.createOrReplaceTempView("_iceberg_scd2_source")
 
       val columns = df.columns.mkString(", ")
-      val insertSql =
+      val isActiveInsert =
+        isActiveCol.map(c => s",\n  true AS $c").getOrElse("")
+
+      spark.sql(
         s"""INSERT INTO $tableName
            |SELECT $columns, current_timestamp() AS $validFromCol,
            |  CAST(NULL AS TIMESTAMP) AS $validToCol,
-           |  true AS $isCurrentCol
+           |  true AS $isCurrentCol$isActiveInsert
            |FROM _iceberg_scd2_source""".stripMargin
-
-      spark.sql(insertSql)
+      )
       spark.catalog.dropTempView("_iceberg_scd2_source")
     } else {
-      // Subsequent load: detect changes, close old versions, insert new
-      logger.info(s"SCD2 change detection on $tableName: $recordCount new records")
+      // Subsequent load: single atomic MERGE INTO with NULL merge_key trick
+      logger.info(
+        s"SCD2 change detection on $tableName: $recordCount records"
+      )
 
       df.createOrReplaceTempView("_iceberg_scd2_source")
 
-      val mergeCondition = pkColumns
-        .map(col => s"target.$col = source.$col")
-        .mkString(" AND ")
+      // Build staged source: all records with _mk=pk UNION changed records with _mk=NULL
+      val srcCols = df.columns.map(c => s"src.$c").mkString(", ")
+      val mkFromPk = pkColumns.map(c => s"src.$c AS _mk_$c").mkString(", ")
+      val mkNull = pkColumns
+        .map { c =>
+          val dataType = df.schema(c).dataType.sql
+          s"CAST(NULL AS $dataType) AS _mk_$c"
+        }
+        .mkString(", ")
 
-      val changeCondition = compareColumns
-        .map(col => s"target.$col != source.$col OR (target.$col IS NULL AND source.$col IS NOT NULL) OR (target.$col IS NOT NULL AND source.$col IS NULL)")
+      val joinCond =
+        pkColumns.map(c => s"src.$c = tgt.$c").mkString(" AND ")
+      val changeCond = compareColumns
+        .map(c =>
+          s"src.$c != tgt.$c OR (src.$c IS NULL AND tgt.$c IS NOT NULL) OR (src.$c IS NOT NULL AND tgt.$c IS NULL)"
+        )
         .mkString(" OR ")
 
-      // Step 1: Close changed records
-      val closeSql =
-        s"""MERGE INTO $tableName AS target
-           |USING _iceberg_scd2_source AS source
-           |ON $mergeCondition AND target.$isCurrentCol = true
-           |WHEN MATCHED AND ($changeCondition) THEN UPDATE SET
+      spark
+        .sql(
+          s"""SELECT $srcCols, $mkFromPk
+           |FROM _iceberg_scd2_source src
+           |UNION ALL
+           |SELECT $srcCols, $mkNull
+           |FROM _iceberg_scd2_source src
+           |JOIN $tableName tgt ON $joinCond AND tgt.$isCurrentCol = true
+           |WHERE $changeCond""".stripMargin
+        )
+        .createOrReplaceTempView("_iceberg_scd2_staged")
+
+      // Build MERGE clauses
+      val mergeOn =
+        pkColumns.map(c => s"target.$c = source._mk_$c").mkString(" AND ") +
+          s" AND target.$isCurrentCol = true"
+
+      val targetChangeCond = compareColumns
+        .map(c =>
+          s"target.$c != source.$c OR (target.$c IS NULL AND source.$c IS NOT NULL) OR (target.$c IS NOT NULL AND source.$c IS NULL)"
+        )
+        .mkString(" OR ")
+
+      // WHEN MATCHED: close old version of changed record
+      val matchedClause =
+        s"""WHEN MATCHED AND ($targetChangeCond) THEN UPDATE SET
            |  target.$validToCol = current_timestamp(),
            |  target.$isCurrentCol = false""".stripMargin
 
-      spark.sql(closeSql)
+      // WHEN NOT MATCHED: insert new version or brand new record
+      val insertColNames =
+        (df.columns.toSeq ++ Seq(validFromCol, validToCol, isCurrentCol) ++ isActiveCol.toSeq)
+          .mkString(", ")
+      val isActiveVal = isActiveCol.map(_ => ", true").getOrElse("")
+      val insertVals =
+        df.columns.map(c => s"source.$c").mkString(", ") +
+          s", current_timestamp(), CAST(NULL AS TIMESTAMP), true$isActiveVal"
+      val notMatchedClause =
+        s"WHEN NOT MATCHED THEN INSERT ($insertColNames) VALUES ($insertVals)"
 
-      // Step 2: Insert new versions of changed records + brand new records
-      val sourceColsQualified = df.columns.map(c => s"source.$c").mkString(", ")
-      val insertSql =
-        s"""INSERT INTO $tableName
-           |SELECT $sourceColsQualified,
-           |  current_timestamp() AS $validFromCol,
-           |  CAST(NULL AS TIMESTAMP) AS $validToCol,
-           |  true AS $isCurrentCol
-           |FROM _iceberg_scd2_source source
-           |LEFT JOIN $tableName target
-           |  ON $mergeCondition AND target.$isCurrentCol = true
-           |WHERE target.${pkColumns.head} IS NULL
-           |  OR ($changeCondition)""".stripMargin
+      // WHEN NOT MATCHED BY SOURCE: soft delete (only if detectDeletes=true)
+      val softDeleteClause =
+        if (detectDeletes) {
+          val isActiveUpdate =
+            isActiveCol.map(c => s",\n  target.$c = false").getOrElse("")
+          Seq(
+            s"""WHEN NOT MATCHED BY SOURCE AND target.$isCurrentCol = true THEN UPDATE SET
+             |  target.$validToCol = current_timestamp(),
+             |  target.$isCurrentCol = false$isActiveUpdate""".stripMargin
+          )
+        } else Seq.empty
 
-      spark.sql(insertSql)
+      val allClauses =
+        Seq(matchedClause, notMatchedClause) ++ softDeleteClause
+      val mergeSql =
+        s"""MERGE INTO $tableName AS target
+           |USING _iceberg_scd2_staged AS source
+           |ON $mergeOn
+           |${allClauses.mkString("\n")}""".stripMargin
+
+      logger.info(s"Executing SCD2 MERGE INTO on $tableName")
+      logger.debug(s"SCD2 Merge SQL: $mergeSql")
+      spark.sql(mergeSql)
+
       spark.catalog.dropTempView("_iceberg_scd2_source")
+      spark.catalog.dropTempView("_iceberg_scd2_staged")
     }
 
     val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)

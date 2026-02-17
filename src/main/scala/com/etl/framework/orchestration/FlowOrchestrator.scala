@@ -1,7 +1,7 @@
 package com.etl.framework.orchestration
 
-import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
-import com.etl.framework.iceberg.IcebergTableManager
+import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig, OrphanAction}
+import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetector, OrphanReport}
 import com.etl.framework.orchestration.batch.{BatchMetadataWriter, FlowGroupExecutor}
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.ExecutionPlanBuilder
@@ -107,11 +107,15 @@ class FlowOrchestrator(
   ): IngestionResult = {
     val executionTimeMs = (System.nanoTime() - startTime) / 1000000
 
+    // Run orphan detection BEFORE maintenance (maintenance may expire snapshots needed for time travel)
+    val orphanReports = runPostBatchOrphanDetection(flowResults)
+
     metadataWriter.writeBatchMetadata(
       batchId,
       flowResults,
       executionTimeMs,
-      success = true
+      success = true,
+      orphanReports = orphanReports
     )
 
     // Run Iceberg table maintenance post-batch
@@ -145,6 +149,40 @@ class FlowOrchestrator(
       error = Some(error.getMessage)
     )
   }
+  /**
+   * Runs post-batch orphan detection if Iceberg is enabled and any FK has onOrphan != Ignore.
+   */
+  private def runPostBatchOrphanDetection(
+    flowResults: Seq[FlowResult]
+  ): Seq[OrphanReport] = {
+    globalConfig.iceberg match {
+      case Some(icebergConfig) =>
+        val hasOrphanChecks = flowConfigs.exists(
+          _.validation.foreignKeys.exists(_.onOrphan != OrphanAction.Ignore)
+        )
+        if (!hasOrphanChecks) return Seq.empty
+
+        try {
+          val detector =
+            new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
+          val plan = buildExecutionPlan()
+          val reports = detector.detectAndResolveOrphans(plan)
+          if (reports.nonEmpty) {
+            logger.info(
+              s"Orphan detection completed: ${reports.size} reports generated"
+            )
+          }
+          reports
+        } catch {
+          case e: Exception =>
+            logger.warn(s"Post-batch orphan detection failed: ${e.getMessage}")
+            Seq.empty
+        }
+
+      case None => Seq.empty
+    }
+  }
+
   /**
    * Runs Iceberg table maintenance on all flow tables after batch completion.
    */

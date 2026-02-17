@@ -1,6 +1,7 @@
 package com.etl.framework.orchestration.batch
 
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
+import com.etl.framework.iceberg.OrphanReport
 import com.etl.framework.orchestration.flow.FlowResult
 import org.json4s._
 import org.json4s.jackson.Serialization
@@ -29,15 +30,28 @@ class BatchMetadataWriter(
     flowResults: Seq[FlowResult],
     executionTimeMs: Long,
     success: Boolean,
-    rolledBack: Boolean = false
+    rolledBack: Boolean = false,
+    orphanReports: Seq[OrphanReport] = Seq.empty
   ): Unit = {
     val metadataPath = s"${globalConfig.paths.metadataPath}/$batchId/summary.json"
-    
+
     val totalInput = flowResults.map(_.inputRecords).sum
     val totalValid = flowResults.map(_.validRecords).sum
     val totalRejected = flowResults.map(_.rejectedRecords).sum
     val overallRejectionRate = if (totalInput > 0) totalRejected.toDouble / totalInput else 0.0
-    
+
+    val orphanReportsData = orphanReports.map { report =>
+      Map[String, Any](
+        "flow_name" -> report.flowName,
+        "fk_name" -> report.fkName,
+        "parent_flow_name" -> report.parentFlowName,
+        "orphan_count" -> report.orphanCount,
+        "removed_parent_key_count" -> report.removedParentKeyCount,
+        "action_taken" -> report.actionTaken,
+        "deleted_child_key_count" -> report.deletedChildKeyCount
+      )
+    }
+
     val metadata = Map(
       "batch_id" -> batchId,
       "execution_start" -> Instant.now().toString,
@@ -49,6 +63,7 @@ class BatchMetadataWriter(
       "total_valid_records" -> totalValid,
       "total_rejected_records" -> totalRejected,
       "overall_rejection_rate" -> overallRejectionRate,
+      "orphan_reports" -> orphanReportsData,
       "flows" -> flowResults.map { result =>
         val baseFlowMetadata = Map[String, Any](
           "flow_name" -> result.flowName,

@@ -254,20 +254,15 @@ class SCD2Merger(
       )
       .select(keyColumns.map(c => col(s"existing.$c").alias(c)): _*)
 
-    // 4. Deleted records: key exists in existing but not in new (detectDeletes only)
-    val deletedKeys =
-      if (detectDeletes) {
-        Some(
-          joined
-            .filter(
-              col(s"new.$COMPARE_KEY").isNull &&
-                col(s"existing.$COMPARE_KEY").isNotNull
-            )
-            .select(
-              keyColumns.map(c => col(s"existing.$c").alias(c)): _*
-            )
-        )
-      } else None
+    // 4. Records in existing but missing from new source
+    val missingFromSourceKeys = joined
+      .filter(
+        col(s"new.$COMPARE_KEY").isNull &&
+          col(s"existing.$COMPARE_KEY").isNotNull
+      )
+      .select(
+        keyColumns.map(c => col(s"existing.$c").alias(c)): _*
+      )
 
     // Close old versions of changed records
     val closedRecords = existing
@@ -295,27 +290,28 @@ class SCD2Merger(
     // Keep all historical (non-current) records
     val historicalRecords = existing.filter(col(isCurrentCol) === false)
 
-    // Soft-delete records missing from source (if detectDeletes=true)
-    val softDeletedRecords = deletedKeys.map { dk =>
+    // Handle records missing from source
+    val missingRecords = if (detectDeletes) {
+      // Soft-delete: close them with is_active=false
       val closed = existing
-        .join(dk, keyColumns, "inner")
+        .join(missingFromSourceKeys, keyColumns, "inner")
         .filter(col(isCurrentCol) === true)
         .withColumn(validToCol, batchTimestamp)
         .withColumn(isCurrentCol, lit(false))
       isActiveCol.fold(closed)(c => closed.withColumn(c, lit(false)))
+    } else {
+      // Keep as-is (not deleted)
+      existing
+        .join(missingFromSourceKeys, keyColumns, "inner")
+        .filter(col(isCurrentCol) === true)
     }
 
     // Union all parts together
-    var result = historicalRecords
+    historicalRecords
       .unionByName(closedRecords)
       .unionByName(unchangedRecords)
       .unionByName(newVersions)
       .unionByName(newRecords)
-
-    softDeletedRecords.foreach { sd =>
-      result = result.unionByName(sd)
-    }
-
-    result
+      .unionByName(missingRecords)
   }
 }

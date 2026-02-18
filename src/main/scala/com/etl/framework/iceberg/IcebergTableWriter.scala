@@ -18,6 +18,9 @@ class IcebergTableWriter(
 
   private val logger = LoggerFactory.getLogger(getClass)
 
+  private def sanitizeViewName(flowName: String): String =
+    flowName.replaceAll("[^a-zA-Z0-9_]", "_")
+
   def writeFullLoad(
       df: DataFrame,
       flowConfig: FlowConfig
@@ -78,20 +81,23 @@ class IcebergTableWriter(
       val insertClause =
         s"WHEN NOT MATCHED THEN INSERT ($insertCols) VALUES ($insertVals)"
 
-      df.createOrReplaceTempView("_iceberg_merge_source")
+      val mergeView = s"_iceberg_merge_${sanitizeViewName(flowConfig.name)}_source"
+      df.createOrReplaceTempView(mergeView)
 
       val mergeSql =
         s"""MERGE INTO $tableName AS target
-           |USING _iceberg_merge_source AS source
+           |USING $mergeView AS source
            |ON $mergeCondition
            |$updateSetClause
            |$insertClause""".stripMargin
 
       logger.info(s"Executing MERGE INTO on $tableName")
       logger.debug(s"Merge SQL: $mergeSql")
-      spark.sql(mergeSql)
-
-      spark.catalog.dropTempView("_iceberg_merge_source")
+      try {
+        spark.sql(mergeSql)
+      } finally {
+        spark.catalog.dropTempView(mergeView)
+      }
     }
 
     val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
@@ -138,31 +144,38 @@ class IcebergTableWriter(
     val existingCount =
       spark.sql(s"SELECT COUNT(*) FROM $tableName").first().getLong(0)
 
+    val sn = sanitizeViewName(flowConfig.name)
+    val sourceView = s"_iceberg_scd2_${sn}_source"
+    val stagedView = s"_iceberg_scd2_${sn}_staged"
+
     if (existingCount == 0) {
       // First load: all records are current and active
       logger.info(s"SCD2 initial load to $tableName: $recordCount records")
 
-      df.createOrReplaceTempView("_iceberg_scd2_source")
+      df.createOrReplaceTempView(sourceView)
 
       val columns = df.columns.mkString(", ")
       val isActiveInsert =
         isActiveCol.map(c => s",\n  true AS $c").getOrElse("")
 
-      spark.sql(
-        s"""INSERT INTO $tableName
-           |SELECT $columns, current_timestamp() AS $validFromCol,
-           |  CAST(NULL AS TIMESTAMP) AS $validToCol,
-           |  true AS $isCurrentCol$isActiveInsert
-           |FROM _iceberg_scd2_source""".stripMargin
-      )
-      spark.catalog.dropTempView("_iceberg_scd2_source")
+      try {
+        spark.sql(
+          s"""INSERT INTO $tableName
+             |SELECT $columns, current_timestamp() AS $validFromCol,
+             |  CAST(NULL AS TIMESTAMP) AS $validToCol,
+             |  true AS $isCurrentCol$isActiveInsert
+             |FROM $sourceView""".stripMargin
+        )
+      } finally {
+        spark.catalog.dropTempView(sourceView)
+      }
     } else {
       // Subsequent load: single atomic MERGE INTO with NULL merge_key trick
       logger.info(
         s"SCD2 change detection on $tableName: $recordCount records"
       )
 
-      df.createOrReplaceTempView("_iceberg_scd2_source")
+      df.createOrReplaceTempView(sourceView)
 
       // Build staged source: all records with _mk=pk UNION changed records with _mk=NULL
       val srcCols = df.columns.map(c => s"src.$c").mkString(", ")
@@ -185,14 +198,14 @@ class IcebergTableWriter(
       spark
         .sql(
           s"""SELECT $srcCols, $mkFromPk
-           |FROM _iceberg_scd2_source src
+           |FROM $sourceView src
            |UNION ALL
            |SELECT $srcCols, $mkNull
-           |FROM _iceberg_scd2_source src
+           |FROM $sourceView src
            |JOIN $tableName tgt ON $joinCond AND tgt.$isCurrentCol = true
            |WHERE $changeCond""".stripMargin
         )
-        .createOrReplaceTempView("_iceberg_scd2_staged")
+        .createOrReplaceTempView(stagedView)
 
       // Build MERGE clauses
       val mergeOn =
@@ -238,16 +251,18 @@ class IcebergTableWriter(
         Seq(matchedClause, notMatchedClause) ++ softDeleteClause
       val mergeSql =
         s"""MERGE INTO $tableName AS target
-           |USING _iceberg_scd2_staged AS source
+           |USING $stagedView AS source
            |ON $mergeOn
            |${allClauses.mkString("\n")}""".stripMargin
 
       logger.info(s"Executing SCD2 MERGE INTO on $tableName")
       logger.debug(s"SCD2 Merge SQL: $mergeSql")
-      spark.sql(mergeSql)
-
-      spark.catalog.dropTempView("_iceberg_scd2_source")
-      spark.catalog.dropTempView("_iceberg_scd2_staged")
+      try {
+        spark.sql(mergeSql)
+      } finally {
+        spark.catalog.dropTempView(sourceView)
+        spark.catalog.dropTempView(stagedView)
+      }
     }
 
     val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)

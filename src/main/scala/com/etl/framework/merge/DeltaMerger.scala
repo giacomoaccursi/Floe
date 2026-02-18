@@ -197,43 +197,36 @@ class SCD2Merger(
     // Join new data with existing current records to identify changes
     val existingCurrent = existing.filter(col(isCurrentCol) === true)
 
-    // Create a comparison key from compare columns
-    val newDataWithCompareKey = newData.withColumn(
-      "_compare_key",
-      concat_ws("||", compareColumns.map(col): _*)
-    )
-
-    val existingWithCompareKey = existingCurrent.withColumn(
-      "_compare_key",
-      concat_ws("||", compareColumns.map(col): _*)
-    )
-
     // Join on key columns to find matches
     val joinCondition = keyColumns
       .map(c => col(s"new.$c") === col(s"existing.$c"))
       .reduce(_ && _)
 
-    val joined = newDataWithCompareKey
+    val joined = newData
       .alias("new")
       .join(
-        existingWithCompareKey.alias("existing"),
+        existingCurrent.alias("existing"),
         joinCondition,
         "full_outer"
       )
 
-    // Identify different scenarios:
-    // 1. Changed records: key matches but compare key differs
+    // Null-safe change detection: at least one compare column differs
+    val changeCondition = compareColumns
+      .map(c => !col(s"new.$c").eqNullSafe(col(s"existing.$c")))
+      .reduce(_ || _)
+
+    // Presence detection based on first key column (PKs are non-null by definition)
+    val newPresent = col(s"new.${keyColumns.head}").isNotNull
+    val existingPresent = col(s"existing.${keyColumns.head}").isNotNull
+
+    // 1. Changed records: key matches but at least one compare column differs
     val changedRecords = joined
-      .filter(
-        col(s"new.$COMPARE_KEY").isNotNull &&
-          col(s"existing.$COMPARE_KEY").isNotNull &&
-          col(s"new.$COMPARE_KEY") =!= col(s"existing.$COMPARE_KEY")
-      )
+      .filter(newPresent && existingPresent && changeCondition)
       .select(keyColumns.map(c => col(s"existing.$c").alias(c)): _*)
 
     // 2. New records: key doesn't exist in existing
     val baseNewRecords = joined
-      .filter(col(s"existing.$COMPARE_KEY").isNull)
+      .filter(!existingPresent)
       .select(
         newData.columns.map(c => col(s"new.$c").alias(c)): _*
       )
@@ -245,21 +238,14 @@ class SCD2Merger(
         baseNewRecords.withColumn(c, lit(true))
       )
 
-    // 3. Unchanged records: key matches and compare key matches
+    // 3. Unchanged records: key matches and all compare columns equal
     val unchangedKeys = joined
-      .filter(
-        col(s"new.$COMPARE_KEY").isNotNull &&
-          col(s"existing.$COMPARE_KEY").isNotNull &&
-          col(s"new.$COMPARE_KEY") === col(s"existing.$COMPARE_KEY")
-      )
+      .filter(newPresent && existingPresent && !changeCondition)
       .select(keyColumns.map(c => col(s"existing.$c").alias(c)): _*)
 
     // 4. Records in existing but missing from new source
     val missingFromSourceKeys = joined
-      .filter(
-        col(s"new.$COMPARE_KEY").isNull &&
-          col(s"existing.$COMPARE_KEY").isNotNull
-      )
+      .filter(!newPresent && existingPresent)
       .select(
         keyColumns.map(c => col(s"existing.$c").alias(c)): _*
       )

@@ -17,8 +17,9 @@ class FlowGroupExecutor(
   globalConfig: GlobalConfig,
   domainsConfig: Option[DomainsConfig]
 )(implicit spark: SparkSession) {
-  
+
   private val logger = LoggerFactory.getLogger(getClass)
+  private val MaxParallelTimeout: FiniteDuration = 2.hours
   
   /**
    * Executes a group of flows sequentially
@@ -61,7 +62,7 @@ class FlowGroupExecutor(
     }
     
     val allResults = Future.sequence(futures)
-    Await.result(allResults, Duration.Inf)
+    Await.result(allResults, MaxParallelTimeout)
   }
   
   /**

@@ -37,6 +37,8 @@ test-*.log
 # Documentation files (external to project)
 *.md
 !README.md
+!docs/
+!docs/**/*.md
 
 # Scripts
 create_git_history.sh

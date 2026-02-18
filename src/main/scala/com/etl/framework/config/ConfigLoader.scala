@@ -111,19 +111,31 @@ trait ConfigLoader[T] {
     }
   }
 
-  /** Substitutes environment variables in the format ${VAR_NAME} or $VAR_NAME
+  /** Substitutes environment variables in the format ${VAR_NAME} or $VAR_NAME.
+    * Fails fast if any referenced variable is not set.
     */
   protected def substituteEnvVars(text: String): String = {
     val pattern = """\$\{([^}]+)}|\$([A-Za-z_][A-Za-z0-9_]*)""".r
+
+    val unresolvedVars = pattern
+      .findAllMatchIn(text)
+      .map(m => Option(m.group(1)).getOrElse(m.group(2)))
+      .filterNot(sys.env.contains)
+      .toSeq
+      .distinct
+
+    if (unresolvedVars.nonEmpty) {
+      throw new IllegalArgumentException(
+        s"Unresolved environment variables: ${unresolvedVars.mkString(", ")}. " +
+          "Set these environment variables before running the pipeline."
+      )
+    }
 
     pattern.replaceAllIn(
       text,
       m => {
         val varName = Option(m.group(1)).getOrElse(m.group(2))
-        // Escape the replacement string if we are returning the original match
-        // to avoid issues with $ and {} being interpreted as groups
-        val replacement = sys.env.getOrElse(varName, m.matched)
-        Matcher.quoteReplacement(replacement)
+        Matcher.quoteReplacement(sys.env(varName))
       }
     )
   }

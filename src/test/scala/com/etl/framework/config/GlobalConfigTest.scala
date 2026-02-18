@@ -59,10 +59,11 @@ class GlobalConfigLoaderLogicTest extends AnyFlatSpec with Matchers {
     }
   }
 
-  it should "leave unknown vars as is" in {
-    loader.testSubstitute(
-      "Value is ${UNKNOWN_VAR_123}"
-    ) shouldBe "Value is ${UNKNOWN_VAR_123}"
+  it should "throw on unresolved env vars" in {
+    val ex = intercept[IllegalArgumentException] {
+      loader.testSubstitute("Value is ${UNKNOWN_VAR_123}")
+    }
+    ex.getMessage should include("UNKNOWN_VAR_123")
   }
 
   it should "parse full configuration correctly" in {

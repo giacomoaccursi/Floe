@@ -41,8 +41,10 @@ class CustomRulesValidator(
           customRule.onFailure match {
             case OnFailureAction.Reject =>
               processRejectRule(currentDf, result, rejectedAcc)
-            case _ =>
+            case OnFailureAction.Warn =>
               processWarnRule(currentDf, result, customRule, rejectedAcc)
+            case OnFailureAction.Skip =>
+              (currentDf, rejectedAcc)
           }
       }
 

@@ -28,10 +28,6 @@ class JoinStrategyExecutor {
       case Nest      => applyNestJoin(parent, child, joinConfig)
       case Flatten   => applyFlattenJoin(parent, child, joinConfig)
       case Aggregate => applyAggregateJoin(parent, child, joinConfig)
-      case other     =>
-        throw new UnsupportedOperationException(
-          s"Unsupported join strategy: $other"
-        )
     }
   }
 
@@ -131,15 +127,15 @@ class JoinStrategyExecutor {
     val aggExprs = joinConfig.aggregations.map { aggSpec =>
       import com.etl.framework.config.AggregationFunction._
       val aggFunc = aggSpec.function match {
-        case Sum   => sum(child(aggSpec.column))
-        case Count => count(child(aggSpec.column))
-        case Avg   => avg(child(aggSpec.column))
-        case Min   => min(child(aggSpec.column))
-        case Max   => max(child(aggSpec.column))
-        case other =>
-          throw new UnsupportedOperationException(
-            s"Unsupported aggregation function: $other"
-          )
+        case Sum         => sum(child(aggSpec.column))
+        case Count       => count(child(aggSpec.column))
+        case Avg         => avg(child(aggSpec.column))
+        case Min         => min(child(aggSpec.column))
+        case Max         => max(child(aggSpec.column))
+        case First       => first(child(aggSpec.column))
+        case Last        => last(child(aggSpec.column))
+        case CollectList => collect_list(child(aggSpec.column))
+        case CollectSet  => collect_set(child(aggSpec.column))
       }
       aggFunc.as(aggSpec.alias)
     }

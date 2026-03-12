@@ -23,6 +23,8 @@ class ExecutionPlanBuilder(
   def build(): ExecutionPlan = {
     logger.info(s"Building execution plan for ${flowConfigs.size} flows")
 
+    validateForeignKeyReferences()
+
     val dependencyGraph = dependencyBuilder.buildGraph()
     val sortedFlows = dependencyBuilder.topologicalSort(dependencyGraph)
     val groups = dependencyBuilder.groupForParallelExecution(
@@ -34,6 +36,19 @@ class ExecutionPlanBuilder(
     logger.info(s"Execution plan created with ${groups.size} groups (${flowConfigs.size} flows)")
 
     ExecutionPlan(groups)
+  }
+
+  private def validateForeignKeyReferences(): Unit = {
+    val flowNames = flowConfigs.map(_.name).toSet
+    flowConfigs.foreach { fc =>
+      fc.validation.foreignKeys.foreach { fk =>
+        if (!flowNames.contains(fk.references.flow)) {
+          throw new IllegalArgumentException(
+            s"Flow '${fc.name}': FK '${fk.name}' references unknown flow '${fk.references.flow}'"
+          )
+        }
+      }
+    }
   }
 }
 

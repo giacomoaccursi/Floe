@@ -148,8 +148,26 @@ class GlobalConfigLoader extends ConfigLoader[GlobalConfig] {
   override def load(
       path: String
   ): Either[ConfigurationException, GlobalConfig] = {
-    loadFromYamlFile(path)
+    for {
+      config <- loadFromYamlFile(path)
+      _      <- validateIcebergConfig(config, path)
+    } yield config
   }
+
+  private def validateIcebergConfig(
+      config: GlobalConfig,
+      path: String
+  ): Either[ConfigurationException, Unit] =
+    config.iceberg match {
+      case Some(iceberg) if iceberg.formatVersion != 1 && iceberg.formatVersion != 2 =>
+        Left(
+          ConfigFileException(
+            file = path,
+            message = s"Invalid formatVersion: ${iceberg.formatVersion}. Must be 1 or 2."
+          )
+        )
+      case _ => Right(())
+    }
 }
 
 /** Domains configuration loader
@@ -217,9 +235,28 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
       path: String
   ): Either[ConfigurationException, FlowConfig] = {
     for {
-      yaml <- loadYamlFile(path)
+      yaml       <- loadYamlFile(path)
       configYaml <- parseYamlToFlowConfigYaml(yaml, path)
-    } yield configYaml.toFlowConfig
+      flowConfig  = configYaml.toFlowConfig
+      _          <- validateFlowConfig(flowConfig, path)
+    } yield flowConfig
+  }
+
+  private def validateFlowConfig(
+      config: FlowConfig,
+      path: String
+  ): Either[ConfigurationException, Unit] = {
+    if (config.loadMode.`type` == LoadMode.SCD2 && config.loadMode.compareColumns.isEmpty) {
+      Left(
+        ConfigFileException(
+          file = path,
+          message =
+            s"Flow '${config.name}': SCD2 load mode requires compareColumns to be non-empty"
+        )
+      )
+    } else {
+      Right(())
+    }
   }
 
   private def parseYamlToFlowConfigYaml(

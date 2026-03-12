@@ -74,7 +74,7 @@ class FlowOrchestrator(
         }
       }
 
-      createSuccessResult(batchId, flowResults.toSeq, startTime)
+      createSuccessResult(batchId, flowResults.toSeq, startTime, plan)
 
     } catch {
       case e: Exception =>
@@ -103,12 +103,13 @@ class FlowOrchestrator(
   private def createSuccessResult(
     batchId: String,
     flowResults: Seq[FlowResult],
-    startTime: Long
+    startTime: Long,
+    plan: ExecutionPlan
   ): IngestionResult = {
     val executionTimeMs = (System.nanoTime() - startTime) / 1000000
 
     // Run orphan detection BEFORE maintenance (maintenance may expire snapshots needed for time travel)
-    val orphanReports = runPostBatchOrphanDetection(flowResults)
+    val orphanReports = runPostBatchOrphanDetection(flowResults, plan)
 
     metadataWriter.writeBatchMetadata(
       batchId,
@@ -153,7 +154,8 @@ class FlowOrchestrator(
    * Runs post-batch orphan detection if Iceberg is enabled and any FK has onOrphan != Ignore.
    */
   private def runPostBatchOrphanDetection(
-    flowResults: Seq[FlowResult]
+    flowResults: Seq[FlowResult],
+    plan: ExecutionPlan
   ): Seq[OrphanReport] = {
     globalConfig.iceberg match {
       case Some(icebergConfig) =>
@@ -165,7 +167,6 @@ class FlowOrchestrator(
         try {
           val detector =
             new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-          val plan = buildExecutionPlan()
           val reports = detector.detectAndResolveOrphans(plan)
           if (reports.nonEmpty) {
             logger.info(

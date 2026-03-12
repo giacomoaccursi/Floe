@@ -44,7 +44,6 @@ class FinalModelWriter[F: Encoder](
   def write(dataset: Dataset[F], outputPath: String): Unit = {
     logger.info(s"Writing Final Model to: $outputPath")
     logger.info(s"Output format: ${outputConfig.format.name}") // Use .name
-    logger.info(s"Record count: ${dataset.count()}")
 
     try {
       var writer = dataset.write
@@ -109,7 +108,6 @@ class FinalModelWriter[F: Encoder](
   ): Unit = {
     logger.info(s"Writing Final Model to: $outputPath with mode: $saveMode")
     logger.info(s"Output format: ${outputConfig.format.name}") // Use .name
-    logger.info(s"Record count: ${dataset.count()}")
 
     try {
       var writer = dataset.write

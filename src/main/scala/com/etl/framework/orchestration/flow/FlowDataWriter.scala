@@ -87,8 +87,6 @@ class FlowDataWriter(
     )
 
     TimingUtil.timed(logger, s"Write rejected data to $rejectedPath") {
-      val recordCount = rejectedData.count()
-
       val rejectedWithAudit = rejectedData
         .withColumn(REJECTED_AT, lit(Instant.now().toString))
         .withColumn(BATCH_ID, lit(batchId))
@@ -97,8 +95,6 @@ class FlowDataWriter(
         .mode(SaveMode.Overwrite)
         .format("parquet")
         .save(rejectedPath)
-
-      logger.info(s"Wrote $recordCount rejected records")
     }
   }
 
@@ -114,8 +110,6 @@ class FlowDataWriter(
       s"${globalConfig.paths.outputPath}/${flowConfig.name}_${tableName}"
     )
 
-    val recordCount = data.count()
-
     var writer = data.write
       .mode(SaveMode.Overwrite)
       .format("parquet")
@@ -128,6 +122,6 @@ class FlowDataWriter(
 
     writer.save(path)
 
-    logger.info(s"Additional table $tableName: $recordCount records -> $path")
+    logger.info(s"Additional table $tableName written to $path")
   }
 }

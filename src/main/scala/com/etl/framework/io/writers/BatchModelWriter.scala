@@ -17,7 +17,6 @@ class BatchModelWriter[T: Encoder](
     */
   def write(dataset: Dataset[T], outputPath: String): Unit = {
     logger.info(s"Writing Batch Model to: $outputPath")
-    logger.info(s"Record count: ${dataset.count()}")
 
     try {
       var writer = dataset.write

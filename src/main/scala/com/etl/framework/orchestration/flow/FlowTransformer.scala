@@ -1,7 +1,7 @@
 package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config.FlowConfig
-import com.etl.framework.core.{AdditionalTableInfo, AdditionalTableMetadata, TransformationContext}
+import com.etl.framework.core.{AdditionalTableInfo, TransformationContext}
 import com.etl.framework.util.TimingUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
@@ -25,7 +25,6 @@ class FlowTransformer(
     flowConfig.preValidationTransformation match {
       case Some(transformation) =>
         TimingUtil.timed(logger, "Pre-validation transformation") {
-          val inputCount = data.count()
           val context = TransformationContext(
             currentFlow = flowConfig.name,
             currentData = data,
@@ -34,14 +33,12 @@ class FlowTransformer(
             spark = spark
           )
           val transformed = transformation(context)
-          val outputCount = transformed.count()
-          logger.info(s"Pre-validation transformation: $inputCount → $outputCount records")
-          
+
           // Store additional tables if any were created
           context.getAdditionalTables.foreach { case (name, info) =>
             additionalTables(name) = info
           }
-          
+
           transformed
         }
       
@@ -61,8 +58,6 @@ class FlowTransformer(
     flowConfig.postValidationTransformation match {
       case Some(transformation) =>
         TimingUtil.timed(logger, "Post-validation transformation") {
-          val inputCount = data.count()
-          
           val context = TransformationContext(
             currentFlow = flowConfig.name,
             currentData = data,
@@ -70,16 +65,13 @@ class FlowTransformer(
             batchId = batchId,
             spark = spark
           )
-          
           val transformed = transformation(context)
-          val outputCount = transformed.count()
-          logger.info(s"Post-validation transformation: $inputCount → $outputCount records")
-          
+
           // Store additional tables if any were created
           context.getAdditionalTables.foreach { case (name, info) =>
             additionalTables(name) = info
           }
-          
+
           transformed
         }
       

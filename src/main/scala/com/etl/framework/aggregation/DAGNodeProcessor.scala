@@ -32,7 +32,7 @@ class DAGNodeProcessor(joinExecutor: JoinStrategyExecutor)(implicit spark: Spark
         selected
     }
     
-    logger.info(s"Node ${node.id} execution completed with ${result.count()} records")
+    logger.info(s"Node ${node.id} execution completed")
     result
   }
   

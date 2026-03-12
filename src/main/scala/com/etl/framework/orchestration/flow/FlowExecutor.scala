@@ -203,15 +203,7 @@ class FlowExecutor(
       flowConfig.loadMode,
       flowConfig.validation.primaryKey
     )
-    val result = merger.merge(newData, existingData)
-
-    logMergeStats(
-      newData.count(),
-      existingData.map(_.count()).getOrElse(0L),
-      result.count()
-    )
-
-    result
+    merger.merge(newData, existingData)
   }
 
   protected def loadExistingData(path: String): Option[DataFrame] = {
@@ -227,7 +219,6 @@ class FlowExecutor(
   }
 
   protected def validateData(data: DataFrame): ValidationResult = {
-    logger.debug(s"Starting validation on ${data.count()} records")
     val engine = new ValidationEngine(domainsConfig)
     engine.validate(data, flowConfig, validatedFlows)
   }
@@ -342,15 +333,6 @@ class FlowExecutor(
     )
   }
 
-  private def logMergeStats(
-      newCount: Long,
-      existingCount: Long,
-      resultCount: Long
-  ): Unit = {
-    logger.info(
-      s"Merge ${flowConfig.loadMode.`type`.name}: existing $existingCount + new $newCount -> result $resultCount records"
-    )
-  }
 }
 
 private case class FlowMetrics(

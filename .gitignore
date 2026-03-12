@@ -39,6 +39,7 @@ test-*.log
 !README.md
 !docs/
 !docs/**/*.md
+docs/technical-review.md
 
 # Scripts
 create_git_history.sh

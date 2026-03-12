@@ -194,14 +194,18 @@ class SCD2Merger(
     // Get current timestamp for this batch
     val batchTimestamp = current_timestamp()
 
+    // Cache existing: used 5 times below (filter + 3 joins + 1 filter)
+    val cachedExisting = existing.cache()
+
     // Join new data with existing current records to identify changes
-    val existingCurrent = existing.filter(col(isCurrentCol) === true)
+    val existingCurrent = cachedExisting.filter(col(isCurrentCol) === true)
 
     // Join on key columns to find matches
     val joinCondition = keyColumns
       .map(c => col(s"new.$c") === col(s"existing.$c"))
       .reduce(_ && _)
 
+    // Cache joined: used 4 times below (4 filters)
     val joined = newData
       .alias("new")
       .join(
@@ -209,6 +213,7 @@ class SCD2Merger(
         joinCondition,
         "full_outer"
       )
+      .cache()
 
     // Null-safe change detection: at least one compare column differs
     val changeCondition = compareColumns
@@ -250,8 +255,10 @@ class SCD2Merger(
         keyColumns.map(c => col(s"existing.$c").alias(c)): _*
       )
 
+    joined.unpersist()
+
     // Close old versions of changed records
-    val closedRecords = existing
+    val closedRecords = cachedExisting
       .join(changedRecords, keyColumns, "inner")
       .filter(col(isCurrentCol) === true)
       .withColumn(validToCol, batchTimestamp)
@@ -269,17 +276,17 @@ class SCD2Merger(
       )
 
     // Keep unchanged current records as-is
-    val unchangedRecords = existing
+    val unchangedRecords = cachedExisting
       .join(unchangedKeys, keyColumns, "inner")
       .filter(col(isCurrentCol) === true)
 
     // Keep all historical (non-current) records
-    val historicalRecords = existing.filter(col(isCurrentCol) === false)
+    val historicalRecords = cachedExisting.filter(col(isCurrentCol) === false)
 
     // Handle records missing from source
     val missingRecords = if (detectDeletes) {
       // Soft-delete: close them with is_active=false
-      val closed = existing
+      val closed = cachedExisting
         .join(missingFromSourceKeys, keyColumns, "inner")
         .filter(col(isCurrentCol) === true)
         .withColumn(validToCol, batchTimestamp)
@@ -287,17 +294,20 @@ class SCD2Merger(
       isActiveCol.fold(closed)(c => closed.withColumn(c, lit(false)))
     } else {
       // Keep as-is (not deleted)
-      existing
+      cachedExisting
         .join(missingFromSourceKeys, keyColumns, "inner")
         .filter(col(isCurrentCol) === true)
     }
 
     // Union all parts together
-    historicalRecords
+    val result = historicalRecords
       .unionByName(closedRecords)
       .unionByName(unchangedRecords)
       .unionByName(newVersions)
       .unionByName(newRecords)
       .unionByName(missingRecords)
+
+    cachedExisting.unpersist()
+    result
   }
 }

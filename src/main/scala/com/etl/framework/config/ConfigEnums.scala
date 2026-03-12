@@ -18,15 +18,11 @@ object JoinStrategy {
   val values: Seq[JoinStrategy] = Seq(Nest, Flatten, Aggregate)
 
   def fromString(s: String): Either[String, JoinStrategy] =
-    s.toLowerCase match {
-      case "nest"      => Right(Nest)
-      case "flatten"   => Right(Flatten)
-      case "aggregate" => Right(Aggregate)
-      case other       =>
-        Left(
-          s"Unknown join strategy: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"
-        )
-    }
+    values
+      .find(_.name == s.toLowerCase)
+      .toRight(
+        s"Unknown join strategy: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
+      )
 
   implicit val reader: ConfigReader[JoinStrategy] =
     ConfigReader.fromString[JoinStrategy](s =>
@@ -63,14 +59,15 @@ object JoinType {
 
   def fromString(s: String): Either[String, JoinType] =
     s.toLowerCase match {
-      case "inner"                 => Right(Inner)
       case "left" | "left_outer"   => Right(LeftOuter)
       case "right" | "right_outer" => Right(RightOuter)
       case "full" | "full_outer"   => Right(FullOuter)
-      case other                   =>
-        Left(
-          s"Unknown join type: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"
-        )
+      case other =>
+        values
+          .find(_.name == other)
+          .toRight(
+            s"Unknown join type: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
+          )
     }
 
   implicit val reader: ConfigReader[JoinType] =
@@ -95,14 +92,12 @@ object SourceType {
 
   val values: Seq[SourceType] = Seq(File, JDBC)
 
-  def fromString(s: String): Either[String, SourceType] = s.toLowerCase match {
-    case "file" => Right(File)
-    case "jdbc" => Right(JDBC)
-    case other  =>
-      Left(
-        s"Unknown source type: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"
+  def fromString(s: String): Either[String, SourceType] =
+    values
+      .find(_.name == s.toLowerCase)
+      .toRight(
+        s"Unknown source type: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
       )
-  }
 
   implicit val reader: ConfigReader[SourceType] =
     ConfigReader.fromString[SourceType](s =>
@@ -137,16 +132,12 @@ object FileFormat {
 
   val values: Seq[FileFormat] = Seq(CSV, Parquet, JSON, JDBC)
 
-  def fromString(s: String): Either[String, FileFormat] = s.toLowerCase match {
-    case "csv"     => Right(CSV)
-    case "parquet" => Right(Parquet)
-    case "json"    => Right(JSON)
-    case "jdbc"    => Right(JDBC)
-    case other     =>
-      Left(
-        s"Unknown file format: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"
+  def fromString(s: String): Either[String, FileFormat] =
+    values
+      .find(_.name == s.toLowerCase)
+      .toRight(
+        s"Unknown file format: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
       )
-  }
 
   implicit val reader: ConfigReader[FileFormat] =
     ConfigReader.fromString[FileFormat](s =>
@@ -171,15 +162,12 @@ object LoadMode {
 
   val values: Seq[LoadMode] = Seq(Full, Delta, SCD2)
 
-  def fromString(s: String): Either[String, LoadMode] = s.toLowerCase match {
-    case "full"  => Right(Full)
-    case "delta" => Right(Delta)
-    case "scd2"  => Right(SCD2)
-    case other   =>
-      Left(
-        s"Unknown load mode: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"
+  def fromString(s: String): Either[String, LoadMode] =
+    values
+      .find(_.name == s.toLowerCase)
+      .toRight(
+        s"Unknown load mode: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
       )
-  }
 
   implicit val reader: ConfigReader[LoadMode] =
     ConfigReader.fromString[LoadMode](s =>
@@ -224,20 +212,11 @@ object ValidationRuleType {
     )
 
   def fromString(s: String): Either[String, ValidationRuleType] =
-    s.toLowerCase match {
-      case "pk_uniqueness" => Right(PKUniqueness)
-      case "fk_integrity"  => Right(FKIntegrity)
-      case "regex"         => Right(Regex)
-      case "range"         => Right(Range)
-      case "domain"        => Right(Domain)
-      case "not_null"      => Right(NotNull)
-      case "custom"        => Right(Custom)
-      case "schema"        => Right(Schema)
-      case other           =>
-        Left(
-          s"Unknown validation rule type: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"
-        )
-    }
+    values
+      .find(_.name == s.toLowerCase)
+      .toRight(
+        s"Unknown validation rule type: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
+      )
 
   implicit val reader: ConfigReader[ValidationRuleType] =
     ConfigReader.fromString[ValidationRuleType](s =>
@@ -263,15 +242,11 @@ object OnFailureAction {
   val values: Seq[OnFailureAction] = Seq(Reject, Warn, Skip)
 
   def fromString(s: String): Either[String, OnFailureAction] =
-    s.toLowerCase match {
-      case "reject" => Right(Reject)
-      case "warn"   => Right(Warn)
-      case "skip"   => Right(Skip)
-      case other    =>
-        Left(
-          s"Unknown on-failure action: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"
-        )
-    }
+    values
+      .find(_.name == s.toLowerCase)
+      .toRight(
+        s"Unknown on-failure action: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
+      )
 
   implicit val reader: ConfigReader[OnFailureAction] =
     ConfigReader.fromString[OnFailureAction](s =>
@@ -297,15 +272,11 @@ object OrphanAction {
   val values: Seq[OrphanAction] = Seq(Warn, Delete, Ignore)
 
   def fromString(s: String): Either[String, OrphanAction] =
-    s.toLowerCase match {
-      case "warn"   => Right(Warn)
-      case "delete" => Right(Delete)
-      case "ignore" => Right(Ignore)
-      case other    =>
-        Left(
-          s"Unknown orphan action: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"
-        )
-    }
+    values
+      .find(_.name == s.toLowerCase)
+      .toRight(
+        s"Unknown orphan action: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
+      )
 
   implicit val reader: ConfigReader[OrphanAction] =
     ConfigReader.fromString[OrphanAction](s =>
@@ -343,19 +314,13 @@ object AggregationFunction {
 
   def fromString(s: String): Either[String, AggregationFunction] =
     s.toLowerCase match {
-      case "sum"             => Right(Sum)
-      case "count"           => Right(Count)
-      case "avg" | "average" => Right(Avg)
-      case "min"             => Right(Min)
-      case "max"             => Right(Max)
-      case "first"           => Right(First)
-      case "last"            => Right(Last)
-      case "collect_list"    => Right(CollectList)
-      case "collect_set"     => Right(CollectSet)
-      case other             =>
-        Left(
-          s"Unknown aggregation function: '$other'. Valid values: ${values.map(_.name).mkString(", ")}"
-        )
+      case "average" => Right(Avg)
+      case other =>
+        values
+          .find(_.name == other)
+          .toRight(
+            s"Unknown aggregation function: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
+          )
     }
 
   implicit val reader: ConfigReader[AggregationFunction] =

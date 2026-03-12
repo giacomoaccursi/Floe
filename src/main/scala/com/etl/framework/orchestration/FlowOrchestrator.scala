@@ -197,7 +197,7 @@ class FlowOrchestrator(
           tableManager.runMaintenance(flowConfig, icebergConfig.maintenance)
         } catch {
           case e: Exception =>
-            logger.warn(
+            logger.error(
               s"Maintenance failed for flow ${flowConfig.name}: ${e.getMessage}"
             )
         }

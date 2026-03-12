@@ -34,7 +34,7 @@ class IcebergTableManager(
       spark.sql(s"DESCRIBE TABLE $tableName")
       true
     } catch {
-      case _: Exception => false
+      case _: org.apache.spark.sql.AnalysisException => false
     }
   }
 
@@ -133,7 +133,7 @@ class IcebergTableManager(
       if (snapshots.isEmpty) None
       else Some(snapshots.first().getLong(0))
     } catch {
-      case _: Exception => None
+      case _: org.apache.spark.sql.AnalysisException => None
     }
   }
 
@@ -153,7 +153,7 @@ class IcebergTableManager(
       logger.info(s"Tagged snapshot $snapshotId as '$tagName' on $tableName")
     } catch {
       case e: Exception =>
-        logger.warn(
+        logger.error(
           s"Failed to tag snapshot $snapshotId on $tableName: ${e.getMessage}"
         )
     }
@@ -198,7 +198,7 @@ class IcebergTableManager(
       )
     } catch {
       case e: Exception =>
-        logger.warn(
+        logger.error(
           s"Failed to get snapshot metadata for $tableName: ${e.getMessage}"
         )
         None
@@ -241,67 +241,47 @@ class IcebergTableManager(
       tableName: String,
       retentionDays: Int
   ): Unit = {
-    try {
-      spark.sql(
-        s"CALL ${icebergConfig.catalogName}.system.expire_snapshots(" +
-          s"table => '$tableName', " +
-          s"older_than => TIMESTAMP '${java.time.Instant.now().minusSeconds(retentionDays.toLong * 86400)}'" +
-          s")"
-      )
-      logger.info(s"Expired snapshots older than $retentionDays days on $tableName")
-    } catch {
-      case e: Exception =>
-        logger.warn(s"Snapshot expiration failed on $tableName: ${e.getMessage}")
-    }
+    spark.sql(
+      s"CALL ${icebergConfig.catalogName}.system.expire_snapshots(" +
+        s"table => '$tableName', " +
+        s"older_than => TIMESTAMP '${java.time.Instant.now().minusSeconds(retentionDays.toLong * 86400)}'" +
+        s")"
+    )
+    logger.info(s"Expired snapshots older than $retentionDays days on $tableName")
   }
 
   private def compactDataFiles(
       tableName: String,
       targetFileSizeMb: Int
   ): Unit = {
-    try {
-      spark.sql(
-        s"CALL ${icebergConfig.catalogName}.system.rewrite_data_files(" +
-          s"table => '$tableName', " +
-          s"options => map('target-file-size-bytes', '${targetFileSizeMb.toLong * 1024 * 1024}')" +
-          s")"
-      )
-      logger.info(s"Compacted data files on $tableName (target: ${targetFileSizeMb}MB)")
-    } catch {
-      case e: Exception =>
-        logger.warn(s"Data file compaction failed on $tableName: ${e.getMessage}")
-    }
+    spark.sql(
+      s"CALL ${icebergConfig.catalogName}.system.rewrite_data_files(" +
+        s"table => '$tableName', " +
+        s"options => map('target-file-size-bytes', '${targetFileSizeMb.toLong * 1024 * 1024}')" +
+        s")"
+    )
+    logger.info(s"Compacted data files on $tableName (target: ${targetFileSizeMb}MB)")
   }
 
   private def removeOrphanFiles(
       tableName: String,
       retentionMinutes: Int
   ): Unit = {
-    try {
-      spark.sql(
-        s"CALL ${icebergConfig.catalogName}.system.remove_orphan_files(" +
-          s"table => '$tableName', " +
-          s"older_than => TIMESTAMP '${java.time.Instant.now().minusSeconds(retentionMinutes.toLong * 60)}'" +
-          s")"
-      )
-      logger.info(
-        s"Removed orphan files older than ${retentionMinutes}min on $tableName"
-      )
-    } catch {
-      case e: Exception =>
-        logger.warn(s"Orphan file cleanup failed on $tableName: ${e.getMessage}")
-    }
+    spark.sql(
+      s"CALL ${icebergConfig.catalogName}.system.remove_orphan_files(" +
+        s"table => '$tableName', " +
+        s"older_than => TIMESTAMP '${java.time.Instant.now().minusSeconds(retentionMinutes.toLong * 60)}'" +
+        s")"
+    )
+    logger.info(
+      s"Removed orphan files older than ${retentionMinutes}min on $tableName"
+    )
   }
 
   private def rewriteManifests(tableName: String): Unit = {
-    try {
-      spark.sql(
-        s"CALL ${icebergConfig.catalogName}.system.rewrite_manifests('$tableName')"
-      )
-      logger.info(s"Rewrote manifests on $tableName")
-    } catch {
-      case e: Exception =>
-        logger.warn(s"Manifest rewrite failed on $tableName: ${e.getMessage}")
-    }
+    spark.sql(
+      s"CALL ${icebergConfig.catalogName}.system.rewrite_manifests('$tableName')"
+    )
+    logger.info(s"Rewrote manifests on $tableName")
   }
 }

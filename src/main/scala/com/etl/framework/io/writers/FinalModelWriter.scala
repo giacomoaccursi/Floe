@@ -41,52 +41,8 @@ class FinalModelWriter[F: Encoder](
     * @throws DataWriteException
     *   if writing fails
     */
-  def write(dataset: Dataset[F], outputPath: String): Unit = {
-    logger.info(s"Writing Final Model to: $outputPath")
-    logger.info(s"Output format: ${outputConfig.format.name}") // Use .name
-
-    try {
-      var writer = dataset.write
-        .mode(SaveMode.Overwrite)
-        .format(outputConfig.format.name) // Use .name
-
-      // Apply partitioning if configured
-      if (outputConfig.partitionBy.nonEmpty) {
-        logger.info(
-          s"Partitioning by: ${outputConfig.partitionBy.mkString(", ")}"
-        )
-        writer = writer.partitionBy(outputConfig.partitionBy: _*)
-      }
-
-      // Apply compression if configured
-      if (outputConfig.compression.nonEmpty) {
-        logger.info(s"Using compression: ${outputConfig.compression}")
-        writer = writer.option("compression", outputConfig.compression)
-      }
-
-      // Apply additional options
-      outputConfig.options.foreach { case (key, value) =>
-        logger.debug(s"Applying option: $key = $value")
-        writer = writer.option(key, value)
-      }
-
-      // Write to output path
-      writer.save(outputPath)
-
-      logger.info(s"Successfully wrote Final Model to $outputPath")
-    } catch {
-      case e: Exception =>
-        logger.error(
-          s"Failed to write Final Model to $outputPath: ${e.getMessage}"
-        )
-        throw DataWriteException(
-          outputType = "Final Model",
-          outputPath = outputPath,
-          details = e.getMessage,
-          cause = e
-        )
-    }
-  }
+  def write(dataset: Dataset[F], outputPath: String): Unit =
+    writeInternal(dataset, outputPath, SaveMode.Overwrite)
 
   /** Writes Dataset[FinalModel] with custom save mode
     *
@@ -105,14 +61,20 @@ class FinalModelWriter[F: Encoder](
       dataset: Dataset[F],
       outputPath: String,
       saveMode: SaveMode
+  ): Unit = writeInternal(dataset, outputPath, saveMode)
+
+  private def writeInternal(
+      dataset: Dataset[F],
+      outputPath: String,
+      saveMode: SaveMode
   ): Unit = {
     logger.info(s"Writing Final Model to: $outputPath with mode: $saveMode")
-    logger.info(s"Output format: ${outputConfig.format.name}") // Use .name
+    logger.info(s"Output format: ${outputConfig.format.name}")
 
     try {
       var writer = dataset.write
         .mode(saveMode)
-        .format(outputConfig.format.name) // Use .name
+        .format(outputConfig.format.name)
 
       // Apply partitioning if configured
       if (outputConfig.partitionBy.nonEmpty) {

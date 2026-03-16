@@ -268,9 +268,11 @@ class FlowExecutor(
         tableInfo.dagMetadata
       )
 
+      val recordCount = tableInfo.data.count()
       metadataWriter.writeAdditionalTableMetadata(
         tableName,
         tableInfo.data,
+        recordCount,
         outputPath,
         tableInfo.dagMetadata,
         batchId

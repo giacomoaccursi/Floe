@@ -67,6 +67,7 @@ class FlowMetadataWriter(
   def writeAdditionalTableMetadata(
     tableName: String,
     data: DataFrame,
+    recordCount: Long,
     outputPath: String,
     dagMetadata: Option[AdditionalTableMetadata],
     batchId: String
@@ -77,7 +78,7 @@ class FlowMetadataWriter(
       "table_name" -> tableName,
       "table_type" -> "additional",
       "created_by_flow" -> flowConfig.name,
-      "record_count" -> data.count(),
+      "record_count" -> recordCount,
       "path" -> outputPath,
       "dag_metadata" -> dagMetadata.map { dm =>
         Map(

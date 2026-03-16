@@ -28,14 +28,14 @@ class IcebergTableWriter(
     val tableName = tableManager.resolveTableName(flowConfig)
     tableManager.createOrUpdateTable(flowConfig, df.schema)
 
-    val recordCount = df.count()
-    logger.info(s"Writing full load to $tableName: $recordCount records")
+    logger.info(s"Writing full load to $tableName")
 
     df.writeTo(tableName).overwritePartitions()
 
+    val recordCount = df.count()
     val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
     snapshotId.foreach { sid =>
-      logger.info(s"Full load complete on $tableName, snapshot: $sid")
+      logger.info(s"Full load complete on $tableName: $recordCount records, snapshot: $sid")
     }
 
     WriteResult(recordCount, snapshotId)
@@ -48,7 +48,6 @@ class IcebergTableWriter(
     val tableName = tableManager.resolveTableName(flowConfig)
     tableManager.createOrUpdateTable(flowConfig, df.schema)
 
-    val recordCount = df.count()
     val pkColumns = flowConfig.validation.primaryKey
 
     if (pkColumns.isEmpty) {
@@ -100,6 +99,7 @@ class IcebergTableWriter(
       }
     }
 
+    val recordCount = df.count()
     val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
     snapshotId.foreach { sid =>
       logger.info(
@@ -140,7 +140,6 @@ class IcebergTableWriter(
 
     tableManager.createOrUpdateTable(flowConfig, scd2Schema)
 
-    val recordCount = df.count()
     val existingCount =
       spark.sql(s"SELECT COUNT(*) FROM $tableName").first().getLong(0)
 
@@ -150,7 +149,7 @@ class IcebergTableWriter(
 
     if (existingCount == 0) {
       // First load: all records are current and active
-      logger.info(s"SCD2 initial load to $tableName: $recordCount records")
+      logger.info(s"SCD2 initial load to $tableName")
 
       df.createOrReplaceTempView(sourceView)
 
@@ -171,9 +170,7 @@ class IcebergTableWriter(
       }
     } else {
       // Subsequent load: single atomic MERGE INTO with NULL merge_key trick
-      logger.info(
-        s"SCD2 change detection on $tableName: $recordCount records"
-      )
+      logger.info(s"SCD2 change detection on $tableName")
 
       df.createOrReplaceTempView(sourceView)
 
@@ -265,6 +262,7 @@ class IcebergTableWriter(
       }
     }
 
+    val recordCount = df.count()
     val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
     snapshotId.foreach { sid =>
       logger.info(

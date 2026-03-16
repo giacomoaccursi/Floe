@@ -26,7 +26,14 @@ class DAGNodeProcessor(joinExecutor: JoinStrategyExecutor)(implicit spark: Spark
     
     val result = node.join match {
       case Some(joinConfig) =>
-        val parentData = nodeResults(joinConfig.parent)
+        val parentData = nodeResults.getOrElse(
+          joinConfig.parent,
+          throw new IllegalStateException(
+            s"Node '${node.id}' requires parent '${joinConfig.parent}' " +
+            s"but it was not found in node results. " +
+            s"Available nodes: ${nodeResults.keys.mkString(", ")}"
+          )
+        )
         joinExecutor.applyJoin(parentData, selected, joinConfig)
       case None =>
         selected

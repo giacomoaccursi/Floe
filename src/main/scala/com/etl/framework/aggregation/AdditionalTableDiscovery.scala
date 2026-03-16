@@ -32,7 +32,7 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
     try {
       val additionalTables = loadAdditionalTablesMetadata(metadataPath)
       logger.info(s"Found ${additionalTables.size} additional tables with DAG metadata")
-      
+
       additionalTables.map { table =>
         val node = DAGNode(
           id = s"${table.tableName}_node",
@@ -48,8 +48,11 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
         node
       }
     } catch {
-      case e: Exception =>
-        logger.warn(s"Could not discover additional tables: ${e.getMessage}")
+      case e: java.nio.file.NoSuchFileException =>
+        logger.info(s"Additional tables metadata directory not found at $metadataPath")
+        Seq.empty
+      case e: java.io.IOException =>
+        logger.warn(s"Could not read additional tables metadata (IO error): ${e.getMessage}")
         Seq.empty
     }
   }

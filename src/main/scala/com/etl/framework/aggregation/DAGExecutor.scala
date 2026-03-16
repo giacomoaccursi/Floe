@@ -12,8 +12,9 @@ import ExecutionContext.Implicits.global
  * Executes DAG execution plans
  */
 class DAGExecutor(nodeProcessor: DAGNodeProcessor) {
-  
+
   private val logger = LoggerFactory.getLogger(getClass)
+  private val MaxParallelTimeout: FiniteDuration = 2.hours
   
   /**
    * Executes DAG nodes according to the execution plan
@@ -36,7 +37,13 @@ class DAGExecutor(nodeProcessor: DAGNodeProcessor) {
       }
     }
     
-    val rootResult = nodeResults(plan.rootNode)
+    val rootResult = nodeResults.getOrElse(
+      plan.rootNode,
+      throw new IllegalStateException(
+        s"DAG execution error: root node '${plan.rootNode}' was not produced. " +
+        s"Available nodes: ${nodeResults.keys.mkString(", ")}"
+      )
+    )
     logger.info(s"DAG execution completed, returning root node: ${plan.rootNode}")
     rootResult
   }
@@ -72,6 +79,6 @@ class DAGExecutor(nodeProcessor: DAGNodeProcessor) {
     }
     
     val allResults = Future.sequence(futures)
-    Await.result(allResults, Duration.Inf).toMap
+    Await.result(allResults, MaxParallelTimeout).toMap
   }
 }

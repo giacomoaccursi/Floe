@@ -18,13 +18,54 @@ class DAGGraphBuilder(globalConfig: GlobalConfig) {
    */
   def buildExecutionPlan(nodes: Seq[DAGNode]): DAGExecutionPlan = {
     logger.info(s"Building DAG execution plan for ${nodes.size} nodes")
-    
+
+    validateNodes(nodes)
+
     val dependencyGraph = buildDependencyGraph(nodes)
     val sortedNodeIds = topologicalSort(dependencyGraph, nodes)
     val groups = groupNodesForParallelExecution(sortedNodeIds, dependencyGraph, nodes)
     val rootNode = findRootNode(nodes, dependencyGraph)
-    
+
     DAGExecutionPlan(groups, rootNode)
+  }
+
+  /**
+   * Validates node definitions before building the graph
+   */
+  private def validateNodes(nodes: Seq[DAGNode]): Unit = {
+    if (nodes.isEmpty) {
+      throw new IllegalStateException("DAG must contain at least one node")
+    }
+
+    val nodeIds = nodes.map(_.id).toSet
+
+    val duplicates = nodes.map(_.id).groupBy(identity).collect { case (id, ids) if ids.size > 1 => id }
+    if (duplicates.nonEmpty) {
+      throw new IllegalStateException(
+        s"DAG contains duplicate node IDs: ${duplicates.mkString(", ")}"
+      )
+    }
+
+    nodes.foreach { node =>
+      val missingDeps = node.dependencies.filterNot(nodeIds.contains)
+      if (missingDeps.nonEmpty) {
+        throw new IllegalStateException(
+          s"Node '${node.id}' declares dependencies that do not exist: ${missingDeps.mkString(", ")}"
+        )
+      }
+      node.join.foreach { joinConfig =>
+        if (!nodeIds.contains(joinConfig.parent)) {
+          throw new IllegalStateException(
+            s"Node '${node.id}' references join parent '${joinConfig.parent}' which does not exist"
+          )
+        }
+        if (joinConfig.on.isEmpty) {
+          throw new IllegalStateException(
+            s"Node '${node.id}' has a join configuration with no join conditions (on is empty)"
+          )
+        }
+      }
+    }
   }
   
   /**

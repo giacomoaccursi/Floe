@@ -4,6 +4,7 @@ import com.etl.framework.config.{FlowConfig, ValidationRule}
 import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions.{broadcast, col}
 
 /**
  * Validator for Foreign Key integrity
@@ -28,11 +29,16 @@ class ForeignKeyValidator(
               )
             
             case Some(referencedFlow) =>
-              // Perform left anti join to find orphan records
-              val orphans = currentDf
+              // Perform left anti join to find orphan records.
+              // NULL FK values are excluded: they are not referential violations
+              // (NULL means "no reference", consistent with standard SQL semantics).
+              // The reference table is broadcast since it is a lookup table (typically small).
+              val nonNullCurrentDf = currentDf.filter(col(fk.column).isNotNull)
+              val refKeys = broadcast(referencedFlow.select(fk.references.column))
+              val orphans = nonNullCurrentDf
                 .join(
-                  referencedFlow.select(fk.references.column),
-                  currentDf(fk.column) === referencedFlow(fk.references.column),
+                  refKeys,
+                  nonNullCurrentDf(fk.column) === refKeys(fk.references.column),
                   "left_anti"
                 )
               

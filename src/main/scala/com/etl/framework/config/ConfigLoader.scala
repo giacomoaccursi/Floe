@@ -310,7 +310,7 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
         val (errors, configs) = results.partition(_.isLeft)
         errors.collectFirst { case Left(err) => err } match {
           case Some(err) => Left(err)
-          case None      => Right(configs.map(_.toOption.get))
+          case None      => Right(configs.collect { case Right(c) => c })
         }
       case Failure(ex) =>
         Left(
@@ -332,8 +332,41 @@ class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
       path: String
   ): Either[ConfigurationException, AggregationConfig] = {
     for {
-      yaml <- loadYamlFile(path)
+      yaml   <- loadYamlFile(path)
       config <- parseYaml(yaml, path)
+      _      <- validateAggregationConfig(config, path)
     } yield config
+  }
+
+  private def validateAggregationConfig(
+      config: AggregationConfig,
+      path: String
+  ): Either[ConfigurationException, Unit] = {
+    if (config.nodes.isEmpty) {
+      return Left(ConfigFileException(file = path, message = s"DAG '${config.name}': nodes list must not be empty"))
+    }
+
+    val nodeIds = config.nodes.map(_.id).toSet
+    val duplicates = config.nodes.map(_.id).groupBy(identity).collect { case (id, ids) if ids.size > 1 => id }
+    if (duplicates.nonEmpty) {
+      return Left(ConfigFileException(file = path, message = s"DAG '${config.name}': duplicate node IDs: ${duplicates.mkString(", ")}"))
+    }
+
+    config.nodes.foreach { node =>
+      val missingDeps = node.dependencies.filterNot(nodeIds.contains)
+      if (missingDeps.nonEmpty) {
+        return Left(ConfigFileException(file = path, message = s"DAG '${config.name}': node '${node.id}' references missing dependencies: ${missingDeps.mkString(", ")}"))
+      }
+      node.join.foreach { joinConfig =>
+        if (!nodeIds.contains(joinConfig.parent)) {
+          return Left(ConfigFileException(file = path, message = s"DAG '${config.name}': node '${node.id}' references missing join parent '${joinConfig.parent}'"))
+        }
+        if (joinConfig.on.isEmpty) {
+          return Left(ConfigFileException(file = path, message = s"DAG '${config.name}': node '${node.id}' has a join with no conditions"))
+        }
+      }
+    }
+
+    Right(())
   }
 }

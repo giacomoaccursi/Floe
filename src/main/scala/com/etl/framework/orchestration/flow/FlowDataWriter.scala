@@ -57,8 +57,6 @@ class FlowDataWriter(
     )
 
     TimingUtil.timed(logger, s"Write validated data to $outputPath") {
-      val recordCount = validData.count()
-
       var writer = validData.write
         .mode(SaveMode.Overwrite)
         .format(flowConfig.output.format.name)
@@ -73,9 +71,11 @@ class FlowDataWriter(
       }
 
       writer.save(outputPath)
+
+      val recordCount = validData.count()
       logger.info(s"Wrote $recordCount validated records")
 
-      WriteResult(recordCount, snapshotId = None)
+      WriteResult(recordsWritten = recordCount, snapshotId = None)
     }
   }
 

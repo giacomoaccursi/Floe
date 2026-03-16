@@ -97,9 +97,11 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit
       valid = result.valid,
       rejected =
         ValidationUtils.combineRejected(state.rejected, result.rejected),
-      rejectionReasons = state.rejectionReasons ++ result.rejected.map(r =>
-        step.reasonKey -> r.count()
-      )
+      rejectionReasons = state.rejectionReasons ++ result.rejected.map { r =>
+        val newCount = r.count()
+        val existing = state.rejectionReasons.getOrElse(step.reasonKey, 0L)
+        step.reasonKey -> (existing + newCount)
+      }
     )
   }
 }

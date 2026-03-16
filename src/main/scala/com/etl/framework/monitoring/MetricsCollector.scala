@@ -195,9 +195,9 @@ class InMemoryMetricsCollector extends MetricsCollector {
   }
   
   private def parseTags(tagStr: String): Map[String, String] = {
-    tagStr.split(",").map { pair =>
-      val parts = pair.split(":")
-      parts(0) -> parts(1)
+    tagStr.split(",").flatMap { pair =>
+      val parts = pair.split(":", 2)
+      if (parts.length == 2) Some(parts(0) -> parts(1)) else None
     }.toMap
   }
 }

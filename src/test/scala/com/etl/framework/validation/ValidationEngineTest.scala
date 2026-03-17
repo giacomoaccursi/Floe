@@ -266,4 +266,62 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
     // RejectionReasons should track counts
     result.rejectionReasons.values.sum shouldBe 3
   }
+
+  // --- Gap #8: multi-validator rejection counting ---
+
+  it should "count each rejected record in exactly one step (no double-counting)" in {
+    // Records:
+    //   id=1  name="Alice"  → valid in all steps
+    //   id=2  name="Bob"    → has duplicate PK → rejected by pk_validation
+    //   id=2  name="Carol"  → has duplicate PK → rejected by pk_validation
+    //   id=null name="Dave" → null id           → rejected by not_null
+    //
+    // Dave is removed by not_null BEFORE pk_validation runs, so it is counted
+    // only in not_null_validation.
+    // Bob and Carol both have id=2 → the PK validator rejects ALL duplicates
+    // (both occurrences), so pk_validation contributes 2 to the count.
+    //
+    // Invariant: rejectionReasons.values.sum == rejected.count()
+    val schema = StructType(
+      Seq(
+        StructField("id", IntegerType, true),
+        StructField("name", StringType, true)
+      )
+    )
+    val data = Seq(
+      Row(1, "Alice"),
+      Row(2, "Bob"),
+      Row(2, "Carol"),  // duplicate PK — pk_validation rejects both duplicates
+      Row(null, "Dave") // null id       — rejected by not_null before pk runs
+    )
+    val df = spark.createDataFrame(data.asJava, schema)
+
+    val flowConfig = createFlowConfig(
+      schemaFields = Seq(
+        ColumnConfig("id", "integer", nullable = false, description = ""),
+        ColumnConfig("name", "string", nullable = true, description = "")
+      ),
+      primaryKey = Seq("id")
+    )
+    val engine = new ValidationEngine()
+
+    val result = engine.validate(df, flowConfig)
+
+    // 1 (Dave, not_null) + 2 (Bob+Carol, pk) = 3 total rejected
+    val totalRejected = result.rejected.map(_.count()).getOrElse(0L)
+    totalRejected shouldBe 3
+
+    // Core invariant: rejectionReasons.values.sum == rejected.count().
+    // Each rejected record is attributed to exactly one validation step —
+    // no double-counting across steps.
+    result.rejectionReasons.values.sum shouldBe totalRejected
+
+    // not_null_validation captured the null-id record only
+    result.rejectionReasons should contain key "not_null_validation"
+    result.rejectionReasons("not_null_validation") shouldBe 1
+
+    // pk_validation captured both duplicate-PK records
+    result.rejectionReasons should contain key "pk_validation"
+    result.rejectionReasons("pk_validation") shouldBe 2
+  }
 }

@@ -54,6 +54,11 @@ class DAGGraphBuilder(globalConfig: GlobalConfig) {
         )
       }
       node.join.foreach { joinConfig =>
+        if (joinConfig.parent == node.id) {
+          throw new IllegalStateException(
+            s"Node '${node.id}' has a self-referential join (join parent is itself)"
+          )
+        }
         if (!nodeIds.contains(joinConfig.parent)) {
           throw new IllegalStateException(
             s"Node '${node.id}' references join parent '${joinConfig.parent}' which does not exist"
@@ -82,8 +87,13 @@ class DAGGraphBuilder(globalConfig: GlobalConfig) {
       node.dependencies.foreach { dep =>
         graph.getOrElseUpdate(node.id, mutable.Set.empty).add(dep)
       }
+      // The join parent is an implicit dependency: the node cannot execute
+      // before its join parent, even if it is not listed in `dependencies`.
+      node.join.foreach { joinConfig =>
+        graph.getOrElseUpdate(node.id, mutable.Set.empty).add(joinConfig.parent)
+      }
     }
-    
+
     graph.map { case (k, v) => k -> v.toSet }.toMap
   }
   

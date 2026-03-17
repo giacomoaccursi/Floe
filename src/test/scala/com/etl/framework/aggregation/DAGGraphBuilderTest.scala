@@ -25,6 +25,28 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
     )
   }
 
+  def createNodeWithJoin(
+      id: String,
+      joinParent: String,
+      dependencies: Seq[String] = Seq.empty
+  ): DAGNode = {
+    DAGNode(
+      id = id,
+      description = s"Node $id",
+      sourceFlow = s"flow_$id",
+      sourcePath = s"/path/$id",
+      dependencies = dependencies,
+      join = Some(
+        JoinConfig(
+          `type` = JoinType.LeftOuter,
+          parent = joinParent,
+          on = Seq(JoinCondition("id", "id")),
+          strategy = JoinStrategy.Nest
+        )
+      )
+    )
+  }
+
   "DAGGraphBuilder" should "build dependency graph with no dependencies" in {
     val builder = new DAGGraphBuilder(createGlobalConfig())
     val nodes = Seq(createNode("A"), createNode("B"), createNode("C"))
@@ -214,5 +236,58 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
     plan.groups(1).parallel shouldBe true
     plan.groups(2).nodes.map(_.id) should contain("F")
     plan.rootNode shouldBe "F"
+  }
+
+  // --- Gap #3: join parent must be treated as implicit dependency ---
+
+  it should "include join parent in the dependency graph" in {
+    val builder = new DAGGraphBuilder(createGlobalConfig())
+    // B declares a join on A but has NO explicit dependency on A
+    val nodes = Seq(
+      createNode("A"),
+      createNodeWithJoin("B", joinParent = "A")
+    )
+
+    val graph = builder.buildDependencyGraph(nodes)
+
+    graph("B") should contain("A")
+  }
+
+  it should "order join-only node after its join parent" in {
+    val builder = new DAGGraphBuilder(createGlobalConfig())
+    // B joins A but has no explicit dep — B must still execute after A
+    val nodes = Seq(
+      createNode("A"),
+      createNodeWithJoin("B", joinParent = "A")
+    )
+
+    val plan = builder.buildExecutionPlan(nodes)
+
+    val allNodeIds = plan.groups.flatMap(_.nodes.map(_.id))
+    allNodeIds.indexOf("A") should be < allNodeIds.indexOf("B")
+  }
+
+  it should "detect a cycle induced by a join parent dependency" in {
+    val builder = new DAGGraphBuilder(createGlobalConfig())
+    // A joins B, B has explicit dep on A → cycle: A → B → A
+    val nodes = Seq(
+      createNodeWithJoin("A", joinParent = "B"),
+      createNode("B", Seq("A"))
+    )
+
+    intercept[CircularDependencyException] {
+      builder.buildExecutionPlan(nodes)
+    }
+  }
+
+  // --- Gap #6: self-referential join ---
+
+  it should "reject a node whose join parent is itself" in {
+    val builder = new DAGGraphBuilder(createGlobalConfig())
+    val nodes = Seq(createNodeWithJoin("A", joinParent = "A"))
+
+    intercept[Exception] {
+      builder.buildExecutionPlan(nodes)
+    }
   }
 }

@@ -254,6 +254,14 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
             s"Flow '${config.name}': SCD2 load mode requires compareColumns to be non-empty"
         )
       )
+    } else if (config.loadMode.`type` == LoadMode.SCD2 && config.validation.primaryKey.isEmpty) {
+      Left(
+        ConfigFileException(
+          file = path,
+          message =
+            s"Flow '${config.name}': SCD2 load mode requires non-empty primaryKey for record identification"
+        )
+      )
     } else {
       Right(())
     }

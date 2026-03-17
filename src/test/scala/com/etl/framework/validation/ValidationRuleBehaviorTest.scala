@@ -236,6 +236,65 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
     result.valid.columns should contain(WARNINGS)
   }
 
+  "RangeValidator on string column" should "use numeric comparison, not lexicographic" in {
+    // "9" > "10" lexicographically but 9 < 10 numerically.
+    // Without a numeric cast, "9" would incorrectly pass a min=10 range check.
+    val records = Seq(
+      ("1", "9"),   // 9 < 10 numerically → should be REJECTED
+      ("2", "15"),  // 15 in [10, 100]   → should be VALID
+      ("3", "101"), // 101 > 100          → should be REJECTED
+      ("4", "100"), // 100 == max         → should be VALID
+      ("5", "10")   // 10 == min          → should be VALID
+    )
+    val df = records.toDF("id", "score")
+
+    val flowConfig = FlowConfig(
+      name = "test_range",
+      description = "",
+      version = "1.0",
+      owner = "test",
+      source = SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty, None),
+      schema = SchemaConfig(
+        enforceSchema = true,
+        allowExtraColumns = false,
+        columns = Seq(
+          ColumnConfig("id", "string", nullable = false, None, ""),
+          ColumnConfig("score", "string", nullable = false, None, "")
+        )
+      ),
+      loadMode = LoadModeConfig(LoadMode.Full),
+      validation = ValidationConfig(
+        primaryKey = Seq("id"),
+        foreignKeys = Seq.empty,
+        rules = Seq(
+          ValidationRule(
+            `type` = ValidationRuleType.Range,
+            column = Some("score"),
+            min = Some("10"),
+            max = Some("100"),
+            description = Some("Score must be between 10 and 100"),
+            skipNull = Some(false),
+            onFailure = OnFailureAction.Reject
+          )
+        )
+      ),
+      output = OutputConfig()
+    )
+
+    val engine = new ValidationEngine()
+    val result = engine.validate(df, flowConfig)
+
+    val rejectedCount = result.rejected.map(_.count()).getOrElse(0L)
+    rejectedCount shouldBe 2
+
+    val rejectedIds = result.rejected.get.select("id").collect().map(_.getString(0)).toSet
+    rejectedIds should contain("1")  // "9" < 10 numerically
+    rejectedIds should contain("3")  // "101" > 100 numerically
+    rejectedIds should not contain "2"
+    rejectedIds should not contain "4"
+    rejectedIds should not contain "5"
+  }
+
   "Multiple rules with different behaviors" should "reject for reject-rules and warn for warn-rules" in {
     val records = Seq(
       ValidationRuleBehaviorRecord(1, "alice@example.com", 25, "active"),  // all valid

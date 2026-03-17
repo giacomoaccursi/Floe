@@ -5,6 +5,7 @@ import com.etl.framework.config.ValidationRule
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Column
+import org.apache.spark.sql.types.DoubleType
 
 /**
  * Validator for range validation (numeric and date types)
@@ -50,15 +51,18 @@ class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flow
       case _ => // OK
     }
     
-    // Build conditions functionally
+    // Build conditions using numeric literals and a DoubleType cast on the column.
+    // This ensures numeric comparison regardless of the column's declared type:
+    // string columns containing numbers are cast correctly, and lexicographic
+    // ordering (e.g. "9" > "10") is avoided.
     val minCondition = rule.min.map { minValue =>
       validateNumericValue(minValue, "min", column)
-      col(column) >= lit(minValue)
+      col(column).cast(DoubleType) >= lit(minValue.toDouble)
     }.getOrElse(lit(true))
-    
+
     val maxCondition = rule.max.map { maxValue =>
       validateNumericValue(maxValue, "max", column)
-      col(column) <= lit(maxValue)
+      col(column).cast(DoubleType) <= lit(maxValue.toDouble)
     }.getOrElse(lit(true))
     
     minCondition && maxCondition

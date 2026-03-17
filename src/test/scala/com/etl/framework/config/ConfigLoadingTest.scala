@@ -212,4 +212,84 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
     result.isLeft shouldBe true
     result.left.get.getMessage should include("Failed to read")
   }
+
+  "FlowConfigLoader" should "reject SCD2 flow with empty primaryKey" in {
+    val yaml =
+      """
+        |name: scd2_flow
+        |description: SCD2 flow
+        |version: "1.0"
+        |owner: test
+        |source:
+        |  type: file
+        |  path: /data/input
+        |  format: csv
+        |  options: {}
+        |schema:
+        |  enforceSchema: true
+        |  allowExtraColumns: false
+        |  columns: []
+        |loadMode:
+        |  type: scd2
+        |  compareColumns:
+        |    - name
+        |    - email
+        |  validFromColumn: valid_from
+        |  validToColumn: valid_to
+        |  isCurrentColumn: is_current
+        |validation:
+        |  primaryKey: []
+        |  foreignKeys: []
+        |  rules: []
+        |output:
+        |  format: parquet
+        |  partitionBy: []
+        |  compression: snappy
+        |  options: {}
+      """.stripMargin
+
+    val result = writeInvalidYaml(yaml, new FlowConfigLoader())
+    result.isLeft shouldBe true
+    result.left.get.getMessage should include("primaryKey")
+  }
+
+  it should "accept SCD2 flow with non-empty primaryKey and compareColumns" in {
+    val yaml =
+      """
+        |name: scd2_flow
+        |description: SCD2 flow
+        |version: "1.0"
+        |owner: test
+        |source:
+        |  type: file
+        |  path: /data/input
+        |  format: csv
+        |  options: {}
+        |schema:
+        |  enforceSchema: true
+        |  allowExtraColumns: false
+        |  columns: []
+        |loadMode:
+        |  type: scd2
+        |  compareColumns:
+        |    - name
+        |    - email
+        |  validFromColumn: valid_from
+        |  validToColumn: valid_to
+        |  isCurrentColumn: is_current
+        |validation:
+        |  primaryKey:
+        |    - id
+        |  foreignKeys: []
+        |  rules: []
+        |output:
+        |  format: parquet
+        |  partitionBy: []
+        |  compression: snappy
+        |  options: {}
+      """.stripMargin
+
+    val result = writeInvalidYaml(yaml, new FlowConfigLoader())
+    result.isRight shouldBe true
+  }
 }

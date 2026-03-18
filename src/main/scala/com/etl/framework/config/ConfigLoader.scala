@@ -262,6 +262,28 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
             s"Flow '${config.name}': SCD2 load mode requires non-empty primaryKey for record identification"
         )
       )
+    } else if (config.loadMode.`type` == LoadMode.SCD2) {
+      // The SCD2 merge SQL uses NULL as a sentinel to distinguish "new record
+      // to insert" (merge key = NULL) from "existing record to update" (merge
+      // key = actual PK value).  A nullable PK column collides with this
+      // sentinel, causing every run to insert null-PK records as new duplicates.
+      val schemaColumnNullability =
+        config.schema.columns.map(c => c.name -> c.nullable).toMap
+      val nullablePkCols = config.validation.primaryKey.filter { pk =>
+        schemaColumnNullability.getOrElse(pk, false)
+      }
+      if (nullablePkCols.nonEmpty) {
+        Left(
+          ConfigFileException(
+            file = path,
+            message =
+              s"Flow '${config.name}': SCD2 load mode requires all PK columns to be non-nullable; " +
+                s"declare nullable=false for: ${nullablePkCols.mkString(", ")}"
+          )
+        )
+      } else {
+        Right(())
+      }
     } else {
       Right(())
     }

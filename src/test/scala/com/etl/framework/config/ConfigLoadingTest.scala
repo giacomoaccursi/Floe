@@ -292,4 +292,104 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
     val result = writeInvalidYaml(yaml, new FlowConfigLoader())
     result.isRight shouldBe true
   }
+
+  it should "reject SCD2 flow when a PK column is declared nullable=true" in {
+    // PK columns must be non-nullable for SCD2: the merge SQL uses NULL as a
+    // sentinel to distinguish "new record to insert" from "existing record to
+    // update". A nullable PK collides with this sentinel and causes duplicates
+    // on every run.
+    val yaml =
+      """
+        |name: scd2_nullable_pk
+        |description: SCD2 with nullable PK
+        |version: "1.0"
+        |owner: test
+        |source:
+        |  type: file
+        |  path: /data/input
+        |  format: csv
+        |  options: {}
+        |schema:
+        |  enforceSchema: true
+        |  allowExtraColumns: false
+        |  columns:
+        |    - name: id
+        |      type: string
+        |      nullable: true
+        |      description: PK column but nullable!
+        |    - name: name
+        |      type: string
+        |      nullable: true
+        |      description: business column
+        |loadMode:
+        |  type: scd2
+        |  compareColumns:
+        |    - name
+        |  validFromColumn: valid_from
+        |  validToColumn: valid_to
+        |  isCurrentColumn: is_current
+        |validation:
+        |  primaryKey:
+        |    - id
+        |  foreignKeys: []
+        |  rules: []
+        |output:
+        |  format: parquet
+        |  partitionBy: []
+        |  compression: snappy
+        |  options: {}
+      """.stripMargin
+
+    val result = writeInvalidYaml(yaml, new FlowConfigLoader())
+    result.isLeft shouldBe true
+    result.left.get.getMessage should include("id")
+    result.left.get.getMessage should (include("nullable") or include("null"))
+  }
+
+  it should "accept SCD2 flow when all PK columns are non-nullable" in {
+    val yaml =
+      """
+        |name: scd2_nonnullable_pk
+        |description: SCD2 with non-nullable PK
+        |version: "1.0"
+        |owner: test
+        |source:
+        |  type: file
+        |  path: /data/input
+        |  format: csv
+        |  options: {}
+        |schema:
+        |  enforceSchema: true
+        |  allowExtraColumns: false
+        |  columns:
+        |    - name: id
+        |      type: string
+        |      nullable: false
+        |      description: PK column, non-nullable
+        |    - name: name
+        |      type: string
+        |      nullable: true
+        |      description: business column
+        |loadMode:
+        |  type: scd2
+        |  compareColumns:
+        |    - name
+        |  validFromColumn: valid_from
+        |  validToColumn: valid_to
+        |  isCurrentColumn: is_current
+        |validation:
+        |  primaryKey:
+        |    - id
+        |  foreignKeys: []
+        |  rules: []
+        |output:
+        |  format: parquet
+        |  partitionBy: []
+        |  compression: snappy
+        |  options: {}
+      """.stripMargin
+
+    val result = writeInvalidYaml(yaml, new FlowConfigLoader())
+    result.isRight shouldBe true
+  }
 }

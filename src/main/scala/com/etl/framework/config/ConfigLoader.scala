@@ -19,7 +19,7 @@ import ConfigHints._
 
 import java.io.File
 import scala.io.Source
-import scala.util.{Failure, Success, Try, Using}
+import scala.util.Using
 import java.util.regex.Matcher
 
 /** Global configuration hints to enforce CamelCase naming strategy (e.g.
@@ -252,46 +252,27 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
       config: FlowConfig,
       path: String
   ): Either[ConfigurationException, Unit] = {
-    if (config.loadMode.`type` == LoadMode.SCD2 && config.loadMode.compareColumns.isEmpty) {
-      Left(
-        ConfigFileException(
-          file = path,
-          message =
-            s"Flow '${config.name}': SCD2 load mode requires compareColumns to be non-empty"
-        )
-      )
-    } else if (config.loadMode.`type` == LoadMode.SCD2 && config.validation.primaryKey.isEmpty) {
-      Left(
-        ConfigFileException(
-          file = path,
-          message =
-            s"Flow '${config.name}': SCD2 load mode requires non-empty primaryKey for record identification"
-        )
-      )
-    } else if (config.loadMode.`type` == LoadMode.SCD2) {
-      // The SCD2 merge SQL uses NULL as a sentinel to distinguish "new record
-      // to insert" (merge key = NULL) from "existing record to update" (merge
-      // key = actual PK value).  A nullable PK column collides with this
-      // sentinel, causing every run to insert null-PK records as new duplicates.
-      val schemaColumnNullability =
-        config.schema.columns.map(c => c.name -> c.nullable).toMap
-      val nullablePkCols = config.validation.primaryKey.filter { pk =>
-        schemaColumnNullability.getOrElse(pk, false)
-      }
-      if (nullablePkCols.nonEmpty) {
-        Left(
-          ConfigFileException(
-            file = path,
-            message =
-              s"Flow '${config.name}': SCD2 load mode requires all PK columns to be non-nullable; " +
-                s"declare nullable=false for: ${nullablePkCols.mkString(", ")}"
-          )
-        )
-      } else {
-        Right(())
-      }
-    } else {
-      Right(())
+    def err(msg: String): Either[ConfigurationException, Unit] =
+      Left(ConfigFileException(file = path, message = s"Flow '${config.name}': $msg"))
+
+    config.loadMode.`type` match {
+      case LoadMode.SCD2 =>
+        if (config.loadMode.compareColumns.isEmpty)
+          err("SCD2 requires compareColumns to be non-empty")
+        else if (config.validation.primaryKey.isEmpty)
+          err("SCD2 requires non-empty primaryKey for record identification")
+        else {
+          // SCD2 uses NULL as a sentinel in merge key columns; a nullable PK
+          // collides with it and causes duplicate insertions on every run.
+          val nullablePkCols = config.validation.primaryKey.filter { pk =>
+            config.schema.columns.find(_.name == pk).exists(_.nullable)
+          }
+          if (nullablePkCols.nonEmpty)
+            err(s"SCD2 requires all PK columns to be non-nullable; " +
+              s"declare nullable=false for: ${nullablePkCols.mkString(", ")}")
+          else Right(())
+        }
+      case _ => Right(())
     }
   }
 
@@ -311,44 +292,26 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
   def loadAll(
       directory: String
   ): Either[ConfigurationException, Seq[FlowConfig]] = {
-    Try {
-      val dir = new File(directory)
-      if (!dir.exists() || !dir.isDirectory) {
-        throw ConfigFileException(
-          file = directory,
-          message = "Directory does not exist or is not a directory"
-        )
-      }
-
-      dir
-        .listFiles()
-        .filter(_.isFile)
-        .filter(f => f.getName.endsWith(".yaml") || f.getName.endsWith(".yml"))
+    val dir = new File(directory)
+    if (!dir.exists() || !dir.isDirectory)
+      Left(ConfigFileException(file = directory, message = "Directory does not exist or is not a directory"))
+    else {
+      val results = Option(dir.listFiles())
+        .getOrElse(Array.empty)
+        .filter(f => f.isFile && (f.getName.endsWith(".yaml") || f.getName.endsWith(".yml")))
         .toSeq
         .map(f => load(f.getAbsolutePath))
-    } match {
-      case Success(results) =>
-        val errors  = results.collect { case Left(err) => err }
-        val configs = results.collect { case Right(c) => c }
-        if (errors.nonEmpty) {
-          Left(
-            ConfigFileException(
-              file = directory,
-              message = s"${errors.size} flow configuration(s) failed to load:\n" +
-                errors.map(e => s"  - ${e.getMessage}").mkString("\n")
-            )
-          )
-        } else {
-          Right(configs)
-        }
-      case Failure(ex) =>
-        Left(
-          ConfigFileException(
-            file = directory,
-            message = "Failed to load flow configurations from directory",
-            cause = ex
-          )
-        )
+
+      val errors  = results.collect { case Left(err)  => err }
+      val configs = results.collect { case Right(cfg) => cfg }
+
+      if (errors.nonEmpty)
+        Left(ConfigFileException(
+          file = directory,
+          message = s"${errors.size} flow configuration(s) failed to load:\n" +
+            errors.map(e => s"  - ${e.getMessage}").mkString("\n")
+        ))
+      else Right(configs)
     }
   }
 }

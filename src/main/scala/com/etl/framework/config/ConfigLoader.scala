@@ -45,9 +45,9 @@ trait ConfigLoader[T] {
       path: String
   )(implicit reader: ConfigReader[T]): Either[ConfigurationException, T] = {
     for {
-      yaml <- loadYamlFile(path)
-      substituted = substituteEnvVars(yaml)
-      config <- parseYaml(substituted, path)
+      yaml        <- loadYamlFile(path)
+      substituted <- substituteEnvVars(yaml, path)
+      config      <- parseYaml(substituted, path)
     } yield config
   }
 
@@ -79,7 +79,7 @@ trait ConfigLoader[T] {
 
   /** Convert PureConfig errors to our custom exception hierarchy
     */
-  private def convertPureConfigError(
+  protected def convertPureConfigError(
       failures: ConfigReaderFailures,
       path: String
   ): ConfigurationException = {
@@ -112,9 +112,12 @@ trait ConfigLoader[T] {
   }
 
   /** Substitutes environment variables in the format ${VAR_NAME} or $VAR_NAME.
-    * Fails fast if any referenced variable is not set.
+    * Returns Left if any referenced variable is not set.
     */
-  protected def substituteEnvVars(text: String): String = {
+  protected def substituteEnvVars(
+      text: String,
+      path: String = "<unknown>"
+  ): Either[ConfigurationException, String] = {
     val pattern = """\$\{([^}]+)}|\$([A-Za-z_][A-Za-z0-9_]*)""".r
 
     val unresolvedVars = pattern
@@ -125,19 +128,25 @@ trait ConfigLoader[T] {
       .distinct
 
     if (unresolvedVars.nonEmpty) {
-      throw new IllegalArgumentException(
-        s"Unresolved environment variables: ${unresolvedVars.mkString(", ")}. " +
-          "Set these environment variables before running the pipeline."
+      Left(
+        ConfigFileException(
+          file = path,
+          message =
+            s"Unresolved environment variables: ${unresolvedVars.mkString(", ")}. " +
+              "Set these environment variables before running the pipeline."
+        )
+      )
+    } else {
+      Right(
+        pattern.replaceAllIn(
+          text,
+          m => {
+            val varName = Option(m.group(1)).getOrElse(m.group(2))
+            Matcher.quoteReplacement(sys.env(varName))
+          }
+        )
       )
     }
-
-    pattern.replaceAllIn(
-      text,
-      m => {
-        val varName = Option(m.group(1)).getOrElse(m.group(2))
-        Matcher.quoteReplacement(sys.env(varName))
-      }
-    )
   }
 }
 
@@ -176,12 +185,8 @@ class DomainsConfigLoader extends ConfigLoader[DomainsConfig] {
 
   override def load(
       path: String
-  ): Either[ConfigurationException, DomainsConfig] = {
-    for {
-      yaml <- loadYamlFile(path)
-      config <- parseYaml(yaml, path)
-    } yield config
-  }
+  ): Either[ConfigurationException, DomainsConfig] =
+    loadFromYamlFile(path)
 }
 
 /** Internal case class for parsing FlowConfig from YAML Excludes
@@ -235,7 +240,8 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
       path: String
   ): Either[ConfigurationException, FlowConfig] = {
     for {
-      yaml       <- loadYamlFile(path)
+      rawYaml    <- loadYamlFile(path)
+      yaml       <- substituteEnvVars(rawYaml, path)
       configYaml <- parseYamlToFlowConfigYaml(yaml, path)
       flowConfig  = configYaml.toFlowConfig
       _          <- validateFlowConfig(flowConfig, path)
@@ -295,26 +301,12 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
   ): Either[ConfigurationException, FlowConfigYaml] = {
     import ConfigHints._
     YamlConfigSource.string(yaml).load[FlowConfigYaml].left.map { failures =>
-      val firstFailure = failures.head
-      firstFailure match {
-        case ConvertFailure(KeyNotFound(key, _), _, configPath) =>
-          val location = if (configPath.isEmpty) "root" else configPath
-          ConfigFileException(
-            file = path,
-            message = s"Missing required field '$key' at '$location'"
-          )
-        case other =>
-          val location =
-            other.origin.map(_.description).getOrElse("unknown location")
-          ConfigFileException(
-            file = path,
-            message = s"Configuration Error at $location: ${other.description}"
-          )
-      }
+      convertPureConfigError(failures, path)
     }
   }
 
-  /** Loads all flow configurations from a directory
+  /** Loads all flow configurations from a directory.
+    * If any files fail to load, all errors are reported together.
     */
   def loadAll(
       directory: String
@@ -328,19 +320,26 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
         )
       }
 
-      val yamlFiles = dir
+      dir
         .listFiles()
         .filter(_.isFile)
         .filter(f => f.getName.endsWith(".yaml") || f.getName.endsWith(".yml"))
         .toSeq
-
-      yamlFiles.map(f => load(f.getAbsolutePath))
+        .map(f => load(f.getAbsolutePath))
     } match {
       case Success(results) =>
-        val (errors, configs) = results.partition(_.isLeft)
-        errors.collectFirst { case Left(err) => err } match {
-          case Some(err) => Left(err)
-          case None      => Right(configs.collect { case Right(c) => c })
+        val errors  = results.collect { case Left(err) => err }
+        val configs = results.collect { case Right(c) => c }
+        if (errors.nonEmpty) {
+          Left(
+            ConfigFileException(
+              file = directory,
+              message = s"${errors.size} flow configuration(s) failed to load:\n" +
+                errors.map(e => s"  - ${e.getMessage}").mkString("\n")
+            )
+          )
+        } else {
+          Right(configs)
         }
       case Failure(ex) =>
         Left(
@@ -362,8 +361,7 @@ class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
       path: String
   ): Either[ConfigurationException, AggregationConfig] = {
     for {
-      yaml   <- loadYamlFile(path)
-      config <- parseYaml(yaml, path)
+      config <- loadFromYamlFile(path)
       _      <- validateAggregationConfig(config, path)
     } yield config
   }
@@ -372,31 +370,40 @@ class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
       config: AggregationConfig,
       path: String
   ): Either[ConfigurationException, Unit] = {
-    if (config.nodes.isEmpty) {
-      return Left(ConfigFileException(file = path, message = s"DAG '${config.name}': nodes list must not be empty"))
-    }
+    def err(msg: String): Either[ConfigurationException, Unit] =
+      Left(ConfigFileException(file = path, message = s"DAG '${config.name}': $msg"))
 
     val nodeIds = config.nodes.map(_.id).toSet
-    val duplicates = config.nodes.map(_.id).groupBy(identity).collect { case (id, ids) if ids.size > 1 => id }
-    if (duplicates.nonEmpty) {
-      return Left(ConfigFileException(file = path, message = s"DAG '${config.name}': duplicate node IDs: ${duplicates.mkString(", ")}"))
-    }
+    val duplicates = config.nodes
+      .map(_.id)
+      .groupBy(identity)
+      .collect { case (id, ids) if ids.size > 1 => id }
+      .toSeq
 
-    config.nodes.foreach { node =>
+    def validateNode(node: DAGNode): Either[ConfigurationException, Unit] = {
       val missingDeps = node.dependencies.filterNot(nodeIds.contains)
-      if (missingDeps.nonEmpty) {
-        return Left(ConfigFileException(file = path, message = s"DAG '${config.name}': node '${node.id}' references missing dependencies: ${missingDeps.mkString(", ")}"))
+      val joinErrors = node.join.toSeq.flatMap { joinConfig =>
+        val missingParent =
+          if (!nodeIds.contains(joinConfig.parent))
+            Seq(s"node '${node.id}' references missing join parent '${joinConfig.parent}'")
+          else Seq.empty
+        val emptyOn =
+          if (joinConfig.on.isEmpty)
+            Seq(s"node '${node.id}' has a join with no conditions")
+          else Seq.empty
+        missingParent ++ emptyOn
       }
-      node.join.foreach { joinConfig =>
-        if (!nodeIds.contains(joinConfig.parent)) {
-          return Left(ConfigFileException(file = path, message = s"DAG '${config.name}': node '${node.id}' references missing join parent '${joinConfig.parent}'"))
-        }
-        if (joinConfig.on.isEmpty) {
-          return Left(ConfigFileException(file = path, message = s"DAG '${config.name}': node '${node.id}' has a join with no conditions"))
-        }
-      }
+      val allErrors =
+        missingDeps.map(d => s"node '${node.id}' references missing dependency '$d'") ++
+          joinErrors
+      allErrors.headOption.fold[Either[ConfigurationException, Unit]](Right(()))(err)
     }
 
-    Right(())
+    if (config.nodes.isEmpty) err("nodes list must not be empty")
+    else if (duplicates.nonEmpty) err(s"duplicate node IDs: ${duplicates.mkString(", ")}")
+    else
+      config.nodes.foldLeft[Either[ConfigurationException, Unit]](Right(())) {
+        (acc, node) => acc.flatMap(_ => validateNode(node))
+      }
   }
 }

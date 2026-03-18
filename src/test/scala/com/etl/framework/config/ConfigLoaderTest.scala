@@ -31,6 +31,14 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
     ): Either[ConfigurationException, TestConfig] = {
       parseYaml(yaml, path)
     }
+
+    // Public wrapper for testing protected method
+    def substituteVars(
+        text: String,
+        path: String = "test.yaml"
+    ): Either[ConfigurationException, String] = {
+      substituteEnvVars(text, path)
+    }
   }
 
   val loader = new TestConfigLoader()
@@ -124,6 +132,49 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
     withTempFile(content) { file =>
       val result = loader.load(file.getAbsolutePath)
       result shouldBe Right(TestConfig("file_test", 100, List("x")))
+    }
+  }
+
+  "substituteEnvVars" should "return Right with substituted text when variable is set" in {
+    val originalEnv = sys.env.get("HOME")
+    assume(originalEnv.isDefined, "HOME env var must be set for this test")
+    val text   = "path: ${HOME}/data"
+    val result = loader.substituteVars(text)
+    result.isRight shouldBe true
+    result.right.get should include(originalEnv.get)
+    result.right.get should not include "${"
+  }
+
+  it should "return Left(ConfigFileException) when variable is not set" in {
+    val text   = "value: ${NONEXISTENT_VAR_XYZ_12345}"
+    val result = loader.substituteVars(text, "config.yaml")
+    result.isLeft shouldBe true
+    result.left.get shouldBe a[ConfigFileException]
+    result.left.get.getMessage should include("NONEXISTENT_VAR_XYZ_12345")
+  }
+
+  it should "report all unresolved variables in a single Left" in {
+    val text   = "a: ${MISSING_A_XYZ} b: ${MISSING_B_XYZ}"
+    val result = loader.substituteVars(text)
+    result.isLeft shouldBe true
+    val msg = result.left.get.getMessage
+    msg should include("MISSING_A_XYZ")
+    msg should include("MISSING_B_XYZ")
+  }
+
+  it should "return Right with unchanged text when no variables are present" in {
+    val text   = "plain: value"
+    val result = loader.substituteVars(text)
+    result shouldBe Right(text)
+  }
+
+  it should "propagate env var errors through loadFromYamlFile as Left, not exception" in {
+    val content = "name: ${NONEXISTENT_VAR_XYZ_99999}\nvalue: 1\nitems: []"
+    withTempFile(content) { file =>
+      val result = loader.load(file.getAbsolutePath)
+      result.isLeft shouldBe true
+      result.left.get shouldBe a[ConfigFileException]
+      result.left.get.getMessage should include("NONEXISTENT_VAR_XYZ_99999")
     }
   }
 

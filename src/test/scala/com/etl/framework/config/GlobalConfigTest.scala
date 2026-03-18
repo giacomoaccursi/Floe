@@ -1,8 +1,8 @@
 package com.etl.framework.config
 
+import com.etl.framework.exceptions.ConfigFileException
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import pureconfig._
 import pureconfig.generic.auto._
 import pureconfig.module.yaml._
 
@@ -43,7 +43,7 @@ class GlobalConfigLoaderLogicTest extends AnyFlatSpec with Matchers {
 
   class TestGlobalLoader extends GlobalConfigLoader {
     // Expose protected methods for testing
-    def testSubstitute(text: String): String = substituteEnvVars(text)
+    def testSubstitute(text: String) = substituteEnvVars(text, "test.yaml")
     def testParse(yaml: String): Either[Exception, GlobalConfig] =
       parseYaml(yaml, "test").left.map(e => e: Exception)
   }
@@ -51,19 +51,18 @@ class GlobalConfigLoaderLogicTest extends AnyFlatSpec with Matchers {
   val loader = new TestGlobalLoader()
 
   "substituteEnvVars" should "replace existing env vars" in {
-    // This depends on actual env vars.
-    // We can use generic ones like PATH or create a test one if possible, but let's assume one exists or skip
     val path = sys.env.getOrElse("PATH", "")
-    if (path.nonEmpty) {
-      loader.testSubstitute("Path is ${PATH}") should include(path)
-    }
+    assume(path.nonEmpty, "PATH env var must be set for this test")
+    val result = loader.testSubstitute("Path is ${PATH}")
+    result.isRight shouldBe true
+    result.right.get should include(path)
   }
 
-  it should "throw on unresolved env vars" in {
-    val ex = intercept[IllegalArgumentException] {
-      loader.testSubstitute("Value is ${UNKNOWN_VAR_123}")
-    }
-    ex.getMessage should include("UNKNOWN_VAR_123")
+  it should "return Left with ConfigFileException on unresolved env vars" in {
+    val result = loader.testSubstitute("Value is ${UNKNOWN_VAR_123}")
+    result.isLeft shouldBe true
+    result.left.get shouldBe a[ConfigFileException]
+    result.left.get.getMessage should include("UNKNOWN_VAR_123")
   }
 
   it should "parse full configuration correctly" in {

@@ -392,4 +392,175 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
     val result = writeInvalidYaml(yaml, new FlowConfigLoader())
     result.isRight shouldBe true
   }
+
+  "FlowConfigLoader" should "substitute environment variables in YAML" in {
+    assume(sys.env.contains("HOME"), "HOME env var must be set for this test")
+    val homeValue = sys.env("HOME")
+    val yaml =
+      s"""
+        |name: env_flow
+        |description: Flow with env var
+        |version: "1.0"
+        |owner: test
+        |source:
+        |  type: file
+        |  path: $${HOME}/data/input
+        |  format: csv
+        |  options: {}
+        |schema:
+        |  enforceSchema: true
+        |  allowExtraColumns: false
+        |  columns: []
+        |loadMode:
+        |  type: full
+        |validation:
+        |  primaryKey: []
+        |  foreignKeys: []
+        |  rules: []
+        |output:
+        |  format: parquet
+        |  partitionBy: []
+        |  compression: snappy
+        |  options: {}
+      """.stripMargin
+
+    val result = writeInvalidYaml(yaml, new FlowConfigLoader())
+    result.isRight shouldBe true
+    result.right.get.source.path shouldBe s"$homeValue/data/input"
+  }
+
+  it should "return Left when a referenced environment variable is not set" in {
+    val yaml =
+      """
+        |name: missing_env_flow
+        |description: Flow with unresolved env var
+        |version: "1.0"
+        |owner: test
+        |source:
+        |  type: file
+        |  path: ${DEFINITELY_MISSING_ENV_VAR_XYZ_789}/data
+        |  format: csv
+        |  options: {}
+        |schema:
+        |  enforceSchema: true
+        |  allowExtraColumns: false
+        |  columns: []
+        |loadMode:
+        |  type: full
+        |validation:
+        |  primaryKey: []
+        |  foreignKeys: []
+        |  rules: []
+        |output:
+        |  format: parquet
+        |  partitionBy: []
+        |  compression: snappy
+        |  options: {}
+      """.stripMargin
+
+    val result = writeInvalidYaml(yaml, new FlowConfigLoader())
+    result.isLeft shouldBe true
+    result.left.get.getMessage should include("DEFINITELY_MISSING_ENV_VAR_XYZ_789")
+  }
+
+  "FlowConfigLoader.loadAll" should "report all errors when multiple files are invalid" in {
+    import java.nio.file.{Files => NIOFiles}
+
+    val tempDir = NIOFiles.createTempDirectory("loadAll-test").toFile
+    tempDir.deleteOnExit()
+
+    def writeFile(name: String, content: String): Unit = {
+      val f = new java.io.File(tempDir, name)
+      f.deleteOnExit()
+      val pw = new PrintWriter(f)
+      try pw.write(content)
+      finally pw.close()
+    }
+
+    val missingNameYaml =
+      """
+        |description: flow without name
+        |version: "1.0"
+        |owner: test
+        |source:
+        |  type: file
+        |  path: /data
+        |  format: csv
+        |  options: {}
+        |schema:
+        |  enforceSchema: true
+        |  allowExtraColumns: false
+        |  columns: []
+        |loadMode:
+        |  type: full
+        |validation:
+        |  primaryKey: []
+        |  foreignKeys: []
+        |  rules: []
+        |output:
+        |  format: parquet
+        |  partitionBy: []
+        |  compression: snappy
+        |  options: {}
+      """.stripMargin
+
+    writeFile("bad1.yaml", missingNameYaml)
+    writeFile("bad2.yaml", missingNameYaml)
+
+    val loader = new FlowConfigLoader()
+    val result = loader.loadAll(tempDir.getAbsolutePath)
+
+    result.isLeft shouldBe true
+    val msg = result.left.get.getMessage
+    // Should report both failures, not just the first
+    msg should include("2 flow configuration(s) failed to load")
+  }
+
+  it should "succeed when all files in directory are valid" in {
+    import java.nio.file.{Files => NIOFiles}
+
+    val tempDir = NIOFiles.createTempDirectory("loadAll-ok-test").toFile
+    tempDir.deleteOnExit()
+
+    val validYaml =
+      """
+        |name: valid_flow
+        |description: Valid flow
+        |version: "1.0"
+        |owner: test
+        |source:
+        |  type: file
+        |  path: /data/input
+        |  format: csv
+        |  options: {}
+        |schema:
+        |  enforceSchema: true
+        |  allowExtraColumns: false
+        |  columns: []
+        |loadMode:
+        |  type: full
+        |validation:
+        |  primaryKey: []
+        |  foreignKeys: []
+        |  rules: []
+        |output:
+        |  format: parquet
+        |  partitionBy: []
+        |  compression: snappy
+        |  options: {}
+      """.stripMargin
+
+    val f = new java.io.File(tempDir, "flow.yaml")
+    f.deleteOnExit()
+    val pw = new PrintWriter(f)
+    try pw.write(validYaml)
+    finally pw.close()
+
+    val loader = new FlowConfigLoader()
+    val result = loader.loadAll(tempDir.getAbsolutePath)
+
+    result.isRight shouldBe true
+    result.right.get should have size 1
+    result.right.get.head.name shouldBe "valid_flow"
+  }
 }

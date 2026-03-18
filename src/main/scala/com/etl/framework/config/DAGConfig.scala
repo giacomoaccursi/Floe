@@ -6,25 +6,7 @@ case class AggregationConfig(
     name: String,
     description: String,
     version: String,
-    batchModel: ModelConfig,
-    finalModel: ModelConfig,
-    output: DAGOutputConfig,
     nodes: Seq[DAGNode]
-)
-
-/** Model configuration
-  */
-case class ModelConfig(
-    `class`: String,
-    mappingFile: Option[String] = None,
-    mapperClass: Option[String] = None
-)
-
-/** DAG output configuration
-  */
-case class DAGOutputConfig(
-    batch: OutputConfig,
-    `final`: OutputConfig
 )
 
 /** DAG node configuration

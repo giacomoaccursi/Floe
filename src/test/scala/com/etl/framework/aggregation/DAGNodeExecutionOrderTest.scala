@@ -45,26 +45,6 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
       name = "test_aggregation",
       description = "Test DAG",
       version = "1.0",
-      batchModel = ModelConfig("com.example.BatchModel", None, None),
-      finalModel = ModelConfig("com.example.FinalModel", None, None),
-      output = DAGOutputConfig(
-        batch = OutputConfig(
-          Some("/data/model/batch"),
-          None,
-          FileFormat.Parquet,
-          Seq.empty,
-          "snappy",
-          Map.empty
-        ),
-        `final` = OutputConfig(
-          Some("/data/model/final"),
-          None,
-          FileFormat.Parquet,
-          Seq.empty,
-          "snappy",
-          Map.empty
-        )
-      ),
       nodes = nodes
     )
 

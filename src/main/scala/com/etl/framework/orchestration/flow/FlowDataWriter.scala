@@ -71,11 +71,9 @@ class FlowDataWriter(
       }
 
       writer.save(outputPath)
+      logger.info("Validated data written successfully")
 
-      val recordCount = validData.count()
-      logger.info(s"Wrote $recordCount validated records")
-
-      WriteResult(recordsWritten = recordCount, snapshotId = None)
+      WriteResult(recordsWritten = 0L, snapshotId = None)
     }
   }
 

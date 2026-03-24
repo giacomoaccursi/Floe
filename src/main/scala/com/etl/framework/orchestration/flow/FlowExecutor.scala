@@ -261,22 +261,29 @@ class FlowExecutor(
         s"${globalConfig.paths.outputPath}/${flowConfig.name}_${tableName}"
       )
 
-      dataWriter.writeAdditionalTable(
-        tableName,
-        tableInfo.data,
-        Some(outputPath),
-        tableInfo.dagMetadata
-      )
+      // Cache before write: the write action populates the cache, count() reuses it
+      // instead of re-executing the full DAG transformation plan
+      val cachedData = tableInfo.data.cache()
+      try {
+        dataWriter.writeAdditionalTable(
+          tableName,
+          cachedData,
+          Some(outputPath),
+          tableInfo.dagMetadata
+        )
 
-      val recordCount = tableInfo.data.count()
-      metadataWriter.writeAdditionalTableMetadata(
-        tableName,
-        tableInfo.data,
-        recordCount,
-        outputPath,
-        tableInfo.dagMetadata,
-        batchId
-      )
+        val recordCount = cachedData.count()
+        metadataWriter.writeAdditionalTableMetadata(
+          tableName,
+          cachedData,
+          recordCount,
+          outputPath,
+          tableInfo.dagMetadata,
+          batchId
+        )
+      } finally {
+        cachedData.unpersist()
+      }
     }
   }
 

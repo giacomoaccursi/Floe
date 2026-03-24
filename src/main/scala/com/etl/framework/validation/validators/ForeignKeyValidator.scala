@@ -4,7 +4,7 @@ import com.etl.framework.config.{FlowConfig, ValidationRule}
 import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.{broadcast, col}
+import org.apache.spark.sql.functions.{broadcast, col, lit}
 
 /**
  * Validator for Foreign Key integrity

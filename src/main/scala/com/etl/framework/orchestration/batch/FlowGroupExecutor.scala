@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory
 import scala.collection.mutable
 import scala.concurrent._
 import scala.concurrent.duration._
+import java.util.concurrent.Executors
 
 /**
  * Executes groups of flows sequentially or in parallel
@@ -20,6 +21,12 @@ class FlowGroupExecutor(
 
   private val logger = LoggerFactory.getLogger(getClass)
   private val MaxParallelTimeout: FiniteDuration = 2.hours
+
+  // Bounded thread pool: each parallel flow executes a full Spark pipeline
+  // (read, validate, write) — unbounded global EC risks driver thread exhaustion
+  private val parallelEc: ExecutionContext = ExecutionContext.fromExecutorService(
+    Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
+  )
   
   /**
    * Executes a group of flows sequentially
@@ -53,15 +60,13 @@ class FlowGroupExecutor(
     batchId: String,
     validatedFlows: Map[String, DataFrame]
   ): Seq[FlowResult] = {
-    import ExecutionContext.Implicits.global
-    
     val futures = group.flows.map { flowConfig =>
       Future {
         executeFlow(flowConfig, batchId, validatedFlows)
-      }
+      }(parallelEc)
     }
-    
-    val allResults = Future.sequence(futures)
+
+    val allResults = Future.sequence(futures)(implicitly, parallelEc)
     Await.result(allResults, MaxParallelTimeout)
   }
   

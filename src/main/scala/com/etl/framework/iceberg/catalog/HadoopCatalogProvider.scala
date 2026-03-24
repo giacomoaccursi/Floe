@@ -3,7 +3,7 @@ package com.etl.framework.iceberg.catalog
 import com.etl.framework.config.IcebergConfig
 import org.apache.spark.sql.SparkSession
 
-class HadoopCatalogProvider extends ICatalogProvider {
+class HadoopCatalogProvider extends CatalogProvider {
 
   private val icebergExtensions =
     "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"

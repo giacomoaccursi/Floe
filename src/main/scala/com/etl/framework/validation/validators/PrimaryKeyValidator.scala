@@ -31,10 +31,13 @@ class PrimaryKeyValidator(flowConfig: FlowConfig, flowName: Option[String] = Non
       if (duplicates.isEmpty) {
         ValidationUtils.validResult(df)
       } else {
-        // Join to get all duplicate records
-        val rejectedDf = df.join(duplicates, pkColumns, "inner")
-        val validDf = df.join(duplicates, pkColumns, "left_anti")
-        
+        // Single left join with a marker column replaces the previous inner + left_anti
+        // double-join pattern, scanning df only once instead of twice
+        val markedDuplicates = duplicates.withColumn("_is_dup", lit(true))
+        val joined = df.join(markedDuplicates, pkColumns, "left")
+        val rejectedDf = joined.filter(col("_is_dup").isNotNull).drop("_is_dup")
+        val validDf    = joined.filter(col("_is_dup").isNull).drop("_is_dup")
+
         ValidationUtils.resultWithRejections(
           validDf,
           rejectedDf,

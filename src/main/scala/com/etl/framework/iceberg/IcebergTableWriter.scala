@@ -30,15 +30,19 @@ class IcebergTableWriter(
 
     logger.info(s"Writing full load to $tableName")
 
-    df.writeTo(tableName).overwritePartitions()
-
-    val recordCount = df.count()
-    val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
-    snapshotId.foreach { sid =>
-      logger.info(s"Full load complete on $tableName: $recordCount records, snapshot: $sid")
+    // Cache df: write populates the cache, count() reuses it avoiding a second scan
+    val cachedDf = df.cache()
+    try {
+      cachedDf.writeTo(tableName).overwritePartitions()
+      val recordCount = cachedDf.count()
+      val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
+      snapshotId.foreach { sid =>
+        logger.info(s"Full load complete on $tableName: $recordCount records, snapshot: $sid")
+      }
+      WriteResult(recordCount, snapshotId)
+    } finally {
+      cachedDf.unpersist()
     }
-
-    WriteResult(recordCount, snapshotId)
   }
 
   def writeDeltaLoad(
@@ -50,64 +54,68 @@ class IcebergTableWriter(
 
     val pkColumns = flowConfig.validation.primaryKey
 
-    if (pkColumns.isEmpty) {
-      logger.warn(s"No primary key defined for $tableName, falling back to append")
-      df.writeTo(tableName).append()
-    } else {
-      val mergeCondition = pkColumns
-        .map(col => s"target.$col = source.$col")
-        .mkString(" AND ")
-
-      val updateCols = df.columns
-        .filterNot(pkColumns.contains)
-
-      val updateSetClause = if (flowConfig.loadMode.updateTimestampColumn.isDefined) {
-        val tsCol = flowConfig.loadMode.updateTimestampColumn.get
-        val timestampCondition = s"source.$tsCol > target.$tsCol"
-        updateCols
-          .map(col => s"target.$col = source.$col")
-          .mkString(", ")
-          .replaceFirst("^", s"WHEN MATCHED AND $timestampCondition THEN UPDATE SET ")
+    // Cache df before write: write populates the cache, count() reuses it
+    val cachedDf = df.cache()
+    try {
+      if (pkColumns.isEmpty) {
+        logger.warn(s"No primary key defined for $tableName, falling back to append")
+        cachedDf.writeTo(tableName).append()
       } else {
-        updateCols
+        val mergeCondition = pkColumns
           .map(col => s"target.$col = source.$col")
-          .mkString(", ")
-          .replaceFirst("^", "WHEN MATCHED THEN UPDATE SET ")
+          .mkString(" AND ")
+
+        val updateCols = cachedDf.columns
+          .filterNot(pkColumns.contains)
+
+        val updateSetClause = if (flowConfig.loadMode.updateTimestampColumn.isDefined) {
+          val tsCol = flowConfig.loadMode.updateTimestampColumn.get
+          val timestampCondition = s"source.$tsCol > target.$tsCol"
+          updateCols
+            .map(col => s"target.$col = source.$col")
+            .mkString(", ")
+            .replaceFirst("^", s"WHEN MATCHED AND $timestampCondition THEN UPDATE SET ")
+        } else {
+          updateCols
+            .map(col => s"target.$col = source.$col")
+            .mkString(", ")
+            .replaceFirst("^", "WHEN MATCHED THEN UPDATE SET ")
+        }
+
+        val insertCols = cachedDf.columns.mkString(", ")
+        val insertVals = cachedDf.columns.map(c => s"source.$c").mkString(", ")
+        val insertClause =
+          s"WHEN NOT MATCHED THEN INSERT ($insertCols) VALUES ($insertVals)"
+
+        val mergeView = s"_iceberg_merge_${sanitizeViewName(flowConfig.name)}_source"
+        val mergeSql =
+          s"""MERGE INTO $tableName AS target
+             |USING $mergeView AS source
+             |ON $mergeCondition
+             |$updateSetClause
+             |$insertClause""".stripMargin
+
+        logger.info(s"Executing MERGE INTO on $tableName")
+        logger.debug(s"Merge SQL: $mergeSql")
+        try {
+          cachedDf.createOrReplaceTempView(mergeView)
+          spark.sql(mergeSql)
+        } finally {
+          spark.catalog.dropTempView(mergeView)
+        }
       }
 
-      val insertCols = df.columns.mkString(", ")
-      val insertVals = df.columns.map(c => s"source.$c").mkString(", ")
-      val insertClause =
-        s"WHEN NOT MATCHED THEN INSERT ($insertCols) VALUES ($insertVals)"
-
-      val mergeView = s"_iceberg_merge_${sanitizeViewName(flowConfig.name)}_source"
-      df.createOrReplaceTempView(mergeView)
-
-      val mergeSql =
-        s"""MERGE INTO $tableName AS target
-           |USING $mergeView AS source
-           |ON $mergeCondition
-           |$updateSetClause
-           |$insertClause""".stripMargin
-
-      logger.info(s"Executing MERGE INTO on $tableName")
-      logger.debug(s"Merge SQL: $mergeSql")
-      try {
-        spark.sql(mergeSql)
-      } finally {
-        spark.catalog.dropTempView(mergeView)
+      val recordCount = cachedDf.count()
+      val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
+      snapshotId.foreach { sid =>
+        logger.info(
+          s"Delta upsert complete on $tableName: $recordCount records, snapshot: $sid"
+        )
       }
+      WriteResult(recordCount, snapshotId)
+    } finally {
+      cachedDf.unpersist()
     }
-
-    val recordCount = df.count()
-    val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
-    snapshotId.foreach { sid =>
-      logger.info(
-        s"Delta upsert complete on $tableName: $recordCount records, snapshot: $sid"
-      )
-    }
-
-    WriteResult(recordCount, snapshotId)
   }
 
   def writeSCD2Load(
@@ -147,13 +155,19 @@ class IcebergTableWriter(
     val sourceView = s"_iceberg_scd2_${sn}_source"
     val stagedView = s"_iceberg_scd2_${sn}_staged"
 
+    // Cache df: the SQL operations reading the source view populate the cache,
+    // count() reuses it avoiding a second scan of the input data
+    val cachedDf = df.cache()
+
+    try {
+
     if (existingCount == 0) {
       // First load: all records are current and active
       logger.info(s"SCD2 initial load to $tableName")
 
-      df.createOrReplaceTempView(sourceView)
+      cachedDf.createOrReplaceTempView(sourceView)
 
-      val columns = df.columns.mkString(", ")
+      val columns = cachedDf.columns.mkString(", ")
       val isActiveInsert =
         isActiveCol.map(c => s",\n  true AS $c").getOrElse("")
 
@@ -172,14 +186,14 @@ class IcebergTableWriter(
       // Subsequent load: single atomic MERGE INTO with NULL merge_key trick
       logger.info(s"SCD2 change detection on $tableName")
 
-      df.createOrReplaceTempView(sourceView)
+      cachedDf.createOrReplaceTempView(sourceView)
 
       // Build staged source: all records with _mk=pk UNION changed records with _mk=NULL
-      val srcCols = df.columns.map(c => s"src.$c").mkString(", ")
+      val srcCols = cachedDf.columns.map(c => s"src.$c").mkString(", ")
       val mkFromPk = pkColumns.map(c => s"src.$c AS _mk_$c").mkString(", ")
       val mkNull = pkColumns
         .map { c =>
-          val dataType = df.schema(c).dataType.sql
+          val dataType = cachedDf.schema(c).dataType.sql
           s"CAST(NULL AS $dataType) AS _mk_$c"
         }
         .mkString(", ")
@@ -223,11 +237,11 @@ class IcebergTableWriter(
 
       // WHEN NOT MATCHED: insert new version or brand new record
       val insertColNames =
-        (df.columns.toSeq ++ Seq(validFromCol, validToCol, isCurrentCol) ++ isActiveCol.toSeq)
+        (cachedDf.columns.toSeq ++ Seq(validFromCol, validToCol, isCurrentCol) ++ isActiveCol.toSeq)
           .mkString(", ")
       val isActiveVal = isActiveCol.map(_ => ", true").getOrElse("")
       val insertVals =
-        df.columns.map(c => s"source.$c").mkString(", ") +
+        cachedDf.columns.map(c => s"source.$c").mkString(", ") +
           s", current_timestamp(), CAST(NULL AS TIMESTAMP), true$isActiveVal"
       val notMatchedClause =
         s"WHEN NOT MATCHED THEN INSERT ($insertColNames) VALUES ($insertVals)"
@@ -262,7 +276,7 @@ class IcebergTableWriter(
       }
     }
 
-    val recordCount = df.count()
+    val recordCount = cachedDf.count()
     val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
     snapshotId.foreach { sid =>
       logger.info(
@@ -271,6 +285,10 @@ class IcebergTableWriter(
     }
 
     WriteResult(recordCount, snapshotId)
+
+    } finally {
+      cachedDf.unpersist()
+    }
   }
 
   def tagBatchSnapshot(

@@ -40,31 +40,26 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit
 
     val validationSteps: Seq[ValidationStep] = Seq(
       ValidationStep(
-        "schema_validation",
         shouldExecute = true,
         new SchemaValidator(flowConfig, flowName),
         ValidationRule(ValidationRuleType.Schema)
       ),
       ValidationStep(
-        "not_null_validation",
         shouldExecute = true,
         new NotNullValidator(flowConfig, flowName),
         ValidationRule(ValidationRuleType.NotNull)
       ),
       ValidationStep(
-        "pk_validation",
         shouldExecute = true,
         new PrimaryKeyValidator(flowConfig, flowName),
         ValidationRule(ValidationRuleType.PKUniqueness)
       ),
       ValidationStep(
-        "fk_validation",
         flowConfig.validation.foreignKeys.nonEmpty,
         new ForeignKeyValidator(flowConfig, validatedFlows, flowName),
         ValidationRule(ValidationRuleType.FKIntegrity)
       ),
       ValidationStep(
-        "rules_validation",
         flowConfig.validation.rules.nonEmpty,
         new CustomRulesValidator(flowConfig, domainsConfig, flowName),
         ValidationRule(ValidationRuleType.Custom)
@@ -74,14 +69,27 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit
     // Execute validation steps
     val finalState = validationSteps
       .filter(_.shouldExecute)
-      .foldLeft(ValidationState(initialDf, None, Map.empty)) { (state, step) =>
+      .foldLeft(ValidationState(initialDf, None)) { (state, step) =>
         executeValidationStep(state, step)
       }
+
+    // Single Spark action: count rejections per validation step using the
+    // _validation_step column already set by each validator's metadata
+    val rejectionReasons: Map[String, Long] = finalState.rejected match {
+      case Some(rejectedDf) =>
+        rejectedDf
+          .groupBy(VALIDATION_STEP)
+          .count()
+          .collect()
+          .map(row => row.getString(0) -> row.getLong(1))
+          .toMap
+      case None => Map.empty
+    }
 
     ValidationResult(
       finalState.valid,
       finalState.rejected,
-      finalState.rejectionReasons
+      rejectionReasons
     )
   }
 
@@ -95,13 +103,7 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit
 
     ValidationState(
       valid = result.valid,
-      rejected =
-        ValidationUtils.combineRejected(state.rejected, result.rejected),
-      rejectionReasons = state.rejectionReasons ++ result.rejected.map { r =>
-        val newCount = r.count()
-        val existing = state.rejectionReasons.getOrElse(step.reasonKey, 0L)
-        step.reasonKey -> (existing + newCount)
-      }
+      rejected = ValidationUtils.combineRejected(state.rejected, result.rejected)
     )
   }
 }
@@ -109,7 +111,6 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit
 /** Represents a single validation step
   */
 private case class ValidationStep(
-    reasonKey: String,
     shouldExecute: Boolean,
     validator: Validator,
     rule: ValidationRule
@@ -119,8 +120,7 @@ private case class ValidationStep(
   */
 private case class ValidationState(
     valid: DataFrame,
-    rejected: Option[DataFrame],
-    rejectionReasons: Map[String, Long]
+    rejected: Option[DataFrame]
 )
 
 /** Result of validation containing valid and rejected DataFrames

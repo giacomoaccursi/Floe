@@ -108,8 +108,8 @@ class FlowExecutor(
     val validationResult = TimingUtil.timed(logger, "Validate data") {
       validateData(preTransformedData)
     }
-    val validCount = validationResult.valid.count()
-    val rejectedCount = validationResult.rejected.map(_.count()).getOrElse(0L)
+    val rejectedCount = validationResult.rejectionReasons.values.sum
+    val validCount = inputCount - rejectedCount
 
     logValidationResults(validationResult, inputCount, rejectedCount)
 
@@ -147,8 +147,8 @@ class FlowExecutor(
     val validationResult = TimingUtil.timed(logger, "Validate data") {
       validateData(mergedData)
     }
-    val validCount = validationResult.valid.count()
-    val rejectedCount = validationResult.rejected.map(_.count()).getOrElse(0L)
+    val rejectedCount = validationResult.rejectionReasons.values.sum
+    val validCount = mergedCount - rejectedCount
 
     logValidationResults(validationResult, mergedCount, rejectedCount)
 

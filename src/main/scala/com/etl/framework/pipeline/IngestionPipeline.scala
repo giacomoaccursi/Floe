@@ -3,7 +3,7 @@ package com.etl.framework.pipeline
 import com.etl.framework.config.{DomainsConfig, DomainsConfigLoader, FlowConfig, FlowConfigLoader, GlobalConfig, GlobalConfigLoader, IcebergConfig}
 import com.etl.framework.core.FlowTransformation
 import com.etl.framework.exceptions.MissingConfigFieldException
-import com.etl.framework.iceberg.catalog.CatalogFactory
+import com.etl.framework.iceberg.catalog.{CatalogFactory, CatalogProvider}
 import com.etl.framework.orchestration.{FlowOrchestrator, IngestionResult}
 import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
@@ -16,7 +16,8 @@ class IngestionPipeline private(
                                  globalConfig: GlobalConfig,
                                  flowConfigs: Seq[FlowConfig],
                                  flowTransformations: Map[String, FlowTransformations],
-                                 domainsConfig: Option[DomainsConfig]
+                                 domainsConfig: Option[DomainsConfig],
+                                 extraCatalogProviders: Map[String, () => CatalogProvider]
                                )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -29,7 +30,7 @@ class IngestionPipeline private(
     logger.info("Executing Ingestion pipeline")
 
     // Configure Spark for Iceberg if enabled
-    globalConfig.iceberg.foreach(configureSparkForIceberg)
+    globalConfig.iceberg.foreach(configureSparkForIceberg(_, extraCatalogProviders))
 
     // Apply transformations to flow configs
     val enrichedFlowConfigs = flowConfigs.map { flowConfig =>
@@ -49,8 +50,11 @@ class IngestionPipeline private(
     orchestrator.execute()
   }
 
-  private def configureSparkForIceberg(config: IcebergConfig): Unit = {
-    CatalogFactory.createCatalogProvider(config.catalogType) match {
+  private def configureSparkForIceberg(
+      config: IcebergConfig,
+      extraProviders: Map[String, () => CatalogProvider]
+  ): Unit = {
+    CatalogFactory.createCatalogProvider(config.catalogType, extraProviders.toMap) match {
       case Right(provider) =>
         provider.validateConfig(config) match {
           case Right(_) =>
@@ -91,6 +95,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private var flowConfigsOpt: Option[Seq[FlowConfig]] = None
   private var domainsConfigOpt: Option[DomainsConfig] = None
   private val flowTransformations = mutable.Map[String, FlowTransformations]()
+  private val extraCatalogProviders = mutable.Map[String, () => CatalogProvider]()
 
   /**
    * Sets the configuration directory path
@@ -197,6 +202,25 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   }
 
   /**
+   * Registers a custom catalog provider for the given catalog type.
+   *
+   * Use this when you need a catalog not built into the framework (e.g. a
+   * proprietary metastore or a community-contributed Iceberg catalog).
+   * Custom providers override built-in ones if the same type key is used.
+   *
+   * @param catalogType Identifier used in `iceberg.catalog-type` (e.g. "custom")
+   * @param provider    Factory function returning the CatalogProvider instance
+   * @return This builder for chaining
+   */
+  def withCatalogProvider(
+      catalogType: String,
+      provider: () => CatalogProvider
+  ): IngestionPipelineBuilder = {
+    extraCatalogProviders(catalogType) = provider
+    this
+  }
+
+  /**
    * Builds the IngestionPipeline
    *
    * @return Configured IngestionPipeline
@@ -234,7 +258,13 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     }
 
     logger.info(s"IngestionPipeline built with ${flowConfigs.size} flows")
-    IngestionPipeline.create(globalConfig, flowConfigs, flowTransformations.toMap, domainsConfigOpt)
+    IngestionPipeline.create(
+      globalConfig,
+      flowConfigs,
+      flowTransformations.toMap,
+      domainsConfigOpt,
+      extraCatalogProviders.toMap
+    )
   }
 
   /**
@@ -323,9 +353,10 @@ object IngestionPipeline {
                                 globalConfig: GlobalConfig,
                                 flowConfigs: Seq[FlowConfig],
                                 flowTransformations: Map[String, FlowTransformations],
-                                domainsConfig: Option[DomainsConfig]
+                                domainsConfig: Option[DomainsConfig],
+                                extraCatalogProviders: Map[String, () => CatalogProvider]
                               )(implicit spark: SparkSession): IngestionPipeline = {
-    new IngestionPipeline(globalConfig, flowConfigs, flowTransformations, domainsConfig)
+    new IngestionPipeline(globalConfig, flowConfigs, flowTransformations, domainsConfig, extraCatalogProviders)
   }
 
   /**
@@ -355,9 +386,12 @@ object IngestionPipeline {
    *     .getOrCreate()
    * }}}
    */
-  def requiredSparkConfig(icebergConfig: IcebergConfig): Map[String, String] =
+  def requiredSparkConfig(
+      icebergConfig: IcebergConfig,
+      extraProviders: Map[String, () => CatalogProvider] = Map.empty
+  ): Map[String, String] =
     CatalogFactory
-      .sparkSessionConfig(icebergConfig.catalogType, icebergConfig)
+      .sparkSessionConfig(icebergConfig.catalogType, icebergConfig, extraProviders.toMap)
       .getOrElse(Map.empty)
 }
 

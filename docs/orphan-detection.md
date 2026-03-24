@@ -83,6 +83,54 @@ Flows are processed in topological order (the same order used for batch executio
 - Cascade flows in the correct direction (parent -> child -> grandchild)
 - No race conditions occur between flows at the same level
 
+## When does orphan detection run?
+
+Orphan detection is **not** executed on every batch. Three guard conditions must all be satisfied:
+
+### Guard 1 — Iceberg must be enabled
+
+Orphan detection uses Iceberg time travel to find removed keys. If `global.yaml` does not include an `iceberg` block, the feature is disabled entirely and the post-batch step is skipped.
+
+```yaml
+# global.yaml
+iceberg:
+  catalog: glue
+  database: my_db
+  formatVersion: 2
+```
+
+Without this block, no orphan detection occurs regardless of FK configuration.
+
+### Guard 2 — At least one FK must be actionable
+
+Even with Iceberg enabled, if every FK across all flows has `onOrphan: ignore`, there is nothing to do. The orchestrator checks this before instantiating the detector and returns immediately if no actionable FK exists.
+
+In practice: as long as at least one FK is configured with `onOrphan: warn` or `onOrphan: delete`, this guard passes.
+
+### Guard 3 — The parent flow must be capable of removing records
+
+At the level of each individual parent flow, the detector only processes parents whose load mode can actually remove records:
+
+| Load Mode | Analyzed as parent? |
+|-----------|-------------------|
+| **Full** | Yes — replaces data, can remove keys |
+| **SCD2 with `detectDeletes: true`** | Yes — soft-deletes absent records |
+| **SCD2 with `detectDeletes: false`** | No — absent records are preserved |
+| **Delta** | No — insert/update only, never deletes |
+
+If the parent was processed in the current batch but its load mode cannot remove records, the detector skips it without performing time travel.
+
+### Summary
+
+```
+globalConfig.iceberg = Some(...)
+    AND at least one FK with onOrphan != ignore
+        AND parent load mode in {Full, SCD2 with detectDeletes}
+            → run orphan detection
+```
+
+Only when all three conditions are met does the detector actually read Iceberg snapshots and look for orphaned records.
+
 ## Configuration
 
 In the child flow's YAML configuration, each FK declares its own `onOrphan`:

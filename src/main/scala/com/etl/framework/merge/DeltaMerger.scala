@@ -216,77 +216,81 @@ class SCD2Merger(
         )
         .cache()
 
-      // Null-safe change detection: at least one compare column differs
-      val changeCondition = compareColumns
-        .map(c => !col(s"new.$c").eqNullSafe(col(s"existing.$c")))
-        .reduce(_ || _)
+      try {
+        // Null-safe change detection: at least one compare column differs
+        val changeCondition = compareColumns
+          .map(c => !col(s"new.$c").eqNullSafe(col(s"existing.$c")))
+          .reduce(_ || _)
 
-      // Presence detection based on first key column (PKs are non-null by definition)
-      val newPresent      = col(s"new.${keyColumns.head}").isNotNull
-      val existingPresent = col(s"existing.${keyColumns.head}").isNotNull
+        // Presence detection based on first key column (PKs are non-null by definition)
+        val newPresent      = col(s"new.${keyColumns.head}").isNotNull
+        val existingPresent = col(s"existing.${keyColumns.head}").isNotNull
 
-      // Column selectors: project full rows from each side of the join
-      val existingCols = existingCurrent.columns.map(c => col(s"existing.$c").alias(c))
-      val newDataCols  = newData.columns.map(c => col(s"new.$c").alias(c))
+        // Column selectors: project full rows from each side of the join
+        val existingCols = existingCurrent.columns.map(c => col(s"existing.$c").alias(c))
+        val newDataCols  = newData.columns.map(c => col(s"new.$c").alias(c))
 
-      // 1. Close old versions of changed records (existing columns, updated SCD2 metadata)
-      val closedRecords = joined
-        .filter(newPresent && existingPresent && changeCondition)
-        .select(existingCols: _*)
-        .withColumn(validToCol, batchTimestamp)
-        .withColumn(isCurrentCol, lit(false))
-
-      // 2. New versions of changed records (new data columns, current SCD2 metadata)
-      val baseNewVersions = joined
-        .filter(newPresent && existingPresent && changeCondition)
-        .select(newDataCols: _*)
-        .withColumn(validFromCol, batchTimestamp)
-        .withColumn(validToCol, lit(null).cast("timestamp"))
-        .withColumn(isCurrentCol, lit(true))
-      val newVersions =
-        isActiveCol.fold(baseNewVersions)(c => baseNewVersions.withColumn(c, lit(true)))
-
-      // 3. Brand-new records: key doesn't exist in existing
-      val baseNewRecords = joined
-        .filter(!existingPresent)
-        .select(newDataCols: _*)
-        .withColumn(validFromCol, batchTimestamp)
-        .withColumn(validToCol, lit(null).cast("timestamp"))
-        .withColumn(isCurrentCol, lit(true))
-      val newRecords =
-        isActiveCol.fold(baseNewRecords)(c => baseNewRecords.withColumn(c, lit(true)))
-
-      // 4. Unchanged records: keep existing row as-is
-      val unchangedRecords = joined
-        .filter(newPresent && existingPresent && !changeCondition)
-        .select(existingCols: _*)
-
-      // 5. Records missing from source
-      val missingRecords = if (detectDeletes) {
-        // Soft-delete: close current version and mark inactive
-        val closed = joined
-          .filter(!newPresent && existingPresent)
+        // 1. Close old versions of changed records (existing columns, updated SCD2 metadata)
+        val closedRecords = joined
+          .filter(newPresent && existingPresent && changeCondition)
           .select(existingCols: _*)
           .withColumn(validToCol, batchTimestamp)
           .withColumn(isCurrentCol, lit(false))
-        isActiveCol.fold(closed)(c => closed.withColumn(c, lit(false)))
-      } else {
-        // Keep as-is (not deleted)
-        joined
-          .filter(!newPresent && existingPresent)
+
+        // 2. New versions of changed records (new data columns, current SCD2 metadata)
+        val baseNewVersions = joined
+          .filter(newPresent && existingPresent && changeCondition)
+          .select(newDataCols: _*)
+          .withColumn(validFromCol, batchTimestamp)
+          .withColumn(validToCol, lit(null).cast("timestamp"))
+          .withColumn(isCurrentCol, lit(true))
+        val newVersions =
+          isActiveCol.fold(baseNewVersions)(c => baseNewVersions.withColumn(c, lit(true)))
+
+        // 3. Brand-new records: key doesn't exist in existing
+        val baseNewRecords = joined
+          .filter(!existingPresent)
+          .select(newDataCols: _*)
+          .withColumn(validFromCol, batchTimestamp)
+          .withColumn(validToCol, lit(null).cast("timestamp"))
+          .withColumn(isCurrentCol, lit(true))
+        val newRecords =
+          isActiveCol.fold(baseNewRecords)(c => baseNewRecords.withColumn(c, lit(true)))
+
+        // 4. Unchanged records: keep existing row as-is
+        val unchangedRecords = joined
+          .filter(newPresent && existingPresent && !changeCondition)
           .select(existingCols: _*)
+
+        // 5. Records missing from source
+        val missingRecords = if (detectDeletes) {
+          // Soft-delete: close current version and mark inactive
+          val closed = joined
+            .filter(!newPresent && existingPresent)
+            .select(existingCols: _*)
+            .withColumn(validToCol, batchTimestamp)
+            .withColumn(isCurrentCol, lit(false))
+          isActiveCol.fold(closed)(c => closed.withColumn(c, lit(false)))
+        } else {
+          // Keep as-is (not deleted)
+          joined
+            .filter(!newPresent && existingPresent)
+            .select(existingCols: _*)
+        }
+
+        // 6. Historical (non-current) records: not part of the join since only
+        //    existingCurrent was joined; retrieved directly from cachedExisting
+        val historicalRecords = cachedExisting.filter(col(isCurrentCol) === false)
+
+        historicalRecords
+          .unionByName(closedRecords)
+          .unionByName(unchangedRecords)
+          .unionByName(newVersions)
+          .unionByName(newRecords)
+          .unionByName(missingRecords)
+      } finally {
+        joined.unpersist()
       }
-
-      // 6. Historical (non-current) records: not part of the join since only
-      //    existingCurrent was joined; retrieved directly from cachedExisting
-      val historicalRecords = cachedExisting.filter(col(isCurrentCol) === false)
-
-      historicalRecords
-        .unionByName(closedRecords)
-        .unionByName(unchangedRecords)
-        .unionByName(newVersions)
-        .unionByName(newRecords)
-        .unionByName(missingRecords)
     } finally {
       cachedExisting.unpersist()
     }

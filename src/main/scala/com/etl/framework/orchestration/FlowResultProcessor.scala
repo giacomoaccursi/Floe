@@ -83,18 +83,28 @@ class FlowResultProcessor(
 
   /**
    * Loads validated data for a successful flow.
+   * When Iceberg is configured, reads directly from the Iceberg table so that
+   * downstream flows that reference this flow via FK can find it in validatedFlows.
+   * Falls back to reading Parquet from the output path for non-Iceberg pipelines.
    */
   def loadValidatedData(
     result: FlowResult,
     validatedFlows: scala.collection.mutable.Map[String, DataFrame]
   ): Unit = {
-    val outputPath = resolveOutputPath(result.flowName)
+    val df = globalConfig.iceberg match {
+      case Some(icebergConfig) =>
+        val tableName = s"${icebergConfig.catalogName}.default.${result.flowName}"
+        scala.util.Try(spark.table(tableName)).toOption.orElse {
+          logger.warn(s"Could not load Iceberg table $tableName, falling back to Parquet")
+          scala.util.Try(spark.read.parquet(resolveOutputPath(result.flowName))).toOption
+        }
+      case None =>
+        scala.util.Try(spark.read.parquet(resolveOutputPath(result.flowName))).toOption
+    }
 
-    try {
-      validatedFlows(result.flowName) = spark.read.parquet(outputPath)
-    } catch {
-      case e: org.apache.spark.sql.AnalysisException =>
-        logger.warn(s"Could not load validated data for ${result.flowName} from $outputPath: ${e.getMessage}")
+    df match {
+      case Some(data) => validatedFlows(result.flowName) = data
+      case None       => logger.warn(s"Could not load validated data for ${result.flowName}, FK checks against it will fail")
     }
   }
 

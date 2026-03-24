@@ -194,120 +194,101 @@ class SCD2Merger(
     // Get current timestamp for this batch
     val batchTimestamp = current_timestamp()
 
-    // Cache existing: used 5 times below (filter + 3 joins + 1 filter)
+    // Cache existing: used twice (existingCurrent for join, historicalRecords for union)
     val cachedExisting = existing.cache()
 
-    // Join new data with existing current records to identify changes
-    val existingCurrent = cachedExisting.filter(col(isCurrentCol) === true)
+    try {
+      val existingCurrent = cachedExisting.filter(col(isCurrentCol) === true)
 
-    // Join on key columns to find matches
-    val joinCondition = keyColumns
-      .map(c => col(s"new.$c") === col(s"existing.$c"))
-      .reduce(_ && _)
+      // Join on key columns to find matches
+      val joinCondition = keyColumns
+        .map(c => col(s"new.$c") === col(s"existing.$c"))
+        .reduce(_ && _)
 
-    // Cache joined: used 4 times below (4 filters)
-    val joined = newData
-      .alias("new")
-      .join(
-        existingCurrent.alias("existing"),
-        joinCondition,
-        "full_outer"
-      )
-      .cache()
+      // Single full-outer join — all output parts are derived directly from here.
+      // Cache since it is used 4-5 times for different filter+select operations.
+      val joined = newData
+        .alias("new")
+        .join(
+          existingCurrent.alias("existing"),
+          joinCondition,
+          "full_outer"
+        )
+        .cache()
 
-    // Null-safe change detection: at least one compare column differs
-    val changeCondition = compareColumns
-      .map(c => !col(s"new.$c").eqNullSafe(col(s"existing.$c")))
-      .reduce(_ || _)
+      // Null-safe change detection: at least one compare column differs
+      val changeCondition = compareColumns
+        .map(c => !col(s"new.$c").eqNullSafe(col(s"existing.$c")))
+        .reduce(_ || _)
 
-    // Presence detection based on first key column (PKs are non-null by definition)
-    val newPresent = col(s"new.${keyColumns.head}").isNotNull
-    val existingPresent = col(s"existing.${keyColumns.head}").isNotNull
+      // Presence detection based on first key column (PKs are non-null by definition)
+      val newPresent      = col(s"new.${keyColumns.head}").isNotNull
+      val existingPresent = col(s"existing.${keyColumns.head}").isNotNull
 
-    // 1. Changed records: key matches but at least one compare column differs
-    val changedRecords = joined
-      .filter(newPresent && existingPresent && changeCondition)
-      .select(keyColumns.map(c => col(s"existing.$c").alias(c)): _*)
+      // Column selectors: project full rows from each side of the join
+      val existingCols = existingCurrent.columns.map(c => col(s"existing.$c").alias(c))
+      val newDataCols  = newData.columns.map(c => col(s"new.$c").alias(c))
 
-    // 2. New records: key doesn't exist in existing
-    val baseNewRecords = joined
-      .filter(!existingPresent)
-      .select(
-        newData.columns.map(c => col(s"new.$c").alias(c)): _*
-      )
-      .withColumn(validFromCol, batchTimestamp)
-      .withColumn(validToCol, lit(null).cast("timestamp"))
-      .withColumn(isCurrentCol, lit(true))
-    val newRecords =
-      isActiveCol.fold(baseNewRecords)(c =>
-        baseNewRecords.withColumn(c, lit(true))
-      )
-
-    // 3. Unchanged records: key matches and all compare columns equal
-    val unchangedKeys = joined
-      .filter(newPresent && existingPresent && !changeCondition)
-      .select(keyColumns.map(c => col(s"existing.$c").alias(c)): _*)
-
-    // 4. Records in existing but missing from new source
-    val missingFromSourceKeys = joined
-      .filter(!newPresent && existingPresent)
-      .select(
-        keyColumns.map(c => col(s"existing.$c").alias(c)): _*
-      )
-
-    joined.unpersist()
-
-    // Close old versions of changed records
-    val closedRecords = cachedExisting
-      .join(changedRecords, keyColumns, "inner")
-      .filter(col(isCurrentCol) === true)
-      .withColumn(validToCol, batchTimestamp)
-      .withColumn(isCurrentCol, lit(false))
-
-    // Add new versions of changed records
-    val baseNewVersions = newData
-      .join(changedRecords, keyColumns, "inner")
-      .withColumn(validFromCol, batchTimestamp)
-      .withColumn(validToCol, lit(null).cast("timestamp"))
-      .withColumn(isCurrentCol, lit(true))
-    val newVersions =
-      isActiveCol.fold(baseNewVersions)(c =>
-        baseNewVersions.withColumn(c, lit(true))
-      )
-
-    // Keep unchanged current records as-is
-    val unchangedRecords = cachedExisting
-      .join(unchangedKeys, keyColumns, "inner")
-      .filter(col(isCurrentCol) === true)
-
-    // Keep all historical (non-current) records
-    val historicalRecords = cachedExisting.filter(col(isCurrentCol) === false)
-
-    // Handle records missing from source
-    val missingRecords = if (detectDeletes) {
-      // Soft-delete: close them with is_active=false
-      val closed = cachedExisting
-        .join(missingFromSourceKeys, keyColumns, "inner")
-        .filter(col(isCurrentCol) === true)
+      // 1. Close old versions of changed records (existing columns, updated SCD2 metadata)
+      val closedRecords = joined
+        .filter(newPresent && existingPresent && changeCondition)
+        .select(existingCols: _*)
         .withColumn(validToCol, batchTimestamp)
         .withColumn(isCurrentCol, lit(false))
-      isActiveCol.fold(closed)(c => closed.withColumn(c, lit(false)))
-    } else {
-      // Keep as-is (not deleted)
-      cachedExisting
-        .join(missingFromSourceKeys, keyColumns, "inner")
-        .filter(col(isCurrentCol) === true)
+
+      // 2. New versions of changed records (new data columns, current SCD2 metadata)
+      val baseNewVersions = joined
+        .filter(newPresent && existingPresent && changeCondition)
+        .select(newDataCols: _*)
+        .withColumn(validFromCol, batchTimestamp)
+        .withColumn(validToCol, lit(null).cast("timestamp"))
+        .withColumn(isCurrentCol, lit(true))
+      val newVersions =
+        isActiveCol.fold(baseNewVersions)(c => baseNewVersions.withColumn(c, lit(true)))
+
+      // 3. Brand-new records: key doesn't exist in existing
+      val baseNewRecords = joined
+        .filter(!existingPresent)
+        .select(newDataCols: _*)
+        .withColumn(validFromCol, batchTimestamp)
+        .withColumn(validToCol, lit(null).cast("timestamp"))
+        .withColumn(isCurrentCol, lit(true))
+      val newRecords =
+        isActiveCol.fold(baseNewRecords)(c => baseNewRecords.withColumn(c, lit(true)))
+
+      // 4. Unchanged records: keep existing row as-is
+      val unchangedRecords = joined
+        .filter(newPresent && existingPresent && !changeCondition)
+        .select(existingCols: _*)
+
+      // 5. Records missing from source
+      val missingRecords = if (detectDeletes) {
+        // Soft-delete: close current version and mark inactive
+        val closed = joined
+          .filter(!newPresent && existingPresent)
+          .select(existingCols: _*)
+          .withColumn(validToCol, batchTimestamp)
+          .withColumn(isCurrentCol, lit(false))
+        isActiveCol.fold(closed)(c => closed.withColumn(c, lit(false)))
+      } else {
+        // Keep as-is (not deleted)
+        joined
+          .filter(!newPresent && existingPresent)
+          .select(existingCols: _*)
+      }
+
+      // 6. Historical (non-current) records: not part of the join since only
+      //    existingCurrent was joined; retrieved directly from cachedExisting
+      val historicalRecords = cachedExisting.filter(col(isCurrentCol) === false)
+
+      historicalRecords
+        .unionByName(closedRecords)
+        .unionByName(unchangedRecords)
+        .unionByName(newVersions)
+        .unionByName(newRecords)
+        .unionByName(missingRecords)
+    } finally {
+      cachedExisting.unpersist()
     }
-
-    // Union all parts together
-    val result = historicalRecords
-      .unionByName(closedRecords)
-      .unionByName(unchangedRecords)
-      .unionByName(newVersions)
-      .unionByName(newRecords)
-      .unionByName(missingRecords)
-
-    cachedExisting.unpersist()
-    result
   }
 }

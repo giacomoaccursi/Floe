@@ -57,9 +57,7 @@ class IcebergTableManager(
           logger.warn(
             s"Partition field '$partitionExpr' was added to an existing table ($tableName). " +
               s"Data written before this change is NOT retroactively partitioned: " +
-              s"partition pruning will apply only to files written from this run onwards. " +
-              s"To apply the partition layout to all existing data, perform a full reload " +
-              s"(set loadMode.type=full for one run, then revert to delta)."
+              s"partition pruning will apply only to files written from this run onwards."
           )
         } catch {
           case e: Exception if isPartitionAlreadyExistsError(e) =>

@@ -54,6 +54,13 @@ class IcebergTableManager(
         try {
           spark.sql(s"ALTER TABLE $tableName ADD PARTITION FIELD $partitionExpr")
           logger.info(s"Added partition field $partitionExpr to $tableName")
+          logger.warn(
+            s"Partition field '$partitionExpr' was added to an existing table ($tableName). " +
+              s"Data written before this change is NOT retroactively partitioned: " +
+              s"partition pruning will apply only to files written from this run onwards. " +
+              s"To apply the partition layout to all existing data, perform a full reload " +
+              s"(set loadMode.type=full for one run, then revert to delta)."
+          )
         } catch {
           case e: Exception if isPartitionAlreadyExistsError(e) =>
             logger.debug(s"Partition field $partitionExpr already present on $tableName, skipping")

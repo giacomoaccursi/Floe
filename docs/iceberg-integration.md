@@ -176,6 +176,12 @@ The `WHEN MATCHED AND (...)` condition uses Iceberg's null-safe equality operato
 
 This means rows where no column has actually changed are skipped entirely by the MERGE engine. Re-running the same batch twice is safe and produces no logical changes.
 
+#### Copy-on-write and snapshot statistics
+
+Iceberg's default write strategy is copy-on-write. Even when the MERGE skips all updates (change condition false for every matched row), Iceberg may still rewrite the data files that were scanned and create a new snapshot. The `added-records` and `deleted-records` values in the snapshot summary reflect file-level statistics, not row-level change counts — a file rewrite shows as `deleted-records = N, added-records = N` even if no row actually changed.
+
+This is expected behavior. The change detection guarantees **correctness** (no row is overwritten unless it actually changed) but does not prevent file rewrites at the storage layer. The practical performance benefit is visible when only a subset of rows changes: the MERGE generates fewer file rewrites than an unconditional update would, especially on partitioned tables where only touched partition files are rewritten.
+
 If no primary key is defined, the write degrades to an append.
 
 ### SCD2 (Slowly Changing Dimension Type 2)
@@ -224,7 +230,7 @@ SELECT src.*, src.pk AS _mk_pk FROM source src
 UNION ALL
 SELECT src.*, CAST(NULL AS type) AS _mk_pk FROM source src
 JOIN target tgt ON src.pk = tgt.pk AND tgt.is_current = true
-WHERE src.col != tgt.col OR ...   -- change detection
+WHERE NOT (src.col <=> tgt.col) OR ...   -- null-safe change detection
 ```
 
 Then a single MERGE runs with three clauses:

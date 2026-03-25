@@ -85,6 +85,34 @@ Tables are created on first write with `CREATE TABLE IF NOT EXISTS`. The schema 
 
 Schema evolution is handled by Iceberg transparently: new columns are added via ALTER TABLE if the incoming schema has columns not present in the table.
 
+### Table configuration updates
+
+Every run, `createOrUpdateTable` compares the current table state against the flow config and applies any differences:
+
+- **Table properties**: reads current properties via `SHOW TBLPROPERTIES` and applies only new or changed entries via `ALTER TABLE SET TBLPROPERTIES`. Existing properties not mentioned in the config are left untouched.
+- **Partition spec**: attempts `ALTER TABLE ADD PARTITION FIELD` for each configured partition. If the field already exists, the operation is silently skipped.
+
+This means adding `icebergPartitions` or `tableProperties` to an existing flow config takes effect at the next run without manual intervention.
+
+#### Partition spec on tables with existing data
+
+Adding a partition field to a table that already contains data does **not** rewrite existing files. Iceberg applies the new spec only to files written after the change. The result is a mixed layout:
+
+- Files written before the change: no partition metadata, always scanned
+- Files written after the change: partitioned, eligible for pruning
+
+The framework logs a `WARN` message whenever a new partition field is applied to an existing table, advising that partition pruning will be partial until all pre-existing data is replaced by new writes.
+
+To apply the new partition layout to all existing data, perform a one-time full reload: temporarily set `loadMode.type: full`, run the pipeline with a complete source dataset, then revert to `delta`. This rewrites all files under the new partition spec. For large tables, the equivalent Iceberg maintenance procedure is preferable:
+
+```sql
+CALL catalog.system.rewrite_data_files(
+  table => 'catalog.default.orders',
+  strategy => 'sort',
+  sort_order => 'order_date ASC'
+)
+```
+
 ### Partitioning and sort order
 
 Partitions are configured per-flow in the output section:
@@ -122,21 +150,31 @@ Replaces all data atomically using `writeTo().overwritePartitions()`. The previo
 
 ### Delta (upsert)
 
-Executes a single `MERGE INTO` statement:
+Executes a single `MERGE INTO` statement with value-based change detection:
 
 ```sql
 MERGE INTO catalog.default.orders AS target
 USING _source AS source
 ON target.order_id = source.order_id
-WHEN MATCHED THEN UPDATE SET *
-WHEN NOT MATCHED THEN INSERT *
+WHEN MATCHED AND (
+  NOT (source.status    <=> target.status)    OR
+  NOT (source.total     <=> target.total)     OR
+  NOT (source.order_date <=> target.order_date)
+) THEN UPDATE SET
+  target.status     = source.status,
+  target.total      = source.total,
+  target.order_date = source.order_date
+WHEN NOT MATCHED THEN INSERT (order_id, status, total, order_date)
+  VALUES (source.order_id, source.status, source.total, source.order_date)
 ```
 
-If the flow defines an `update-timestamp-column`, the MATCHED clause adds a condition to only update when the source timestamp is newer:
+The `WHEN MATCHED AND (...)` condition uses Iceberg's null-safe equality operator `<=>`, which correctly handles NULL comparisons:
 
-```sql
-WHEN MATCHED AND source.updated_at > target.updated_at THEN UPDATE SET *
-```
+- `NULL <=> NULL` → `true` (equal, no update)
+- `NULL <=> 'value'` → `false` (different, update)
+- `'a' <=> 'a'` → `true` (equal, no update)
+
+This means rows where no column has actually changed are skipped entirely by the MERGE engine. Re-running the same batch twice is safe and produces no logical changes.
 
 If no primary key is defined, the write degrades to an append.
 
@@ -422,7 +460,6 @@ schema:
 
 load-mode:
   type: delta
-  update-timestamp-column: updated_at
 
 validation:
   primary-key: [order_id]
@@ -473,8 +510,12 @@ WHERE curr.name != prev.name OR curr.customer_id IS NULL OR prev.customer_id IS 
 
 **Why MERGE INTO instead of DataFrame API**: Iceberg's MERGE INTO is a single atomic SQL operation. The DataFrame API would require reading, transforming, and writing in separate steps with no transactional guarantee between them.
 
+**Why value-based change detection instead of a timestamp column**: An `update-timestamp-column` approach is fragile — it assumes the source always provides a reliable, monotonically increasing timestamp, and silently overwrites data when the timestamp is missing or stale. Value-based change detection using `<=>` makes no assumptions about the source: a row is updated if and only if at least one non-key column actually differs. This makes delta loads idempotent by default — re-running the same batch twice produces no writes and no data corruption.
+
 **Why the NULL merge-key trick for SCD2**: A single MERGE with three clauses (MATCHED, NOT MATCHED, NOT MATCHED BY SOURCE) is atomic. The alternative — a MERGE to close records followed by an INSERT for new versions — has a window between the two operations where the table is inconsistent. The NULL merge key forces Iceberg to treat changed records as both a match (to close the old version) and a non-match (to insert the new version) in one pass.
 
 **Why maintenance runs after orphan detection**: Snapshot expiration removes old snapshots. Orphan detection needs the previous snapshot for time travel. If maintenance ran first, it could expire the snapshot that orphan detection needs. Running orphan detection first guarantees the previous snapshot is still available.
 
 **Why Iceberg is optional**: Not every deployment has Iceberg infrastructure. The framework degrades gracefully to Parquet with in-memory merge, keeping the same configuration model and validation pipeline. Switching to Iceberg later requires only adding the `iceberg` block to `global.yaml`.
+
+**Why partition spec changes do not rewrite existing data**: Rewriting all existing files on a config change would be an unbounded, blocking operation — a table with years of history could take hours. The framework applies the new spec to future writes only and warns the operator. The decision to repartition existing data is an explicit operational action, not an automatic side effect of a config change.

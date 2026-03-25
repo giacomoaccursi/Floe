@@ -23,10 +23,48 @@ class IcebergTableManager(
     val tableName = resolveTableName(flowConfig)
 
     if (tableExists(tableName)) {
-      logger.info(s"Table $tableName already exists, checking schema evolution")
+      logger.info(s"Table $tableName exists, applying config updates")
+      updateTableConfig(tableName, flowConfig)
     } else {
       createTable(tableName, schema, flowConfig)
     }
+  }
+
+  private def updateTableConfig(tableName: String, flowConfig: FlowConfig): Unit = {
+    // Apply new or changed table properties
+    if (flowConfig.output.tableProperties.nonEmpty) {
+      val currentProps = spark.sql(s"SHOW TBLPROPERTIES $tableName")
+        .collect()
+        .map(row => row.getString(0) -> row.getString(1))
+        .toMap
+      val toApply = flowConfig.output.tableProperties
+        .filterNot { case (k, v) => currentProps.get(k).contains(v) }
+      if (toApply.nonEmpty) {
+        toApply.foreach { case (key, value) =>
+          spark.sql(s"ALTER TABLE $tableName SET TBLPROPERTIES ('$key' = '$value')")
+        }
+        logger.info(s"Applied ${toApply.size} property updates to $tableName: ${toApply.keys.mkString(", ")}")
+      }
+    }
+
+    // Add missing partition fields — idempotent: Iceberg throws if field already exists
+    if (flowConfig.output.icebergPartitions.nonEmpty) {
+      flowConfig.output.icebergPartitions.foreach { partition =>
+        val partitionExpr = parsePartitionTransform(partition)
+        try {
+          spark.sql(s"ALTER TABLE $tableName ADD PARTITION FIELD $partitionExpr")
+          logger.info(s"Added partition field $partitionExpr to $tableName")
+        } catch {
+          case e: Exception if isPartitionAlreadyExistsError(e) =>
+            logger.debug(s"Partition field $partitionExpr already present on $tableName, skipping")
+        }
+      }
+    }
+  }
+
+  private def isPartitionAlreadyExistsError(e: Exception): Boolean = {
+    val msg = Option(e.getMessage).getOrElse("").toLowerCase
+    msg.contains("already exists") || msg.contains("redundant") || msg.contains("duplicate")
   }
 
   private def tableExists(tableName: String): Boolean = {

@@ -58,7 +58,8 @@ class IcebergTableManagerTest
       name: String,
       primaryKey: Seq[String] = Seq("id"),
       sortOrder: Seq[String] = Seq.empty,
-      icebergPartitions: Seq[String] = Seq.empty
+      icebergPartitions: Seq[String] = Seq.empty,
+      tableProperties: Map[String, String] = Map.empty
   ): FlowConfig = {
     FlowConfig(
       name = name,
@@ -84,7 +85,8 @@ class IcebergTableManagerTest
       ),
       output = OutputConfig(
         sortOrder = sortOrder,
-        icebergPartitions = icebergPartitions
+        icebergPartitions = icebergPartitions,
+        tableProperties = tableProperties
       )
     )
   }
@@ -118,6 +120,86 @@ class IcebergTableManagerTest
     // Should not throw on second call
     noException should be thrownBy {
       tableManager.createOrUpdateTable(flowConfig, testSchema)
+    }
+  }
+
+  it should "apply new table properties to an existing table" in {
+    // Create table without custom properties
+    val initial = testFlowConfig("props_update_test")
+    tableManager.createOrUpdateTable(initial, testSchema)
+
+    // Re-run with a new property added to config
+    val updated = testFlowConfig(
+      "props_update_test",
+      tableProperties = Map("custom.etl.owner" -> "data-team")
+    )
+    tableManager.createOrUpdateTable(updated, testSchema)
+
+    val props = spark.sql("SHOW TBLPROPERTIES test_catalog.default.props_update_test")
+      .collect()
+      .map(row => row.getString(0) -> row.getString(1))
+      .toMap
+
+    props should contain("custom.etl.owner" -> "data-team")
+  }
+
+  it should "not re-apply table properties that are already set" in {
+    val fc = testFlowConfig(
+      "props_idempotent_test",
+      tableProperties = Map("custom.etl.version" -> "1")
+    )
+    tableManager.createOrUpdateTable(fc, testSchema)
+
+    // Second call with same properties — should not throw
+    noException should be thrownBy {
+      tableManager.createOrUpdateTable(fc, testSchema)
+    }
+  }
+
+  it should "add partition spec to an existing unpartitioned table" in {
+    val schemaWithDate = StructType(Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("event_date", DateType, nullable = true)
+    ))
+
+    // Create table without partitions
+    val initial = testFlowConfig("partition_update_test")
+    tableManager.createOrUpdateTable(initial, schemaWithDate)
+
+    // Re-run with partition added to config
+    val updated = testFlowConfig(
+      "partition_update_test",
+      icebergPartitions = Seq("month(event_date)")
+    )
+    tableManager.createOrUpdateTable(updated, schemaWithDate)
+
+    // Verify partition was applied: write data and check physical layout
+    val data = Seq((1, java.sql.Date.valueOf("2024-01-15")), (2, java.sql.Date.valueOf("2024-02-20")))
+      .toDF("id", "event_date")
+    data.writeTo("test_catalog.default.partition_update_test").append()
+
+    val showCreate = spark.sql("SHOW CREATE TABLE test_catalog.default.partition_update_test")
+      .collect().map(_.getString(0)).mkString("")
+
+    showCreate.toLowerCase should include("month")
+  }
+
+  it should "not fail when adding a partition field that already exists" in {
+    val schemaWithDate = StructType(Seq(
+      StructField("id", IntegerType, nullable = false),
+      StructField("event_date", DateType, nullable = true)
+    ))
+
+    val fc = testFlowConfig(
+      "partition_idempotent_test",
+      icebergPartitions = Seq("month(event_date)")
+    )
+
+    tableManager.createOrUpdateTable(fc, schemaWithDate)
+
+    // Second call with same partition — should not throw
+    noException should be thrownBy {
+      tableManager.createOrUpdateTable(fc, schemaWithDate)
     }
   }
 
@@ -224,6 +306,10 @@ class IcebergTableManagerTest
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.empty_snapshot_test")
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.tag_test")
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.metadata_test")
+    spark.sql("DROP TABLE IF EXISTS test_catalog.default.props_update_test")
+    spark.sql("DROP TABLE IF EXISTS test_catalog.default.props_idempotent_test")
+    spark.sql("DROP TABLE IF EXISTS test_catalog.default.partition_update_test")
+    spark.sql("DROP TABLE IF EXISTS test_catalog.default.partition_idempotent_test")
     super.afterAll()
   }
 }

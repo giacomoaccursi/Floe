@@ -232,6 +232,42 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
     result.executionTimeMs shouldBe 5000L
   }
 
+  // Regression test: verifyInvariant was called with inputCount (pre-merge) instead of
+  // mergedCount (post-merge) in the Parquet pipeline, causing InvariantViolationException
+  // on any Delta/SCD2 load after the first execution (when mergedCount != inputCount).
+  "Parquet Delta pipeline" should "not throw InvariantViolationException when mergedCount exceeds inputCount" in {
+    val deltaFlowConfig = FlowConfig(
+      name = "delta_invariant_test",
+      description = "Delta merge invariant regression test",
+      version = "1.0",
+      owner = "test",
+      source = SourceConfig(SourceType.File, "/tmp/test", FileFormat.CSV, Map.empty, None),
+      schema = SchemaConfig(enforceSchema = false, allowExtraColumns = true, Seq.empty),
+      loadMode = LoadModeConfig(LoadMode.Delta),
+      validation = ValidationConfig(primaryKey = Seq("id"), foreignKeys = Seq.empty, rules = Seq.empty),
+      output = OutputConfig(path = Some("/tmp/flow_executor_invariant_test/output"))
+    )
+
+    // 2 new records (id=6,7) + 5 existing (id=1..5, non-overlapping) → mergedCount=7, inputCount=2
+    val newRecords      = Seq((6, "F"), (7, "G")).toDF("id", "value")
+    val existingRecords = Seq((1, "A"), (2, "B"), (3, "C"), (4, "D"), (5, "E")).toDF("id", "value")
+
+    class InvariantTestExecutor extends FlowExecutor(deltaFlowConfig, createGlobalConfig()) {
+      override protected def readData(): DataFrame          = newRecords
+      override protected def loadExistingData(path: String) = Some(existingRecords)
+    }
+
+    val result = new InvariantTestExecutor().execute("batch_invariant_001")
+
+    // With the old code: verifyInvariant(inputCount=2, valid=7, rejected=0) → 2 ≠ 7 → crash
+    // With the fix:      verifyInvariant(mergedCount=7, valid=7, rejected=0) → 7 == 7 → ok
+    result.success         shouldBe true
+    result.inputRecords    shouldBe 2
+    result.mergedRecords   shouldBe 7
+    result.validRecords    shouldBe 7
+    result.rejectedRecords shouldBe 0
+  }
+
   "InvariantViolationException" should "be throwable with correct context" in {
     val exception = InvariantViolationException(
       flowName = "test_flow",

@@ -158,7 +158,7 @@ class FlowExecutor(
       validatedFlows
     )
 
-    verifyInvariant(inputCount, validCount, rejectedCount)
+    verifyInvariant(mergedCount, validCount, rejectedCount)
 
     val writeResult = writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
 

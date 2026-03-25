@@ -1,9 +1,7 @@
 package com.etl.framework.merge
 
 import com.etl.framework.config.{LoadMode, LoadModeConfig}
-import com.etl.framework.merge.MergeColumns._
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 
 /** Handles merge of incremental data with existing data
@@ -30,7 +28,7 @@ object DeltaMergerFactory {
   def create(loadMode: LoadModeConfig, primaryKey: Seq[String]): DeltaMerger = {
     loadMode.`type` match {
       case LoadMode.Delta =>
-        new UpsertMerger(primaryKey, loadMode.updateTimestampColumn)
+        new UpsertMerger(primaryKey)
 
       case LoadMode.SCD2 =>
         require(
@@ -75,12 +73,10 @@ object DeltaMergerFactory {
   }
 }
 
-/** Upsert merger - updates existing records and inserts new ones Supports merge
-  * with and without timestamp
+/** Upsert merger - updates existing records and inserts new ones
   */
 class UpsertMerger(
-    keyColumns: Seq[String],
-    updateTimestampColumn: Option[String]
+    keyColumns: Seq[String]
 ) extends DeltaMerger {
 
   require(keyColumns.nonEmpty, "keyColumns cannot be empty for upsert merge")
@@ -95,42 +91,10 @@ class UpsertMerger(
         newData
 
       case Some(existing) =>
-        updateTimestampColumn match {
-          case Some(tsCol) =>
-            // Merge with timestamp: take most recent record
-            mergeWithTimestamp(newData, existing, tsCol)
-          case None =>
-            // Merge without timestamp: new records always overwrite
-            mergeWithoutTimestamp(newData, existing)
-        }
+        mergeWithoutTimestamp(newData, existing)
     }
   }
 
-  /** Merges with timestamp - keeps the most recent record based on timestamp
-    * column
-    */
-  private def mergeWithTimestamp(
-      newData: DataFrame,
-      existing: DataFrame,
-      tsCol: String
-  ): DataFrame = {
-    // Union both datasets
-    val combined = existing.unionByName(newData)
-
-    // Create window partitioned by key columns, ordered by timestamp descending
-    val windowSpec = Window
-      .partitionBy(keyColumns.map(col): _*)
-      .orderBy(col(tsCol).desc)
-
-    // Add row number and keep only the first (most recent) record for each key
-    combined
-      .withColumn(ROW_NUM, row_number().over(windowSpec))
-      .filter(col(ROW_NUM) === 1)
-      .drop(ROW_NUM)
-  }
-
-  /** Merges without timestamp - new records always overwrite existing ones
-    */
   private def mergeWithoutTimestamp(
       newData: DataFrame,
       existing: DataFrame

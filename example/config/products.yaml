@@ -46,7 +46,6 @@ schema:
 
 loadMode:
   type: "delta"
-  updateTimestampColumn: "last_updated"
 
 validation:
   primaryKey:

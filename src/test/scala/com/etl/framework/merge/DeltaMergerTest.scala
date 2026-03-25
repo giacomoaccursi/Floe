@@ -67,8 +67,8 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
 
   // --- UpsertMerger tests ---
 
-  "UpsertMerger" should "insert new records and update existing without timestamp" in {
-    val merger = new UpsertMerger(Seq("id"), None)
+  "UpsertMerger" should "insert new records and update existing" in {
+    val merger = new UpsertMerger(Seq("id"))
     val existing = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
     val newData = Seq((2, "Bob_updated"), (3, "Charlie")).toDF("id", "name")
 
@@ -80,35 +80,33 @@ class DeltaMergerTest extends AnyFlatSpec with Matchers {
   }
 
   it should "return new data when no existing data" in {
-    val merger = new UpsertMerger(Seq("id"), None)
+    val merger = new UpsertMerger(Seq("id"))
     val newData = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
 
     val result = merger.merge(newData, None)
     result.count() shouldBe 2
   }
 
-  it should "keep most recent record when using timestamp" in {
-    val merger = new UpsertMerger(Seq("id"), Some("ts"))
-    val existing =
-      Seq((1, "Alice_old", 1L), (2, "Bob", 1L)).toDF("id", "name", "ts")
-    val newData =
-      Seq((1, "Alice_new", 2L), (3, "Charlie", 1L)).toDF("id", "name", "ts")
+  it should "be idempotent: re-merging the same data returns same record count" in {
+    val merger = new UpsertMerger(Seq("id"))
+    val existing = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
 
-    val result = merger.merge(newData, Some(existing))
-    result.count() shouldBe 3
+    // First merge: same data re-ingested
+    val result = merger.merge(existing, Some(existing))
+    result.count() shouldBe 2
 
-    val aliceRecord = result.filter(col("id") === 1).collect().head
-    aliceRecord.getAs[String]("name") shouldBe "Alice_new"
+    val names = result.orderBy("id").collect().map(_.getAs[String]("name"))
+    names shouldBe Array("Alice", "Bob")
   }
 
   it should "require non-empty key columns" in {
     intercept[IllegalArgumentException] {
-      new UpsertMerger(Seq.empty, None)
+      new UpsertMerger(Seq.empty)
     }
   }
 
   it should "handle composite key columns" in {
-    val merger = new UpsertMerger(Seq("id", "category"), None)
+    val merger = new UpsertMerger(Seq("id", "category"))
     val existing =
       Seq((1, "A", "old"), (1, "B", "old")).toDF("id", "category", "value")
     val newData =

@@ -68,19 +68,12 @@ class IcebergTableWriter(
         val updateCols = cachedDf.columns
           .filterNot(pkColumns.contains)
 
-        val updateSetClause = if (flowConfig.loadMode.updateTimestampColumn.isDefined) {
-          val tsCol = flowConfig.loadMode.updateTimestampColumn.get
-          val timestampCondition = s"source.$tsCol > target.$tsCol"
-          updateCols
-            .map(col => s"target.$col = source.$col")
-            .mkString(", ")
-            .replaceFirst("^", s"WHEN MATCHED AND $timestampCondition THEN UPDATE SET ")
-        } else {
-          updateCols
-            .map(col => s"target.$col = source.$col")
-            .mkString(", ")
-            .replaceFirst("^", "WHEN MATCHED THEN UPDATE SET ")
-        }
+        val changeCondition = updateCols
+          .map(c => s"NOT (source.$c <=> target.$c)")
+          .mkString(" OR ")
+        val updateSetClause =
+          s"WHEN MATCHED AND ($changeCondition) THEN UPDATE SET " +
+            updateCols.map(c => s"target.$c = source.$c").mkString(", ")
 
         val insertCols = cachedDf.columns.mkString(", ")
         val insertVals = cachedDf.columns.map(c => s"source.$c").mkString(", ")

@@ -50,7 +50,6 @@ case class ColumnConfig(
   */
 case class LoadModeConfig(
     `type`: LoadMode, // "full" | "delta" | "scd2"
-    updateTimestampColumn: Option[String] = None,
     validFromColumn: Option[String] = None,
     validToColumn: Option[String] = None,
     isCurrentColumn: Option[String] = None,

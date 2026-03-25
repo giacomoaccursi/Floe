@@ -58,7 +58,6 @@ class IcebergTableWriterTest
       name: String,
       loadMode: LoadMode = LoadMode.Full,
       primaryKey: Seq[String] = Seq("id"),
-      updateTimestampColumn: Option[String] = None,
       compareColumns: Seq[String] = Seq.empty,
       validFromColumn: Option[String] = None,
       validToColumn: Option[String] = None,
@@ -84,7 +83,6 @@ class IcebergTableWriterTest
       ),
       loadMode = LoadModeConfig(
         `type` = loadMode,
-        updateTimestampColumn = updateTimestampColumn,
         compareColumns = compareColumns,
         validFromColumn = validFromColumn,
         validToColumn = validToColumn,
@@ -162,35 +160,20 @@ class IcebergTableWriterTest
     readBack(2).getAs[String]("name") shouldBe "Charlie"
   }
 
-  it should "respect timestamp column for conditional updates" in {
-    val fc = flowConfig(
-      "delta_ts",
-      loadMode = LoadMode.Delta,
-      updateTimestampColumn = Some("ts")
-    )
-    val initial =
-      Seq((1, "Alice", 2L), (2, "Bob", 3L)).toDF("id", "name", "ts")
-    writer.writeDeltaLoad(initial, fc)
+  it should "be idempotent: re-writing unchanged data leaves table content unchanged" in {
+    val fc = flowConfig("delta_idempotent", loadMode = LoadMode.Delta)
+    val data = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
+    writer.writeDeltaLoad(data, fc)
 
-    // Update with older timestamp should NOT overwrite
-    val olderUpdate =
-      Seq((1, "Alice_OLD", 1L)).toDF("id", "name", "ts")
-    writer.writeDeltaLoad(olderUpdate, fc)
+    // Re-write exact same data — change detection should skip all updates
+    writer.writeDeltaLoad(data, fc)
 
     val readBack = spark
-      .sql("SELECT * FROM writer_catalog.default.delta_ts WHERE id = 1")
+      .sql("SELECT * FROM writer_catalog.default.delta_idempotent ORDER BY id")
       .collect()
-    readBack.head.getAs[String]("name") shouldBe "Alice"
-
-    // Update with newer timestamp SHOULD overwrite
-    val newerUpdate =
-      Seq((1, "Alice_NEW", 5L)).toDF("id", "name", "ts")
-    writer.writeDeltaLoad(newerUpdate, fc)
-
-    val readBack2 = spark
-      .sql("SELECT * FROM writer_catalog.default.delta_ts WHERE id = 1")
-      .collect()
-    readBack2.head.getAs[String]("name") shouldBe "Alice_NEW"
+    readBack.length shouldBe 2
+    readBack(0).getAs[String]("name") shouldBe "Alice"
+    readBack(1).getAs[String]("name") shouldBe "Bob"
   }
 
   // --- SCD2 Tests ---
@@ -345,7 +328,7 @@ class IcebergTableWriterTest
     "full_overwrite",
     "delta_first",
     "delta_upsert",
-    "delta_ts",
+    "delta_idempotent",
     "scd2_first",
     "scd2_change",
     "scd2_detect_del",

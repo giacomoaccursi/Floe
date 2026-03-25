@@ -119,7 +119,7 @@ object UpsertMergeProperties extends Properties("UpsertMerge") {
           val existingDf = existingRecords.toDF()
           val newDf = newRecords.toDF()
           
-          val merger = new UpsertMerger(Seq("id"), None)
+          val merger = new UpsertMerger(Seq("id"))
           val result = merger.merge(newDf, Some(existingDf))
           
           // For each overlapping ID, the result should contain the new record's data
@@ -157,7 +157,7 @@ object UpsertMergeProperties extends Properties("UpsertMerge") {
           val existingDf = existingRecords.toDF()
           val newDf = newRecords.toDF()
           
-          val merger = new UpsertMerger(Seq("id"), None)
+          val merger = new UpsertMerger(Seq("id"))
           val result = merger.merge(newDf, Some(existingDf))
           
           // Find IDs that are only in new records
@@ -184,43 +184,26 @@ object UpsertMergeProperties extends Properties("UpsertMerge") {
   }
   
   /**
-   * Property 15: Upsert Merge Correctness - Timestamp-Based Merge Keeps Most Recent
-   * For any datasets with timestamps, upsert merge should keep the most recent record
+   * Property: Upsert Merge Idempotency
+   * Re-merging the same data into an existing dataset leaves the result unchanged
    */
-  property("upsert_with_timestamp_keeps_most_recent") = forAll(overlappingDatasetsWithTimestampGen) {
-    case (existingRecords, newRecords, overlapIds) =>
+  property("upsert_idempotent_on_same_data") = forAll(overlappingDatasetsGen) {
+    case (existingRecords, _, _) =>
       Try {
-        if (existingRecords.isEmpty || newRecords.isEmpty || overlapIds.isEmpty) {
+        if (existingRecords.isEmpty) {
           true // Skip empty test cases
         } else {
           val existingDf = existingRecords.toDF()
-          val newDf = newRecords.toDF()
-          
-          val merger = new UpsertMerger(Seq("id"), Some("updated_at"))
-          val result = merger.merge(newDf, Some(existingDf))
-          
-          // For each overlapping ID, the result should contain the record with the latest timestamp
-          val mostRecentKept = overlapIds.forall { id =>
-            val existingRecord = existingRecords.find(_.id == id).get
-            val newRecord = newRecords.find(_.id == id).get
-            val resultRecord = result.filter($"id" === id).as[TestRecord].head()
-            
-            // New record has newer timestamp, so it should be in the result
-            if (newRecord.updated_at.after(existingRecord.updated_at)) {
-              resultRecord.name == newRecord.name &&
-              resultRecord.value == newRecord.value &&
-              resultRecord.updated_at == newRecord.updated_at
-            } else {
-              resultRecord.name == existingRecord.name &&
-              resultRecord.value == existingRecord.value &&
-              resultRecord.updated_at == existingRecord.updated_at
-            }
-          }
-          
-          // Each ID should appear exactly once
-          val noDuplicates = result.count() == result.select("id").distinct().count()
-          
-          mostRecentKept && noDuplicates
+
+          val merger = new UpsertMerger(Seq("id"))
+          // Merge existing with itself — semantically a no-op
+          val result = merger.merge(existingDf, Some(existingDf))
+
+          // Count and key set must be unchanged
+          val sameCount = result.count() == existingDf.count()
+          val allIds = existingRecords.map(_.id).toSet
+          val resultIds = result.select("id").as[Int].collect().toSet
+          sameCount && resultIds == allIds
         }
       }.getOrElse(false)
   }
@@ -238,7 +221,7 @@ object UpsertMergeProperties extends Properties("UpsertMerge") {
       
       val newDf = newRecords.toDF()
       
-      val merger = new UpsertMerger(Seq("id"), None)
+      val merger = new UpsertMerger(Seq("id"))
       val result = merger.merge(newDf, None)
       
       // Result should be identical to new data
@@ -267,7 +250,7 @@ object UpsertMergeProperties extends Properties("UpsertMerge") {
           val existingDf = existingRecords.toDF()
           val newDf = newRecords.toDF()
           
-          val merger = new UpsertMerger(Seq("id"), None)
+          val merger = new UpsertMerger(Seq("id"))
           val result = merger.merge(newDf, Some(existingDf))
           
           // Result should have all columns from input
@@ -313,7 +296,7 @@ object UpsertMergeProperties extends Properties("UpsertMerge") {
       val existingDf = existingRecords.toDF()
       val newDf = newRecords.toDF()
       
-      val merger = new UpsertMerger(Seq("id", "name"), None)
+      val merger = new UpsertMerger(Seq("id", "name"))
       val result = merger.merge(newDf, Some(existingDf))
       
       // Each composite key should appear exactly once
@@ -351,7 +334,7 @@ object UpsertMergeProperties extends Properties("UpsertMerge") {
       val newDf = newRecords.toDF()
       val emptyDf = Seq.empty[SimpleRecord].toDF()
       
-      val merger = new UpsertMerger(Seq("id"), None)
+      val merger = new UpsertMerger(Seq("id"))
       val result = merger.merge(newDf, Some(emptyDf))
       
       // Result should be identical to new data
@@ -379,7 +362,7 @@ object UpsertMergeProperties extends Properties("UpsertMerge") {
           val existingDf = existingRecords.toDF()
           val newDf = newRecords.toDF()
           
-          val merger = new UpsertMerger(Seq("id"), None)
+          val merger = new UpsertMerger(Seq("id"))
           val result = merger.merge(newDf, Some(existingDf))
           
           // Count unique IDs from both datasets

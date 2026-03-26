@@ -288,6 +288,50 @@ class IcebergTableManagerTest
     metadata.get.manifestListLocation should not be empty
   }
 
+  it should "not fail when running snapshot expiration" in {
+    val flowConfig = testFlowConfig("maintenance_test")
+    tableManager.createOrUpdateTable(flowConfig, testSchema)
+
+    Seq((1, "Alice", 10.0)).toDF("id", "name", "value")
+      .writeTo("test_catalog.default.maintenance_test").append()
+    Seq((2, "Bob", 20.0)).toDF("id", "name", "value")
+      .writeTo("test_catalog.default.maintenance_test").append()
+
+    val maintenanceConfig = MaintenanceConfig(
+      enableSnapshotExpiration = true,
+      snapshotRetentionDays = 0,
+      enableCompaction = false,
+      targetFileSizeMb = 128,
+      enableOrphanCleanup = false,
+      orphanRetentionMinutes = 1440,
+      enableManifestRewrite = false
+    )
+    noException should be thrownBy {
+      tableManager.runMaintenance(flowConfig, maintenanceConfig)
+    }
+  }
+
+  it should "not fail when running orphan cleanup with valid retention" in {
+    val flowConfig = testFlowConfig("orphan_cleanup_test")
+    tableManager.createOrUpdateTable(flowConfig, testSchema)
+
+    Seq((1, "Alice", 10.0)).toDF("id", "name", "value")
+      .writeTo("test_catalog.default.orphan_cleanup_test").append()
+
+    val maintenanceConfig = MaintenanceConfig(
+      enableSnapshotExpiration = false,
+      snapshotRetentionDays = 7,
+      enableCompaction = false,
+      targetFileSizeMb = 128,
+      enableOrphanCleanup = true,
+      orphanRetentionMinutes = 1440,
+      enableManifestRewrite = false
+    )
+    noException should be thrownBy {
+      tableManager.runMaintenance(flowConfig, maintenanceConfig)
+    }
+  }
+
   // --- parsePartitionTransform tests ---
 
   "parsePartitionTransform" should "pass through identity partitions" in {
@@ -334,6 +378,8 @@ class IcebergTableManagerTest
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.partition_idempotent_test")
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.schema_evolution_test")
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.schema_evolution_idempotent_test")
+    spark.sql("DROP TABLE IF EXISTS test_catalog.default.maintenance_test")
+    spark.sql("DROP TABLE IF EXISTS test_catalog.default.orphan_cleanup_test")
     super.afterAll()
   }
 }

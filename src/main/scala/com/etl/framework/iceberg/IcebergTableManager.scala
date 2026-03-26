@@ -5,12 +5,19 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.StructType
 import org.slf4j.LoggerFactory
 
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+
 class IcebergTableManager(
     spark: SparkSession,
     icebergConfig: IcebergConfig
 ) {
 
   private val logger = LoggerFactory.getLogger(getClass)
+
+  private val sqlTimestampFmt = DateTimeFormatter
+    .ofPattern("yyyy-MM-dd HH:mm:ss")
+    .withZone(ZoneOffset.UTC)
 
   def resolveTableName(flowConfig: FlowConfig): String = {
     s"${icebergConfig.catalogName}.default.${flowConfig.name}"
@@ -295,7 +302,7 @@ class IcebergTableManager(
     spark.sql(
       s"CALL ${icebergConfig.catalogName}.system.expire_snapshots(" +
         s"table => '$tableName', " +
-        s"older_than => TIMESTAMP '${java.time.Instant.now().minusSeconds(retentionDays.toLong * 86400)}'" +
+        s"older_than => TIMESTAMP '${sqlTimestampFmt.format(java.time.Instant.now().minusSeconds(retentionDays.toLong * 86400))}'" +
         s")"
     )
     logger.info(s"Expired snapshots older than $retentionDays days on $tableName")
@@ -318,14 +325,21 @@ class IcebergTableManager(
       tableName: String,
       retentionMinutes: Int
   ): Unit = {
+    val effectiveMinutes = if (retentionMinutes < 1440) {
+      logger.warn(
+        s"orphanRetentionMinutes=$retentionMinutes is below Iceberg's 24-hour minimum. " +
+          s"Clamping to 1440 minutes to prevent data corruption."
+      )
+      1440
+    } else retentionMinutes
     spark.sql(
       s"CALL ${icebergConfig.catalogName}.system.remove_orphan_files(" +
         s"table => '$tableName', " +
-        s"older_than => TIMESTAMP '${java.time.Instant.now().minusSeconds(retentionMinutes.toLong * 60)}'" +
+        s"older_than => TIMESTAMP '${sqlTimestampFmt.format(java.time.Instant.now().minusSeconds(effectiveMinutes.toLong * 60))}'" +
         s")"
     )
     logger.info(
-      s"Removed orphan files older than ${retentionMinutes}min on $tableName"
+      s"Removed orphan files older than ${effectiveMinutes}min on $tableName"
     )
   }
 

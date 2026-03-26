@@ -203,6 +203,28 @@ class IcebergTableManagerTest
     }
   }
 
+  it should "add a new column to an existing table" in {
+    val initial = testFlowConfig("schema_evolution_test")
+    tableManager.createOrUpdateTable(initial, testSchema)
+
+    val extendedSchema = StructType(testSchema.fields :+
+      StructField("notes", StringType, nullable = true))
+    tableManager.createOrUpdateTable(initial, extendedSchema)
+
+    val cols = spark.table("test_catalog.default.schema_evolution_test").schema.fieldNames
+    cols should contain("notes")
+  }
+
+  it should "not fail when evolving schema with columns that already exist" in {
+    val fc = testFlowConfig("schema_evolution_idempotent_test")
+    tableManager.createOrUpdateTable(fc, testSchema)
+
+    // Second call with same schema — should not throw
+    noException should be thrownBy {
+      tableManager.createOrUpdateTable(fc, testSchema)
+    }
+  }
+
   it should "apply sort order when creating table" in {
     val flowConfig = testFlowConfig("sorted_table", sortOrder = Seq("id"))
     tableManager.createOrUpdateTable(flowConfig, testSchema)
@@ -310,6 +332,8 @@ class IcebergTableManagerTest
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.props_idempotent_test")
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.partition_update_test")
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.partition_idempotent_test")
+    spark.sql("DROP TABLE IF EXISTS test_catalog.default.schema_evolution_test")
+    spark.sql("DROP TABLE IF EXISTS test_catalog.default.schema_evolution_idempotent_test")
     super.afterAll()
   }
 }

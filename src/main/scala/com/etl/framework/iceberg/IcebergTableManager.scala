@@ -24,13 +24,21 @@ class IcebergTableManager(
 
     if (tableExists(tableName)) {
       logger.info(s"Table $tableName exists, applying config updates")
-      updateTableConfig(tableName, flowConfig)
+      updateTableConfig(tableName, schema, flowConfig)
     } else {
       createTable(tableName, schema, flowConfig)
     }
   }
 
-  private def updateTableConfig(tableName: String, flowConfig: FlowConfig): Unit = {
+  private def updateTableConfig(tableName: String, schema: StructType, flowConfig: FlowConfig): Unit = {
+    // Add new columns that exist in the incoming schema but not in the table
+    val currentColumns = spark.table(tableName).schema.fieldNames.toSet
+    val newColumns = schema.fields.filterNot(f => currentColumns.contains(f.name))
+    newColumns.foreach { field =>
+      spark.sql(s"ALTER TABLE $tableName ADD COLUMN ${field.name} ${field.dataType.sql}")
+      logger.info(s"Added column ${field.name} (${field.dataType.sql}) to $tableName")
+    }
+
     // Apply new or changed table properties
     if (flowConfig.output.tableProperties.nonEmpty) {
       val currentProps = spark.sql(s"SHOW TBLPROPERTIES $tableName")

@@ -41,9 +41,18 @@ class IcebergTableManager(
     // Add new columns that exist in the incoming schema but not in the table
     val currentColumns = spark.table(tableName).schema.fieldNames.toSet
     val newColumns = schema.fields.filterNot(f => currentColumns.contains(f.name))
+    val isActiveCol = flowConfig.loadMode.isActiveColumn
     newColumns.foreach { field =>
       spark.sql(s"ALTER TABLE $tableName ADD COLUMN ${field.name} ${field.dataType.sql}")
       logger.info(s"Added column ${field.name} (${field.dataType.sql}) to $tableName")
+      if (isActiveCol.contains(field.name)) {
+        logger.warn(
+          s"Column '${field.name}' (is_active) was added to an existing table ($tableName). " +
+            s"Rows written before this change have ${field.name}=NULL and will be excluded by " +
+            s"queries filtering on ${field.name} = true. " +
+            s"Run a full reload to backfill ${field.name}=true on all current records."
+        )
+      }
     }
 
     // Apply new or changed table properties

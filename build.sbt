@@ -7,7 +7,7 @@ version := "0.1.0-SNAPSHOT"
 scalaVersion := "2.12.18"
 
 val sparkVersion = "3.5.8"
-val icebergVersion = "1.5.0"
+val icebergVersion = "1.10.1"
 val scalaTestVersion = "3.2.19"
 val scalaCheckVersion = "1.19.0"
 val json4sVersion = "3.7.0-M11"

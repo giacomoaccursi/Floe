@@ -111,7 +111,6 @@ object PKValidationProperties extends Properties("PKValidation") {
       path = None,
       rejectedPath = None,
       format = FileFormat.Parquet,
-      partitionBy = Seq.empty,
       compression = "snappy",
       options = Map.empty
     )
@@ -258,7 +257,6 @@ object PKValidationProperties extends Properties("PKValidation") {
           path = None,
           rejectedPath = None,
           format = FileFormat.Parquet,
-          partitionBy = Seq.empty,
           compression = "snappy",
           options = Map.empty
         )
@@ -432,7 +430,6 @@ object PKValidationProperties extends Properties("PKValidation") {
           path = None,
           rejectedPath = None,
           format = FileFormat.Parquet,
-          partitionBy = Seq.empty,
           compression = "snappy",
           options = Map.empty
         )

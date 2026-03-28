@@ -73,7 +73,6 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
         path = Some(s"$tempDir/output/$flowName"),
         rejectedPath = Some(s"$tempDir/rejected/$flowName"),
         format = FileFormat.Parquet,
-        partitionBy = Seq.empty,
         compression = "snappy",
         options = Map.empty
       )

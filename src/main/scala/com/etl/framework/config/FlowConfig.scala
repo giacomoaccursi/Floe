@@ -104,7 +104,6 @@ case class OutputConfig(
     path: Option[String] = None,
     rejectedPath: Option[String] = None,
     format: FileFormat = FileFormat.Parquet,
-    partitionBy: Seq[String] = Seq.empty,
     compression: String = "snappy",
     options: Map[String, String] = Map.empty,
     sortOrder: Seq[String] = Seq.empty,

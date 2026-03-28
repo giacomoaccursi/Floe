@@ -152,7 +152,6 @@ object FKValidationProperties extends Properties("FKValidation") {
       path = None,
       rejectedPath = None,
       format = FileFormat.Parquet,
-      partitionBy = Seq.empty,
       compression = "snappy",
       options = Map.empty
     )
@@ -384,7 +383,6 @@ object FKValidationProperties extends Properties("FKValidation") {
               path = None,
               rejectedPath = None,
               format = FileFormat.Parquet,
-              partitionBy = Seq.empty,
               compression = "snappy",
               options = Map.empty
             )
@@ -739,7 +737,6 @@ object FKValidationProperties extends Properties("FKValidation") {
           path = None,
           rejectedPath = None,
           format = FileFormat.Parquet,
-          partitionBy = Seq.empty,
           compression = "snappy",
           options = Map.empty
         )

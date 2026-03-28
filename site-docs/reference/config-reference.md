@@ -173,7 +173,6 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 | `path` | — | Output path (optional) |
 | `rejectedPath` | — | Override global rejectedPath |
 | `format` | `parquet` | Output format |
-| `partitionBy` | `[]` | Partition columns (non-Iceberg) |
 | `compression` | `snappy` | Compression codec |
 | `options` | `{}` | Additional write options |
 | `sortOrder` | `[]` | Iceberg write sort order |

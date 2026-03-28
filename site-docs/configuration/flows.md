@@ -206,7 +206,6 @@ Controls how validated data is written.
 | `path` | — | Output path (optional, framework uses Iceberg table) |
 | `rejectedPath` | — | Path for rejected records (overrides global `rejectedPath`) |
 | `format` | `parquet` | Output format |
-| `partitionBy` | `[]` | Partition columns (non-Iceberg output) |
 | `compression` | `snappy` | Compression codec |
 | `options` | `{}` | Additional write options |
 | `sortOrder` | `[]` | Iceberg write sort order columns |

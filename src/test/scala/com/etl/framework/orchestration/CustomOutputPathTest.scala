@@ -99,36 +99,4 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
     }
   }
 
-  it should "apply partitioning when configured" in {
-    val partitionColumns = List("status", "date", "region")
-
-    val flowConfig = FlowConfig(
-      name = "test_flow",
-      description = "Test flow",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(
-        `type` = SourceType.File,
-        path = "/tmp/test",
-        format = FileFormat.CSV,
-        options = Map.empty,
-        filePattern = None
-      ),
-      schema = SchemaConfig(
-        enforceSchema = true,
-        allowExtraColumns = false,
-        columns = Seq(ColumnConfig("id", "string", nullable = false, None, "ID"))
-      ),
-      loadMode = LoadModeConfig(`type` = LoadMode.Full),
-      validation = ValidationConfig(
-        primaryKey = Seq("id"),
-        foreignKeys = Seq.empty,
-        rules = Seq.empty
-      ),
-      output = OutputConfig(partitionBy = partitionColumns)
-    )
-
-    flowConfig.output.partitionBy should not be empty
-    flowConfig.output.partitionBy should have size 3
-  }
 }

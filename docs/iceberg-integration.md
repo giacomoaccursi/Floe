@@ -342,7 +342,7 @@ Each write produces an `IcebergFlowMetadata` object containing:
 
 - `tableName`: fully qualified Iceberg table name
 - `snapshotId`: numeric snapshot ID
-- `snapshotTag`: batch tag string
+- `snapshotTag`: batch tag string, or `null` if tagging is disabled or the tag operation failed. When `null`, use `snapshotId` for time travel instead.
 - `parentSnapshotId`: the snapshot that existed before this write (used for time travel in orphan detection)
 - `snapshotTimestampMs`: creation timestamp
 - `recordsWritten`: record count

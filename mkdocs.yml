@@ -1,0 +1,75 @@
+site_name: Spark ETL Framework
+site_description: Declarative Scala/Spark framework for enterprise ETL pipelines with Apache Iceberg
+repo_url: https://github.com/giacomoaccursi/spark-etl-framework
+repo_name: giacomoaccursi/spark-etl-framework
+
+docs_dir: site-docs
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quickstart: getting-started/quickstart.md
+    - Project Setup: getting-started/project-setup.md
+  - Configuration:
+    - Overview: configuration/overview.md
+    - Global Config: configuration/global.md
+    - Flow Config: configuration/flows.md
+    - Domains: configuration/domains.md
+    - DAG Config: configuration/dag.md
+  - Guides:
+    - Data Sources: guides/data-sources.md
+    - Validation Engine: guides/validation.md
+    - Iceberg Integration: guides/iceberg.md
+    - SCD2: guides/scd2.md
+    - DAG Aggregation: guides/dag-aggregation.md
+    - Pipeline Builder: guides/pipeline-builder.md
+    - Orphan Detection: guides/orphan-detection.md
+    - Custom Validators: guides/custom-validators.md
+    - Cloud Deployment: guides/cloud-deployment.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Modules: architecture/modules.md
+    - Data Flow: architecture/data-flow.md
+    - Execution Model: architecture/execution-model.md
+    - Design Decisions: architecture/design-decisions.md
+  - Reference:
+    - Config Reference: reference/config-reference.md
+    - Exceptions: reference/exceptions.md
+    - Changelog: reference/changelog.md
+  - Contributing:
+    - Development: contributing/development.md
+    - Workflow: contributing/workflow.md
+    - Code Quality: contributing/code-quality.md

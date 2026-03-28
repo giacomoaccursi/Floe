@@ -1,0 +1,61 @@
+# Domains Configuration
+
+Reference for `domains.yaml` — defines named sets of allowed values for domain validation rules.
+
+## Example
+
+```yaml
+domains:
+  order_status:
+    name: order_status
+    description: "Valid order statuses"
+    values: ["pending", "confirmed", "shipped", "delivered", "cancelled"]
+    caseSensitive: false
+
+  country_code:
+    name: country_code
+    description: "ISO 3166-1 alpha-2 country codes"
+    values: ["US", "GB", "DE", "FR", "IT", "ES"]
+    caseSensitive: true
+```
+
+## Domain fields
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `name` | — | Domain identifier (must match the map key) |
+| `description` | — | Human-readable description |
+| `values` | — | List of allowed values |
+| `caseSensitive` | `true` | If false, comparison is case-insensitive |
+
+## Usage in flow validation
+
+Reference a domain in a flow's validation rules using `domainName`:
+
+```yaml
+# In flows/orders.yaml
+validation:
+  rules:
+    - type: domain
+      column: status
+      domainName: order_status
+      onFailure: reject
+```
+
+If the domain name is not found in `domains.yaml`, the error message lists all available domains.
+
+For the full validation reference, see [Validation Engine](../guides/validation.md#domain-validation).
+
+## Empty domains file
+
+An empty domains file is valid — domains are only needed when flows use domain validation rules:
+
+```yaml
+domains: {}
+```
+
+## Case sensitivity
+
+When `caseSensitive: false`, the comparison converts both the column value and the domain values to lowercase before matching. This means `"Shipped"`, `"SHIPPED"`, and `"shipped"` all match a domain value of `"shipped"`.
+
+When `caseSensitive: true` (default), the match is exact.

@@ -1,0 +1,258 @@
+# Flow Configuration
+
+Complete reference for flow YAML files. Each file defines a single data ingestion pipeline and lives in the `flows/` subdirectory of the config directory.
+
+## Full example
+
+```yaml
+name: orders
+description: "Customer orders"
+version: "1.0"
+owner: data-team
+
+source:
+  type: file
+  path: "data/orders.csv"
+  format: csv
+  options:
+    header: "true"
+  filePattern: "orders_*.csv"
+
+schema:
+  enforceSchema: true
+  allowExtraColumns: false
+  columns:
+    - name: order_id
+      type: integer
+      nullable: false
+      description: "Unique order identifier"
+    - name: total_amount
+      type: "decimal(10, 2)"
+      nullable: false
+      description: "Order total"
+    - name: order_date
+      type: date
+      nullable: false
+      description: "Date the order was placed"
+
+loadMode:
+  type: delta
+
+validation:
+  primaryKey: [order_id]
+  foreignKeys:
+    - name: fk_customer
+      column: customer_id
+      references:
+        flow: customers
+        column: customer_id
+      onOrphan: warn
+  rules:
+    - type: regex
+      column: email
+      pattern: "^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$"
+      onFailure: reject
+
+output:
+  icebergPartitions:
+    - "month(order_date)"
+  sortOrder:
+    - order_date
+  tableProperties:
+    write.merge.mode: "merge-on-read"
+```
+
+## Top-level fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | yes | Flow name — maps to the Iceberg table name |
+| `description` | no | Human-readable description |
+| `version` | no | Flow version string |
+| `owner` | no | Team or person responsible |
+
+## source
+
+Defines where data is read from.
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `type` | yes | — | Source type: `file` |
+| `path` | yes | — | Path to source data |
+| `format` | yes | — | File format: `csv`, `parquet`, `json` |
+| `options` | no | `{}` | Format-specific options passed to the Spark reader |
+| `filePattern` | no | — | Glob pattern for file matching (appended to `path`) |
+
+Common CSV options: `header: "true"`, `delimiter: ";"`, `quote: "\""`, `escape: "\\"`, `nullValue: ""`.
+
+For details on each file format and their options, see [Data Sources](../guides/data-sources.md).
+
+## schema
+
+Defines the expected schema and controls enforcement during read.
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `enforceSchema` | — | If true, validate column presence and apply Spark schema during read |
+| `allowExtraColumns` | — | If false, reject data with columns not defined in `columns` |
+| `columns` | — | List of column definitions |
+
+### Column definition
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `name` | yes | — | Column name |
+| `type` | yes | — | Data type (see table below) |
+| `nullable` | yes | — | Whether the column allows NULL values. `false` triggers not-null validation. |
+| `default` | no | — | Default value (string). Reserved for future use. |
+| `description` | yes | — | Human-readable description |
+
+### Column types
+
+| Type | Spark type | Notes |
+|------|-----------|-------|
+| `string`, `varchar`, `text` | `StringType` | |
+| `int`, `integer` | `IntegerType` | |
+| `long`, `bigint` | `LongType` | |
+| `float` | `FloatType` | |
+| `double` | `DoubleType` | |
+| `boolean`, `bool` | `BooleanType` | |
+| `date` | `DateType` | |
+| `timestamp`, `datetime` | `TimestampType` | |
+| `decimal` | `DecimalType(38, 18)` | Default precision |
+| `decimal(p, s)` | `DecimalType(p, s)` | Custom precision, e.g. `decimal(10, 2)` |
+| `binary` | `BinaryType` | |
+| `byte`, `tinyint` | `ByteType` | |
+| `short`, `smallint` | `ShortType` | |
+
+!!!tip "Decimal precision"
+    Use `decimal(p, s)` for financial amounts: `decimal(10, 2)` gives 10 total digits with 2 decimal places. Plain `decimal` defaults to `(38, 18)` which may be more precision than needed.
+
+## loadMode
+
+Controls how data is written to the Iceberg table.
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `type` | yes | — | Load mode: `full`, `delta`, `scd2` |
+| `compareColumns` | SCD2 only | — | Columns used for SCD2 change detection. For delta mode, all non-PK columns are compared automatically. |
+| `validFromColumn` | no | `valid_from` | SCD2 valid-from timestamp column |
+| `validToColumn` | no | `valid_to` | SCD2 valid-to timestamp column |
+| `isCurrentColumn` | no | `is_current` | SCD2 current-version flag column |
+| `detectDeletes` | no | `false` | SCD2: soft-delete records absent from source |
+| `isActiveColumn` | no | `is_active` | SCD2: active flag column (used with `detectDeletes`) |
+
+- **full** — replaces all data atomically each batch
+- **delta** — upsert via MERGE INTO with value-based change detection
+- **scd2** — maintains full history with versioned rows
+
+For SCD2 details, see [SCD2 Guide](../guides/scd2.md). For Iceberg write mechanics, see [Iceberg Integration](../guides/iceberg.md).
+
+## validation
+
+Defines data quality rules. For the complete validation reference, see [Validation Engine](../guides/validation.md).
+
+```yaml
+validation:
+  primaryKey: [order_id]
+  foreignKeys:
+    - name: fk_customer
+      column: customer_id
+      references:
+        flow: customers
+        column: customer_id
+      onOrphan: warn
+  rules:
+    - type: regex
+      column: email
+      pattern: "^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$"
+      onFailure: reject
+```
+
+`primaryKey` is required — the framework throws an error if empty. `foreignKeys` and `rules` can be empty lists.
+
+### Foreign key fields
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `name` | string | yes | — | Descriptive name for the FK constraint |
+| `column` | string | yes | — | Column in the current flow |
+| `references.flow` | string | yes | — | Name of the parent flow |
+| `references.column` | string | yes | — | Column in the parent flow |
+| `onOrphan` | string | — | `warn` | Post-batch orphan action: `warn`, `delete`, `ignore`. See [Orphan Detection](../guides/orphan-detection.md). |
+
+### Rule fields
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `type` | string | yes | — | Rule type: `regex`, `range`, `domain`, `custom` |
+| `column` | string | yes* | — | Column to validate |
+| `pattern` | string | — | — | Regex pattern (for `regex` type) |
+| `min` | string | — | — | Minimum value (for `range` type) |
+| `max` | string | — | — | Maximum value (for `range` type) |
+| `domainName` | string | — | — | Domain name from `domains.yaml` (for `domain` type) |
+| `class` | string | — | — | Fully qualified class name (for `custom` type) |
+| `config` | map | — | — | Key-value config passed to custom validators |
+| `description` | string | — | — | Human-readable description |
+| `skipNull` | boolean | — | `true` | If true, NULL values pass without being checked |
+| `onFailure` | string | — | `reject` | Action on failure: `reject`, `warn`, `skip` |
+
+## output
+
+Controls how validated data is written.
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `path` | — | Output path (optional, framework uses Iceberg table) |
+| `rejectedPath` | — | Path for rejected records (overrides global `rejectedPath`) |
+| `format` | `parquet` | Output format |
+| `partitionBy` | `[]` | Partition columns (non-Iceberg output) |
+| `compression` | `snappy` | Compression codec |
+| `options` | `{}` | Additional write options |
+| `sortOrder` | `[]` | Iceberg write sort order columns |
+| `icebergPartitions` | `[]` | Iceberg partition expressions |
+| `tableProperties` | `{}` | Iceberg table properties |
+
+### Partition transforms
+
+Supported transforms for `icebergPartitions`:
+
+| Transform | Example | Description |
+|-----------|---------|-------------|
+| identity | `country` | Partition by raw column value |
+| `year(col)` | `year(order_date)` | Partition by year |
+| `month(col)` | `month(order_date)` | Partition by year-month |
+| `day(col)` | `day(created_at)` | Partition by date |
+| `hour(col)` | `hour(event_time)` | Partition by hour |
+| `bucket(n, col)` | `bucket(16, customer_id)` | Hash-partition into n buckets |
+| `truncate(len, col)` | `truncate(3, zip_code)` | Partition by truncated value |
+
+Transforms are case-insensitive.
+
+!!!warning "Partitioning guidelines"
+    - Partition on low-cardinality temporal columns (`month(order_date)`, `year(created_at)`)
+    - Do **not** partition on high-cardinality columns (IDs, timestamps with seconds/milliseconds)
+    - Do **not** partition on boolean columns (`is_current`) — only 2 values, creates severely imbalanced partitions
+
+### Sort order
+
+`sortOrder` controls data layout within files via `WRITE ORDERED BY`. This improves scan performance without affecting query semantics:
+
+```yaml
+output:
+  sortOrder:
+    - order_date
+    - customer_id
+```
+
+### Table properties
+
+Pass Iceberg table properties per-flow:
+
+```yaml
+output:
+  tableProperties:
+    write.merge.mode: "merge-on-read"
+    write.format.default: "parquet"
+    commit.retry.num-retries: "4"
+```

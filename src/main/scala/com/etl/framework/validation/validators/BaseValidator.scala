@@ -21,15 +21,11 @@ abstract class BaseValidator(flowName: Option[String] = None) extends Validator 
     // 2. Build validation condition
     val validationCondition = buildValidationCondition(df, rule, column)
 
-    // 3. Apply skipNull logic
-    val skipNull = rule.skipNull.getOrElse(true)
-    val finalCondition = applySkipNullLogic(column, validationCondition, skipNull)
+    // 3. Split into valid and invalid
+    val validDf = df.filter(validationCondition)
+    val invalidDf = df.filter(!validationCondition)
 
-    // 4. Split into valid and invalid
-    val validDf = df.filter(finalCondition)
-    val invalidDf = df.filter(!finalCondition)
-
-    // 5. Create result
+    // 4. Create result
     if (invalidDf.isEmpty) {
       ValidationStepResult(validDf, None)
     } else {
@@ -60,16 +56,6 @@ abstract class BaseValidator(flowName: Option[String] = None) extends Validator 
       .withColumn(REJECTION_REASON, lit(rejectionReason(rule, column)))
       .withColumn(VALIDATION_STEP, lit(validationStep))
       .withColumn(REJECTED_AT, current_timestamp())
-  }
-
-  /** Applies skipNull logic to the validation condition
-    */
-  protected def applySkipNullLogic(column: String, condition: Column, skipNull: Boolean): Column = {
-    if (skipNull) {
-      col(column).isNull || condition
-    } else {
-      condition
-    }
   }
 
   /** Returns the flow context string for error messages

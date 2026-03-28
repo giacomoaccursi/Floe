@@ -24,6 +24,31 @@ IngestionPipeline.builder()
 
 All three sections (`global.yaml`, `domains.yaml`, `flows/`) are required when using directory-based loading. Flow files must have `.yaml` or `.yml` extension.
 
+## Naming convention
+
+All YAML field names use camelCase to match the Scala case class fields directly:
+
+```yaml
+# Correct
+loadMode:
+  type: delta
+  compareColumns: [status, amount]
+
+# Wrong — will not be recognized
+load_mode:
+  type: delta
+  compare_columns: [status, amount]
+```
+
+## Error handling
+
+If a YAML file has syntax errors, the framework reports the file name and error location. If a required field is missing, the error message names the field and the section. If multiple flow files fail to load, all errors are reported together.
+
+```
+[CONFIG_FILE_ERROR] Configuration file error in 'config/flows/orders.yaml':
+  Missing required field 'name' at 'root'
+```
+
 ## Variable substitution
 
 YAML files support variable references with `${VAR_NAME}` or `$VAR_NAME` syntax:
@@ -124,7 +149,7 @@ iceberg:
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `batchIdFormat` | — | Java `DateTimeFormatter` pattern for batch ID generation |
+| `batchIdFormat` | — | Java `DateTimeFormatter` pattern for batch ID generation (e.g. `yyyyMMdd_HHmmss` → `20260328_150000`) |
 | `failOnValidationError` | `false` | Stop batch execution when any flow has rejected records |
 | `maxRejectionRate` | `0.1` | Rejection rate threshold (0.1 = 10%). See [validation-engine.md](validation-engine.md#batch-level-rejection-behavior) |
 
@@ -146,7 +171,7 @@ See [iceberg-integration.md](iceberg-integration.md) for the complete Iceberg co
 | `warehouse` | — (required) | Path to the Iceberg warehouse directory |
 | `catalogProperties` | `{}` | Additional key-value properties passed to the catalog provider |
 | `fileFormat` | `parquet` | Default data file format |
-| `formatVersion` | `2` | Iceberg format version (1 or 2). Version 2 required for MERGE INTO |
+| `formatVersion` | `2` | Iceberg format version. Must be `1` or `2`. Version 2 is required for row-level operations (MERGE INTO) — delta and SCD2 load modes fail on version 1 |
 | `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel |
 
 ## domains.yaml
@@ -230,10 +255,27 @@ output:
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `type` | yes | — | Source type: `file`, `jdbc` |
-| `path` | yes | — | Path to source data (or JDBC URL) |
-| `format` | yes | — | File format: `csv`, `parquet`, `json` |
-| `options` | yes | — | Format-specific options (e.g. `header: "true"` for CSV) |
+| `path` | yes | — | Path to source data (for file) or JDBC URL (for jdbc) |
+| `format` | yes | — | File format: `csv`, `parquet`, `json`. Ignored for JDBC. |
+| `options` | no | `{}` | Format-specific options passed to the Spark reader |
 | `filePattern` | no | — | Glob pattern for file matching (appended to `path`) |
+
+Common options for CSV: `header: "true"`, `delimiter: ";"`, `quote: "\""`, `escape: "\\"`, `nullValue: ""`.
+
+JDBC source example:
+
+```yaml
+source:
+  type: jdbc
+  path: ""
+  format: csv    # ignored for JDBC, but required by schema
+  options:
+    url: "jdbc:postgresql://host:5432/mydb"
+    dbtable: "public.customers"
+    user: "${DB_USER}"
+    password: "${DB_PASSWORD}"
+    driver: "org.postgresql.Driver"
+```
 
 ### schema
 
@@ -242,6 +284,16 @@ output:
 | `enforceSchema` | — | If true, validate column presence and apply Spark schema during read |
 | `allowExtraColumns` | — | If false, reject data with columns not defined in `columns` |
 | `columns` | — | List of column definitions |
+
+Each column has:
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `name` | yes | — | Column name |
+| `type` | yes | — | Data type (see table below) |
+| `nullable` | yes | — | Whether the column allows NULL values. `false` triggers not-null validation. |
+| `default` | no | — | Default value (string). Not currently applied during read — reserved for future use. |
+| `description` | yes | — | Human-readable description |
 
 #### Column types
 
@@ -266,7 +318,7 @@ output:
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `type` | yes | — | Load mode: `full`, `delta`, `scd2` |
-| `compareColumns` | SCD2 only | — | Columns used for change detection |
+| `compareColumns` | SCD2 only | — | Columns used for SCD2 change detection. For delta mode, all non-PK columns are compared automatically. |
 | `validFromColumn` | no | `valid_from` | SCD2 valid-from timestamp column |
 | `validToColumn` | no | `valid_to` | SCD2 valid-to timestamp column |
 | `isCurrentColumn` | no | `is_current` | SCD2 current-version flag column |
@@ -277,7 +329,24 @@ See [scd2.md](scd2.md) for complete SCD2 documentation.
 
 ### validation
 
-See [validation-engine.md](validation-engine.md) for the complete validation reference.
+```yaml
+validation:
+  primaryKey: [order_id]
+  foreignKeys:
+    - name: fk_customer
+      column: customer_id
+      references:
+        flow: customers
+        column: customer_id
+      onOrphan: warn
+  rules:
+    - type: regex
+      column: email
+      pattern: "^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$$"
+      onFailure: reject
+```
+
+`primaryKey` is required (the framework throws an error if empty). `foreignKeys` and `rules` can be empty lists. For the complete validation reference including all rule types, skipNull, onFailure behavior, and rejection metadata, see [validation-engine.md](validation-engine.md).
 
 ### output
 
@@ -290,8 +359,22 @@ See [validation-engine.md](validation-engine.md) for the complete validation ref
 | `compression` | `snappy` | Compression codec |
 | `options` | `{}` | Additional write options |
 | `sortOrder` | `[]` | Iceberg write sort order columns |
-| `icebergPartitions` | `[]` | Iceberg partition expressions (e.g. `month(date)`, `bucket(16, id)`) |
+| `icebergPartitions` | `[]` | Iceberg partition expressions |
 | `tableProperties` | `{}` | Iceberg table properties (e.g. `write.merge.mode: merge-on-read`) |
+
+Supported partition transforms for `icebergPartitions`:
+
+| Transform | Example | Description |
+|-----------|---------|-------------|
+| identity | `country` | Partition by raw column value |
+| `year(col)` | `year(order_date)` | Partition by year |
+| `month(col)` | `month(order_date)` | Partition by year-month |
+| `day(col)` | `day(created_at)` | Partition by date |
+| `hour(col)` | `hour(event_time)` | Partition by hour |
+| `bucket(n, col)` | `bucket(16, customer_id)` | Hash-partition into n buckets |
+| `truncate(len, col)` | `truncate(3, zip_code)` | Partition by truncated value |
+
+Transforms are case-insensitive. Do not partition on high-cardinality columns (IDs, fine-grained timestamps).
 
 ## DAG YAML
 

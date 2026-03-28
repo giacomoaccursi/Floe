@@ -10,9 +10,6 @@ class HadoopCatalogProvider extends CatalogProvider {
 
   override def catalogType: String = "hadoop"
 
-  override def sparkSessionConfig(config: IcebergConfig): Map[String, String] =
-    Map("spark.sql.extensions" -> icebergExtensions)
-
   override def configureCatalog(
       spark: SparkSession,
       config: IcebergConfig

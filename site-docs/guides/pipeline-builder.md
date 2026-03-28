@@ -326,10 +326,6 @@ import org.apache.spark.sql.SparkSession
 class NessieCatalogProvider extends CatalogProvider {
   override def catalogType: String = "nessie"
 
-  override def sparkSessionConfig(config: IcebergConfig): Map[String, String] =
-    Map("spark.sql.extensions" ->
-      "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-
   override def configureCatalog(spark: SparkSession, config: IcebergConfig): Unit = {
     val prefix = s"spark.sql.catalog.${config.catalogName}"
     spark.conf.set(prefix, "org.apache.iceberg.spark.SparkCatalog")
@@ -350,50 +346,15 @@ IngestionPipeline.builder()
   .build()
 ```
 
-The `CatalogProvider` trait has four methods:
+The `CatalogProvider` trait has three methods:
 
 | Method | Description |
 |--------|-------------|
 | `catalogType` | Identifier string (must match `iceberg.catalogType` in YAML) |
-| `sparkSessionConfig(config)` | Returns Spark properties that must be set before session creation (e.g. `spark.sql.extensions`) |
 | `configureCatalog(spark, config)` | Configures the SparkSession with catalog-specific properties at runtime |
 | `validateConfig(config)` | Validates the IcebergConfig; returns `Left(error)` to abort startup |
 
 Custom providers override built-in ones if the same type key is used. The provider is registered as a factory function (`() => CatalogProvider`) to support lazy initialization.
-
-## requiredSparkConfig helper
-
-Some Spark properties (like `spark.sql.extensions`) must be set before the SparkSession is created. The `requiredSparkConfig` helper returns these properties for programmatic session creation:
-
-```scala
-val icebergConfig = IcebergConfig(
-  catalogType = "hadoop",
-  catalogName = "spark_catalog",
-  warehouse = "output/warehouse"
-)
-
-val baseBuilder = SparkSession.builder()
-  .appName("my-app")
-  .master("local[*]")
-
-val spark = IngestionPipeline
-  .requiredSparkConfig(icebergConfig)
-  .foldLeft(baseBuilder) { case (b, (k, v)) => b.config(k, v) }
-  .getOrCreate()
-```
-
-If you registered custom catalog providers, pass them to `requiredSparkConfig` so their session-level properties are included:
-
-```scala
-val extraProviders = Map("nessie" -> (() => new NessieCatalogProvider()))
-
-val spark = IngestionPipeline
-  .requiredSparkConfig(icebergConfig, extraProviders)
-  .foldLeft(baseBuilder) { case (b, (k, v)) => b.config(k, v) }
-  .getOrCreate()
-```
-
-In cluster environments (Databricks, EMR, YARN), these properties are typically set via cluster config or `spark-submit --conf` and this helper is not needed.
 
 ## Complete example
 

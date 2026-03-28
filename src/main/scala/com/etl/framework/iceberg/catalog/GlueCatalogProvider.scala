@@ -10,9 +10,6 @@ class GlueCatalogProvider extends CatalogProvider {
 
   override def catalogType: String = "glue"
 
-  override def sparkSessionConfig(config: IcebergConfig): Map[String, String] =
-    Map("spark.sql.extensions" -> icebergExtensions)
-
   override def configureCatalog(
       spark: SparkSession,
       config: IcebergConfig

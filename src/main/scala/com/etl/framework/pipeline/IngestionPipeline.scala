@@ -389,30 +389,6 @@ object IngestionPipeline {
   def builder()(implicit spark: SparkSession): IngestionPipelineBuilder = {
     new IngestionPipelineBuilder()
   }
-
-  /** Returns the static Spark properties required by the given IcebergConfig that must be present in the SparkSession
-    * *before* it is created (e.g. spark.sql.extensions).
-    *
-    * This is a convenience helper for programmatic session creation. In cluster environments (Databricks, EMR, YARN)
-    * these properties are typically set via cluster config or spark-submit --conf and do not need to be applied in
-    * code.
-    *
-    * Usage (programmatic session creation only):
-    * {{{
-    *   val baseBuilder = SparkSession.builder().appName("my-app").master("local[*]")
-    *   val spark = IngestionPipeline
-    *     .requiredSparkConfig(icebergConfig)
-    *     .foldLeft(baseBuilder) { case (b, (k, v)) => b.config(k, v) }
-    *     .getOrCreate()
-    * }}}
-    */
-  def requiredSparkConfig(
-      icebergConfig: IcebergConfig,
-      extraProviders: Map[String, () => CatalogProvider] = Map.empty
-  ): Map[String, String] =
-    CatalogFactory
-      .sparkSessionConfig(icebergConfig.catalogType, icebergConfig, extraProviders.toMap)
-      .getOrElse(Map.empty)
 }
 
 /** Container for flow transformations

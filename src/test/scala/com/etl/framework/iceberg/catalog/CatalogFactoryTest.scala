@@ -9,7 +9,6 @@ class CatalogFactoryTest extends AnyFlatSpec with Matchers {
 
   private class CustomCatalogProvider extends CatalogProvider {
     override def catalogType: String = "custom"
-    override def sparkSessionConfig(config: IcebergConfig): Map[String, String] = Map.empty
     override def configureCatalog(spark: SparkSession, config: IcebergConfig): Unit = ()
     override def validateConfig(config: IcebergConfig): Either[String, Unit] = Right(())
   }

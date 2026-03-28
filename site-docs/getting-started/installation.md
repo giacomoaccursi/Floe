@@ -29,10 +29,6 @@ On Java 18+, you also need `-Djava.security.manager=allow` for Hadoop's `UserGro
 
 The framework requires Iceberg SQL extensions to be registered on the SparkSession **before** it is created. Spark does not allow adding extensions after session creation.
 
-There are two ways to set this up:
-
-### Option 1: Manual configuration
-
 Set the extensions directly on the SparkSession builder:
 
 ```scala
@@ -45,41 +41,6 @@ val spark = SparkSession.builder()
 ```
 
 All other Iceberg settings (catalog name, warehouse path, catalog type) are configured automatically by the framework from `global.yaml` — you only need the extensions line.
-
-### Option 2: requiredSparkConfig helper
-
-If you want the framework to tell you exactly which Spark properties are needed, use `IngestionPipeline.requiredSparkConfig()`. It returns a `Map[String, String]` with all properties that must be set before session creation:
-
-```scala
-import com.etl.framework.pipeline.IngestionPipeline
-import com.etl.framework.config.IcebergConfig
-
-// Define your Iceberg config (or load it from YAML)
-val icebergConfig = IcebergConfig(warehouse = "output/warehouse")
-
-// Get the required Spark properties
-val requiredProps: Map[String, String] = IngestionPipeline.requiredSparkConfig(icebergConfig)
-// Returns: Map("spark.sql.extensions" -> "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-
-// Apply them to the session builder
-val spark = requiredProps
-  .foldLeft(SparkSession.builder().appName("my-app").master("local[*]")) {
-    case (builder, (key, value)) => builder.config(key, value)
-  }
-  .getOrCreate()
-```
-
-This is useful when:
-
-- You use a custom catalog provider (Glue, Nessie) that may require additional session-level properties
-- You want to keep the session setup in sync with the framework's requirements automatically
-
-If you registered custom catalog providers, pass them so their properties are included:
-
-```scala
-val extraProviders = Map("nessie" -> (() => new NessieCatalogProvider()))
-val requiredProps = IngestionPipeline.requiredSparkConfig(icebergConfig, extraProviders)
-```
 
 ### On managed platforms
 

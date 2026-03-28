@@ -5,9 +5,8 @@ import com.etl.framework.exceptions.UnsupportedOperationException
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-/** DataReader implementation for file-based sources Supports CSV, Parquet, JSON
-  * formats with file pattern matching Can optionally enforce schema during read
-  * for type safety
+/** DataReader implementation for file-based sources Supports CSV, Parquet, JSON formats with file pattern matching Can
+  * optionally enforce schema during read for type safety
   */
 class FileDataReader(
     sourceConfig: SourceConfig,
@@ -87,7 +86,7 @@ class FileDataReader(
       case "binary"             => BinaryType
       case "byte" | "tinyint"   => ByteType
       case "short" | "smallint" => ShortType
-      case other                =>
+      case other =>
         throw UnsupportedOperationException(
           operation = s"type '$other'",
           details =

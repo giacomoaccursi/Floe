@@ -64,8 +64,7 @@ class DependencyGraphTest extends AnyFlatSpec with Matchers {
       foreignKeys = Seq(
         ForeignKeyConfig("fk_a", "a_id", ReferenceConfig("flow_a", "id"))
       ),
-      fkColumns =
-        Seq(ColumnConfig("a_id", "string", false, None, "FK to A"))
+      fkColumns = Seq(ColumnConfig("a_id", "string", false, None, "FK to A"))
     )
     val flowC = createFlow(
       "flow_c",
@@ -101,16 +100,14 @@ class DependencyGraphTest extends AnyFlatSpec with Matchers {
       foreignKeys = Seq(
         ForeignKeyConfig("fk_a", "a_id", ReferenceConfig("flow_a", "id"))
       ),
-      fkColumns =
-        Seq(ColumnConfig("a_id", "string", false, None, "FK to A"))
+      fkColumns = Seq(ColumnConfig("a_id", "string", false, None, "FK to A"))
     )
     val flowC = createFlow(
       "flow_c",
       foreignKeys = Seq(
         ForeignKeyConfig("fk_b", "b_id", ReferenceConfig("flow_b", "id"))
       ),
-      fkColumns =
-        Seq(ColumnConfig("b_id", "string", false, None, "FK to B"))
+      fkColumns = Seq(ColumnConfig("b_id", "string", false, None, "FK to B"))
     )
 
     val orchestrator =
@@ -131,24 +128,21 @@ class DependencyGraphTest extends AnyFlatSpec with Matchers {
       foreignKeys = Seq(
         ForeignKeyConfig("fk_c", "c_id", ReferenceConfig("flow_c", "id"))
       ),
-      fkColumns =
-        Seq(ColumnConfig("c_id", "string", false, None, "FK to C"))
+      fkColumns = Seq(ColumnConfig("c_id", "string", false, None, "FK to C"))
     )
     val flowB = createFlow(
       "flow_b",
       foreignKeys = Seq(
         ForeignKeyConfig("fk_a", "a_id", ReferenceConfig("flow_a", "id"))
       ),
-      fkColumns =
-        Seq(ColumnConfig("a_id", "string", false, None, "FK to A"))
+      fkColumns = Seq(ColumnConfig("a_id", "string", false, None, "FK to A"))
     )
     val flowC = createFlow(
       "flow_c",
       foreignKeys = Seq(
         ForeignKeyConfig("fk_b", "b_id", ReferenceConfig("flow_b", "id"))
       ),
-      fkColumns =
-        Seq(ColumnConfig("b_id", "string", false, None, "FK to B"))
+      fkColumns = Seq(ColumnConfig("b_id", "string", false, None, "FK to B"))
     )
 
     val orchestrator =

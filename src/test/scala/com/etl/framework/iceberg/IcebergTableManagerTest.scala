@@ -9,10 +9,7 @@ import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.{Files, Path}
 
-class IcebergTableManagerTest
-    extends AnyFlatSpec
-    with Matchers
-    with BeforeAndAfterAll {
+class IcebergTableManagerTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
   private var warehousePath: Path = _
 
@@ -135,7 +132,8 @@ class IcebergTableManagerTest
     )
     tableManager.createOrUpdateTable(updated, testSchema)
 
-    val props = spark.sql("SHOW TBLPROPERTIES test_catalog.default.props_update_test")
+    val props = spark
+      .sql("SHOW TBLPROPERTIES test_catalog.default.props_update_test")
       .collect()
       .map(row => row.getString(0) -> row.getString(1))
       .toMap
@@ -157,10 +155,12 @@ class IcebergTableManagerTest
   }
 
   it should "add partition spec to an existing unpartitioned table" in {
-    val schemaWithDate = StructType(Seq(
-      StructField("id", IntegerType, nullable = false),
-      StructField("event_date", DateType, nullable = true)
-    ))
+    val schemaWithDate = StructType(
+      Seq(
+        StructField("id", IntegerType, nullable = false),
+        StructField("event_date", DateType, nullable = true)
+      )
+    )
 
     // Create table without partitions
     val initial = testFlowConfig("partition_update_test")
@@ -178,17 +178,22 @@ class IcebergTableManagerTest
       .toDF("id", "event_date")
     data.writeTo("test_catalog.default.partition_update_test").append()
 
-    val showCreate = spark.sql("SHOW CREATE TABLE test_catalog.default.partition_update_test")
-      .collect().map(_.getString(0)).mkString("")
+    val showCreate = spark
+      .sql("SHOW CREATE TABLE test_catalog.default.partition_update_test")
+      .collect()
+      .map(_.getString(0))
+      .mkString("")
 
     showCreate.toLowerCase should include("month")
   }
 
   it should "not fail when adding a partition field that already exists" in {
-    val schemaWithDate = StructType(Seq(
-      StructField("id", IntegerType, nullable = false),
-      StructField("event_date", DateType, nullable = true)
-    ))
+    val schemaWithDate = StructType(
+      Seq(
+        StructField("id", IntegerType, nullable = false),
+        StructField("event_date", DateType, nullable = true)
+      )
+    )
 
     val fc = testFlowConfig(
       "partition_idempotent_test",
@@ -207,8 +212,10 @@ class IcebergTableManagerTest
     val initial = testFlowConfig("schema_evolution_test")
     tableManager.createOrUpdateTable(initial, testSchema)
 
-    val extendedSchema = StructType(testSchema.fields :+
-      StructField("notes", StringType, nullable = true))
+    val extendedSchema = StructType(
+      testSchema.fields :+
+        StructField("notes", StringType, nullable = true)
+    )
     tableManager.createOrUpdateTable(initial, extendedSchema)
 
     val cols = spark.table("test_catalog.default.schema_evolution_test").schema.fieldNames
@@ -290,10 +297,14 @@ class IcebergTableManagerTest
     val flowConfig = testFlowConfig("maintenance_test")
     tableManager.createOrUpdateTable(flowConfig, testSchema)
 
-    Seq((1, "Alice", 10.0)).toDF("id", "name", "value")
-      .writeTo("test_catalog.default.maintenance_test").append()
-    Seq((2, "Bob", 20.0)).toDF("id", "name", "value")
-      .writeTo("test_catalog.default.maintenance_test").append()
+    Seq((1, "Alice", 10.0))
+      .toDF("id", "name", "value")
+      .writeTo("test_catalog.default.maintenance_test")
+      .append()
+    Seq((2, "Bob", 20.0))
+      .toDF("id", "name", "value")
+      .writeTo("test_catalog.default.maintenance_test")
+      .append()
 
     val maintenanceConfig = MaintenanceConfig(
       enableSnapshotExpiration = true,
@@ -313,8 +324,10 @@ class IcebergTableManagerTest
     val flowConfig = testFlowConfig("orphan_cleanup_test")
     tableManager.createOrUpdateTable(flowConfig, testSchema)
 
-    Seq((1, "Alice", 10.0)).toDF("id", "name", "value")
-      .writeTo("test_catalog.default.orphan_cleanup_test").append()
+    Seq((1, "Alice", 10.0))
+      .toDF("id", "name", "value")
+      .writeTo("test_catalog.default.orphan_cleanup_test")
+      .append()
 
     val maintenanceConfig = MaintenanceConfig(
       enableSnapshotExpiration = false,

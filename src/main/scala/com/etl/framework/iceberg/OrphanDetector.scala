@@ -18,12 +18,10 @@ case class OrphanReport(
     deletedChildKeyCount: Long = 0
 )
 
-/**
- * Detects and resolves orphaned records after batch execution.
- * Uses Iceberg time travel to find PKs removed by parent flows,
- * then checks child flows for orphaned FK references.
- * Processes flows in topological order to support cascade propagation.
- */
+/** Detects and resolves orphaned records after batch execution. Uses Iceberg time travel to find PKs removed by parent
+  * flows, then checks child flows for orphaned FK references. Processes flows in topological order to support cascade
+  * propagation.
+  */
 class OrphanDetector(
     spark: SparkSession,
     icebergConfig: IcebergConfig,
@@ -36,10 +34,9 @@ class OrphanDetector(
   private val flowConfigMap = flowConfigs.map(fc => fc.name -> fc).toMap
   private val flowResultMap = flowResults.map(fr => fr.flowName -> fr).toMap
 
-  /**
-   * Detects and resolves orphans for all flows in topological order.
-   * Cascade: when onOrphan=Delete, deleted child PKs propagate to next level.
-   */
+  /** Detects and resolves orphans for all flows in topological order. Cascade: when onOrphan=Delete, deleted child PKs
+    * propagate to next level.
+    */
   def detectAndResolveOrphans(
       plan: ExecutionPlan
   ): Seq[OrphanReport] = {
@@ -92,10 +89,9 @@ class OrphanDetector(
     }
   }
 
-  /**
-   * Finds PKs removed from the parent flow using Iceberg time travel
-   * or cascade propagation from a previously processed flow.
-   */
+  /** Finds PKs removed from the parent flow using Iceberg time travel or cascade propagation from a previously
+    * processed flow.
+    */
   private def findRemovedParentKeys(
       parentCfg: FlowConfig,
       parentResult: FlowResult,
@@ -119,10 +115,8 @@ class OrphanDetector(
     }
   }
 
-  /**
-   * Uses Iceberg time travel to compare previous and current snapshot
-   * and find PKs that were removed.
-   */
+  /** Uses Iceberg time travel to compare previous and current snapshot and find PKs that were removed.
+    */
   private def findRemovedKeysViaTimeTravel(
       parentCfg: FlowConfig,
       parentResult: FlowResult,
@@ -193,9 +187,8 @@ class OrphanDetector(
     }
   }
 
-  /**
-   * Resolves orphans based on the FK's onOrphan action.
-   */
+  /** Resolves orphans based on the FK's onOrphan action.
+    */
   private def resolveOrphans(
       childFlow: FlowConfig,
       fk: ForeignKeyConfig,

@@ -31,8 +31,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
             failOnValidationError = false,
             maxRejectionRate = rejectionThreshold
           ),
-          performance =
-            PerformanceConfig(parallelFlows = true, parallelNodes = true),
+          performance = PerformanceConfig(parallelFlows = true, parallelNodes = true),
           iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
         ),
         None,
@@ -71,8 +70,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
         failOnValidationError = false,
         maxRejectionRate = rejectionThreshold
       ),
-      performance =
-        PerformanceConfig(parallelFlows = true, parallelNodes = true),
+      performance = PerformanceConfig(parallelFlows = true, parallelNodes = true),
       iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
     )
   }
@@ -86,8 +84,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
       description = "Test flow",
       version = "1.0",
       owner = "test",
-      source =
-        SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
+      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
       schema = SchemaConfig(true, true, Seq.empty),
       loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(Seq.empty, Seq.empty, Seq.empty),

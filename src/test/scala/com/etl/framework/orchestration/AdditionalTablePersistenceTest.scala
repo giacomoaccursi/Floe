@@ -1,9 +1,6 @@
 package com.etl.framework.orchestration
 
-import com.etl.framework.core.{
-  AdditionalTableMetadata,
-  TransformationContext
-}
+import com.etl.framework.core.{AdditionalTableMetadata, TransformationContext}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.{functions => f}
 import org.scalatest.flatspec.AnyFlatSpec

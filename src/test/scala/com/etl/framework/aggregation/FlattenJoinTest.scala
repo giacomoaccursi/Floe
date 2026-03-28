@@ -115,7 +115,7 @@ class FlattenJoinTest extends AnyFlatSpec with Matchers {
   it should "handle join key with same name in both tables without ambiguity" in {
     // Both parent and child share the same join key column name: "product_id"
     val parentDF = Seq((1, "Widget"), (2, "Gadget")).toDF("product_id", "product_name")
-    val childDF  = Seq((10, 1, 5), (11, 1, 3), (12, 2, 7)).toDF("order_id", "product_id", "quantity")
+    val childDF = Seq((10, 1, 5), (11, 1, 3), (12, 2, 7)).toDF("order_id", "product_id", "quantity")
 
     val joinConfig = JoinConfig(
       `type` = JoinType.Inner,
@@ -128,17 +128,19 @@ class FlattenJoinTest extends AnyFlatSpec with Matchers {
     val result = executor.applyJoin(parentDF, childDF, joinConfig)
 
     result.count() shouldBe 3L
-    result.columns should contain allOf("product_id", "product_name", "order_id", "quantity")
+    result.columns should contain allOf ("product_id", "product_name", "order_id", "quantity")
   }
 
   it should "preserve all parent records and produce NULLs for child columns when child DataFrame is empty" in {
     val parentDF = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
     val emptyChildDF = spark.createDataFrame(
       spark.sparkContext.emptyRDD[org.apache.spark.sql.Row],
-      org.apache.spark.sql.types.StructType(Seq(
-        org.apache.spark.sql.types.StructField("parent_id", org.apache.spark.sql.types.IntegerType),
-        org.apache.spark.sql.types.StructField("score", org.apache.spark.sql.types.IntegerType)
-      ))
+      org.apache.spark.sql.types.StructType(
+        Seq(
+          org.apache.spark.sql.types.StructField("parent_id", org.apache.spark.sql.types.IntegerType),
+          org.apache.spark.sql.types.StructField("score", org.apache.spark.sql.types.IntegerType)
+        )
+      )
     )
 
     val joinConfig = JoinConfig(
@@ -152,7 +154,7 @@ class FlattenJoinTest extends AnyFlatSpec with Matchers {
     val result = executor.applyJoin(parentDF, emptyChildDF, joinConfig)
 
     result.count() shouldBe 2L
-    result.columns should contain allOf("id", "name", "score")
+    result.columns should contain allOf ("id", "name", "score")
     result.filter("score IS NULL").count() shouldBe 2L
   }
 }

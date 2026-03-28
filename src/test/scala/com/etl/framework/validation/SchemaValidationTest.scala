@@ -28,8 +28,7 @@ class SchemaValidationTest extends AnyFlatSpec with Matchers {
       description = "Test flow",
       version = "1.0",
       owner = "test",
-      source =
-        SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
+      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
       schema = SchemaConfig(enforceSchema, allowExtraColumns, schemaFields),
       loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(Seq("id"), Seq.empty, Seq.empty),
@@ -102,9 +101,11 @@ class SchemaValidationTest extends AnyFlatSpec with Matchers {
     val engine = new ValidationEngine()
     val result = engine.validate(df, flowConfig)
 
-    val schemaRejections = result.rejected.map { rejectedDf =>
-      rejectedDf.filter(f.col(REJECTION_CODE) === "SCHEMA_VALIDATION_FAILED").count()
-    }.getOrElse(0L)
+    val schemaRejections = result.rejected
+      .map { rejectedDf =>
+        rejectedDf.filter(f.col(REJECTION_CODE) === "SCHEMA_VALIDATION_FAILED").count()
+      }
+      .getOrElse(0L)
 
     schemaRejections shouldBe 0
   }
@@ -150,9 +151,11 @@ class SchemaValidationTest extends AnyFlatSpec with Matchers {
     val engine = new ValidationEngine()
     val result = engine.validate(df, flowConfig)
 
-    val schemaRejections = result.rejected.map { rejectedDf =>
-      rejectedDf.filter(f.col(REJECTION_CODE) === "SCHEMA_VALIDATION_FAILED").count()
-    }.getOrElse(0L)
+    val schemaRejections = result.rejected
+      .map { rejectedDf =>
+        rejectedDf.filter(f.col(REJECTION_CODE) === "SCHEMA_VALIDATION_FAILED").count()
+      }
+      .getOrElse(0L)
 
     schemaRejections shouldBe 0
   }

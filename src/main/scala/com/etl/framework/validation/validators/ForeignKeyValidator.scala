@@ -6,16 +6,14 @@ import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{broadcast, col, lit}
 
-/**
- * Validator for Foreign Key integrity
- * Validates that foreign key values exist in referenced tables
- */
+/** Validator for Foreign Key integrity Validates that foreign key values exist in referenced tables
+  */
 class ForeignKeyValidator(
-  flowConfig: FlowConfig,
-  validatedFlows: Map[String, DataFrame],
-  flowName: Option[String] = None
+    flowConfig: FlowConfig,
+    validatedFlows: Map[String, DataFrame],
+    flowName: Option[String] = None
 ) extends FlowConfigValidator(flowConfig, flowName) {
-  
+
   override def validate(df: DataFrame, rule: ValidationRule): ValidationStepResult = {
     if (flowConfig.validation.foreignKeys.isEmpty) {
       ValidationUtils.validResult(df)
@@ -57,7 +55,7 @@ class ForeignKeyValidator(
                 .cache()
 
               try {
-                val orphans    = joinedWithRef.filter(col("_fk_ref_exists").isNull).drop("_fk_ref_exists")
+                val orphans = joinedWithRef.filter(col("_fk_ref_exists").isNull).drop("_fk_ref_exists")
                 val validNonNull = joinedWithRef.filter(col("_fk_ref_exists").isNotNull).drop("_fk_ref_exists")
 
                 if (orphans.isEmpty) {

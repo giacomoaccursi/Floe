@@ -8,10 +8,7 @@ import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.{Files, Path}
 
-class IcebergTableWriterTest
-    extends AnyFlatSpec
-    with Matchers
-    with BeforeAndAfterAll {
+class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
   private var warehousePath: Path = _
 
@@ -357,8 +354,10 @@ class IcebergTableWriterTest
     ).toDF("id", "score")
     writer.writeSCD2Load(initial, fc)
 
-    spark.sql("SELECT * FROM writer_catalog.default.scd2_null_change")
-      .filter("is_current = true").count() shouldBe 2L
+    spark
+      .sql("SELECT * FROM writer_catalog.default.scd2_null_change")
+      .filter("is_current = true")
+      .count() shouldBe 2L
 
     // Second load: record 1 now has score=100 (NULL→value = change), record 2 stays NULL→NULL (no change)
     val update = Seq(
@@ -424,8 +423,10 @@ class IcebergTableWriterTest
     val data = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
     writer.writeSCD2Load(data, fc)
 
-    spark.sql("SELECT * FROM writer_catalog.default.scd2_empty_first")
-      .filter("is_current = true").count() shouldBe 2L
+    spark
+      .sql("SELECT * FROM writer_catalog.default.scd2_empty_first")
+      .filter("is_current = true")
+      .count() shouldBe 2L
   }
 
   // --- Full Load with empty DataFrame ---

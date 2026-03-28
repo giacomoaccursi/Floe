@@ -41,8 +41,7 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
       description = "Test flow",
       version = "1.0",
       owner = "test",
-      source =
-        SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty, None),
+      source = SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty, None),
       schema = SchemaConfig(
         enforceSchema = true,
         allowExtraColumns = false,
@@ -206,9 +205,7 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
       .collect()
       .foreach { row =>
         val warnings = row.getSeq[String](0)
-        warnings.filter(w =>
-          w.toLowerCase.contains("email") && w.toLowerCase.contains("pattern")
-        ) shouldBe empty
+        warnings.filter(w => w.toLowerCase.contains("email") && w.toLowerCase.contains("pattern")) shouldBe empty
       }
   }
 
@@ -240,11 +237,11 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
     // "9" > "10" lexicographically but 9 < 10 numerically.
     // Without a numeric cast, "9" would incorrectly pass a min=10 range check.
     val records = Seq(
-      ("1", "9"),   // 9 < 10 numerically → should be REJECTED
-      ("2", "15"),  // 15 in [10, 100]   → should be VALID
+      ("1", "9"), // 9 < 10 numerically → should be REJECTED
+      ("2", "15"), // 15 in [10, 100]   → should be VALID
       ("3", "101"), // 101 > 100          → should be REJECTED
       ("4", "100"), // 100 == max         → should be VALID
-      ("5", "10")   // 10 == min          → should be VALID
+      ("5", "10") // 10 == min          → should be VALID
     )
     val df = records.toDF("id", "score")
 
@@ -288,8 +285,8 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
     rejectedCount shouldBe 2
 
     val rejectedIds = result.rejected.get.select("id").collect().map(_.getString(0)).toSet
-    rejectedIds should contain("1")  // "9" < 10 numerically
-    rejectedIds should contain("3")  // "101" > 100 numerically
+    rejectedIds should contain("1") // "9" < 10 numerically
+    rejectedIds should contain("3") // "101" > 100 numerically
     rejectedIds should not contain "2"
     rejectedIds should not contain "4"
     rejectedIds should not contain "5"
@@ -297,10 +294,10 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
 
   "Multiple rules with different behaviors" should "reject for reject-rules and warn for warn-rules" in {
     val records = Seq(
-      ValidationRuleBehaviorRecord(1, "alice@example.com", 25, "active"),  // all valid
-      ValidationRuleBehaviorRecord(2, "invalidemail", 30, "active"),        // invalid email (warn)
-      ValidationRuleBehaviorRecord(3, "bob@test.org", 150, "inactive"),     // invalid age (reject)
-      ValidationRuleBehaviorRecord(4, "noemail", 200, "pending")            // both invalid
+      ValidationRuleBehaviorRecord(1, "alice@example.com", 25, "active"), // all valid
+      ValidationRuleBehaviorRecord(2, "invalidemail", 30, "active"), // invalid email (warn)
+      ValidationRuleBehaviorRecord(3, "bob@test.org", 150, "inactive"), // invalid age (reject)
+      ValidationRuleBehaviorRecord(4, "noemail", 200, "pending") // both invalid
     )
     val df = records.toDF()
 
@@ -309,8 +306,7 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
       description = "Test flow",
       version = "1.0",
       owner = "test",
-      source =
-        SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty, None),
+      source = SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty, None),
       schema = SchemaConfig(
         enforceSchema = true,
         allowExtraColumns = false,

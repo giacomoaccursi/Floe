@@ -8,31 +8,27 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Column
 
-/**
- * Base class for validators with common functionality
- * Reduces code duplication across validator implementations
- */
+/** Base class for validators with common functionality Reduces code duplication across validator implementations
+  */
 abstract class BaseValidator(flowName: Option[String] = None) extends Validator {
-  
-  /**
-   * Validates the DataFrame according to the rule
-   * Template method that delegates to abstract methods
-   */
+
+  /** Validates the DataFrame according to the rule Template method that delegates to abstract methods
+    */
   final override def validate(df: DataFrame, rule: ValidationRule): ValidationStepResult = {
     // 1. Extract and validate column
     val column = extractColumn(rule)
-    
+
     // 2. Build validation condition
     val validationCondition = buildValidationCondition(df, rule, column)
-    
+
     // 3. Apply skipNull logic
     val skipNull = rule.skipNull.getOrElse(true)
     val finalCondition = applySkipNullLogic(column, validationCondition, skipNull)
-    
+
     // 4. Split into valid and invalid
     val validDf = df.filter(finalCondition)
     val invalidDf = df.filter(!finalCondition)
-    
+
     // 5. Create result
     if (invalidDf.isEmpty) {
       ValidationStepResult(validDf, None)
@@ -41,10 +37,9 @@ abstract class BaseValidator(flowName: Option[String] = None) extends Validator 
       ValidationStepResult(validDf, Some(rejectedDf))
     }
   }
-  
-  /**
-   * Extracts and validates the column from the rule
-   */
+
+  /** Extracts and validates the column from the rule
+    */
   protected def extractColumn(rule: ValidationRule): String = {
     rule.column.getOrElse {
       throw ValidationConfigException(
@@ -52,15 +47,13 @@ abstract class BaseValidator(flowName: Option[String] = None) extends Validator 
       )
     }
   }
-  
-  /**
-   * Builds the validation condition (to be implemented by subclasses)
-   */
+
+  /** Builds the validation condition (to be implemented by subclasses)
+    */
   protected def buildValidationCondition(df: DataFrame, rule: ValidationRule, column: String): Column
-  
-  /**
-   * Creates the rejected DataFrame with metadata columns
-   */
+
+  /** Creates the rejected DataFrame with metadata columns
+    */
   protected def createRejectedDataFrame(invalidDf: DataFrame, rule: ValidationRule, column: String): DataFrame = {
     invalidDf
       .withColumn(REJECTION_CODE, lit(rejectionCode))
@@ -68,10 +61,9 @@ abstract class BaseValidator(flowName: Option[String] = None) extends Validator 
       .withColumn(VALIDATION_STEP, lit(validationStep))
       .withColumn(REJECTED_AT, current_timestamp())
   }
-  
-  /**
-   * Applies skipNull logic to the validation condition
-   */
+
+  /** Applies skipNull logic to the validation condition
+    */
   protected def applySkipNullLogic(column: String, condition: Column, skipNull: Boolean): Column = {
     if (skipNull) {
       col(column).isNull || condition
@@ -79,31 +71,26 @@ abstract class BaseValidator(flowName: Option[String] = None) extends Validator 
       condition
     }
   }
-  
-  /**
-   * Returns the flow context string for error messages
-   */
+
+  /** Returns the flow context string for error messages
+    */
   protected def flowContext: String = flowName.map(f => s" in flow '$f'").getOrElse("")
-  
+
   // Abstract methods to be implemented by subclasses
-  
-  /**
-   * Name of the validator (e.g., "Regex", "Range", "Domain")
-   */
+
+  /** Name of the validator (e.g., "Regex", "Range", "Domain")
+    */
   protected def validatorName: String
-  
-  /**
-   * Rejection code for this validator
-   */
+
+  /** Rejection code for this validator
+    */
   protected def rejectionCode: String
-  
-  /**
-   * Rejection reason message
-   */
+
+  /** Rejection reason message
+    */
   protected def rejectionReason(rule: ValidationRule, column: String): String
-  
-  /**
-   * Validation step name
-   */
+
+  /** Validation step name
+    */
   protected def validationStep: String
 }

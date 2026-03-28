@@ -4,20 +4,18 @@ import com.etl.framework.config.{FlowConfig, ValidationRule}
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
 
-/**
- * Validator for schema validation
- * Validates that all required columns are present
- */
-class SchemaValidator(flowConfig: FlowConfig, flowName: Option[String] = None) 
-  extends FlowConfigValidator(flowConfig, flowName) {
-  
+/** Validator for schema validation Validates that all required columns are present
+  */
+class SchemaValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
+    extends FlowConfigValidator(flowConfig, flowName) {
+
   override def validate(df: DataFrame, rule: ValidationRule): ValidationStepResult = {
     if (!flowConfig.schema.enforceSchema) {
       ValidationUtils.validResult(df)
     } else {
       val requiredColumns = flowConfig.schema.columns.map(_.name).toSet
       val actualColumns = df.columns.toSet
-      
+
       // 1. Check for missing required columns
       val missingColumns = requiredColumns -- actualColumns
       if (missingColumns.nonEmpty) {

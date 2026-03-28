@@ -57,7 +57,8 @@ class IcebergTableManager(
 
     // Apply new or changed table properties
     if (flowConfig.output.tableProperties.nonEmpty) {
-      val currentProps = spark.sql(s"SHOW TBLPROPERTIES $tableName")
+      val currentProps = spark
+        .sql(s"SHOW TBLPROPERTIES $tableName")
         .collect()
         .map(row => row.getString(0) -> row.getString(1))
         .toMap
@@ -110,9 +111,11 @@ class IcebergTableManager(
       schema: StructType,
       flowConfig: FlowConfig
   ): Unit = {
-    val columns = schema.fields.map { field =>
-      s"${field.name} ${field.dataType.sql}"
-    }.mkString(", ")
+    val columns = schema.fields
+      .map { field =>
+        s"${field.name} ${field.dataType.sql}"
+      }
+      .mkString(", ")
 
     val createSql = s"CREATE TABLE IF NOT EXISTS $tableName ($columns) USING iceberg"
     logger.info(s"Creating Iceberg table: $createSql")

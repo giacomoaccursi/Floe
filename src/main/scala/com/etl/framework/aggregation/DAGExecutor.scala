@@ -7,69 +7,65 @@ import scala.collection.mutable
 import scala.concurrent._
 import scala.concurrent.duration._
 
-/**
- * Executes DAG execution plans
- */
+/** Executes DAG execution plans
+  */
 class DAGExecutor(nodeProcessor: DAGNodeProcessor, parallelEc: ExecutionContext) {
 
   private val logger = LoggerFactory.getLogger(getClass)
   private val MaxParallelTimeout: FiniteDuration = 2.hours
-  
-  /**
-   * Executes DAG nodes according to the execution plan
-   */
+
+  /** Executes DAG nodes according to the execution plan
+    */
   def execute(plan: DAGExecutionPlan): DataFrame = {
     logger.info("Executing DAG plan")
     val nodeResults = mutable.Map[String, DataFrame]()
-    
+
     plan.groups.foreach { group =>
       logger.info(s"Executing DAG group with ${group.nodes.size} nodes (parallel=${group.parallel})")
-      
+
       val groupResults = if (group.parallel) {
         executeGroupParallel(group, nodeResults.toMap)
       } else {
         executeGroupSequential(group, nodeResults.toMap)
       }
-      
+
       groupResults.foreach { case (nodeId, df) =>
         nodeResults(nodeId) = df
       }
     }
-    
+
     val rootResult = nodeResults.getOrElse(
       plan.rootNode,
       throw new IllegalStateException(
         s"DAG execution error: root node '${plan.rootNode}' was not produced. " +
-        s"Available nodes: ${nodeResults.keys.mkString(", ")}"
+          s"Available nodes: ${nodeResults.keys.mkString(", ")}"
       )
     )
     logger.info(s"DAG execution completed, returning root node: ${plan.rootNode}")
     rootResult
   }
-  
-  /**
-   * Executes a group of nodes sequentially
-   */
+
+  /** Executes a group of nodes sequentially
+    */
   private def executeGroupSequential(
-    group: DAGExecutionGroup,
-    nodeResults: Map[String, DataFrame]
+      group: DAGExecutionGroup,
+      nodeResults: Map[String, DataFrame]
   ): Map[String, DataFrame] = {
     val results = mutable.Map[String, DataFrame]()
-    
+
     group.nodes.foreach { node =>
       val result = nodeProcessor.executeNode(node, nodeResults ++ results)
       results(node.id) = result
     }
-    
+
     results.toMap
   }
-  
-  /**
-   * Executes a group of nodes in parallel
-   */
+
+  /** Executes a group of nodes in parallel
+    */
   private def executeGroupParallel(
-    group: DAGExecutionGroup,
-    nodeResults: Map[String, DataFrame]
+      group: DAGExecutionGroup,
+      nodeResults: Map[String, DataFrame]
   ): Map[String, DataFrame] = {
     val futures = group.nodes.map { node =>
       Future {

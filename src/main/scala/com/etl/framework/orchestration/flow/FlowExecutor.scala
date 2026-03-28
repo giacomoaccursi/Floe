@@ -1,10 +1,6 @@
 package com.etl.framework.orchestration.flow
 
-import com.etl.framework.config.{
-  DomainsConfig,
-  FlowConfig,
-  GlobalConfig
-}
+import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
 import com.etl.framework.core.AdditionalTableInfo
 import com.etl.framework.exceptions.InvariantViolationException
 import com.etl.framework.iceberg.{IcebergFlowMetadata, IcebergTableManager, IcebergTableWriter, WriteResult}
@@ -83,37 +79,37 @@ class FlowExecutor(
     val cachedInput = preTransformedData.cache()
     try {
 
-    val inputCount = cachedInput.count()
+      val inputCount = cachedInput.count()
 
-    // 3. Validate new data only, merge happens during Iceberg write
-    val validationResult = TimingUtil.timed(logger, "Validate data") {
-      validateData(cachedInput)
-    }
-    val rejectedCount = validationResult.rejectionReasons.values.sum
-    val validCount = inputCount - rejectedCount
+      // 3. Validate new data only, merge happens during Iceberg write
+      val validationResult = TimingUtil.timed(logger, "Validate data") {
+        validateData(cachedInput)
+      }
+      val rejectedCount = validationResult.rejectionReasons.values.sum
+      val validCount = inputCount - rejectedCount
 
-    logValidationResults(validationResult, inputCount, rejectedCount)
+      logValidationResults(validationResult, inputCount, rejectedCount)
 
-    // 4. Apply post-validation transformations
-    val postTransformedData = transformer.applyPostValidationTransformation(
-      validationResult.valid,
-      batchId,
-      validatedFlows
-    )
+      // 4. Apply post-validation transformations
+      val postTransformedData = transformer.applyPostValidationTransformation(
+        validationResult.valid,
+        batchId,
+        validatedFlows
+      )
 
-    verifyInvariant(inputCount, validCount, rejectedCount)
+      verifyInvariant(inputCount, validCount, rejectedCount)
 
-    // 5. Write to Iceberg
-    val writeResult = writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
+      // 5. Write to Iceberg
+      val writeResult = writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
 
-    FlowMetrics(
-      inputCount = inputCount,
-      mergedCount = inputCount,
-      validCount = validCount,
-      rejectedCount = rejectedCount,
-      rejectionReasons = validationResult.rejectionReasons,
-      icebergMetadata = writeResult.icebergMetadata
-    )
+      FlowMetrics(
+        inputCount = inputCount,
+        mergedCount = inputCount,
+        validCount = validCount,
+        rejectedCount = rejectedCount,
+        rejectionReasons = validationResult.rejectionReasons,
+        icebergMetadata = writeResult.icebergMetadata
+      )
 
     } finally {
       cachedInput.unpersist()

@@ -104,7 +104,7 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
 
   it should "handle join key with same name in both tables without ambiguity" in {
     val parentDF = Seq((1, "Alice"), (2, "Bob")).toDF("customer_id", "name")
-    val childDF  = Seq((10, 1, "shipped"), (11, 1, "pending"), (12, 2, "shipped"))
+    val childDF = Seq((10, 1, "shipped"), (11, 1, "pending"), (12, 2, "shipped"))
       .toDF("order_id", "customer_id", "status")
 
     val joinConfig = JoinConfig(
@@ -118,14 +118,15 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
     val executor = new JoinStrategyExecutor()
     val result = executor.applyJoin(parentDF, childDF, joinConfig)
 
-    result.columns should contain allOf("customer_id", "name", "orders")
+    result.columns should contain allOf ("customer_id", "name", "orders")
     result.count() shouldBe 2L
   }
 
   it should "produce empty arrays for parents without children" in {
     val parentDF = parentRecords.toDF("id", "name", "value")
     val emptyChildDF =
-      Seq.empty[(String, String, Int)]
+      Seq
+        .empty[(String, String, Int)]
         .toDF("parent_id", "child_name", "child_value")
 
     val executor = new JoinStrategyExecutor()
@@ -145,10 +146,12 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
     val parentDF = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
     val emptyChildDF = spark.createDataFrame(
       spark.sparkContext.emptyRDD[org.apache.spark.sql.Row],
-      org.apache.spark.sql.types.StructType(Seq(
-        org.apache.spark.sql.types.StructField("parent_id", org.apache.spark.sql.types.IntegerType),
-        org.apache.spark.sql.types.StructField("value", org.apache.spark.sql.types.StringType)
-      ))
+      org.apache.spark.sql.types.StructType(
+        Seq(
+          org.apache.spark.sql.types.StructField("parent_id", org.apache.spark.sql.types.IntegerType),
+          org.apache.spark.sql.types.StructField("value", org.apache.spark.sql.types.StringType)
+        )
+      )
     )
 
     val joinConfig = JoinConfig(

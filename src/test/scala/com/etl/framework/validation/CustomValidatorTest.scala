@@ -197,9 +197,7 @@ class TestCustomValidator extends Validator with ConfigurableValidator {
       df: DataFrame,
       rule: ValidationRule
   ): ValidationStepResult = {
-    rule.config.foreach(cfg =>
-      configure(cfg.map { case (k, v) => k -> v.toString })
-    )
+    rule.config.foreach(cfg => configure(cfg.map { case (k, v) => k -> v.toString }))
 
     val column = rule.column.getOrElse("value")
 
@@ -231,9 +229,7 @@ class TestConfigurableValidator extends Validator with ConfigurableValidator {
       df: DataFrame,
       rule: ValidationRule
   ): ValidationStepResult = {
-    rule.config.foreach(cfg =>
-      configure(cfg.map { case (k, v) => k -> v.toString })
-    )
+    rule.config.foreach(cfg => configure(cfg.map { case (k, v) => k -> v.toString }))
 
     val column = rule.column.getOrElse("value")
 

@@ -55,7 +55,7 @@ class RangeValidatorTest extends AnyFlatSpec with Matchers {
 
     result.rejected match {
       case Some(rejectedDf) => rejectedDf.count() shouldBe 0
-      case None => succeed // No rejection DataFrame created implies success
+      case None             => succeed // No rejection DataFrame created implies success
     }
     result.valid.count() shouldBe 3
   }

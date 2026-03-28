@@ -1,12 +1,6 @@
 package com.etl.framework.io.readers
 
-import com.etl.framework.config.{
-  ColumnConfig,
-  SchemaConfig,
-  SourceConfig,
-  SourceType,
-  FileFormat
-}
+import com.etl.framework.config.{ColumnConfig, SchemaConfig, SourceConfig, SourceType, FileFormat}
 import com.etl.framework.exceptions.UnsupportedOperationException
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -206,8 +200,7 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       val schemaConfig = SchemaConfig(
         enforceSchema = false,
         allowExtraColumns = true,
-        columns =
-          Seq(ColumnConfig("id", "integer", nullable = false, description = ""))
+        columns = Seq(ColumnConfig("id", "integer", nullable = false, description = ""))
       )
       val reader = new FileDataReader(sourceConfig, Some(schemaConfig))
       val df = reader.read()

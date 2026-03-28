@@ -6,17 +6,16 @@ import com.etl.framework.orchestration.flow.FlowResult
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-/**
- * Tests for FlowGroupExecutor.shouldStopExecution semantics.
- *
- * Key documented behaviors:
- *  - failOnValidationError=false, rejectionRate > maxRejectionRate  → do NOT stop
- *  - failOnValidationError=true,  rejectionRate > maxRejectionRate  → stop
- *  - failOnValidationError=true,  rejectionRate <= maxRejectionRate
- *      but rejectedRecords > 0                                      → stop (any rejection fails)
- *  - Boundary: rejectionRate == maxRejectionRate uses strict >,
- *      so exactly-at-threshold does NOT stop (only > threshold stops)
- */
+/** Tests for FlowGroupExecutor.shouldStopExecution semantics.
+  *
+  * Key documented behaviors:
+  *   - failOnValidationError=false, rejectionRate > maxRejectionRate → do NOT stop
+  *   - failOnValidationError=true, rejectionRate > maxRejectionRate → stop
+  *   - failOnValidationError=true, rejectionRate <= maxRejectionRate but rejectedRecords > 0 → stop (any rejection
+  *     fails)
+  *   - Boundary: rejectionRate == maxRejectionRate uses strict >, so exactly-at-threshold does NOT stop (only >
+  *     threshold stops)
+  */
 class FlowGroupExecutorTest extends AnyFlatSpec with Matchers {
 
   private def makeConfig(
@@ -38,20 +37,20 @@ class FlowGroupExecutorTest extends AnyFlatSpec with Matchers {
       inputRecords: Long,
       rejectedRecords: Long
   ): FlowResult = {
-    val validRecords  = inputRecords - rejectedRecords
+    val validRecords = inputRecords - rejectedRecords
     val rejectionRate = if (inputRecords == 0) 0.0 else rejectedRecords.toDouble / inputRecords
     FlowResult(
-      flowName        = "test_flow",
-      batchId         = "20260317",
-      success         = success,
-      inputRecords    = inputRecords,
-      mergedRecords   = inputRecords,
-      validRecords    = validRecords,
+      flowName = "test_flow",
+      batchId = "20260317",
+      success = success,
+      inputRecords = inputRecords,
+      mergedRecords = inputRecords,
+      validRecords = validRecords,
       rejectedRecords = rejectedRecords,
-      rejectionRate   = rejectionRate,
+      rejectionRate = rejectionRate,
       executionTimeMs = 100L,
       rejectionReasons = Map.empty,
-      error           = None,
+      error = None,
       icebergMetadata = None
     )
   }
@@ -69,7 +68,11 @@ class FlowGroupExecutorTest extends AnyFlatSpec with Matchers {
         .config("spark.ui.enabled", "false")
         .getOrCreate()
 
-    new FlowGroupExecutor(makeConfig(failOnValidationError, maxRejectionRate), None, scala.concurrent.ExecutionContext.global)
+    new FlowGroupExecutor(
+      makeConfig(failOnValidationError, maxRejectionRate),
+      None,
+      scala.concurrent.ExecutionContext.global
+    )
   }
 
   "shouldStopExecution" should "return true when the flow itself failed" in {

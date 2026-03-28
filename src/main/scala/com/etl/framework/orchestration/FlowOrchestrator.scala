@@ -12,47 +12,53 @@ import scala.collection.mutable
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 
-/**
- * Coordinates execution of all flows respecting dependencies.
- * Uses specialized components following Single Responsibility Principle:
- * - ExecutionPlanBuilder: builds execution plan from dependencies
- * - FlowGroupExecutor: executes groups of flows
- * - FlowResultProcessor: processes results and loads validated data
- * - BatchMetadataWriter: writes batch metadata
- * - ExecutionLogger: handles logging
- *
- * @param globalConfig Global framework configuration
- * @param flowConfigs Configurations for all flows to execute
- * @param domainsConfig Optional domain value configurations
- * @param planBuilder Builds execution plans (injected for testability)
- * @param groupExecutor Executes flow groups (injected for testability)
- * @param resultProcessor Processes results (injected for testability)
- * @param metadataWriter Writes batch metadata (injected for testability)
- * @param executionLogger Handles logging (injected for testability)
- * @param spark Implicit SparkSession
- */
+/** Coordinates execution of all flows respecting dependencies. Uses specialized components following Single
+  * Responsibility Principle:
+  *   - ExecutionPlanBuilder: builds execution plan from dependencies
+  *   - FlowGroupExecutor: executes groups of flows
+  *   - FlowResultProcessor: processes results and loads validated data
+  *   - BatchMetadataWriter: writes batch metadata
+  *   - ExecutionLogger: handles logging
+  *
+  * @param globalConfig
+  *   Global framework configuration
+  * @param flowConfigs
+  *   Configurations for all flows to execute
+  * @param domainsConfig
+  *   Optional domain value configurations
+  * @param planBuilder
+  *   Builds execution plans (injected for testability)
+  * @param groupExecutor
+  *   Executes flow groups (injected for testability)
+  * @param resultProcessor
+  *   Processes results (injected for testability)
+  * @param metadataWriter
+  *   Writes batch metadata (injected for testability)
+  * @param executionLogger
+  *   Handles logging (injected for testability)
+  * @param spark
+  *   Implicit SparkSession
+  */
 class FlowOrchestrator(
-  globalConfig: GlobalConfig,
-  flowConfigs: Seq[FlowConfig],
-  domainsConfig: Option[DomainsConfig],
-  planBuilder: ExecutionPlanBuilder,
-  groupExecutor: FlowGroupExecutor,
-  resultProcessor: FlowResultProcessor,
-  metadataWriter: BatchMetadataWriter,
-  executionLogger: ExecutionLogger,
-  threadPool: Option[java.util.concurrent.ExecutorService] = None
+    globalConfig: GlobalConfig,
+    flowConfigs: Seq[FlowConfig],
+    domainsConfig: Option[DomainsConfig],
+    planBuilder: ExecutionPlanBuilder,
+    groupExecutor: FlowGroupExecutor,
+    resultProcessor: FlowResultProcessor,
+    metadataWriter: BatchMetadataWriter,
+    executionLogger: ExecutionLogger,
+    threadPool: Option[java.util.concurrent.ExecutorService] = None
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
-  /**
-   * Builds execution plan based on FK dependencies.
-   */
+  /** Builds execution plan based on FK dependencies.
+    */
   def buildExecutionPlan(): ExecutionPlan = planBuilder.build()
 
-  /**
-   * Executes all flows in correct order.
-   */
+  /** Executes all flows in correct order.
+    */
   def execute(): IngestionResult = {
     val batchId = metadataWriter.generateBatchId()
     val startTime = System.nanoTime()
@@ -87,13 +93,12 @@ class FlowOrchestrator(
     }
   }
 
-  /**
-   * Executes a group of flows (sequential or parallel).
-   */
+  /** Executes a group of flows (sequential or parallel).
+    */
   private def executeGroup(
-    group: ExecutionGroup,
-    batchId: String,
-    validatedFlows: Map[String, DataFrame]
+      group: ExecutionGroup,
+      batchId: String,
+      validatedFlows: Map[String, DataFrame]
   ): Seq[FlowResult] = {
     if (group.parallel) {
       groupExecutor.executeParallel(group, batchId, validatedFlows)
@@ -102,14 +107,13 @@ class FlowOrchestrator(
     }
   }
 
-  /**
-   * Creates a successful ingestion result.
-   */
+  /** Creates a successful ingestion result.
+    */
   private def createSuccessResult(
-    batchId: String,
-    flowResults: Seq[FlowResult],
-    startTime: Long,
-    plan: ExecutionPlan
+      batchId: String,
+      flowResults: Seq[FlowResult],
+      startTime: Long,
+      plan: ExecutionPlan
   ): IngestionResult = {
     val executionTimeMs = (System.nanoTime() - startTime) / 1000000
 
@@ -136,14 +140,13 @@ class FlowOrchestrator(
     )
   }
 
-  /**
-   * Handles execution failure.
-   */
+  /** Handles execution failure.
+    */
   private def handleExecutionFailure(
-    batchId: String,
-    flowResults: Seq[FlowResult],
-    startTime: Long,
-    error: Exception
+      batchId: String,
+      flowResults: Seq[FlowResult],
+      startTime: Long,
+      error: Exception
   ): IngestionResult = {
     val executionTimeMs = (System.nanoTime() - startTime) / 1000000
     executionLogger.logExecutionFailure(batchId, executionTimeMs, error)
@@ -155,12 +158,12 @@ class FlowOrchestrator(
       error = Some(error.getMessage)
     )
   }
-  /**
-   * Runs post-batch orphan detection if Iceberg is enabled and any FK has onOrphan != Ignore.
-   */
+
+  /** Runs post-batch orphan detection if Iceberg is enabled and any FK has onOrphan != Ignore.
+    */
   private def runPostBatchOrphanDetection(
-    flowResults: Seq[FlowResult],
-    plan: ExecutionPlan
+      flowResults: Seq[FlowResult],
+      plan: ExecutionPlan
   ): Seq[OrphanReport] = {
     val hasOrphanChecks = flowConfigs.exists(
       _.validation.foreignKeys.exists(_.onOrphan != OrphanAction.Ignore)
@@ -184,9 +187,8 @@ class FlowOrchestrator(
     }
   }
 
-  /**
-   * Runs Iceberg table maintenance on all flow tables after batch completion.
-   */
+  /** Runs Iceberg table maintenance on all flow tables after batch completion.
+    */
   private def runPostBatchMaintenance(): Unit = {
     val icebergConfig = globalConfig.iceberg
     val tableManager = new IcebergTableManager(spark, icebergConfig)
@@ -205,18 +207,16 @@ class FlowOrchestrator(
   }
 }
 
-/**
- * Factory for creating FlowOrchestrator with default dependencies.
- */
+/** Factory for creating FlowOrchestrator with default dependencies.
+  */
 object FlowOrchestrator {
 
-  /**
-   * Creates FlowOrchestrator with default component implementations.
-   */
+  /** Creates FlowOrchestrator with default component implementations.
+    */
   def apply(
-    globalConfig: GlobalConfig,
-    flowConfigs: Seq[FlowConfig],
-    domainsConfig: Option[DomainsConfig] = None
+      globalConfig: GlobalConfig,
+      flowConfigs: Seq[FlowConfig],
+      domainsConfig: Option[DomainsConfig] = None
   )(implicit spark: SparkSession): FlowOrchestrator = {
     val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
     val ec = ExecutionContext.fromExecutorService(pool)
@@ -240,27 +240,24 @@ object FlowOrchestrator {
   }
 }
 
-/**
- * Execution plan containing groups of flows.
- */
+/** Execution plan containing groups of flows.
+  */
 case class ExecutionPlan(
-  groups: Seq[ExecutionGroup]
+    groups: Seq[ExecutionGroup]
 )
 
-/**
- * Group of flows that can be executed together.
- */
+/** Group of flows that can be executed together.
+  */
 case class ExecutionGroup(
-  flows: Seq[FlowConfig],
-  parallel: Boolean
+    flows: Seq[FlowConfig],
+    parallel: Boolean
 )
 
-/**
- * Result of Ingestion execution.
- */
+/** Result of Ingestion execution.
+  */
 case class IngestionResult(
-  batchId: String,
-  flowResults: Seq[FlowResult],
-  success: Boolean,
-  error: Option[String] = None
+    batchId: String,
+    flowResults: Seq[FlowResult],
+    success: Boolean,
+    error: Option[String] = None
 )

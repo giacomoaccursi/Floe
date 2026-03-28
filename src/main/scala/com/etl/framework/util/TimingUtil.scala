@@ -2,14 +2,12 @@ package com.etl.framework.util
 
 import org.slf4j.Logger
 
-/**
- * Simple utility for timing operations
- */
+/** Simple utility for timing operations
+  */
 object TimingUtil {
-  
-  /**
-   * Execute operation with automatic timing and logging
-   */
+
+  /** Execute operation with automatic timing and logging
+    */
   def timed[T](logger: Logger, operation: String)(block: => T): T = {
     val startTime = System.nanoTime()
     try {
@@ -24,15 +22,18 @@ object TimingUtil {
         throw e
     }
   }
-  
-  /**
-   * Execute operation with automatic timing and logging, returning both result and duration
-   * 
-   * @param logger Logger instance for logging
-   * @param operation Description of the operation being timed
-   * @param block Code block to execute and time
-   * @return Tuple of (result, durationMs)
-   */
+
+  /** Execute operation with automatic timing and logging, returning both result and duration
+    *
+    * @param logger
+    *   Logger instance for logging
+    * @param operation
+    *   Description of the operation being timed
+    * @param block
+    *   Code block to execute and time
+    * @return
+    *   Tuple of (result, durationMs)
+    */
   def timedWithDuration[T](logger: Logger, operation: String)(block: => T): (T, Long) = {
     val startTime = System.nanoTime()
     try {

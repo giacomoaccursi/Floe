@@ -25,9 +25,7 @@ object JoinStrategy {
       )
 
   implicit val reader: ConfigReader[JoinStrategy] =
-    ConfigReader.fromString[JoinStrategy](s =>
-      fromString(s).left.map(msg => CannotConvert(s, "JoinStrategy", msg))
-    )
+    ConfigReader.fromString[JoinStrategy](s => fromString(s).left.map(msg => CannotConvert(s, "JoinStrategy", msg)))
 
   implicit val writer: ConfigWriter[JoinStrategy] =
     ConfigWriter[String].contramap(_.name)
@@ -71,9 +69,7 @@ object JoinType {
     }
 
   implicit val reader: ConfigReader[JoinType] =
-    ConfigReader.fromString[JoinType](s =>
-      fromString(s).left.map(msg => CannotConvert(s, "JoinType", msg))
-    )
+    ConfigReader.fromString[JoinType](s => fromString(s).left.map(msg => CannotConvert(s, "JoinType", msg)))
 
   implicit val writer: ConfigWriter[JoinType] =
     ConfigWriter[String].contramap(_.name)
@@ -100,9 +96,7 @@ object SourceType {
       )
 
   implicit val reader: ConfigReader[SourceType] =
-    ConfigReader.fromString[SourceType](s =>
-      fromString(s).left.map(msg => CannotConvert(s, "SourceType", msg))
-    )
+    ConfigReader.fromString[SourceType](s => fromString(s).left.map(msg => CannotConvert(s, "SourceType", msg)))
 
   implicit val writer: ConfigWriter[SourceType] =
     ConfigWriter[String].contramap(_.name)
@@ -140,9 +134,7 @@ object FileFormat {
       )
 
   implicit val reader: ConfigReader[FileFormat] =
-    ConfigReader.fromString[FileFormat](s =>
-      fromString(s).left.map(msg => CannotConvert(s, "FileFormat", msg))
-    )
+    ConfigReader.fromString[FileFormat](s => fromString(s).left.map(msg => CannotConvert(s, "FileFormat", msg)))
 
   implicit val writer: ConfigWriter[FileFormat] =
     ConfigWriter[String].contramap(_.name)
@@ -170,9 +162,7 @@ object LoadMode {
       )
 
   implicit val reader: ConfigReader[LoadMode] =
-    ConfigReader.fromString[LoadMode](s =>
-      fromString(s).left.map(msg => CannotConvert(s, "LoadMode", msg))
-    )
+    ConfigReader.fromString[LoadMode](s => fromString(s).left.map(msg => CannotConvert(s, "LoadMode", msg)))
 
   implicit val writer: ConfigWriter[LoadMode] =
     ConfigWriter[String].contramap(_.name)
@@ -279,9 +269,7 @@ object OrphanAction {
       )
 
   implicit val reader: ConfigReader[OrphanAction] =
-    ConfigReader.fromString[OrphanAction](s =>
-      fromString(s).left.map(msg => CannotConvert(s, "OrphanAction", msg))
-    )
+    ConfigReader.fromString[OrphanAction](s => fromString(s).left.map(msg => CannotConvert(s, "OrphanAction", msg)))
 
   implicit val writer: ConfigWriter[OrphanAction] =
     ConfigWriter[String].contramap(_.name)
@@ -325,9 +313,7 @@ object AggregationFunction {
 
   implicit val reader: ConfigReader[AggregationFunction] =
     ConfigReader.fromString[AggregationFunction](s =>
-      fromString(s).left.map(msg =>
-        CannotConvert(s, "AggregationFunction", msg)
-      )
+      fromString(s).left.map(msg => CannotConvert(s, "AggregationFunction", msg))
     )
 
   implicit val writer: ConfigWriter[AggregationFunction] =

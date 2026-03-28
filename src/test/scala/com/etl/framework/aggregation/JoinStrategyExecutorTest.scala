@@ -218,7 +218,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
   it should "handle aggregate join key with same name in both tables without ambiguity" in {
     val parent = Seq((1, "Alice"), (2, "Bob")).toDF("customer_id", "name")
-    val child  = Seq((1, 50.0), (1, 30.0), (2, 20.0)).toDF("customer_id", "amount")
+    val child = Seq((1, 50.0), (1, 30.0), (2, 20.0)).toDF("customer_id", "amount")
 
     import com.etl.framework.config.JoinType._
     import com.etl.framework.config.AggregationFunction._
@@ -233,7 +233,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
     val result = executor.applyJoin(parent, child, joinConfig)
 
-    result.columns should contain allOf("customer_id", "name", "total_spent")
+    result.columns should contain allOf ("customer_id", "name", "total_spent")
     result.filter($"customer_id" === 1).select("total_spent").head().getDouble(0) shouldBe 80.0
   }
 

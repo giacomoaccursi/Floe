@@ -1,19 +1,8 @@
 package com.etl.framework.validation
 
-import com.etl.framework.config.{
-  DomainsConfig,
-  ValidationRule,
-  ValidationRuleType
-}
-import com.etl.framework.exceptions.{
-  UnsupportedOperationException,
-  ValidationConfigException
-}
-import com.etl.framework.validation.validators.{
-  DomainValidator,
-  RangeValidator,
-  RegexValidator
-}
+import com.etl.framework.config.{DomainsConfig, ValidationRule, ValidationRuleType}
+import com.etl.framework.exceptions.{UnsupportedOperationException, ValidationConfigException}
+import com.etl.framework.validation.validators.{DomainValidator, RangeValidator, RegexValidator}
 import org.apache.spark.sql.DataFrame
 
 /** Trait for custom validators
@@ -53,17 +42,16 @@ object ValidatorFactory {
       flowName: Option[String] = None
   ): Validator = {
     rule.`type` match {
-      case ValidationRuleType.Regex  => new RegexValidator(flowName)
-      case ValidationRuleType.Range  => new RangeValidator(flowName)
+      case ValidationRuleType.Regex => new RegexValidator(flowName)
+      case ValidationRuleType.Range => new RangeValidator(flowName)
       case ValidationRuleType.Domain =>
         new DomainValidator(domainsConfig, flowName)
       case ValidationRuleType.Custom => createCustomValidator(rule, flowName)
-      case unsupported               =>
+      case unsupported =>
         val flowContext = flowName.map(f => s" in flow '$f'").getOrElse("")
         throw UnsupportedOperationException(
           operation = s"validator type '${unsupported.name}'",
-          details =
-            s"Supported validators: regex, range, domain, custom$flowContext"
+          details = s"Supported validators: regex, range, domain, custom$flowContext"
         )
     }
   }
@@ -108,7 +96,7 @@ object ValidatorFactory {
           e
         )
       case e: ValidationConfigException => throw e
-      case e: Exception                 =>
+      case e: Exception =>
         throw ValidationConfigException(
           s"Failed to instantiate custom validator: $className",
           e

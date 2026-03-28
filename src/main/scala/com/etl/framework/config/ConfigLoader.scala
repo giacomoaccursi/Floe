@@ -1,17 +1,8 @@
 package com.etl.framework.config
 
-import com.etl.framework.exceptions.{
-  ConfigFileException,
-  ConfigurationException,
-  YAMLSyntaxException
-}
+import com.etl.framework.exceptions.{ConfigFileException, ConfigurationException, YAMLSyntaxException}
 import pureconfig._
-import pureconfig.error.{
-  ConfigReaderFailures,
-  ConvertFailure,
-  KeyNotFound,
-  ThrowableFailure
-}
+import pureconfig.error.{ConfigReaderFailures, ConvertFailure, KeyNotFound, ThrowableFailure}
 import pureconfig.generic.auto._
 import pureconfig.module.yaml._
 // Import ConfigHints at top level to ensure all derived readers in this file use CamelCase
@@ -22,8 +13,8 @@ import scala.io.Source
 import scala.util.Using
 import java.util.regex.Matcher
 
-/** Global configuration hints to enforce CamelCase naming strategy (e.g.
-  * "outputPath" in YAML matches "outputPath" in case class)
+/** Global configuration hints to enforce CamelCase naming strategy (e.g. "outputPath" in YAML matches "outputPath" in
+  * case class)
   */
 object ConfigHints {
   import pureconfig.ConfigFieldMapping
@@ -46,9 +37,9 @@ trait ConfigLoader[T] {
       variables: Map[String, String] = Map.empty
   )(implicit reader: ConfigReader[T]): Either[ConfigurationException, T] = {
     for {
-      yaml        <- loadYamlFile(path)
+      yaml <- loadYamlFile(path)
       substituted <- substituteEnvVars(yaml, path, variables)
-      config      <- parseYaml(substituted, path)
+      config <- parseYaml(substituted, path)
     } yield config
   }
 
@@ -112,8 +103,8 @@ trait ConfigLoader[T] {
     }
   }
 
-  /** Substitutes environment variables in the format ${VAR_NAME} or $VAR_NAME.
-    * Returns Left if any referenced variable is not set.
+  /** Substitutes environment variables in the format ${VAR_NAME} or $VAR_NAME. Returns Left if any referenced variable
+    * is not set.
     */
   protected def substituteEnvVars(
       text: String,
@@ -139,9 +130,8 @@ trait ConfigLoader[T] {
       Left(
         ConfigFileException(
           file = path,
-          message =
-            s"Unresolved environment variables: ${unresolvedVars.mkString(", ")}. " +
-              "Set these environment variables before running the pipeline."
+          message = s"Unresolved environment variables: ${unresolvedVars.mkString(", ")}. " +
+            "Set these environment variables before running the pipeline."
         )
       )
     } else {
@@ -187,8 +177,8 @@ class DomainsConfigLoader extends ConfigLoader[DomainsConfig] {
     loadFromYamlFile(path, variables)
 }
 
-/** Internal case class for parsing FlowConfig from YAML Excludes
-  * FlowTransformation fields which cannot be deserialized from YAML
+/** Internal case class for parsing FlowConfig from YAML Excludes FlowTransformation fields which cannot be deserialized
+  * from YAML
   */
 private[config] case class FlowConfigYaml(
     name: String,
@@ -243,11 +233,11 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
       variables: Map[String, String]
   ): Either[ConfigurationException, FlowConfig] = {
     for {
-      rawYaml    <- loadYamlFile(path)
-      yaml       <- substituteEnvVars(rawYaml, path, variables)
+      rawYaml <- loadYamlFile(path)
+      yaml <- substituteEnvVars(rawYaml, path, variables)
       configYaml <- parseYamlToFlowConfigYaml(yaml, path)
-      flowConfig  = configYaml.toFlowConfig
-      _          <- validateFlowConfig(flowConfig, path)
+      flowConfig = configYaml.toFlowConfig
+      _ <- validateFlowConfig(flowConfig, path)
     } yield flowConfig
   }
 
@@ -271,8 +261,10 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
             config.schema.columns.find(_.name == pk).exists(_.nullable)
           }
           if (nullablePkCols.nonEmpty)
-            err(s"SCD2 requires all PK columns to be non-nullable; " +
-              s"declare nullable=false for: ${nullablePkCols.mkString(", ")}")
+            err(
+              s"SCD2 requires all PK columns to be non-nullable; " +
+                s"declare nullable=false for: ${nullablePkCols.mkString(", ")}"
+            )
           else Right(())
         }
       case _ => Right(())
@@ -289,8 +281,7 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
     }
   }
 
-  /** Loads all flow configurations from a directory.
-    * If any files fail to load, all errors are reported together.
+  /** Loads all flow configurations from a directory. If any files fail to load, all errors are reported together.
     */
   def loadAll(
       directory: String
@@ -310,15 +301,17 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
         .toSeq
         .map(f => load(f.getAbsolutePath, variables))
 
-      val errors  = results.collect { case Left(err)  => err }
+      val errors = results.collect { case Left(err) => err }
       val configs = results.collect { case Right(cfg) => cfg }
 
       if (errors.nonEmpty)
-        Left(ConfigFileException(
-          file = directory,
-          message = s"${errors.size} flow configuration(s) failed to load:\n" +
-            errors.map(e => s"  - ${e.getMessage}").mkString("\n")
-        ))
+        Left(
+          ConfigFileException(
+            file = directory,
+            message = s"${errors.size} flow configuration(s) failed to load:\n" +
+              errors.map(e => s"  - ${e.getMessage}").mkString("\n")
+          )
+        )
       else Right(configs)
     }
   }
@@ -338,7 +331,7 @@ class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
   ): Either[ConfigurationException, AggregationConfig] = {
     for {
       config <- loadFromYamlFile(path, variables)
-      _      <- validateAggregationConfig(config, path)
+      _ <- validateAggregationConfig(config, path)
     } yield config
   }
 
@@ -378,8 +371,8 @@ class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
     if (config.nodes.isEmpty) err("nodes list must not be empty")
     else if (duplicates.nonEmpty) err(s"duplicate node IDs: ${duplicates.mkString(", ")}")
     else
-      config.nodes.foldLeft[Either[ConfigurationException, Unit]](Right(())) {
-        (acc, node) => acc.flatMap(_ => validateNode(node))
+      config.nodes.foldLeft[Either[ConfigurationException, Unit]](Right(())) { (acc, node) =>
+        acc.flatMap(_ => validateNode(node))
       }
   }
 }

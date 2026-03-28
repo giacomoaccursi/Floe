@@ -31,8 +31,7 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
       description = "Test flow",
       version = "1.0",
       owner = "test",
-      source =
-        SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
+      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
       schema = SchemaConfig(true, true, schemaFields),
       loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(primaryKey, foreignKeys, rules),
@@ -46,8 +45,7 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
     val df = spark.createDataFrame(data.asJava, schema)
 
     val flowConfig = createFlowConfig(
-      schemaFields =
-        Seq(ColumnConfig("id", "string", nullable = false, description = ""))
+      schemaFields = Seq(ColumnConfig("id", "string", nullable = false, description = ""))
     )
     val engine = new ValidationEngine()
 
@@ -164,8 +162,7 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
 
     // Config without foreign keys or custom rules — these should be skipped
     val flowConfig = createFlowConfig(
-      schemaFields =
-        Seq(ColumnConfig("id", "string", nullable = false, description = "")),
+      schemaFields = Seq(ColumnConfig("id", "string", nullable = false, description = "")),
       foreignKeys = Seq.empty, // FK validation should be skipped
       rules = Seq.empty // Custom rules validation should be skipped
     )
@@ -217,8 +214,7 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
     val df = spark.createDataFrame(data.asJava, schema)
 
     val flowConfig = createFlowConfig(
-      schemaFields =
-        Seq(ColumnConfig("id", "string", nullable = false, description = ""))
+      schemaFields = Seq(ColumnConfig("id", "string", nullable = false, description = ""))
     )
     val engine = new ValidationEngine()
 
@@ -291,7 +287,7 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
     val data = Seq(
       Row(1, "Alice"),
       Row(2, "Bob"),
-      Row(2, "Carol"),  // duplicate PK — pk_validation rejects both duplicates
+      Row(2, "Carol"), // duplicate PK — pk_validation rejects both duplicates
       Row(null, "Dave") // null id       — rejected by not_null before pk runs
     )
     val df = spark.createDataFrame(data.asJava, schema)

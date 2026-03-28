@@ -29,8 +29,7 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
         failOnValidationError = false,
         maxRejectionRate = 0.1
       ),
-      performance =
-        PerformanceConfig(parallelFlows = false, parallelNodes = false),
+      performance = PerformanceConfig(parallelFlows = false, parallelNodes = false),
       iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
     )
   }
@@ -59,8 +58,7 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
       ),
       loadMode = LoadModeConfig(loadMode),
       validation = ValidationConfig(Seq.empty, Seq.empty, Seq.empty),
-      output =
-        OutputConfig(path = Some(s"/tmp/flow_executor_test/output/$name"))
+      output = OutputConfig(path = Some(s"/tmp/flow_executor_test/output/$name"))
     )
   }
 

@@ -1,11 +1,6 @@
 package com.etl.framework.validation.validators
 
-import com.etl.framework.config.{
-  ValidationRule,
-  DomainsConfig,
-  DomainConfig,
-  ValidationRuleType
-}
+import com.etl.framework.config.{ValidationRule, DomainsConfig, DomainConfig, ValidationRuleType}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.{SparkSession, Row}

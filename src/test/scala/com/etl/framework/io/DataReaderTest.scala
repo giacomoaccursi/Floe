@@ -56,8 +56,13 @@ class DataReaderTest extends AnyFlatSpec with Matchers {
     try {
       writeTestData(FileFormat.CSV, tempPath, Map("delimiter" -> ","))
 
-      val config = SourceConfig(SourceType.File, tempPath, FileFormat.CSV,
-        Map("delimiter" -> ",", "header" -> "true", "inferSchema" -> "true"), None)
+      val config = SourceConfig(
+        SourceType.File,
+        tempPath,
+        FileFormat.CSV,
+        Map("delimiter" -> ",", "header" -> "true", "inferSchema" -> "true"),
+        None
+      )
       val reader = DataReaderFactory.create(config)
       val df = reader.read()
 
@@ -74,8 +79,13 @@ class DataReaderTest extends AnyFlatSpec with Matchers {
     try {
       writeTestData(FileFormat.CSV, tempPath, Map("delimiter" -> ";"))
 
-      val config = SourceConfig(SourceType.File, tempPath, FileFormat.CSV,
-        Map("delimiter" -> ";", "header" -> "true", "inferSchema" -> "true"), None)
+      val config = SourceConfig(
+        SourceType.File,
+        tempPath,
+        FileFormat.CSV,
+        Map("delimiter" -> ";", "header" -> "true", "inferSchema" -> "true"),
+        None
+      )
       val reader = DataReaderFactory.create(config)
       val df = reader.read()
 
@@ -125,14 +135,20 @@ class DataReaderTest extends AnyFlatSpec with Matchers {
     val tempPath = tempDir.toAbsolutePath.toString
     try {
       val df = testData.toDF()
-      df.repartition(3).write
+      df.repartition(3)
+        .write
         .format("csv")
         .option("header", "true")
         .mode("overwrite")
         .save(tempPath)
 
-      val config = SourceConfig(SourceType.File, tempPath, FileFormat.CSV,
-        Map("header" -> "true", "inferSchema" -> "true"), Some("*.csv"))
+      val config = SourceConfig(
+        SourceType.File,
+        tempPath,
+        FileFormat.CSV,
+        Map("header" -> "true", "inferSchema" -> "true"),
+        Some("*.csv")
+      )
       val reader = DataReaderFactory.create(config)
       val readDf = reader.read()
 

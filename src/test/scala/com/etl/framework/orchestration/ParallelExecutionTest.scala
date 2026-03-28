@@ -31,7 +31,8 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
       (s"${flowName}_1", "value_1"),
       (s"${flowName}_2", "value_2"),
       (s"${flowName}_3", "value_3")
-    ).toDF("id", "value").write
+    ).toDF("id", "value")
+      .write
       .mode("overwrite")
       .format("csv")
       .option("header", "true")
@@ -107,9 +108,7 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
     val tempDir =
       Files.createTempDirectory("parallel-exec-test").toString
     try {
-      val flows = (1 to 3).map(i =>
-        createIndependentFlow(s"independent_flow_$i", tempDir)
-      )
+      val flows = (1 to 3).map(i => createIndependentFlow(s"independent_flow_$i", tempDir))
       val globalConfig = createGlobalConfig(tempDir, parallel = true)
 
       val orchestrator = FlowOrchestrator(globalConfig, flows)
@@ -127,9 +126,7 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
     val tempDir =
       Files.createTempDirectory("sequential-exec-test").toString
     try {
-      val flows = (1 to 3).map(i =>
-        createIndependentFlow(s"independent_flow_$i", tempDir)
-      )
+      val flows = (1 to 3).map(i => createIndependentFlow(s"independent_flow_$i", tempDir))
       val globalConfig = createGlobalConfig(tempDir, parallel = false)
 
       val orchestrator = FlowOrchestrator(globalConfig, flows)

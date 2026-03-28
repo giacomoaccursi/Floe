@@ -167,7 +167,7 @@ class JoinStrategyExecutor {
     // Use parent-qualified references for parent columns and aggregatedChild references
     // for aggregation aliases to avoid ambiguity on shared join key names
     val parentSelects = parent.columns.map(parent(_))
-    val aggSelects    = joinConfig.aggregations.map(spec => aggregatedChild(spec.alias))
+    val aggSelects = joinConfig.aggregations.map(spec => aggregatedChild(spec.alias))
     result.select((parentSelects ++ aggSelects): _*)
   }
 }

@@ -1,24 +1,13 @@
 package com.etl.framework.validation.validators
 
-import com.etl.framework.config.{
-  DomainsConfig,
-  FlowConfig,
-  OnFailureAction,
-  ValidationRule
-}
-import com.etl.framework.validation.{
-  ValidationStepResult,
-  ValidationUtils,
-  Validator,
-  ValidatorFactory
-}
+import com.etl.framework.config.{DomainsConfig, FlowConfig, OnFailureAction, ValidationRule}
+import com.etl.framework.validation.{ValidationStepResult, ValidationUtils, Validator, ValidatorFactory}
 import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-/** Validator for custom validation rules with reject/warn support This
-  * validator orchestrates multiple validators, so it implements Validator
-  * directly rather than extending BaseValidator
+/** Validator for custom validation rules with reject/warn support This validator orchestrates multiple validators, so
+  * it implements Validator directly rather than extending BaseValidator
   */
 class CustomRulesValidator(
     flowConfig: FlowConfig,
@@ -85,7 +74,7 @@ class CustomRulesValidator(
     result.rejected match {
       case None                               => df
       case Some(rejected) if rejected.isEmpty => df
-      case Some(rejected)                     =>
+      case Some(rejected) =>
         val pkColumns = getPrimaryKeyColumns(df)
         val warningMessage = createWarningMessage(rule)
         val failedRecords = rejected.select(pkColumns.map(col): _*)

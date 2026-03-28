@@ -6,29 +6,26 @@ import com.etl.framework.config.{DAGNode, GlobalConfig, JoinCondition, JoinConfi
 import com.etl.framework.core.AdditionalTableMetadata
 import org.slf4j.LoggerFactory
 
-/**
- * Metadata about an additional table loaded from disk (for discovery)
- */
+/** Metadata about an additional table loaded from disk (for discovery)
+  */
 case class AdditionalTableMetadataFile(
-  tableName: String,
-  path: String,
-  dagMetadata: AdditionalTableMetadata
+    tableName: String,
+    path: String,
+    dagMetadata: AdditionalTableMetadata
 )
 
-/**
- * Discovers additional tables from metadata
- */
+/** Discovers additional tables from metadata
+  */
 class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
-  
+
   private val logger = LoggerFactory.getLogger(getClass)
-  
-  /**
-   * Discovers additional tables from metadata (public for testing)
-   */
+
+  /** Discovers additional tables from metadata (public for testing)
+    */
   def discoverAdditionalTables(): Seq[DAGNode] = {
     val metadataPath = s"${globalConfig.paths.metadataPath}/latest"
     logger.info(s"Reading additional tables metadata from: $metadataPath")
-    
+
     try {
       val additionalTables = loadAdditionalTablesMetadata(metadataPath)
       logger.info(s"Found ${additionalTables.size} additional tables with DAG metadata")
@@ -56,25 +53,25 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
         Seq.empty
     }
   }
-  
-  /**
-   * Loads additional tables metadata from the metadata directory
-   */
+
+  /** Loads additional tables metadata from the metadata directory
+    */
   private def loadAdditionalTablesMetadata(metadataPath: String): Seq[AdditionalTableMetadataFile] = {
     import java.nio.file.{Files, Paths}
     import scala.jdk.CollectionConverters._
     import org.json4s._
     import org.json4s.jackson.JsonMethods._
-    
+
     val additionalTablesDir = Paths.get(s"$metadataPath/additional_tables")
-    
+
     if (!Files.exists(additionalTablesDir)) {
       logger.info("No additional tables directory found")
       Seq.empty
     } else {
       implicit val formats: Formats = DefaultFormats
-      
-      Files.list(additionalTablesDir)
+
+      Files
+        .list(additionalTablesDir)
         .iterator()
         .asScala
         .filter(p => p.toString.endsWith(".json"))
@@ -82,42 +79,40 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
           try {
             val jsonContent = new String(Files.readAllBytes(metadataFile))
             val json = parse(jsonContent)
-          
-          val tableName = (json \ "table_name").extract[String]
-          val path = (json \ "path").extract[String]
-          
-          val dagMetadataOpt = (json \ "dag_metadata").toOption.map { dagJson =>
-            AdditionalTableMetadata(
-              primaryKey = (dagJson \ "primary_key").extract[Seq[String]],
-              joinKeys = (dagJson \ "join_keys").extract[Map[String, Seq[String]]],
-              description = (dagJson \ "description").extractOpt[String],
-              partitionBy = (dagJson \ "partition_by").extractOpt[Seq[String]].getOrElse(Seq.empty)
-            )
+
+            val tableName = (json \ "table_name").extract[String]
+            val path = (json \ "path").extract[String]
+
+            val dagMetadataOpt = (json \ "dag_metadata").toOption.map { dagJson =>
+              AdditionalTableMetadata(
+                primaryKey = (dagJson \ "primary_key").extract[Seq[String]],
+                joinKeys = (dagJson \ "join_keys").extract[Map[String, Seq[String]]],
+                description = (dagJson \ "description").extractOpt[String],
+                partitionBy = (dagJson \ "partition_by").extractOpt[Seq[String]].getOrElse(Seq.empty)
+              )
+            }
+
+            dagMetadataOpt.map { dagMetadata =>
+              AdditionalTableMetadataFile(tableName, path, dagMetadata)
+            }
+          } catch {
+            case e: Exception =>
+              logger.warn(s"Could not parse metadata file ${metadataFile}: ${e.getMessage}")
+              None
           }
-          
-          dagMetadataOpt.map { dagMetadata =>
-            AdditionalTableMetadataFile(tableName, path, dagMetadata)
-          }
-        } catch {
-          case e: Exception =>
-            logger.warn(s"Could not parse metadata file ${metadataFile}: ${e.getMessage}")
-            None
         }
-      }
-      .toSeq
+        .toSeq
     }
   }
-  
-  /**
-   * Infers dependencies from join keys
-   */
+
+  /** Infers dependencies from join keys
+    */
   private def inferDependencies(table: AdditionalTableMetadataFile): Seq[String] = {
     table.dagMetadata.joinKeys.keys.map(flow => s"${flow}_node").toSeq
   }
-  
-  /**
-   * Infers join configuration from metadata
-   */
+
+  /** Infers join configuration from metadata
+    */
   private def inferJoinConfig(table: AdditionalTableMetadataFile): Option[JoinConfig] = {
     table.dagMetadata.joinKeys.headOption.map { case (parentFlow, keys) =>
       JoinConfig(

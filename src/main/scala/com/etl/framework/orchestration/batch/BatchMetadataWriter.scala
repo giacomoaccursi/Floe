@@ -11,27 +11,25 @@ import org.slf4j.LoggerFactory
 import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.time.Instant
 
-/**
- * Handles writing of batch execution metadata
- */
+/** Handles writing of batch execution metadata
+  */
 class BatchMetadataWriter(
-  globalConfig: GlobalConfig,
-  flowConfigs: Seq[FlowConfig]
+    globalConfig: GlobalConfig,
+    flowConfigs: Seq[FlowConfig]
 ) {
-  
+
   private val logger = LoggerFactory.getLogger(getClass)
   private implicit val formats: Formats = Serialization.formats(NoTypeHints)
-  
-  /**
-   * Writes batch metadata
-   */
+
+  /** Writes batch metadata
+    */
   def writeBatchMetadata(
-    batchId: String,
-    flowResults: Seq[FlowResult],
-    executionTimeMs: Long,
-    success: Boolean,
-    rolledBack: Boolean = false,
-    orphanReports: Seq[OrphanReport] = Seq.empty
+      batchId: String,
+      flowResults: Seq[FlowResult],
+      executionTimeMs: Long,
+      success: Boolean,
+      rolledBack: Boolean = false,
+      orphanReports: Seq[OrphanReport] = Seq.empty
   ): Unit = {
     val metadataPath = s"${globalConfig.paths.metadataPath}/$batchId/summary.json"
 
@@ -95,36 +93,34 @@ class BatchMetadataWriter(
         }
       }
     )
-    
+
     writeJsonToFile(metadata, metadataPath)
     createLatestSymlink(batchId)
-    
+
     logger.debug(s"Batch metadata written - batchId: $batchId, path: $metadataPath")
   }
-  
-  /**
-   * Writes a map as JSON to a file
-   */
+
+  /** Writes a map as JSON to a file
+    */
   private def writeJsonToFile(data: Map[String, Any], filePath: String): Unit = {
     val jsonString = write(data)
     val path = Paths.get(filePath)
     Files.createDirectories(path.getParent)
     Files.write(path, jsonString.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
   }
-  
-  /**
-   * Creates a "latest" symlink pointing to the current batch
-   */
+
+  /** Creates a "latest" symlink pointing to the current batch
+    */
   private def createLatestSymlink(batchId: String): Unit = {
     val latestPath = Paths.get(s"${globalConfig.paths.metadataPath}/latest")
     val targetPath = Paths.get(s"${globalConfig.paths.metadataPath}/$batchId")
-    
+
     try {
       // Delete existing symlink if it exists
       if (Files.exists(latestPath)) {
         Files.delete(latestPath)
       }
-      
+
       // Create new symlink
       Files.createSymbolicLink(latestPath, targetPath)
       logger.debug(s"Created 'latest' symlink for batch $batchId")
@@ -133,28 +129,29 @@ class BatchMetadataWriter(
         logger.warn(s"Could not create 'latest' symlink: ${e.getMessage}")
     }
   }
-  
-  /**
-   * Generates a unique batch ID
-   */
+
+  /** Generates a unique batch ID
+    */
   def generateBatchId(): String = {
     val format = globalConfig.processing.batchIdFormat
     val timestamp = Instant.now()
-    
+
     import java.time.format.DateTimeFormatter
-    
+
     format match {
       case "timestamp" =>
         timestamp.toEpochMilli.toString
-      
+
       case "datetime" =>
-        DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
+        DateTimeFormatter
+          .ofPattern("yyyyMMdd_HHmmss")
           .withZone(java.time.ZoneId.systemDefault())
           .format(timestamp)
-      
+
       case _ =>
         // Default to datetime format
-        DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
+        DateTimeFormatter
+          .ofPattern("yyyyMMdd_HHmmss")
           .withZone(java.time.ZoneId.systemDefault())
           .format(timestamp)
     }

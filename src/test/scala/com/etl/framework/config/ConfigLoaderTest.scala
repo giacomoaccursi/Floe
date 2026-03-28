@@ -1,10 +1,6 @@
 package com.etl.framework.config
 
-import com.etl.framework.exceptions.{
-  ConfigFileException,
-  ConfigurationException,
-  YAMLSyntaxException
-}
+import com.etl.framework.exceptions.{ConfigFileException, ConfigurationException, YAMLSyntaxException}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import pureconfig._
@@ -139,7 +135,7 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
   "substituteEnvVars" should "return Right with substituted text when variable is set" in {
     val originalEnv = sys.env.get("HOME")
     assume(originalEnv.isDefined, "HOME env var must be set for this test")
-    val text   = "path: ${HOME}/data"
+    val text = "path: ${HOME}/data"
     val result = loader.substituteVars(text)
     result.isRight shouldBe true
     result.right.get should include(originalEnv.get)
@@ -147,7 +143,7 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
   }
 
   it should "return Left(ConfigFileException) when variable is not set" in {
-    val text   = "value: ${NONEXISTENT_VAR_XYZ_12345}"
+    val text = "value: ${NONEXISTENT_VAR_XYZ_12345}"
     val result = loader.substituteVars(text, "config.yaml")
     result.isLeft shouldBe true
     result.left.get shouldBe a[ConfigFileException]
@@ -155,7 +151,7 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
   }
 
   it should "report all unresolved variables in a single Left" in {
-    val text   = "a: ${MISSING_A_XYZ} b: ${MISSING_B_XYZ}"
+    val text = "a: ${MISSING_A_XYZ} b: ${MISSING_B_XYZ}"
     val result = loader.substituteVars(text)
     result.isLeft shouldBe true
     val msg = result.left.get.getMessage
@@ -164,7 +160,7 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
   }
 
   it should "return Right with unchanged text when no variables are present" in {
-    val text   = "plain: value"
+    val text = "plain: value"
     val result = loader.substituteVars(text)
     result shouldBe Right(text)
   }
@@ -180,19 +176,19 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
   }
 
   it should "treat $$ as an escaped literal dollar sign" in {
-    val text   = "pattern: $$USD"
+    val text = "pattern: $$USD"
     val result = loader.substituteVars(text)
     result shouldBe Right("pattern: $USD")
   }
 
   it should "not treat $$ followed by letters as an env var" in {
-    val text   = "desc: Amount in $$USD is valid"
+    val text = "desc: Amount in $$USD is valid"
     val result = loader.substituteVars(text)
     result shouldBe Right("desc: Amount in $USD is valid")
   }
 
   it should "resolve variables from explicit map before sys.env" in {
-    val text   = "path: ${MY_CUSTOM_VAR}/data"
+    val text = "path: ${MY_CUSTOM_VAR}/data"
     val result = loader.substituteVars(text, variables = Map("MY_CUSTOM_VAR" -> "/custom/path"))
     result shouldBe Right("path: /custom/path/data")
   }
@@ -200,14 +196,14 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
   it should "fall back to sys.env when variable not in explicit map" in {
     val home = sys.env.getOrElse("HOME", "")
     assume(home.nonEmpty, "HOME env var must be set for this test")
-    val text   = "path: ${HOME}/data"
+    val text = "path: ${HOME}/data"
     val result = loader.substituteVars(text, variables = Map("OTHER" -> "x"))
     result.isRight shouldBe true
     result.right.get shouldBe s"path: $home/data"
   }
 
   it should "prefer explicit variable over sys.env" in {
-    val text   = "path: ${HOME}/data"
+    val text = "path: ${HOME}/data"
     val result = loader.substituteVars(text, variables = Map("HOME" -> "/overridden"))
     result shouldBe Right("path: /overridden/data")
   }

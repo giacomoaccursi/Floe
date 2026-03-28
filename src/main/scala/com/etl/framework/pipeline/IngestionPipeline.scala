@@ -1,6 +1,14 @@
 package com.etl.framework.pipeline
 
-import com.etl.framework.config.{DomainsConfig, DomainsConfigLoader, FlowConfig, FlowConfigLoader, GlobalConfig, GlobalConfigLoader, IcebergConfig}
+import com.etl.framework.config.{
+  DomainsConfig,
+  DomainsConfigLoader,
+  FlowConfig,
+  FlowConfigLoader,
+  GlobalConfig,
+  GlobalConfigLoader,
+  IcebergConfig
+}
 import com.etl.framework.core.FlowTransformation
 import com.etl.framework.exceptions.MissingConfigFieldException
 import com.etl.framework.iceberg.catalog.{CatalogFactory, CatalogProvider}
@@ -9,23 +17,20 @@ import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
 import scala.collection._
 
-/**
- * Fluent API builder for Ingestion pipeline (Extract, Load & Validation)
- */
-class IngestionPipeline private(
-                                 globalConfig: GlobalConfig,
-                                 flowConfigs: Seq[FlowConfig],
-                                 flowTransformations: Map[String, FlowTransformations],
-                                 domainsConfig: Option[DomainsConfig],
-                                 extraCatalogProviders: Map[String, () => CatalogProvider]
-                               )(implicit spark: SparkSession) {
+/** Fluent API builder for Ingestion pipeline (Extract, Load & Validation)
+  */
+class IngestionPipeline private (
+    globalConfig: GlobalConfig,
+    flowConfigs: Seq[FlowConfig],
+    flowTransformations: Map[String, FlowTransformations],
+    domainsConfig: Option[DomainsConfig],
+    extraCatalogProviders: Map[String, () => CatalogProvider]
+)(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
-  /**
-   * Executes Ingestion pipeline
-   * Returns IngestionResult with batch ID and flow results
-   */
+  /** Executes Ingestion pipeline Returns IngestionResult with batch ID and flow results
+    */
   def execute(): IngestionResult = {
     logger.info("Executing Ingestion pipeline")
 
@@ -73,20 +78,17 @@ class IngestionPipeline private(
     }
   }
 
-  /**
-   * Returns the global configuration
-   */
+  /** Returns the global configuration
+    */
   def getGlobalConfig: GlobalConfig = globalConfig
 
-  /**
-   * Returns the flow configurations
-   */
+  /** Returns the flow configurations
+    */
   def getFlowConfigs: Seq[FlowConfig] = flowConfigs
 }
 
-/**
- * Builder for IngestionPipeline
- */
+/** Builder for IngestionPipeline
+  */
 class IngestionPipelineBuilder(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -98,84 +100,87 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private val extraCatalogProviders = mutable.Map[String, () => CatalogProvider]()
   private var configVariables: scala.collection.immutable.Map[String, String] = scala.collection.immutable.Map.empty
 
-  /**
-   * Sets the configuration directory path
-   * Loads global.yaml, domains.yaml, and flows/ *.yaml from this directory
-   *
-   * @param path Path to configuration directory
-   * @return This builder for chaining
-   */
+  /** Sets the configuration directory path Loads global.yaml, domains.yaml, and flows/ *.yaml from this directory
+    *
+    * @param path
+    *   Path to configuration directory
+    * @return
+    *   This builder for chaining
+    */
   def withConfigDirectory(path: String): IngestionPipelineBuilder = {
     logger.info(s"Setting config directory: $path")
     this.configDirectory = Some(path)
     this
   }
 
-  /**
-   * Sets the global configuration directly
-   * Alternative to withConfigDirectory for programmatic configuration
-   *
-   * @param config Global configuration
-   * @return This builder for chaining
-   */
+  /** Sets the global configuration directly Alternative to withConfigDirectory for programmatic configuration
+    *
+    * @param config
+    *   Global configuration
+    * @return
+    *   This builder for chaining
+    */
   def withGlobalConfig(config: GlobalConfig): IngestionPipelineBuilder = {
     logger.info("Setting global config directly")
     this.globalConfigOpt = Some(config)
     this
   }
 
-  /**
-   * Sets the domains configuration directly
-   * Alternative to withConfigDirectory for programmatic configuration
-   *
-   * @param config Domains configuration
-   * @return This builder for chaining
-   */
+  /** Sets the domains configuration directly Alternative to withConfigDirectory for programmatic configuration
+    *
+    * @param config
+    *   Domains configuration
+    * @return
+    *   This builder for chaining
+    */
   def withDomainsConfig(config: DomainsConfig): IngestionPipelineBuilder = {
     logger.info(s"Setting domains config directly with ${config.domains.size} domains")
     this.domainsConfigOpt = Some(config)
     this
   }
 
-  /**
-   * Sets the flow configurations directly
-   * Alternative to withConfigDirectory for programmatic configuration
-   *
-   * @param configs Flow configurations
-   * @return This builder for chaining
-   */
+  /** Sets the flow configurations directly Alternative to withConfigDirectory for programmatic configuration
+    *
+    * @param configs
+    *   Flow configurations
+    * @return
+    *   This builder for chaining
+    */
   def withFlowConfigs(configs: Seq[FlowConfig]): IngestionPipelineBuilder = {
     logger.info(s"Setting ${configs.size} flow configs directly")
     this.flowConfigsOpt = Some(configs)
     this
   }
 
-  /**
-   * Sets variables for YAML config substitution.
-   * These take priority over environment variables.
-   *
-   * @param variables Map of variable name to value
-   * @return This builder for chaining
-   */
+  /** Sets variables for YAML config substitution. These take priority over environment variables.
+    *
+    * @param variables
+    *   Map of variable name to value
+    * @return
+    *   This builder for chaining
+    */
   def withVariables(variables: scala.collection.immutable.Map[String, String]): IngestionPipelineBuilder = {
     logger.info(s"Setting ${variables.size} config variables")
     this.configVariables = variables
     this
   }
 
-  /**
-   * Adds a transformation for a specific flow
-   *
-   * @param flowName Name of the flow
-   * @param preValidation Optional pre-validation transformation
-   * @param postValidation Optional post-validation transformation
-   * @return This builder for chaining
-   */
+  /** Adds a transformation for a specific flow
+    *
+    * @param flowName
+    *   Name of the flow
+    * @param preValidation
+    *   Optional pre-validation transformation
+    * @param postValidation
+    *   Optional post-validation transformation
+    * @return
+    *   This builder for chaining
+    */
   def withFlowTransformation(
-                              flowName: String,
-                              preValidation: Option[FlowTransformation] = None,
-                              postValidation: Option[FlowTransformation] = None
-                            ): IngestionPipelineBuilder = {
+      flowName: String,
+      preValidation: Option[FlowTransformation] = None,
+      postValidation: Option[FlowTransformation] = None
+  ): IngestionPipelineBuilder = {
     logger.info(s"Adding transformation for flow: $flowName")
 
     val existing = flowTransformations.getOrElse(flowName, FlowTransformations(None, None))
@@ -187,45 +192,50 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     this
   }
 
-  /**
-   * Adds a pre-validation transformation for a specific flow
-   *
-   * @param flowName Name of the flow
-   * @param transformation Pre-validation transformation function
-   * @return This builder for chaining
-   */
+  /** Adds a pre-validation transformation for a specific flow
+    *
+    * @param flowName
+    *   Name of the flow
+    * @param transformation
+    *   Pre-validation transformation function
+    * @return
+    *   This builder for chaining
+    */
   def withPreValidationTransformation(
-                                       flowName: String,
-                                       transformation: FlowTransformation
-                                     ): IngestionPipelineBuilder = {
+      flowName: String,
+      transformation: FlowTransformation
+  ): IngestionPipelineBuilder = {
     withFlowTransformation(flowName, preValidation = Some(transformation))
   }
 
-  /**
-   * Adds a post-validation transformation for a specific flow
-   *
-   * @param flowName Name of the flow
-   * @param transformation Post-validation transformation function
-   * @return This builder for chaining
-   */
+  /** Adds a post-validation transformation for a specific flow
+    *
+    * @param flowName
+    *   Name of the flow
+    * @param transformation
+    *   Post-validation transformation function
+    * @return
+    *   This builder for chaining
+    */
   def withPostValidationTransformation(
-                                        flowName: String,
-                                        transformation: FlowTransformation
-                                      ): IngestionPipelineBuilder = {
+      flowName: String,
+      transformation: FlowTransformation
+  ): IngestionPipelineBuilder = {
     withFlowTransformation(flowName, postValidation = Some(transformation))
   }
 
-  /**
-   * Registers a custom catalog provider for the given catalog type.
-   *
-   * Use this when you need a catalog not built into the framework (e.g. a
-   * proprietary metastore or a community-contributed Iceberg catalog).
-   * Custom providers override built-in ones if the same type key is used.
-   *
-   * @param catalogType Identifier used in `iceberg.catalog-type` (e.g. "custom")
-   * @param provider    Factory function returning the CatalogProvider instance
-   * @return This builder for chaining
-   */
+  /** Registers a custom catalog provider for the given catalog type.
+    *
+    * Use this when you need a catalog not built into the framework (e.g. a proprietary metastore or a
+    * community-contributed Iceberg catalog). Custom providers override built-in ones if the same type key is used.
+    *
+    * @param catalogType
+    *   Identifier used in `iceberg.catalog-type` (e.g. "custom")
+    * @param provider
+    *   Factory function returning the CatalogProvider instance
+    * @return
+    *   This builder for chaining
+    */
   def withCatalogProvider(
       catalogType: String,
       provider: () => CatalogProvider
@@ -234,12 +244,13 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     this
   }
 
-  /**
-   * Builds the IngestionPipeline
-   *
-   * @return Configured IngestionPipeline
-   * @throws IllegalStateException if required configuration is missing
-   */
+  /** Builds the IngestionPipeline
+    *
+    * @return
+    *   Configured IngestionPipeline
+    * @throws IllegalStateException
+    *   if required configuration is missing
+    */
   def build(): IngestionPipeline = {
     logger.info("Building IngestionPipeline")
 
@@ -281,9 +292,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     )
   }
 
-  /**
-   * Loads all configurations from directory
-   */
+  /** Loads all configurations from directory
+    */
   private def loadConfigurationsFromDirectory(directory: String): (GlobalConfig, Seq[FlowConfig]) = {
     logger.info(s"Loading configurations from directory: $directory")
 
@@ -293,21 +303,21 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
 
     val globalConfig = globalConfigLoader.load(s"$directory/global.yaml", configVariables) match {
       case Right(config) => config
-      case Left(error) => throw error
+      case Left(error)   => throw error
     }
 
     val domainsConfig = domainsConfigLoader.load(s"$directory/domains.yaml", configVariables) match {
-      case Right(config) => 
+      case Right(config) =>
         logger.info(s"Loaded ${config.domains.size} domains from domains.yaml")
         config
-      case Left(error) => 
+      case Left(error) =>
         logger.warn(s"Could not load domains.yaml: ${error.getMessage}")
         throw error
     }
 
     val flowConfigs = flowConfigLoader.loadAll(s"$directory/flows", configVariables) match {
       case Right(configs) => configs
-      case Left(error) => throw error
+      case Left(error)    => throw error
     }
 
     // Store domainsConfig in builder for later use
@@ -316,31 +326,29 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     (globalConfig, flowConfigs)
   }
 
-  /**
-   * Loads global config from directory
-   */
+  /** Loads global config from directory
+    */
   private def loadGlobalConfigFromDirectory(directory: String): GlobalConfig = {
     logger.info(s"Loading global config from directory: $directory")
     val loader = new GlobalConfigLoader()
     loader.load(s"$directory/global.yaml", configVariables) match {
       case Right(config) => config
-      case Left(error) => throw error
+      case Left(error)   => throw error
     }
   }
 
-  /**
-   * Loads flow configs from directory
-   */
+  /** Loads flow configs from directory
+    */
   private def loadFlowConfigsFromDirectory(directory: String): Seq[FlowConfig] = {
     logger.info(s"Loading flow configs from directory: $directory")
     val domainsLoader = new DomainsConfigLoader()
     val flowLoader = new FlowConfigLoader()
 
     val domainsConfig = domainsLoader.load(s"$directory/domains.yaml", configVariables) match {
-      case Right(config) => 
+      case Right(config) =>
         logger.info(s"Loaded ${config.domains.size} domains from domains.yaml")
         config
-      case Left(error) => 
+      case Left(error) =>
         logger.warn(s"Could not load domains.yaml: ${error.getMessage}")
         throw error
     }
@@ -350,56 +358,54 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
 
     flowLoader.loadAll(s"$directory/flows", configVariables) match {
       case Right(configs) => configs
-      case Left(error) => throw error
+      case Left(error)    => throw error
     }
   }
 }
 
-/**
- * Companion object for IngestionPipeline
- */
+/** Companion object for IngestionPipeline
+  */
 object IngestionPipeline {
 
-  /**
-   * Internal factory method to create IngestionPipeline instances
-   */
+  /** Internal factory method to create IngestionPipeline instances
+    */
   private[pipeline] def create(
-                                globalConfig: GlobalConfig,
-                                flowConfigs: Seq[FlowConfig],
-                                flowTransformations: Map[String, FlowTransformations],
-                                domainsConfig: Option[DomainsConfig],
-                                extraCatalogProviders: Map[String, () => CatalogProvider]
-                              )(implicit spark: SparkSession): IngestionPipeline = {
+      globalConfig: GlobalConfig,
+      flowConfigs: Seq[FlowConfig],
+      flowTransformations: Map[String, FlowTransformations],
+      domainsConfig: Option[DomainsConfig],
+      extraCatalogProviders: Map[String, () => CatalogProvider]
+  )(implicit spark: SparkSession): IngestionPipeline = {
     new IngestionPipeline(globalConfig, flowConfigs, flowTransformations, domainsConfig, extraCatalogProviders)
   }
 
-  /**
-   * Creates a new IngestionPipeline builder
-   *
-   * @param spark Implicit SparkSession
-   * @return New IngestionPipelineBuilder
-   */
+  /** Creates a new IngestionPipeline builder
+    *
+    * @param spark
+    *   Implicit SparkSession
+    * @return
+    *   New IngestionPipelineBuilder
+    */
   def builder()(implicit spark: SparkSession): IngestionPipelineBuilder = {
     new IngestionPipelineBuilder()
   }
 
-  /**
-   * Returns the static Spark properties required by the given IcebergConfig that
-   * must be present in the SparkSession *before* it is created (e.g. spark.sql.extensions).
-   *
-   * This is a convenience helper for programmatic session creation. In cluster
-   * environments (Databricks, EMR, YARN) these properties are typically set via
-   * cluster config or spark-submit --conf and do not need to be applied in code.
-   *
-   * Usage (programmatic session creation only):
-   * {{{
-   *   val baseBuilder = SparkSession.builder().appName("my-app").master("local[*]")
-   *   val spark = IngestionPipeline
-   *     .requiredSparkConfig(icebergConfig)
-   *     .foldLeft(baseBuilder) { case (b, (k, v)) => b.config(k, v) }
-   *     .getOrCreate()
-   * }}}
-   */
+  /** Returns the static Spark properties required by the given IcebergConfig that must be present in the SparkSession
+    * *before* it is created (e.g. spark.sql.extensions).
+    *
+    * This is a convenience helper for programmatic session creation. In cluster environments (Databricks, EMR, YARN)
+    * these properties are typically set via cluster config or spark-submit --conf and do not need to be applied in
+    * code.
+    *
+    * Usage (programmatic session creation only):
+    * {{{
+    *   val baseBuilder = SparkSession.builder().appName("my-app").master("local[*]")
+    *   val spark = IngestionPipeline
+    *     .requiredSparkConfig(icebergConfig)
+    *     .foldLeft(baseBuilder) { case (b, (k, v)) => b.config(k, v) }
+    *     .getOrCreate()
+    * }}}
+    */
   def requiredSparkConfig(
       icebergConfig: IcebergConfig,
       extraProviders: Map[String, () => CatalogProvider] = Map.empty
@@ -409,10 +415,9 @@ object IngestionPipeline {
       .getOrElse(Map.empty)
 }
 
-/**
- * Container for flow transformations
- */
+/** Container for flow transformations
+  */
 private case class FlowTransformations(
-                                        preValidation: Option[FlowTransformation],
-                                        postValidation: Option[FlowTransformation]
-                                      )
+    preValidation: Option[FlowTransformation],
+    postValidation: Option[FlowTransformation]
+)

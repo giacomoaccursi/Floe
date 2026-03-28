@@ -54,7 +54,7 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
 
     val result = processor.executeNode(node, Map.empty)
     result.count() shouldBe 2
-    result.columns should contain allOf("id", "name", "amount")
+    result.columns should contain allOf ("id", "name", "amount")
   }
 
   it should "load source data from sourceTable when provided" in {
@@ -69,7 +69,7 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
 
     val result = processor.executeNode(node, Map.empty)
     result.count() shouldBe 2
-    result.columns should contain allOf("id", "name", "amount")
+    result.columns should contain allOf ("id", "name", "amount")
   }
 
   it should "apply filters correctly" in {
@@ -98,7 +98,7 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
     )
 
     val result = processor.executeNode(node, Map.empty)
-    result.columns should contain allOf("id", "name")
+    result.columns should contain allOf ("id", "name")
     result.columns should not contain "amount"
   }
 
@@ -124,12 +124,14 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
       sourceFlow = "child",
       sourcePath = parquetDir.resolve("customers").toString,
       dependencies = Seq("missing_parent"),
-      join = Some(JoinConfig(
-        `type` = JoinType.LeftOuter,
-        parent = "missing_parent",
-        conditions = Seq(JoinCondition("id", "id")),
-        strategy = JoinStrategy.Flatten
-      ))
+      join = Some(
+        JoinConfig(
+          `type` = JoinType.LeftOuter,
+          parent = "missing_parent",
+          conditions = Seq(JoinCondition("id", "id")),
+          strategy = JoinStrategy.Flatten
+        )
+      )
     )
 
     an[IllegalStateException] should be thrownBy {

@@ -57,8 +57,7 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
       schema = SchemaConfig(
         enforceSchema = true,
         allowExtraColumns = false,
-        columns =
-          Seq(ColumnConfig("id", "string", nullable = false, None, "ID"))
+        columns = Seq(ColumnConfig("id", "string", nullable = false, None, "ID"))
       ),
       loadMode = LoadModeConfig(`type` = LoadMode.Full),
       validation = ValidationConfig(
@@ -118,8 +117,7 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
       schema = SchemaConfig(
         enforceSchema = true,
         allowExtraColumns = false,
-        columns =
-          Seq(ColumnConfig("id", "string", nullable = false, None, "ID"))
+        columns = Seq(ColumnConfig("id", "string", nullable = false, None, "ID"))
       ),
       loadMode = LoadModeConfig(`type` = LoadMode.Full),
       validation = ValidationConfig(

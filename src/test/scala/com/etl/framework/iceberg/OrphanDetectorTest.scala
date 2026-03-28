@@ -10,10 +10,7 @@ import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.{Files, Path}
 
-class OrphanDetectorTest
-    extends AnyFlatSpec
-    with Matchers
-    with BeforeAndAfterAll {
+class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
   private var warehousePath: Path = _
 
@@ -80,17 +77,12 @@ class OrphanDetectorTest
       ),
       loadMode = LoadModeConfig(
         `type` = loadMode,
-        compareColumns =
-          if (loadMode == LoadMode.SCD2) Seq("name") else Seq.empty,
-        validFromColumn =
-          if (loadMode == LoadMode.SCD2) Some("valid_from") else None,
-        validToColumn =
-          if (loadMode == LoadMode.SCD2) Some("valid_to") else None,
-        isCurrentColumn =
-          if (loadMode == LoadMode.SCD2) Some("is_current") else None,
+        compareColumns = if (loadMode == LoadMode.SCD2) Seq("name") else Seq.empty,
+        validFromColumn = if (loadMode == LoadMode.SCD2) Some("valid_from") else None,
+        validToColumn = if (loadMode == LoadMode.SCD2) Some("valid_to") else None,
+        isCurrentColumn = if (loadMode == LoadMode.SCD2) Some("is_current") else None,
         detectDeletes = detectDeletes,
-        isActiveColumn =
-          if (detectDeletes) Some("is_active") else None
+        isActiveColumn = if (detectDeletes) Some("is_active") else None
       ),
       validation = ValidationConfig(
         primaryKey = primaryKey,
@@ -266,8 +258,7 @@ class OrphanDetectorTest
         ForeignKeyConfig(
           name = "fk_customer",
           column = "customer_id",
-          references =
-            ReferenceConfig(flow = "od_cust_first", column = "id"),
+          references = ReferenceConfig(flow = "od_cust_first", column = "id"),
           onOrphan = OrphanAction.Warn
         )
       )
@@ -392,8 +383,7 @@ class OrphanDetectorTest
         ForeignKeyConfig(
           name = "fk_parent",
           column = "parent_id",
-          references =
-            ReferenceConfig(flow = "od_parent_delta", column = "id"),
+          references = ReferenceConfig(flow = "od_parent_delta", column = "id"),
           onOrphan = OrphanAction.Warn
         )
       )

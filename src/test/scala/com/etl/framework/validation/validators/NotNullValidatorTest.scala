@@ -32,8 +32,7 @@ class NotNullValidatorTest extends AnyFlatSpec with Matchers {
       description = "desc",
       version = "1.0",
       owner = "me",
-      source =
-        SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
+      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
       schema = SchemaConfig(true, false, columns),
       loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(Seq.empty, Seq.empty, Seq.empty),

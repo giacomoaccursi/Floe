@@ -5,12 +5,10 @@ import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.col
 
-/**
- * Validator for not-null constraints
- * Validates that non-nullable columns don't contain null values
- */
+/** Validator for not-null constraints Validates that non-nullable columns don't contain null values
+  */
 class NotNullValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
-  extends FlowConfigValidator(flowConfig, flowName) {
+    extends FlowConfigValidator(flowConfig, flowName) {
 
   override def validate(df: DataFrame, rule: ValidationRule): ValidationStepResult = {
     val notNullColumns = flowConfig.schema.columns

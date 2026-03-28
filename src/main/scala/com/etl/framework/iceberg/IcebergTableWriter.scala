@@ -139,9 +139,7 @@ class IcebergTableWriter(
       .add(validFromCol, "timestamp")
       .add(validToCol, "timestamp")
       .add(isCurrentCol, "boolean")
-    val scd2Schema = isActiveCol.fold(baseScd2Schema)(c =>
-      baseScd2Schema.add(c, "boolean")
-    )
+    val scd2Schema = isActiveCol.fold(baseScd2Schema)(c => baseScd2Schema.add(c, "boolean"))
 
     tableManager.createOrUpdateTable(flowConfig, scd2Schema)
 
@@ -158,130 +156,130 @@ class IcebergTableWriter(
 
     try {
 
-    if (existingCount == 0) {
-      // First load: all records are current and active
-      logger.info(s"SCD2 initial load to $tableName")
+      if (existingCount == 0) {
+        // First load: all records are current and active
+        logger.info(s"SCD2 initial load to $tableName")
 
-      cachedDf.createOrReplaceTempView(sourceView)
+        cachedDf.createOrReplaceTempView(sourceView)
 
-      val columns = cachedDf.columns.mkString(", ")
-      val isActiveInsert =
-        isActiveCol.map(c => s",\n  true AS $c").getOrElse("")
+        val columns = cachedDf.columns.mkString(", ")
+        val isActiveInsert =
+          isActiveCol.map(c => s",\n  true AS $c").getOrElse("")
 
-      try {
-        spark.sql(
-          s"""INSERT INTO $tableName
+        try {
+          spark.sql(
+            s"""INSERT INTO $tableName
              |SELECT $columns, current_timestamp() AS $validFromCol,
              |  CAST(NULL AS TIMESTAMP) AS $validToCol,
              |  true AS $isCurrentCol$isActiveInsert
              |FROM $sourceView""".stripMargin
-        )
-      } finally {
-        spark.catalog.dropTempView(sourceView)
-      }
-    } else {
-      // Subsequent load: single atomic MERGE INTO with NULL merge_key trick
-      logger.info(s"SCD2 change detection on $tableName")
-
-      cachedDf.createOrReplaceTempView(sourceView)
-
-      // Build staged source: all records with _mk=pk UNION changed records with _mk=NULL
-      val srcCols = cachedDf.columns.map(c => s"src.$c").mkString(", ")
-      val mkFromPk = pkColumns.map(c => s"src.$c AS _mk_$c").mkString(", ")
-      val mkNull = pkColumns
-        .map { c =>
-          val dataType = cachedDf.schema(c).dataType.sql
-          s"CAST(NULL AS $dataType) AS _mk_$c"
+          )
+        } finally {
+          spark.catalog.dropTempView(sourceView)
         }
-        .mkString(", ")
+      } else {
+        // Subsequent load: single atomic MERGE INTO with NULL merge_key trick
+        logger.info(s"SCD2 change detection on $tableName")
 
-      val joinCond =
-        pkColumns.map(c => s"src.$c = tgt.$c").mkString(" AND ")
-      val changeCond = compareColumns
-        .map(c =>
-          s"src.$c != tgt.$c OR (src.$c IS NULL AND tgt.$c IS NOT NULL) OR (src.$c IS NOT NULL AND tgt.$c IS NULL)"
-        )
-        .mkString(" OR ")
+        cachedDf.createOrReplaceTempView(sourceView)
 
-      spark
-        .sql(
-          s"""SELECT $srcCols, $mkFromPk
+        // Build staged source: all records with _mk=pk UNION changed records with _mk=NULL
+        val srcCols = cachedDf.columns.map(c => s"src.$c").mkString(", ")
+        val mkFromPk = pkColumns.map(c => s"src.$c AS _mk_$c").mkString(", ")
+        val mkNull = pkColumns
+          .map { c =>
+            val dataType = cachedDf.schema(c).dataType.sql
+            s"CAST(NULL AS $dataType) AS _mk_$c"
+          }
+          .mkString(", ")
+
+        val joinCond =
+          pkColumns.map(c => s"src.$c = tgt.$c").mkString(" AND ")
+        val changeCond = compareColumns
+          .map(c =>
+            s"src.$c != tgt.$c OR (src.$c IS NULL AND tgt.$c IS NOT NULL) OR (src.$c IS NOT NULL AND tgt.$c IS NULL)"
+          )
+          .mkString(" OR ")
+
+        spark
+          .sql(
+            s"""SELECT $srcCols, $mkFromPk
            |FROM $sourceView src
            |UNION ALL
            |SELECT $srcCols, $mkNull
            |FROM $sourceView src
            |JOIN $tableName tgt ON $joinCond AND tgt.$isCurrentCol = true
            |WHERE $changeCond""".stripMargin
-        )
-        .createOrReplaceTempView(stagedView)
+          )
+          .createOrReplaceTempView(stagedView)
 
-      // Build MERGE clauses
-      val mergeOn =
-        pkColumns.map(c => s"target.$c = source._mk_$c").mkString(" AND ") +
-          s" AND target.$isCurrentCol = true"
+        // Build MERGE clauses
+        val mergeOn =
+          pkColumns.map(c => s"target.$c = source._mk_$c").mkString(" AND ") +
+            s" AND target.$isCurrentCol = true"
 
-      val targetChangeCond = compareColumns
-        .map(c =>
-          s"target.$c != source.$c OR (target.$c IS NULL AND source.$c IS NOT NULL) OR (target.$c IS NOT NULL AND source.$c IS NULL)"
-        )
-        .mkString(" OR ")
+        val targetChangeCond = compareColumns
+          .map(c =>
+            s"target.$c != source.$c OR (target.$c IS NULL AND source.$c IS NOT NULL) OR (target.$c IS NOT NULL AND source.$c IS NULL)"
+          )
+          .mkString(" OR ")
 
-      // WHEN MATCHED: close old version of changed record
-      val matchedClause =
-        s"""WHEN MATCHED AND ($targetChangeCond) THEN UPDATE SET
+        // WHEN MATCHED: close old version of changed record
+        val matchedClause =
+          s"""WHEN MATCHED AND ($targetChangeCond) THEN UPDATE SET
            |  target.$validToCol = current_timestamp(),
            |  target.$isCurrentCol = false""".stripMargin
 
-      // WHEN NOT MATCHED: insert new version or brand new record
-      val insertColNames =
-        (cachedDf.columns.toSeq ++ Seq(validFromCol, validToCol, isCurrentCol) ++ isActiveCol.toSeq)
-          .mkString(", ")
-      val isActiveVal = isActiveCol.map(_ => ", true").getOrElse("")
-      val insertVals =
-        cachedDf.columns.map(c => s"source.$c").mkString(", ") +
-          s", current_timestamp(), CAST(NULL AS TIMESTAMP), true$isActiveVal"
-      val notMatchedClause =
-        s"WHEN NOT MATCHED THEN INSERT ($insertColNames) VALUES ($insertVals)"
+        // WHEN NOT MATCHED: insert new version or brand new record
+        val insertColNames =
+          (cachedDf.columns.toSeq ++ Seq(validFromCol, validToCol, isCurrentCol) ++ isActiveCol.toSeq)
+            .mkString(", ")
+        val isActiveVal = isActiveCol.map(_ => ", true").getOrElse("")
+        val insertVals =
+          cachedDf.columns.map(c => s"source.$c").mkString(", ") +
+            s", current_timestamp(), CAST(NULL AS TIMESTAMP), true$isActiveVal"
+        val notMatchedClause =
+          s"WHEN NOT MATCHED THEN INSERT ($insertColNames) VALUES ($insertVals)"
 
-      // WHEN NOT MATCHED BY SOURCE: soft delete (only if detectDeletes=true)
-      val softDeleteClause =
-        if (detectDeletes) {
-          val isActiveUpdate =
-            isActiveCol.map(c => s",\n  target.$c = false").getOrElse("")
-          Seq(
-            s"""WHEN NOT MATCHED BY SOURCE AND target.$isCurrentCol = true THEN UPDATE SET
+        // WHEN NOT MATCHED BY SOURCE: soft delete (only if detectDeletes=true)
+        val softDeleteClause =
+          if (detectDeletes) {
+            val isActiveUpdate =
+              isActiveCol.map(c => s",\n  target.$c = false").getOrElse("")
+            Seq(
+              s"""WHEN NOT MATCHED BY SOURCE AND target.$isCurrentCol = true THEN UPDATE SET
              |  target.$validToCol = current_timestamp(),
              |  target.$isCurrentCol = false$isActiveUpdate""".stripMargin
-          )
-        } else Seq.empty
+            )
+          } else Seq.empty
 
-      val allClauses =
-        Seq(matchedClause, notMatchedClause) ++ softDeleteClause
-      val mergeSql =
-        s"""MERGE INTO $tableName AS target
+        val allClauses =
+          Seq(matchedClause, notMatchedClause) ++ softDeleteClause
+        val mergeSql =
+          s"""MERGE INTO $tableName AS target
            |USING $stagedView AS source
            |ON $mergeOn
            |${allClauses.mkString("\n")}""".stripMargin
 
-      logger.info(s"Executing SCD2 MERGE INTO on $tableName")
-      logger.debug(s"SCD2 Merge SQL: $mergeSql")
-      try {
-        spark.sql(mergeSql)
-      } finally {
-        spark.catalog.dropTempView(sourceView)
-        spark.catalog.dropTempView(stagedView)
+        logger.info(s"Executing SCD2 MERGE INTO on $tableName")
+        logger.debug(s"SCD2 Merge SQL: $mergeSql")
+        try {
+          spark.sql(mergeSql)
+        } finally {
+          spark.catalog.dropTempView(sourceView)
+          spark.catalog.dropTempView(stagedView)
+        }
       }
-    }
 
-    val recordCount = cachedDf.count()
-    val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
-    snapshotId.foreach { sid =>
-      logger.info(
-        s"SCD2 load complete on $tableName: $recordCount records, snapshot: $sid"
-      )
-    }
+      val recordCount = cachedDf.count()
+      val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
+      snapshotId.foreach { sid =>
+        logger.info(
+          s"SCD2 load complete on $tableName: $recordCount records, snapshot: $sid"
+        )
+      }
 
-    WriteResult(recordCount, snapshotId)
+      WriteResult(recordCount, snapshotId)
 
     } finally {
       cachedDf.unpersist()

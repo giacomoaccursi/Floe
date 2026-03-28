@@ -6,7 +6,7 @@ object CatalogFactory {
 
   private val builtinProviders: Map[String, () => CatalogProvider] = Map(
     "hadoop" -> (() => new HadoopCatalogProvider()),
-    "glue"   -> (() => new GlueCatalogProvider())
+    "glue" -> (() => new GlueCatalogProvider())
   )
 
   def createCatalogProvider(
@@ -25,8 +25,8 @@ object CatalogFactory {
       )
   }
 
-  /** Returns Spark properties that must be passed to the SparkSession builder
-    * before session creation (e.g. spark.sql.extensions).
+  /** Returns Spark properties that must be passed to the SparkSession builder before session creation (e.g.
+    * spark.sql.extensions).
     */
   def sparkSessionConfig(
       catalogType: String,

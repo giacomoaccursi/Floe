@@ -107,9 +107,11 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val emptyDF = spark.createDataFrame(
       spark.sparkContext.emptyRDD[org.apache.spark.sql.Row],
-      org.apache.spark.sql.types.StructType(Seq(
-        org.apache.spark.sql.types.StructField("id", org.apache.spark.sql.types.StringType)
-      ))
+      org.apache.spark.sql.types.StructType(
+        Seq(
+          org.apache.spark.sql.types.StructField("id", org.apache.spark.sql.types.StringType)
+        )
+      )
     )
 
     noException should be thrownBy writer.writeRejected(emptyDF, "batch_000")
@@ -129,7 +131,7 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val written = spark.read.parquet(outputPath)
     written.count() shouldBe 3L
-    written.columns should contain allOf("id", "value")
+    written.columns should contain allOf ("id", "value")
   }
 
   it should "partition data when dagMetadata specifies partitionBy" in {

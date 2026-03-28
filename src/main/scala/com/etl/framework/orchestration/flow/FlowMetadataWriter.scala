@@ -10,23 +10,21 @@ import org.slf4j.LoggerFactory
 
 import java.nio.file.{Files, Paths, StandardOpenOption}
 
-/**
- * Handles writing of flow and additional table metadata
- */
+/** Handles writing of flow and additional table metadata
+  */
 class FlowMetadataWriter(
-  flowConfig: FlowConfig,
-  globalConfig: GlobalConfig
+    flowConfig: FlowConfig,
+    globalConfig: GlobalConfig
 ) {
-  
+
   private val logger = LoggerFactory.getLogger(getClass)
   private implicit val formats: Formats = Serialization.formats(NoTypeHints)
-  
-  /**
-   * Writes flow execution metadata
-   */
+
+  /** Writes flow execution metadata
+    */
   def writeFlowMetadata(result: FlowResult, batchId: String): Unit = {
     val metadataPath = s"${globalConfig.paths.metadataPath}/$batchId/flows/${flowConfig.name}.json"
-    
+
     val baseMetadata = Map[String, Any](
       "flow_name" -> result.flowName,
       "batch_id" -> result.batchId,
@@ -56,21 +54,20 @@ class FlowMetadataWriter(
         ))
       case None => baseMetadata
     }
-    
+
     writeJsonToFile(metadata, metadataPath)
     logger.debug(s"Flow metadata written: ${flowConfig.name} → $metadataPath")
   }
-  
-  /**
-   * Writes metadata for an additional table
-   */
+
+  /** Writes metadata for an additional table
+    */
   def writeAdditionalTableMetadata(
-    tableName: String,
-    data: DataFrame,
-    recordCount: Long,
-    outputPath: String,
-    dagMetadata: Option[AdditionalTableMetadata],
-    batchId: String
+      tableName: String,
+      data: DataFrame,
+      recordCount: Long,
+      outputPath: String,
+      dagMetadata: Option[AdditionalTableMetadata],
+      batchId: String
   ): Unit = {
     val metadataPath = s"${globalConfig.paths.metadataPath}/$batchId/additional_tables/${tableName}.json"
 
@@ -80,14 +77,16 @@ class FlowMetadataWriter(
       "created_by_flow" -> flowConfig.name,
       "record_count" -> recordCount,
       "path" -> outputPath,
-      "dag_metadata" -> dagMetadata.map { dm =>
-        Map(
-          "primary_key" -> dm.primaryKey,
-          "join_keys" -> dm.joinKeys,
-          "description" -> dm.description.getOrElse(""),
-          "partition_by" -> dm.partitionBy
-        )
-      }.getOrElse(Map.empty),
+      "dag_metadata" -> dagMetadata
+        .map { dm =>
+          Map(
+            "primary_key" -> dm.primaryKey,
+            "join_keys" -> dm.joinKeys,
+            "description" -> dm.description.getOrElse(""),
+            "partition_by" -> dm.partitionBy
+          )
+        }
+        .getOrElse(Map.empty),
       "schema" -> Map(
         "fields" -> data.schema.fields.map { field =>
           Map(
@@ -97,14 +96,13 @@ class FlowMetadataWriter(
         }
       )
     )
-    
+
     writeJsonToFile(metadata, metadataPath)
     logger.debug(s"Additional table metadata written: $tableName → $metadataPath")
   }
-  
-  /**
-   * Writes a map as JSON to a file
-   */
+
+  /** Writes a map as JSON to a file
+    */
   private def writeJsonToFile(data: Map[String, Any], filePath: String): Unit = {
     val jsonString = write(data)
     val path = Paths.get(filePath)

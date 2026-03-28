@@ -45,7 +45,7 @@ class ConfigEnumsTest extends AnyFlatSpec with Matchers {
     FileFormat.fromString("parquet") shouldBe Right(FileFormat.Parquet)
     FileFormat.fromString("json") shouldBe Right(FileFormat.JSON)
   }
-  
+
   "FileFormat values" should "have correct spark format mapping" in {
     FileFormat.CSV.sparkFormat shouldBe "csv"
     FileFormat.Parquet.sparkFormat shouldBe "parquet"

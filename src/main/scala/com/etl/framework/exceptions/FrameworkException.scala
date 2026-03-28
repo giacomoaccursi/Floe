@@ -2,27 +2,23 @@ package com.etl.framework.exceptions
 
 import com.etl.framework.exceptions.ContextKeys._
 
-/**
- * Base exception for all framework errors
- */
+/** Base exception for all framework errors
+  */
 abstract class FrameworkException(
-  message: String,
-  cause: Throwable = null
+    message: String,
+    cause: Throwable = null
 ) extends RuntimeException(message, cause) {
-  
-  /**
-   * Error code for categorization and monitoring
-   */
+
+  /** Error code for categorization and monitoring
+    */
   def errorCode: String
-  
-  /**
-   * Additional context for debugging
-   */
+
+  /** Additional context for debugging
+    */
   def context: Map[String, Any] = Map.empty
-  
-  /**
-   * Formatted error message with context
-   */
+
+  /** Formatted error message with context
+    */
   override def getMessage: String = {
     val baseMessage = super.getMessage
     if (context.isEmpty) {
@@ -34,27 +30,25 @@ abstract class FrameworkException(
   }
 }
 
-/**
- * Configuration-related errors
- */
+/** Configuration-related errors
+  */
 sealed abstract class ConfigurationException(
-  message: String,
-  cause: Throwable = null
+    message: String,
+    cause: Throwable = null
 ) extends FrameworkException(message, cause)
 
-/**
- * YAML syntax error in configuration file
- */
+/** YAML syntax error in configuration file
+  */
 case class YAMLSyntaxException(
-  file: String,
-  line: Option[Int] = None,
-  column: Option[Int] = None,
-  details: String,
-  cause: Throwable = null
+    file: String,
+    line: Option[Int] = None,
+    column: Option[Int] = None,
+    details: String,
+    cause: Throwable = null
 ) extends ConfigurationException(
-  s"YAML syntax error in file '$file'${line.map(l => s" at line $l").getOrElse("")}${column.map(c => s", column $c").getOrElse("")}: $details",
-  cause
-) {
+      s"YAML syntax error in file '$file'${line.map(l => s" at line $l").getOrElse("")}${column.map(c => s", column $c").getOrElse("")}: $details",
+      cause
+    ) {
   override def errorCode: String = "CONFIG_YAML_SYNTAX"
   override def context: Map[String, Any] = Map(
     FILE -> file,
@@ -64,16 +58,15 @@ case class YAMLSyntaxException(
   )
 }
 
-/**
- * Missing required field in configuration
- */
+/** Missing required field in configuration
+  */
 case class MissingConfigFieldException(
-  file: String,
-  field: String,
-  section: String
+    file: String,
+    field: String,
+    section: String
 ) extends ConfigurationException(
-  s"Missing required field '$field' in section '$section' of configuration file '$file'"
-) {
+      s"Missing required field '$field' in section '$section' of configuration file '$file'"
+    ) {
   override def errorCode: String = "CONFIG_MISSING_FIELD"
   override def context: Map[String, Any] = Map(
     FILE -> file,
@@ -82,17 +75,16 @@ case class MissingConfigFieldException(
   )
 }
 
-/**
- * Invalid type in configuration
- */
+/** Invalid type in configuration
+  */
 case class InvalidConfigTypeException(
-  file: String,
-  field: String,
-  expectedType: String,
-  actualType: String
+    file: String,
+    field: String,
+    expectedType: String,
+    actualType: String
 ) extends ConfigurationException(
-  s"Invalid type for field '$field' in configuration file '$file': expected $expectedType, got $actualType"
-) {
+      s"Invalid type for field '$field' in configuration file '$file': expected $expectedType, got $actualType"
+    ) {
   override def errorCode: String = "CONFIG_INVALID_TYPE"
   override def context: Map[String, Any] = Map(
     FILE -> file,
@@ -102,17 +94,16 @@ case class InvalidConfigTypeException(
   )
 }
 
-/**
- * Generic configuration file error (I/O, parsing, etc.)
- */
+/** Generic configuration file error (I/O, parsing, etc.)
+  */
 case class ConfigFileException(
-  file: String,
-  message: String,
-  cause: Throwable = null
+    file: String,
+    message: String,
+    cause: Throwable = null
 ) extends ConfigurationException(
-  s"Configuration file error in '$file': $message",
-  cause
-) {
+      s"Configuration file error in '$file': $message",
+      cause
+    ) {
   override def errorCode: String = "CONFIG_FILE_ERROR"
   override def context: Map[String, Any] = Map(
     FILE -> file,
@@ -120,19 +111,17 @@ case class ConfigFileException(
   )
 }
 
-/**
- * Reference to non-existent entity in configuration
- */
+/** Reference to non-existent entity in configuration
+  */
 case class InvalidReferenceException(
-  file: String,
-  referenceType: String,
-  referenceName: String,
-  availableReferences: Seq[String] = Seq.empty
+    file: String,
+    referenceType: String,
+    referenceName: String,
+    availableReferences: Seq[String] = Seq.empty
 ) extends ConfigurationException(
-  s"Invalid reference to $referenceType '$referenceName' in configuration file '$file'${
-    if (availableReferences.nonEmpty) s". Available: ${availableReferences.mkString(", ")}" else ""
-  }"
-) {
+      s"Invalid reference to $referenceType '$referenceName' in configuration file '$file'${if (availableReferences.nonEmpty) s". Available: ${availableReferences.mkString(", ")}"
+        else ""}"
+    ) {
   override def errorCode: String = "CONFIG_INVALID_REFERENCE"
   override def context: Map[String, Any] = Map(
     FILE -> file,
@@ -142,15 +131,14 @@ case class InvalidReferenceException(
   )
 }
 
-/**
- * Circular dependency detected in flow or DAG graph
- */
+/** Circular dependency detected in flow or DAG graph
+  */
 case class CircularDependencyException(
-  graphType: String,
-  cycle: Seq[String]
+    graphType: String,
+    cycle: Seq[String]
 ) extends ConfigurationException(
-  s"Circular dependency detected in $graphType: ${cycle.mkString(" -> ")}"
-) {
+      s"Circular dependency detected in $graphType: ${cycle.mkString(" -> ")}"
+    ) {
   override def errorCode: String = "CONFIG_CIRCULAR_DEPENDENCY"
   override def context: Map[String, Any] = Map(
     GRAPH_TYPE -> graphType,
@@ -158,20 +146,18 @@ case class CircularDependencyException(
   )
 }
 
-/**
- * Validation-related errors
- */
+/** Validation-related errors
+  */
 sealed abstract class ValidationException(
-  message: String,
-  cause: Throwable = null
+    message: String,
+    cause: Throwable = null
 ) extends FrameworkException(message, cause)
 
-/**
- * Validation configuration error
- */
+/** Validation configuration error
+  */
 case class ValidationConfigException(
-  message: String,
-  cause: Throwable = null
+    message: String,
+    cause: Throwable = null
 ) extends ValidationException(message, cause) {
   override def errorCode: String = "VALIDATION_CONFIG_ERROR"
   override def context: Map[String, Any] = Map(
@@ -179,25 +165,23 @@ case class ValidationConfigException(
   )
 }
 
-/**
- * Schema validation failure
- */
+/** Schema validation failure
+  */
 case class SchemaValidationException(
-  flowName: String,
-  missingColumns: Seq[String] = Seq.empty,
-  typeMismatches: Map[String, (String, String)] = Map.empty
+    flowName: String,
+    missingColumns: Seq[String] = Seq.empty,
+    typeMismatches: Map[String, (String, String)] = Map.empty
 ) extends ValidationException(
-  s"Schema validation failed for flow '$flowName'${
-    if (missingColumns.nonEmpty) s". Missing columns: ${missingColumns.mkString(", ")}" else ""
-  }${
-    if (typeMismatches.nonEmpty) {
-      val mismatches = typeMismatches.map { case (col, (expected, actual)) =>
-        s"$col (expected: $expected, got: $actual)"
-      }.mkString(", ")
-      s". Type mismatches: $mismatches"
-    } else ""
-  }"
-) {
+      s"Schema validation failed for flow '$flowName'${if (missingColumns.nonEmpty) s". Missing columns: ${missingColumns.mkString(", ")}"
+        else ""}${if (typeMismatches.nonEmpty) {
+          val mismatches = typeMismatches
+            .map { case (col, (expected, actual)) =>
+              s"$col (expected: $expected, got: $actual)"
+            }
+            .mkString(", ")
+          s". Type mismatches: $mismatches"
+        } else ""}"
+    ) {
   override def errorCode: String = "VALIDATION_SCHEMA"
   override def context: Map[String, Any] = Map(
     FLOW_NAME -> flowName,
@@ -206,16 +190,15 @@ case class SchemaValidationException(
   )
 }
 
-/**
- * Primary key validation failure
- */
+/** Primary key validation failure
+  */
 case class PrimaryKeyViolationException(
-  flowName: String,
-  duplicateCount: Long,
-  keyColumns: Seq[String]
+    flowName: String,
+    duplicateCount: Long,
+    keyColumns: Seq[String]
 ) extends ValidationException(
-  s"Primary key violation in flow '$flowName': found $duplicateCount duplicate records on key columns [${keyColumns.mkString(", ")}]"
-) {
+      s"Primary key violation in flow '$flowName': found $duplicateCount duplicate records on key columns [${keyColumns.mkString(", ")}]"
+    ) {
   override def errorCode: String = "VALIDATION_PK_VIOLATION"
   override def context: Map[String, Any] = Map(
     FLOW_NAME -> flowName,
@@ -224,17 +207,16 @@ case class PrimaryKeyViolationException(
   )
 }
 
-/**
- * Foreign key validation failure
- */
+/** Foreign key validation failure
+  */
 case class ForeignKeyViolationException(
-  flowName: String,
-  orphanCount: Long,
-  foreignKeyName: String,
-  referencedFlow: String
+    flowName: String,
+    orphanCount: Long,
+    foreignKeyName: String,
+    referencedFlow: String
 ) extends ValidationException(
-  s"Foreign key violation in flow '$flowName': found $orphanCount orphan records for FK '$foreignKeyName' referencing flow '$referencedFlow'"
-) {
+      s"Foreign key violation in flow '$flowName': found $orphanCount orphan records for FK '$foreignKeyName' referencing flow '$referencedFlow'"
+    ) {
   override def errorCode: String = "VALIDATION_FK_VIOLATION"
   override def context: Map[String, Any] = Map(
     FLOW_NAME -> flowName,
@@ -244,18 +226,17 @@ case class ForeignKeyViolationException(
   )
 }
 
-/**
- * Maximum rejection rate exceeded
- */
+/** Maximum rejection rate exceeded
+  */
 case class MaxRejectionRateExceededException(
-  flowName: String,
-  actualRate: Double,
-  maxRate: Double,
-  rejectedCount: Long,
-  totalCount: Long
+    flowName: String,
+    actualRate: Double,
+    maxRate: Double,
+    rejectedCount: Long,
+    totalCount: Long
 ) extends ValidationException(
-  f"Maximum rejection rate exceeded for flow '$flowName': ${actualRate * 100}%.2f%% (${rejectedCount}/${totalCount}) exceeds configured maximum of ${maxRate * 100}%.2f%%"
-) {
+      f"Maximum rejection rate exceeded for flow '$flowName': ${actualRate * 100}%.2f%% (${rejectedCount}/${totalCount}) exceeds configured maximum of ${maxRate * 100}%.2f%%"
+    ) {
   override def errorCode: String = "VALIDATION_MAX_REJECTION_RATE"
   override def context: Map[String, Any] = Map(
     FLOW_NAME -> flowName,
@@ -266,25 +247,23 @@ case class MaxRejectionRateExceededException(
   )
 }
 
-/**
- * Data processing errors
- */
+/** Data processing errors
+  */
 sealed abstract class DataProcessingException(
-  message: String,
-  cause: Throwable = null
+    message: String,
+    cause: Throwable = null
 ) extends FrameworkException(message, cause)
 
-/**
- * Record count invariant violation
- */
+/** Record count invariant violation
+  */
 case class InvariantViolationException(
-  flowName: String,
-  inputCount: Long,
-  validCount: Long,
-  rejectedCount: Long
+    flowName: String,
+    inputCount: Long,
+    validCount: Long,
+    rejectedCount: Long
 ) extends DataProcessingException(
-  s"Record count invariant violated for flow '$flowName': input ($inputCount) != valid ($validCount) + rejected ($rejectedCount). Difference: ${inputCount - (validCount + rejectedCount)}"
-) {
+      s"Record count invariant violated for flow '$flowName': input ($inputCount) != valid ($validCount) + rejected ($rejectedCount). Difference: ${inputCount - (validCount + rejectedCount)}"
+    ) {
   override def errorCode: String = "DATA_INVARIANT_VIOLATION"
   override def context: Map[String, Any] = Map(
     FLOW_NAME -> flowName,
@@ -295,19 +274,17 @@ case class InvariantViolationException(
   )
 }
 
-
-/**
- * Data source unavailable or unreadable
- */
+/** Data source unavailable or unreadable
+  */
 case class DataSourceException(
-  sourceType: String,
-  sourcePath: String,
-  details: String,
-  cause: Throwable = null
+    sourceType: String,
+    sourcePath: String,
+    details: String,
+    cause: Throwable = null
 ) extends DataProcessingException(
-  s"Failed to read from $sourceType source '$sourcePath': $details",
-  cause
-) {
+      s"Failed to read from $sourceType source '$sourcePath': $details",
+      cause
+    ) {
   override def errorCode: String = "DATA_SOURCE_ERROR"
   override def context: Map[String, Any] = Map(
     SOURCE_TYPE -> sourceType,
@@ -316,18 +293,17 @@ case class DataSourceException(
   )
 }
 
-/**
- * Failed to write output data
- */
+/** Failed to write output data
+  */
 case class DataWriteException(
-  outputType: String,
-  outputPath: String,
-  details: String,
-  cause: Throwable = null
+    outputType: String,
+    outputPath: String,
+    details: String,
+    cause: Throwable = null
 ) extends DataProcessingException(
-  s"Failed to write $outputType to '$outputPath': $details",
-  cause
-) {
+      s"Failed to write $outputType to '$outputPath': $details",
+      cause
+    ) {
   override def errorCode: String = "DATA_WRITE_ERROR"
   override def context: Map[String, Any] = Map(
     OUTPUT_TYPE -> outputType,
@@ -336,18 +312,17 @@ case class DataWriteException(
   )
 }
 
-/**
- * Merge operation failure
- */
+/** Merge operation failure
+  */
 case class MergeException(
-  flowName: String,
-  mergeStrategy: String,
-  details: String,
-  cause: Throwable = null
+    flowName: String,
+    mergeStrategy: String,
+    details: String,
+    cause: Throwable = null
 ) extends DataProcessingException(
-  s"Merge operation failed for flow '$flowName' with strategy '$mergeStrategy': $details",
-  cause
-) {
+      s"Merge operation failed for flow '$flowName' with strategy '$mergeStrategy': $details",
+      cause
+    ) {
   override def errorCode: String = "DATA_MERGE_ERROR"
   override def context: Map[String, Any] = Map(
     FLOW_NAME -> flowName,
@@ -356,25 +331,23 @@ case class MergeException(
   )
 }
 
-/**
- * Transformation errors
- */
+/** Transformation errors
+  */
 sealed abstract class TransformationException(
-  message: String,
-  cause: Throwable = null
+    message: String,
+    cause: Throwable = null
 ) extends FrameworkException(message, cause)
 
-/**
- * Pre-validation transformation failure
- */
+/** Pre-validation transformation failure
+  */
 case class PreValidationTransformationException(
-  flowName: String,
-  details: String,
-  cause: Throwable = null
+    flowName: String,
+    details: String,
+    cause: Throwable = null
 ) extends TransformationException(
-  s"Pre-validation transformation failed for flow '$flowName': $details",
-  cause
-) {
+      s"Pre-validation transformation failed for flow '$flowName': $details",
+      cause
+    ) {
   override def errorCode: String = "TRANSFORM_PRE_VALIDATION"
   override def context: Map[String, Any] = Map(
     FLOW_NAME -> flowName,
@@ -382,17 +355,16 @@ case class PreValidationTransformationException(
   )
 }
 
-/**
- * Post-validation transformation failure
- */
+/** Post-validation transformation failure
+  */
 case class PostValidationTransformationException(
-  flowName: String,
-  details: String,
-  cause: Throwable = null
+    flowName: String,
+    details: String,
+    cause: Throwable = null
 ) extends TransformationException(
-  s"Post-validation transformation failed for flow '$flowName': $details",
-  cause
-) {
+      s"Post-validation transformation failed for flow '$flowName': $details",
+      cause
+    ) {
   override def errorCode: String = "TRANSFORM_POST_VALIDATION"
   override def context: Map[String, Any] = Map(
     FLOW_NAME -> flowName,
@@ -400,25 +372,23 @@ case class PostValidationTransformationException(
   )
 }
 
-/**
- * DAG/Aggregation errors
- */
+/** DAG/Aggregation errors
+  */
 sealed abstract class AggregationException(
-  message: String,
-  cause: Throwable = null
+    message: String,
+    cause: Throwable = null
 ) extends FrameworkException(message, cause)
 
-/**
- * DAG node execution failure
- */
+/** DAG node execution failure
+  */
 case class DAGNodeExecutionException(
-  nodeId: String,
-  details: String,
-  cause: Throwable = null
+    nodeId: String,
+    details: String,
+    cause: Throwable = null
 ) extends AggregationException(
-  s"DAG node execution failed for node '$nodeId': $details",
-  cause
-) {
+      s"DAG node execution failed for node '$nodeId': $details",
+      cause
+    ) {
   override def errorCode: String = "DAG_NODE_EXECUTION"
   override def context: Map[String, Any] = Map(
     "nodeId" -> nodeId,
@@ -426,19 +396,18 @@ case class DAGNodeExecutionException(
   )
 }
 
-/**
- * Join operation failure
- */
+/** Join operation failure
+  */
 case class JoinException(
-  parentNode: String,
-  childNode: String,
-  joinStrategy: String,
-  details: String,
-  cause: Throwable = null
+    parentNode: String,
+    childNode: String,
+    joinStrategy: String,
+    details: String,
+    cause: Throwable = null
 ) extends AggregationException(
-  s"Join operation failed between parent '$parentNode' and child '$childNode' with strategy '$joinStrategy': $details",
-  cause
-) {
+      s"Join operation failed between parent '$parentNode' and child '$childNode' with strategy '$joinStrategy': $details",
+      cause
+    ) {
   override def errorCode: String = "DAG_JOIN_ERROR"
   override def context: Map[String, Any] = Map(
     PARENT_NODE -> parentNode,
@@ -448,25 +417,23 @@ case class JoinException(
   )
 }
 
-/**
- * Plugin/Extension errors
- */
+/** Plugin/Extension errors
+  */
 sealed abstract class PluginException(
-  message: String,
-  cause: Throwable = null
+    message: String,
+    cause: Throwable = null
 ) extends FrameworkException(message, cause)
 
-/**
- * Custom validator loading failure
- */
+/** Custom validator loading failure
+  */
 case class CustomValidatorLoadException(
-  className: String,
-  details: String,
-  cause: Throwable = null
+    className: String,
+    details: String,
+    cause: Throwable = null
 ) extends PluginException(
-  s"Failed to load custom validator '$className': $details",
-  cause
-) {
+      s"Failed to load custom validator '$className': $details",
+      cause
+    ) {
   override def errorCode: String = "PLUGIN_VALIDATOR_LOAD"
   override def context: Map[String, Any] = Map(
     "className" -> className,
@@ -474,17 +441,16 @@ case class CustomValidatorLoadException(
   )
 }
 
-/**
- * Custom validator execution failure
- */
+/** Custom validator execution failure
+  */
 case class CustomValidatorExecutionException(
-  className: String,
-  details: String,
-  cause: Throwable = null
+    className: String,
+    details: String,
+    cause: Throwable = null
 ) extends PluginException(
-  s"Custom validator '$className' execution failed: $details",
-  cause
-) {
+      s"Custom validator '$className' execution failed: $details",
+      cause
+    ) {
   override def errorCode: String = "PLUGIN_VALIDATOR_EXECUTION"
   override def context: Map[String, Any] = Map(
     "className" -> className,
@@ -492,25 +458,23 @@ case class CustomValidatorExecutionException(
   )
 }
 
-/**
- * Orchestration errors
- */
+/** Orchestration errors
+  */
 sealed abstract class OrchestrationException(
-  message: String,
-  cause: Throwable = null
+    message: String,
+    cause: Throwable = null
 ) extends FrameworkException(message, cause)
 
-/**
- * Flow execution failure
- */
+/** Flow execution failure
+  */
 case class FlowExecutionException(
-  flowName: String,
-  details: String,
-  cause: Throwable = null
+    flowName: String,
+    details: String,
+    cause: Throwable = null
 ) extends OrchestrationException(
-  s"Flow execution failed for '$flowName': $details",
-  cause
-) {
+      s"Flow execution failed for '$flowName': $details",
+      cause
+    ) {
   override def errorCode: String = "ORCHESTRATION_FLOW_EXECUTION"
   override def context: Map[String, Any] = Map(
     "flowName" -> flowName,
@@ -518,15 +482,14 @@ case class FlowExecutionException(
   )
 }
 
-/**
- * Unsupported operation
- */
+/** Unsupported operation
+  */
 case class UnsupportedOperationException(
-  operation: String,
-  details: String
+    operation: String,
+    details: String
 ) extends FrameworkException(
-  s"Unsupported operation '$operation': $details"
-) {
+      s"Unsupported operation '$operation': $details"
+    ) {
   override def errorCode: String = "UNSUPPORTED_OPERATION"
   override def context: Map[String, Any] = Map(
     "operation" -> operation,

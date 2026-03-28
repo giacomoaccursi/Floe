@@ -4,6 +4,9 @@ import com.etl.framework.config.{AggregationConfig, GlobalConfig}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext
+
 /**
  * Coordinates DAG-based aggregation
  */
@@ -20,7 +23,8 @@ class DAGOrchestrator(
   private val graphBuilder = new DAGGraphBuilder(globalConfig)
   private val joinExecutor = new JoinStrategyExecutor()
   private val nodeProcessor = new DAGNodeProcessor(joinExecutor)
-  private val dagExecutor = new DAGExecutor(nodeProcessor)
+  private val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
+  private val dagExecutor = new DAGExecutor(nodeProcessor, ExecutionContext.fromExecutorService(pool))
   
   /**
    * Builds execution plan from DAG configuration
@@ -50,7 +54,11 @@ class DAGOrchestrator(
    */
   def execute(): DataFrame = {
     logger.info("Starting DAG execution")
-    val plan = buildExecutionPlan()
-    dagExecutor.execute(plan)
+    try {
+      val plan = buildExecutionPlan()
+      dagExecutor.execute(plan)
+    } finally {
+      pool.shutdown()
+    }
   }
 }

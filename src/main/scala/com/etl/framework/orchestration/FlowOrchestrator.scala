@@ -9,6 +9,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext
 
 /**
  * Coordinates execution of all flows respecting dependencies.
@@ -37,7 +39,8 @@ class FlowOrchestrator(
   groupExecutor: FlowGroupExecutor,
   resultProcessor: FlowResultProcessor,
   metadataWriter: BatchMetadataWriter,
-  executionLogger: ExecutionLogger
+  executionLogger: ExecutionLogger,
+  threadPool: Option[java.util.concurrent.ExecutorService] = None
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -79,6 +82,8 @@ class FlowOrchestrator(
     } catch {
       case e: Exception =>
         handleExecutionFailure(batchId, flowResults.toSeq, startTime, e)
+    } finally {
+      threadPool.foreach(_.shutdown())
     }
   }
 
@@ -213,7 +218,9 @@ object FlowOrchestrator {
     flowConfigs: Seq[FlowConfig],
     domainsConfig: Option[DomainsConfig] = None
   )(implicit spark: SparkSession): FlowOrchestrator = {
-    val groupExecutor = new FlowGroupExecutor(globalConfig, domainsConfig)
+    val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
+    val ec = ExecutionContext.fromExecutorService(pool)
+    val groupExecutor = new FlowGroupExecutor(globalConfig, domainsConfig, ec)
     val metadataWriter = new BatchMetadataWriter(globalConfig, flowConfigs)
     val planBuilder = new ExecutionPlanBuilder(flowConfigs, globalConfig)
     val resultProcessor = new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
@@ -227,7 +234,8 @@ object FlowOrchestrator {
       groupExecutor = groupExecutor,
       resultProcessor = resultProcessor,
       metadataWriter = metadataWriter,
-      executionLogger = executionLogger
+      executionLogger = executionLogger,
+      threadPool = Some(pool)
     )
   }
 }

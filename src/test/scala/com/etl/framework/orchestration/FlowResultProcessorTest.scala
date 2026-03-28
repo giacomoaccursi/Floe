@@ -35,7 +35,8 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
             PerformanceConfig(parallelFlows = true, parallelNodes = true),
           iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
         ),
-        None
+        None,
+        scala.concurrent.ExecutionContext.global
       ) {
     override def shouldStopExecution(result: FlowResult): Boolean = {
       if (!result.success) return true

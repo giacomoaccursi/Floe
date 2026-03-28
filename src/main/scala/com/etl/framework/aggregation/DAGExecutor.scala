@@ -1,26 +1,19 @@
 package com.etl.framework.aggregation
 
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.DataFrame
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
 import scala.concurrent._
 import scala.concurrent.duration._
-import java.util.concurrent.Executors
 
 /**
  * Executes DAG execution plans
  */
-class DAGExecutor(nodeProcessor: DAGNodeProcessor) {
+class DAGExecutor(nodeProcessor: DAGNodeProcessor, parallelEc: ExecutionContext) {
 
   private val logger = LoggerFactory.getLogger(getClass)
   private val MaxParallelTimeout: FiniteDuration = 2.hours
-
-  // Bounded thread pool: avoids saturating the driver with unbounded concurrent
-  // metadata resolutions and schema inferences when many DAG nodes run in parallel
-  private val parallelEc: ExecutionContext = ExecutionContext.fromExecutorService(
-    Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
-  )
   
   /**
    * Executes DAG nodes according to the execution plan

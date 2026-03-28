@@ -69,7 +69,7 @@ class FlowGroupExecutorTest extends AnyFlatSpec with Matchers {
         .config("spark.ui.enabled", "false")
         .getOrCreate()
 
-    new FlowGroupExecutor(makeConfig(failOnValidationError, maxRejectionRate), None)
+    new FlowGroupExecutor(makeConfig(failOnValidationError, maxRejectionRate), None, scala.concurrent.ExecutionContext.global)
   }
 
   "shouldStopExecution" should "return true when the flow itself failed" in {

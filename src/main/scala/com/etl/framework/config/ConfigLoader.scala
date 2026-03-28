@@ -118,10 +118,13 @@ trait ConfigLoader[T] {
       text: String,
       path: String = "<unknown>"
   ): Either[ConfigurationException, String] = {
+    val escapePlaceholder = "\u0000DOLLAR\u0000"
+    val escaped = text.replace("$$", escapePlaceholder)
+
     val pattern = """\$\{([^}]+)}|\$([A-Za-z_][A-Za-z0-9_]*)""".r
 
     val unresolvedVars = pattern
-      .findAllMatchIn(text)
+      .findAllMatchIn(escaped)
       .map(m => Option(m.group(1)).getOrElse(m.group(2)))
       .filterNot(sys.env.contains)
       .toSeq
@@ -137,15 +140,14 @@ trait ConfigLoader[T] {
         )
       )
     } else {
-      Right(
-        pattern.replaceAllIn(
-          text,
-          m => {
-            val varName = Option(m.group(1)).getOrElse(m.group(2))
-            Matcher.quoteReplacement(sys.env(varName))
-          }
-        )
+      val substituted = pattern.replaceAllIn(
+        escaped,
+        m => {
+          val varName = Option(m.group(1)).getOrElse(m.group(2))
+          Matcher.quoteReplacement(sys.env(varName))
+        }
       )
+      Right(substituted.replace(escapePlaceholder, "$"))
     }
   }
 }

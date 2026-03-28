@@ -178,6 +178,18 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
     }
   }
 
+  it should "treat $$ as an escaped literal dollar sign" in {
+    val text   = "pattern: $$USD"
+    val result = loader.substituteVars(text)
+    result shouldBe Right("pattern: $USD")
+  }
+
+  it should "not treat $$ followed by letters as an env var" in {
+    val text   = "desc: Amount in $$USD is valid"
+    val result = loader.substituteVars(text)
+    result shouldBe Right("desc: Amount in $USD is valid")
+  }
+
   "ConfigLoader with defaults" should "use case class default values when field is missing" in {
     case class ConfigWithDefaults(
         name: String,

@@ -179,13 +179,6 @@ Custom validators interact with the standard `skipNull` and `onFailure` settings
 
 - **onFailure**: the framework applies the `onFailure` action (reject, warn, skip) based on the `ValidationStepResult` you return. If `onFailure: skip`, your validator is never called.
 
-## Invariant
-
-The validation engine enforces `input_count == valid_count + rejected_count` after every step. If your custom validator returns a `validDf` and `rejectedDf` whose combined row count doesn't match the input, the flow fails with `InvariantViolationException`.
-
-!!!warning
-    Make sure your validator partitions records cleanly — every input row must appear in either the valid or rejected output, never both, never neither.
-
 ## Related
 
 - [Validation Engine](validation.md) — full validation pipeline

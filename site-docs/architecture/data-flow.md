@@ -93,15 +93,16 @@ For each FK, checks that values exist in the referenced parent flow's DataFrame 
 Processes rules in order. Each rule is dispatched to its validator (regex, range, domain, custom class). Based on `onFailure`:
 
 - `reject` — record moves to rejected DataFrame
-- `warn` — record stays valid, warning appended to `_warnings` column
+- `warn` — record stays valid, warning record written to separate Parquet file at `{rejectedPath}/{flowName}_warnings/`
 - `skip` — rule not executed
 
 ### Output
 
 The validation step produces:
 
-- **Valid DataFrame** — clean records with optional `_warnings` column
+- **Valid DataFrame** — clean records with business columns only
 - **Rejected DataFrame** — records with `_rejection_code`, `_rejection_reason`, `_validation_step`, `_rejected_at`
+- **Warning DataFrame** — records with PK columns + `_warning_rule`, `_warning_message`, `_warning_column`, `_warned_at`, `_batch_id` (written to separate Parquet)
 - **Rejection reasons** — `Map[String, Long]` counting rejections per step
 
 Rejected records are written to the flow's `rejectedPath`.

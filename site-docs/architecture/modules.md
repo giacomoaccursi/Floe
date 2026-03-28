@@ -38,7 +38,7 @@ The validation engine runs a deterministic pipeline on every incoming DataFrame:
 4. Foreign key integrity (parent flow lookup)
 5. Custom rules (regex, range, domain, user-defined)
 
-Each step separates valid from rejected records. Rejected records carry metadata columns (`_rejection_code`, `_rejection_reason`, `_validation_step`, `_rejected_at`). The engine enforces the invariant `input = valid + rejected`.
+Each step separates valid from rejected records. Rejected records carry metadata columns (`_rejection_code`, `_rejection_reason`, `_validation_step`, `_rejected_at`).
 
 Includes a plugin system for custom validators loaded via reflection.
 
@@ -116,7 +116,7 @@ Domain-specific exception hierarchy rooted at `FrameworkException`:
 
 - `ConfigurationException` — YAML syntax, missing fields, invalid types, circular dependencies
 - `ValidationException` — schema, PK, FK, rejection rate violations
-- `DataProcessingException` — invariant violations, source errors, write errors, merge errors
+- `DataProcessingException` — source errors, write errors, merge errors
 - `TransformationException` — pre/post-validation transformation failures
 - `AggregationException` — DAG node execution, join failures
 - `PluginException` — custom validator loading/execution failures

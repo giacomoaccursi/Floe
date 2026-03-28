@@ -63,7 +63,7 @@ FrameworkException (abstract)
 
 | Exception | Error Code | Context Keys | When |
 |-----------|-----------|--------------|------|
-| `InvariantViolationException` | `DATA_INVARIANT_VIOLATION` | flowName, inputCount, validCount, rejectedCount, difference | input ≠ valid + rejected |
+| `InvariantViolationException` | `DATA_INVARIANT_VIOLATION` | flowName, inputCount, validCount, rejectedCount, difference | Not currently thrown by the framework. Retained in the hierarchy for backward compatibility. |
 | `DataSourceException` | `DATA_SOURCE_ERROR` | sourceType, sourcePath, details | Failed to read source data |
 | `DataWriteException` | `DATA_WRITE_ERROR` | outputType, outputPath, details | Failed to write output |
 | `MergeException` | `DATA_MERGE_ERROR` | flowName, mergeStrategy, details | MERGE INTO operation failed |

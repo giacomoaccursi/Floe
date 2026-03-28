@@ -14,7 +14,7 @@ The pipeline order is deterministic:
 
 Each step receives the valid records from the previous step. Rejected records accumulate across steps and are written to the configured `rejectedPath` at the end of the pipeline.
 
-The engine enforces an invariant: `input_count == valid_count + rejected_count`. If this invariant is violated (a bug in a custom validator, for example), the flow fails immediately with an `InvariantViolationException`.
+
 
 ## Validation configuration
 
@@ -315,7 +315,15 @@ Rejected records are written to the flow's `rejectedPath`.
 
 ### warn
 
-The record stays in the valid DataFrame but receives a warning message appended to the `_warnings` array column. The warning message is taken from the rule's `description` field, or auto-generated if not provided.
+The record stays in the valid DataFrame unchanged (no extra columns are added). A separate warning record is written to a Parquet file at `{rejectedPath}/{flowName}_warnings/`. Each warning record contains the flow's primary key columns plus warning metadata:
+
+| Column | Description |
+|--------|-------------|
+| `_warning_rule` | Name of the rule that triggered the warning |
+| `_warning_message` | Human-readable message (from the rule's `description`, or auto-generated) |
+| `_warning_column` | Column that was validated |
+| `_warned_at` | Timestamp of the warning |
+| `_batch_id` | Batch identifier |
 
 ```yaml
 - type: range
@@ -326,7 +334,7 @@ The record stays in the valid DataFrame but receives a warning message appended 
   onFailure: warn
 ```
 
-Warning identification uses the flow's primary key columns. If no PK is defined, all non-metadata columns are used as the join key.
+The Iceberg table contains only business columns — no internal framework columns are written.
 
 ### skip
 
@@ -336,8 +344,6 @@ The rule is not executed at all. Useful for temporarily disabling a rule without
 
 ```
 Input DataFrame
-  │
-  ├─ + _warnings column (empty array)
   │
   ▼
 Schema Validation ──rejected──▶ SCHEMA_VALIDATION_FAILED / SCHEMA_EXTRA_COLUMNS
@@ -354,13 +360,14 @@ FK Integrity ──rejected──▶ FK_VIOLATION
   ▼
 Custom Rules (in order)
   │  ├─ onFailure=reject ──rejected──▶ {RULE}_VALIDATION_FAILED
-  │  ├─ onFailure=warn ──warning──▶ appended to _warnings
+  │  ├─ onFailure=warn ──warning──▶ written to {rejectedPath}/{flowName}_warnings/
   │  └─ onFailure=skip ──(no-op)──
   │
   ▼
 ValidationResult
-  ├─ valid: DataFrame (clean records + _warnings)
+  ├─ valid: DataFrame (clean records, business columns only)
   ├─ rejected: Option[DataFrame] (all rejected records with metadata)
+  ├─ warned: Option[DataFrame] (warning records with PK + warning metadata)
   └─ rejectionReasons: Map[String, Long] (count per validation step)
 ```
 

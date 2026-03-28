@@ -255,10 +255,13 @@ class OrphanDetector(
           .withColumnRenamed(refCol, fkCol)
           .createOrReplaceTempView(removedPksView)
 
-        spark.sql(
-          s"DELETE FROM $childTableName WHERE $fkCol IN (SELECT $fkCol FROM $removedPksView)"
-        )
-        spark.catalog.dropTempView(removedPksView)
+        try {
+          spark.sql(
+            s"DELETE FROM $childTableName WHERE $fkCol IN (SELECT $fkCol FROM $removedPksView)"
+          )
+        } finally {
+          spark.catalog.dropTempView(removedPksView)
+        }
 
         // Propagate cascade: save deleted child PKs for next level
         deletedChildKeys.foreach { dck =>

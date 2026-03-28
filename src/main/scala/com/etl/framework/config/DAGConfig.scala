@@ -19,7 +19,8 @@ case class DAGNode(
     dependencies: Seq[String],
     join: Option[JoinConfig] = None,
     select: Seq[String] = Seq.empty,
-    filters: Seq[String] = Seq.empty
+    filters: Seq[String] = Seq.empty,
+    sourceTable: Option[String] = None
 )
 
 /** Join configuration
@@ -27,7 +28,7 @@ case class DAGNode(
 case class JoinConfig(
     `type`: JoinType,
     parent: String,
-    on: Seq[JoinCondition],
+    conditions: Seq[JoinCondition],
     strategy: JoinStrategy,
     nestAs: Option[String] = None,
     aggregations: Seq[AggregationSpec] = Seq.empty

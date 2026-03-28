@@ -18,8 +18,15 @@ class DAGNodeProcessor(joinExecutor: JoinStrategyExecutor)(implicit spark: Spark
   def executeNode(node: DAGNode, nodeResults: Map[String, DataFrame]): DataFrame = {
     logger.info(s"Executing DAG node: ${node.id}")
     
-    val sourceData = spark.read.parquet(node.sourcePath)
-    logger.debug(s"Loaded source data from: ${node.sourcePath}")
+    val sourceData = node.sourceTable match {
+      case Some(table) =>
+        logger.debug(s"Loading source data from table: $table")
+        spark.table(table)
+      case None =>
+        logger.debug(s"Loading source data from parquet: ${node.sourcePath}")
+        spark.read.parquet(node.sourcePath)
+    }
+    logger.debug(s"Source data loaded for node: ${node.id}")
     
     val filtered = applyFilters(sourceData, node.filters)
     val selected = applySelect(filtered, node.select)

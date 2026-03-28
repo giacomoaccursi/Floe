@@ -2,9 +2,18 @@ organization := "com.etl"
 
 name := "spark-etl-framework"
 
-version := "0.1.0-SNAPSHOT"
+// Version is derived from git tags by sbt-dynver
+ThisBuild / dynverSeparator := "-"
 
 scalaVersion := "2.12.18"
+
+// Publish to GitHub Packages
+publishTo := Some(
+  "GitHub Packages" at s"https://maven.pkg.github.com/${sys.env.getOrElse("GITHUB_REPOSITORY", "owner/spark-etl-framework")}"
+)
+credentials ++= sys.env.get("GITHUB_TOKEN").map { token =>
+  Credentials("GitHub Package Registry", "maven.pkg.github.com", "_", token)
+}.toSeq
 
 val sparkVersion = "3.5.8"
 val icebergVersion = "1.10.1"

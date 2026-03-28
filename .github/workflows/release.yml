@@ -41,6 +41,12 @@ jobs:
           git tag -a "v${{ steps.version.outputs.next }}" -m "Release v${{ steps.version.outputs.next }}"
           git push origin "v${{ steps.version.outputs.next }}"
 
+      - name: Publish to GitHub Packages
+        if: steps.version.outputs.next != ''
+        run: sbt publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build fat JAR
         if: steps.version.outputs.next != ''
         run: sbt assembly
@@ -53,12 +59,6 @@ jobs:
           token: ${{ github.token }}
           tag: "v${{ steps.version.outputs.next }}"
           excludeTypes: chore,docs,test
-
-      - name: Publish to GitHub Packages
-        if: steps.version.outputs.next != ''
-        run: sbt publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
         if: steps.version.outputs.next != ''

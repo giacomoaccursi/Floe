@@ -42,11 +42,12 @@ trait ConfigLoader[T] {
   /** Load configuration from a YAML file using PureConfig
     */
   protected def loadFromYamlFile(
-      path: String
+      path: String,
+      variables: Map[String, String] = Map.empty
   )(implicit reader: ConfigReader[T]): Either[ConfigurationException, T] = {
     for {
       yaml        <- loadYamlFile(path)
-      substituted <- substituteEnvVars(yaml, path)
+      substituted <- substituteEnvVars(yaml, path, variables)
       config      <- parseYaml(substituted, path)
     } yield config
   }
@@ -116,17 +117,21 @@ trait ConfigLoader[T] {
     */
   protected def substituteEnvVars(
       text: String,
-      path: String = "<unknown>"
+      path: String = "<unknown>",
+      variables: Map[String, String] = Map.empty
   ): Either[ConfigurationException, String] = {
     val escapePlaceholder = "\u0000DOLLAR\u0000"
     val escaped = text.replace("$$", escapePlaceholder)
 
     val pattern = """\$\{([^}]+)}|\$([A-Za-z_][A-Za-z0-9_]*)""".r
 
+    def resolve(name: String): Option[String] =
+      variables.get(name).orElse(sys.env.get(name))
+
     val unresolvedVars = pattern
       .findAllMatchIn(escaped)
       .map(m => Option(m.group(1)).getOrElse(m.group(2)))
-      .filterNot(sys.env.contains)
+      .filterNot(resolve(_).isDefined)
       .toSeq
       .distinct
 
@@ -144,7 +149,7 @@ trait ConfigLoader[T] {
         escaped,
         m => {
           val varName = Option(m.group(1)).getOrElse(m.group(2))
-          Matcher.quoteReplacement(sys.env(varName))
+          Matcher.quoteReplacement(resolve(varName).get)
         }
       )
       Right(substituted.replace(escapePlaceholder, "$"))
@@ -158,9 +163,14 @@ class GlobalConfigLoader extends ConfigLoader[GlobalConfig] {
 
   override def load(
       path: String
+  ): Either[ConfigurationException, GlobalConfig] = load(path, Map.empty)
+
+  def load(
+      path: String,
+      variables: Map[String, String]
   ): Either[ConfigurationException, GlobalConfig] = {
     for {
-      config <- loadFromYamlFile(path)
+      config <- loadFromYamlFile(path, variables)
       _      <- validateIcebergConfig(config, path)
     } yield config
   }
@@ -185,8 +195,13 @@ class DomainsConfigLoader extends ConfigLoader[DomainsConfig] {
 
   override def load(
       path: String
+  ): Either[ConfigurationException, DomainsConfig] = load(path, Map.empty)
+
+  def load(
+      path: String,
+      variables: Map[String, String]
   ): Either[ConfigurationException, DomainsConfig] =
-    loadFromYamlFile(path)
+    loadFromYamlFile(path, variables)
 }
 
 /** Internal case class for parsing FlowConfig from YAML Excludes
@@ -238,10 +253,15 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
 
   override def load(
       path: String
+  ): Either[ConfigurationException, FlowConfig] = load(path, Map.empty)
+
+  def load(
+      path: String,
+      variables: Map[String, String]
   ): Either[ConfigurationException, FlowConfig] = {
     for {
       rawYaml    <- loadYamlFile(path)
-      yaml       <- substituteEnvVars(rawYaml, path)
+      yaml       <- substituteEnvVars(rawYaml, path, variables)
       configYaml <- parseYamlToFlowConfigYaml(yaml, path)
       flowConfig  = configYaml.toFlowConfig
       _          <- validateFlowConfig(flowConfig, path)
@@ -291,6 +311,11 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
     */
   def loadAll(
       directory: String
+  ): Either[ConfigurationException, Seq[FlowConfig]] = loadAll(directory, Map.empty)
+
+  def loadAll(
+      directory: String,
+      variables: Map[String, String]
   ): Either[ConfigurationException, Seq[FlowConfig]] = {
     val dir = new File(directory)
     if (!dir.exists() || !dir.isDirectory)
@@ -300,7 +325,7 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
         .getOrElse(Array.empty)
         .filter(f => f.isFile && (f.getName.endsWith(".yaml") || f.getName.endsWith(".yml")))
         .toSeq
-        .map(f => load(f.getAbsolutePath))
+        .map(f => load(f.getAbsolutePath, variables))
 
       val errors  = results.collect { case Left(err)  => err }
       val configs = results.collect { case Right(cfg) => cfg }
@@ -322,9 +347,14 @@ class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
 
   override def load(
       path: String
+  ): Either[ConfigurationException, AggregationConfig] = load(path, Map.empty)
+
+  def load(
+      path: String,
+      variables: Map[String, String]
   ): Either[ConfigurationException, AggregationConfig] = {
     for {
-      config <- loadFromYamlFile(path)
+      config <- loadFromYamlFile(path, variables)
       _      <- validateAggregationConfig(config, path)
     } yield config
   }

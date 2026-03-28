@@ -96,6 +96,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private var domainsConfigOpt: Option[DomainsConfig] = None
   private val flowTransformations = mutable.Map[String, FlowTransformations]()
   private val extraCatalogProviders = mutable.Map[String, () => CatalogProvider]()
+  private var configVariables: scala.collection.immutable.Map[String, String] = scala.collection.immutable.Map.empty
 
   /**
    * Sets the configuration directory path
@@ -146,6 +147,19 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   def withFlowConfigs(configs: Seq[FlowConfig]): IngestionPipelineBuilder = {
     logger.info(s"Setting ${configs.size} flow configs directly")
     this.flowConfigsOpt = Some(configs)
+    this
+  }
+
+  /**
+   * Sets variables for YAML config substitution.
+   * These take priority over environment variables.
+   *
+   * @param variables Map of variable name to value
+   * @return This builder for chaining
+   */
+  def withVariables(variables: scala.collection.immutable.Map[String, String]): IngestionPipelineBuilder = {
+    logger.info(s"Setting ${variables.size} config variables")
+    this.configVariables = variables
     this
   }
 
@@ -277,12 +291,12 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     val domainsConfigLoader = new DomainsConfigLoader()
     val flowConfigLoader = new FlowConfigLoader()
 
-    val globalConfig = globalConfigLoader.load(s"$directory/global.yaml") match {
+    val globalConfig = globalConfigLoader.load(s"$directory/global.yaml", configVariables) match {
       case Right(config) => config
       case Left(error) => throw error
     }
 
-    val domainsConfig = domainsConfigLoader.load(s"$directory/domains.yaml") match {
+    val domainsConfig = domainsConfigLoader.load(s"$directory/domains.yaml", configVariables) match {
       case Right(config) => 
         logger.info(s"Loaded ${config.domains.size} domains from domains.yaml")
         config
@@ -291,7 +305,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
         throw error
     }
 
-    val flowConfigs = flowConfigLoader.loadAll(s"$directory/flows") match {
+    val flowConfigs = flowConfigLoader.loadAll(s"$directory/flows", configVariables) match {
       case Right(configs) => configs
       case Left(error) => throw error
     }
@@ -308,7 +322,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private def loadGlobalConfigFromDirectory(directory: String): GlobalConfig = {
     logger.info(s"Loading global config from directory: $directory")
     val loader = new GlobalConfigLoader()
-    loader.load(s"$directory/global.yaml") match {
+    loader.load(s"$directory/global.yaml", configVariables) match {
       case Right(config) => config
       case Left(error) => throw error
     }
@@ -322,7 +336,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     val domainsLoader = new DomainsConfigLoader()
     val flowLoader = new FlowConfigLoader()
 
-    val domainsConfig = domainsLoader.load(s"$directory/domains.yaml") match {
+    val domainsConfig = domainsLoader.load(s"$directory/domains.yaml", configVariables) match {
       case Right(config) => 
         logger.info(s"Loaded ${config.domains.size} domains from domains.yaml")
         config
@@ -334,7 +348,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     // Store domainsConfig in builder for later use
     this.domainsConfigOpt = Some(domainsConfig)
 
-    flowLoader.loadAll(s"$directory/flows") match {
+    flowLoader.loadAll(s"$directory/flows", configVariables) match {
       case Right(configs) => configs
       case Left(error) => throw error
     }

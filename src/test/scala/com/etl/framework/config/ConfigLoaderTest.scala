@@ -35,9 +35,10 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
     // Public wrapper for testing protected method
     def substituteVars(
         text: String,
-        path: String = "test.yaml"
+        path: String = "test.yaml",
+        variables: Map[String, String] = Map.empty
     ): Either[ConfigurationException, String] = {
-      substituteEnvVars(text, path)
+      substituteEnvVars(text, path, variables)
     }
   }
 
@@ -188,6 +189,27 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
     val text   = "desc: Amount in $$USD is valid"
     val result = loader.substituteVars(text)
     result shouldBe Right("desc: Amount in $USD is valid")
+  }
+
+  it should "resolve variables from explicit map before sys.env" in {
+    val text   = "path: ${MY_CUSTOM_VAR}/data"
+    val result = loader.substituteVars(text, variables = Map("MY_CUSTOM_VAR" -> "/custom/path"))
+    result shouldBe Right("path: /custom/path/data")
+  }
+
+  it should "fall back to sys.env when variable not in explicit map" in {
+    val home = sys.env.getOrElse("HOME", "")
+    assume(home.nonEmpty, "HOME env var must be set for this test")
+    val text   = "path: ${HOME}/data"
+    val result = loader.substituteVars(text, variables = Map("OTHER" -> "x"))
+    result.isRight shouldBe true
+    result.right.get shouldBe s"path: $home/data"
+  }
+
+  it should "prefer explicit variable over sys.env" in {
+    val text   = "path: ${HOME}/data"
+    val result = loader.substituteVars(text, variables = Map("HOME" -> "/overridden"))
+    result shouldBe Right("path: /overridden/data")
   }
 
   "ConfigLoader with defaults" should "use case class default values when field is missing" in {

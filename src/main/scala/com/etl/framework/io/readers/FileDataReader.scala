@@ -73,7 +73,17 @@ class FileDataReader(
       case "boolean" | "bool"            => BooleanType
       case "date"                        => DateType
       case "timestamp" | "datetime"      => TimestampType
-      case "decimal"            => DecimalType(38, 18) // Default precision
+      case d if d.startsWith("decimal") =>
+        val paramPattern = """decimal\((\d+),\s*(\d+)\)""".r
+        d match {
+          case paramPattern(p, s) => DecimalType(p.toInt, s.toInt)
+          case "decimal"          => DecimalType(38, 18)
+          case _ =>
+            throw UnsupportedOperationException(
+              operation = s"type '$d'",
+              details = "Decimal format must be 'decimal' or 'decimal(precision, scale)', e.g. 'decimal(10, 2)'"
+            )
+        }
       case "binary"             => BinaryType
       case "byte" | "tinyint"   => ByteType
       case "short" | "smallint" => ShortType

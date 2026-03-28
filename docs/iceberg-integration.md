@@ -6,26 +6,58 @@ The framework optionally integrates with Apache Iceberg to replace the default P
 
 Iceberg is entirely opt-in: if the `iceberg` section is absent from `global.yaml`, the framework falls back to Parquet files with in-memory merge logic. No code changes are needed to switch between the two modes.
 
+## Prerequisites
+
+### SparkSession configuration
+
+The Iceberg Spark extensions **must** be configured before the SparkSession is created. Spark does not allow changing `spark.sql.extensions` after session creation. The framework configures the catalog settings automatically from `global.yaml`, but the extensions must be set by the application entry point:
+
+```scala
+implicit val spark: SparkSession = SparkSession.builder()
+  .appName("My ETL Pipeline")
+  .master("local[*]")
+  .config("spark.sql.extensions",
+    "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+  .getOrCreate()
+```
+
+All other Iceberg catalog settings (warehouse path, catalog type, catalog class) are applied automatically by the framework at pipeline startup.
+
+### Java 18+ compatibility
+
+On Java 18 or newer, Hadoop's `UserGroupInformation` requires the security manager to be explicitly allowed. Add this JVM option:
+
+```
+-Djava.security.manager=allow
+```
+
+In SBT:
+```scala
+run / javaOptions += "-Djava.security.manager=allow"
+```
+
+Without this flag, Spark fails at startup with `UnsupportedOperationException: getSubject is supported only if a security manager is allowed`.
+
 ## Enabling Iceberg
 
 Add an `iceberg` block to `global.yaml`:
 
 ```yaml
 iceberg:
-  catalog-type: "hadoop"
-  catalog-name: "spark_catalog"
-  warehouse: "warehouse/iceberg"
-  file-format: "parquet"
-  format-version: 2
-  enable-snapshot-tagging: true
+  catalogType: "hadoop"
+  catalogName: "spark_catalog"
+  warehouse: "output/warehouse"
+  fileFormat: "parquet"
+  formatVersion: 2
+  enableSnapshotTagging: true
   maintenance:
-    enable-snapshot-expiration: true
-    snapshot-retention-days: 7
-    enable-compaction: true
-    target-file-size-mb: 128
-    enable-orphan-cleanup: true
-    orphan-retention-minutes: 60
-    enable-manifest-rewrite: false
+    enableSnapshotExpiration: true
+    snapshotRetentionDays: 7
+    enableCompaction: true
+    targetFileSizeMb: 128
+    enableOrphanCleanup: true
+    orphanRetentionMinutes: 1440
+    enableManifestRewrite: false
 ```
 
 At startup, the pipeline validates the config and configures the SparkSession with the Iceberg catalog. If validation fails, execution stops immediately (fail-fast).
@@ -34,25 +66,25 @@ At startup, the pipeline validates the config and configures the SparkSession wi
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `catalog-type` | `hadoop` | Iceberg catalog implementation. Currently only `hadoop` is supported. |
-| `catalog-name` | `spark_catalog` | Name used in SQL queries (`catalog.default.table`). |
+| `catalogType` | `hadoop` | Iceberg catalog implementation. Currently only `hadoop` is supported. |
+| `catalogName` | `spark_catalog` | Name used in SQL queries (`catalog.default.table`). |
 | `warehouse` | *required* | Path to the Iceberg warehouse directory. |
-| `file-format` | `parquet` | Default data file format. |
-| `format-version` | `2` | Iceberg format version. Version 2 is required for row-level operations (MERGE INTO, DELETE). |
-| `enable-snapshot-tagging` | `true` | Tag each batch snapshot for time travel by batch ID. |
+| `fileFormat` | `parquet` | Default data file format. |
+| `formatVersion` | `2` | Iceberg format version. **Version 2 is required** for row-level operations (MERGE INTO, DELETE). Version 1 only supports append and overwrite — delta and SCD2 load modes will fail. |
+| `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel by batch ID. |
 | `maintenance.*` | see below | Post-batch maintenance settings. |
 
 ### Maintenance settings
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `enable-snapshot-expiration` | `true` | Expire snapshots older than the retention period. |
-| `snapshot-retention-days` | `7` | Days to retain snapshots before expiration. |
-| `enable-compaction` | `true` | Compact small data files into larger ones. |
-| `target-file-size-mb` | `128` | Target file size after compaction. |
-| `enable-orphan-cleanup` | `true` | Remove orphaned files left by failed operations. |
-| `orphan-retention-minutes` | `60` | Grace period before orphan files become eligible for cleanup. |
-| `enable-manifest-rewrite` | `false` | Rewrite manifest files for scan optimization. |
+| `enableSnapshotExpiration` | `true` | Expire snapshots older than the retention period. |
+| `snapshotRetentionDays` | `7` | Days to retain snapshots before expiration. |
+| `enableCompaction` | `true` | Compact small data files into larger ones. |
+| `targetFileSizeMb` | `128` | Target file size after compaction. |
+| `enableOrphanCleanup` | `true` | Remove orphaned files left by failed operations. |
+| `orphanRetentionMinutes` | `1440` | Grace period before orphan files become eligible for cleanup. **Iceberg enforces a minimum of 1440 minutes (24 hours)** — values below this are automatically clamped with a warning. This prevents accidental data corruption from concurrent operations. |
+| `enableManifestRewrite` | `false` | Rewrite manifest files for scan optimization. |
 
 ## Architecture
 
@@ -83,16 +115,51 @@ For example, a flow named `customers` with catalog `spark_catalog` becomes `spar
 
 Tables are created on first write with `CREATE TABLE IF NOT EXISTS`. The schema is derived from the flow's `SchemaConfig` columns plus any system columns added by the load mode (e.g., `valid_from`, `valid_to`, `is_current` for SCD2).
 
-Schema evolution is handled by Iceberg transparently: new columns are added via ALTER TABLE if the incoming schema has columns not present in the table.
+### Schema evolution
+
+Every run, the framework compares the incoming schema with the existing table schema and adds any new columns via `ALTER TABLE ADD COLUMN`. Columns present in the table but absent from the incoming schema are left untouched — the framework never drops columns.
+
+This means adding a column to a flow's `schema.columns` section takes effect at the next run without manual intervention:
+
+1. The new column is added to the Iceberg table via ALTER TABLE
+2. Existing rows have `NULL` for the new column
+3. The MERGE INTO includes the new column in the change detection and update logic
+4. Rows with a non-NULL value for the new column are updated; rows where the source also has NULL are skipped
+
+Example: adding a `notes` column to an orders flow.
+
+```yaml
+# Before
+columns:
+  - name: "order_id"
+    type: "integer"
+  - name: "status"
+    type: "string"
+
+# After — just add the new column
+columns:
+  - name: "order_id"
+    type: "integer"
+  - name: "status"
+    type: "string"
+  - name: "notes"
+    type: "string"
+    nullable: true
+```
+
+At the next run, the framework logs `Added column notes (STRING) to catalog.default.orders` and the column becomes available.
+
+**Special case: `is_active` column on existing SCD2 tables.** When `detectDeletes` is enabled mid-stream, the `is_active` column is added via schema evolution. Existing rows will have `is_active = NULL`, which causes `WHERE is_active = true` queries to exclude them. The framework emits a specific warning for this case. See [scd2.md](scd2.md) for details and the recommended backfill procedure.
 
 ### Table configuration updates
 
 Every run, `createOrUpdateTable` compares the current table state against the flow config and applies any differences:
 
+- **Schema**: new columns are added via `ALTER TABLE ADD COLUMN` (see above).
 - **Table properties**: reads current properties via `SHOW TBLPROPERTIES` and applies only new or changed entries via `ALTER TABLE SET TBLPROPERTIES`. Existing properties not mentioned in the config are left untouched.
 - **Partition spec**: attempts `ALTER TABLE ADD PARTITION FIELD` for each configured partition. If the field already exists, the operation is silently skipped.
 
-This means adding `icebergPartitions` or `tableProperties` to an existing flow config takes effect at the next run without manual intervention.
+This means adding `icebergPartitions`, `tableProperties`, or new schema columns to an existing flow config takes effect at the next run without manual intervention.
 
 #### Partition spec on tables with existing data
 
@@ -101,7 +168,13 @@ Adding a partition field to a table that already contains data does **not** rewr
 - Files written before the change: no partition metadata, always scanned
 - Files written after the change: partitioned, eligible for pruning
 
-The framework logs a `WARN` message whenever a new partition field is applied to an existing table, advising that partition pruning will be partial until all pre-existing data is replaced by new writes.
+The framework logs a `WARN` message whenever a new partition field is applied to an existing table:
+
+```
+WARN  Partition field 'month(order_date)' was added to an existing table (catalog.default.orders).
+      Data written before this change is NOT retroactively partitioned:
+      partition pruning will apply only to files written from this run onwards.
+```
 
 To apply the new partition layout to all existing data, perform a one-time full reload: temporarily set `loadMode.type: full`, run the pipeline with a complete source dataset, then revert to `delta`. This rewrites all files under the new partition spec. For large tables, the equivalent Iceberg maintenance procedure is preferable:
 
@@ -119,23 +192,28 @@ Partitions are configured per-flow in the output section:
 
 ```yaml
 output:
-  iceberg-partitions:
+  icebergPartitions:
     - "month(order_date)"
     - "bucket(16, customer_id)"
-  sort-order:
+  sortOrder:
     - "order_date"
     - "customer_id"
 ```
 
-Supported partition transforms: `year()`, `month()`, `day()`, `hour()`, `bucket(n, col)`, `truncate(len, col)`, and identity (bare column name).
+Supported partition transforms: `year()`, `month()`, `day()`, `hour()`, `bucket(n, col)`, `truncate(len, col)`, and identity (bare column name). Transforms are case-insensitive (`MONTH(ts)` and `month(ts)` are equivalent).
 
 Sort order is applied with `WRITE ORDERED BY`, which controls data layout within files for better scan performance without affecting query semantics.
+
+**Partitioning guidelines:**
+- Partition on low-cardinality temporal columns (`month(order_date)`, `year(created_at)`)
+- Do not partition on high-cardinality columns (IDs, timestamps with seconds/milliseconds)
+- Do not partition on boolean columns (`is_current`) — only 2 values, creates severely imbalanced partitions
 
 Table properties can also be set per-flow:
 
 ```yaml
 output:
-  table-properties:
+  tableProperties:
     write.format.default: "parquet"
     commit.retry.num-retries: "4"
 ```
@@ -147,6 +225,17 @@ All writes go through `IcebergTableWriter`, which selects the appropriate strate
 ### Full load
 
 Replaces all data atomically using `writeTo().overwritePartitions()`. The previous data is not deleted from disk until snapshot expiration runs; it remains accessible via time travel.
+
+The snapshot summary includes `replace-partitions: true` to distinguish full reloads from delta writes:
+
+```json
+{
+  "replace-partitions": "true",
+  "added-records": "35",
+  "deleted-records": "35",
+  "total-records": "35"
+}
+```
 
 ### Delta (upsert)
 
@@ -174,113 +263,71 @@ The `WHEN MATCHED AND (...)` condition uses Iceberg's null-safe equality operato
 - `NULL <=> 'value'` → `false` (different, update)
 - `'a' <=> 'a'` → `true` (equal, no update)
 
-This means rows where no column has actually changed are skipped entirely by the MERGE engine. Re-running the same batch twice is safe and produces no logical changes.
-
-#### Copy-on-write and snapshot statistics
-
-Iceberg's default write strategy is copy-on-write. Even when the MERGE skips all updates (change condition false for every matched row), Iceberg may still rewrite the data files that were scanned and create a new snapshot. The `added-records` and `deleted-records` values in the snapshot summary reflect file-level statistics, not row-level change counts — a file rewrite shows as `deleted-records = N, added-records = N` even if no row actually changed.
-
-This is expected behavior. The change detection guarantees **correctness** (no row is overwritten unless it actually changed) but does not prevent file rewrites at the storage layer. The practical performance benefit is visible when only a subset of rows changes: the MERGE generates fewer file rewrites than an unconditional update would, especially on partitioned tables where only touched partition files are rewritten.
+This means rows where no column has actually changed are skipped entirely by the MERGE engine.
 
 If no primary key is defined, the write degrades to an append.
 
-### SCD2 (Slowly Changing Dimension Type 2)
+#### Idempotency
 
-SCD2 is the most complex write mode. It maintains full history of every record.
+Re-running the same batch with the same source data produces no logical changes. The change detection compares every non-PK column and finds no differences, so neither the `WHEN MATCHED` (update) nor `WHEN NOT MATCHED` (insert) clause fires for any row.
 
-#### Columns
+At the storage level, Iceberg may still create a new snapshot depending on the write mode (see copy-on-write vs merge-on-read below), but the data content is identical.
 
-| Column | Purpose |
-|--------|---------|
-| `valid_from` | Timestamp when this version became effective |
-| `valid_to` | Timestamp when this version was superseded (`NULL` = still current) |
-| `is_current` | `true` for the latest version of each record |
-| `is_active` | `true` if the record still exists in the source (only with `detect-deletes`) |
+#### Copy-on-write vs merge-on-read
 
-Column names are configurable in `load-mode`:
+Iceberg supports two write strategies that affect how MERGE INTO behaves:
+
+**Copy-on-write (default):**
+- Rewrites entire data files for any file containing a matched row, even if the row was not actually updated
+- Even fully idempotent runs (zero changes) rewrite all scanned files and create a new snapshot
+- Snapshot summary shows `added-records = N, deleted-records = N` — this reflects file-level rewrites, not row-level changes
+- Simpler and better for read-heavy workloads (no read-time merge overhead)
+
+**Merge-on-read:**
+- Writes only delete files (position deletes) for changed rows
+- Idempotent runs produce no file rewrites: `changed-partition-count = 0`
+- Better for write-heavy workloads or frequent idempotent runs
+- Slight read overhead: queries must merge delete files at scan time
+
+To enable merge-on-read for a specific flow:
 
 ```yaml
-load-mode:
-  type: scd2
-  valid-from-column: valid_from
-  valid-to-column: valid_to
-  is-current-column: is_current
-  is-active-column: is_active
-  compare-columns: [name, email, status]
-  detect-deletes: true
+output:
+  tableProperties:
+    write.merge.mode: "merge-on-read"
 ```
 
-#### First load
+Comparison from actual test runs (idempotent batch, 35 records across 3 partitions):
 
-All records are inserted with `valid_from = now`, `valid_to = NULL`, `is_current = true`, `is_active = true`.
+| Metric | Copy-on-write | Merge-on-read |
+|--------|--------------|---------------|
+| `added-data-files` | 3 | 0 |
+| `deleted-data-files` | 3 | 0 |
+| `changed-partition-count` | 3 | 0 |
+| File I/O | Full rewrite | None |
 
-#### Subsequent loads: the NULL merge-key trick
+#### Partition pruning and MERGE INTO
 
-A naive SCD2 implementation would require two separate operations: a MERGE to close changed records, then an INSERT for new versions. This is not atomic — a failure between the two steps leaves the table in an inconsistent state.
+The `MERGE INTO` statement scans all partitions of the target table to match rows, regardless of the source data's partition range. Even if the source only contains records for January 2024, all partitions (January, February, March...) are scanned and potentially rewritten under copy-on-write.
 
-The framework solves this with a single atomic MERGE INTO by using a staging view that contains each source record twice when it has changed:
+The framework does not add partition pruning hints to the MERGE ON condition. This is a deliberate choice: automatically inferring partition predicates from the source data is fragile (requires knowing the partition expression semantics and the data's value range) and could silently skip rows that should be matched.
 
-1. **All source records** with merge key = primary key (for matching against existing records)
-2. **Changed records only** with merge key = NULL (forces NOT MATCHED, triggering an INSERT of the new version)
+For large partitioned tables, merge-on-read (`write.merge.mode: merge-on-read`) significantly reduces the I/O impact by avoiding rewrites of untouched partitions.
 
-The staged source is built as:
+### SCD2 (Slowly Changing Dimension Type 2)
 
-```sql
-SELECT src.*, src.pk AS _mk_pk FROM source src
-UNION ALL
-SELECT src.*, CAST(NULL AS type) AS _mk_pk FROM source src
-JOIN target tgt ON src.pk = tgt.pk AND tgt.is_current = true
-WHERE NOT (src.col <=> tgt.col) OR ...   -- null-safe change detection
-```
+SCD2 maintains full history of every record using versioned rows with `valid_from`, `valid_to`, and `is_current` columns. It is the most complex write mode.
 
-Then a single MERGE runs with three clauses:
-
-```sql
-MERGE INTO target
-USING staged_source AS source
-ON target.pk = source._mk_pk AND target.is_current = true
-
--- Close old version of changed record
-WHEN MATCHED AND (change condition) THEN UPDATE SET
-  valid_to = current_timestamp(),
-  is_current = false
-
--- Insert new version (NULL _mk forces NOT MATCHED) or brand new record
-WHEN NOT MATCHED THEN INSERT (cols) VALUES (source.cols, now(), NULL, true)
-
--- Soft-delete records missing from source (only if detectDeletes=true)
-WHEN NOT MATCHED BY SOURCE AND target.is_current = true THEN UPDATE SET
-  valid_to = current_timestamp(),
-  is_current = false,
-  is_active = false
-```
-
-The `WHEN NOT MATCHED BY SOURCE` clause (Iceberg 1.2+ / Spark 3.4+) catches records in the target that have no match in the source at all. Combined with `target.is_current = true` in the ON clause, it only affects current versions and leaves historical records untouched.
-
-#### is_current vs is_active
-
-These two booleans encode different information:
-
-| is_current | is_active | Meaning |
-|------------|-----------|---------|
-| true | true | Latest version, record exists in source |
-| false | true | Historical version, superseded by a newer one |
-| false | false | Record was deleted from source (soft-delete) |
-| true | false | Not possible under normal operation |
-
-`is_current` tracks versioning. `is_active` tracks logical deletion. Separating them allows queries like "show me the last known state of all deleted customers" (`is_current = false AND is_active = false AND valid_to IS NOT NULL`).
-
-`is_active` is only added when `detect-deletes: true` or when `is-active-column` is explicitly configured.
+For complete documentation including configuration, behavior per scenario, edge cases, query examples, and implementation details, see the dedicated **[SCD2 documentation](scd2.md)**.
 
 ## Snapshot management
 
 ### Tagging
 
-After every write, if `enable-snapshot-tagging` is true, the framework tags the new snapshot:
+After every write, if `enableSnapshotTagging` is true, the framework tags the new snapshot:
 
 ```sql
 ALTER TABLE catalog.default.customers SET TAG `batch_20260218_150000`
-RETAIN 7 DAYS
 ```
 
 This allows querying any historical batch by name:
@@ -288,6 +335,8 @@ This allows querying any historical batch by name:
 ```sql
 SELECT * FROM catalog.default.customers VERSION AS OF 'batch_20260218_150000'
 ```
+
+Tags are retained as long as the underlying snapshot exists. When a snapshot is expired by maintenance, its tag is also removed.
 
 ### Metadata capture
 
@@ -302,11 +351,33 @@ Each write produces an `IcebergFlowMetadata` object containing:
 - `manifestListLocation`: path to the manifest list file
 - `summary`: Iceberg summary map (added/deleted records, file counts, etc.)
 
-This metadata is written to the batch metadata JSON and to per-flow metadata files for audit trails.
+This metadata is written to the batch metadata JSON at `{metadataPath}/{batchId}/flows/{flowName}.json`.
+
+#### Interpreting snapshot summary
+
+The snapshot summary contains file-level statistics, not row-level change counts. Key fields:
+
+| Field | Meaning |
+|-------|---------|
+| `added-records` | Total records in newly written data files |
+| `deleted-records` | Total records in replaced (old) data files |
+| `total-records` | Total records in the table after this snapshot |
+| `added-data-files` | Number of new data files written |
+| `deleted-data-files` | Number of old data files replaced |
+| `changed-partition-count` | Number of partitions with file changes |
+| `replace-partitions` | `true` for full load (overwrite), absent for delta |
+
+A `deleted-records = 35, added-records = 35` on a delta run does **not** mean 35 rows were updated — it means the files containing those 35 rows were rewritten (copy-on-write). The actual number of changed rows can be 0.
 
 ### Rollback
 
-The `IcebergTableManager` exposes a `rollbackToSnapshot` method that can revert a table to a previous snapshot. This is not called automatically by the framework but is available for manual recovery.
+The `IcebergTableManager` exposes a `rollbackToSnapshot` method that can revert a table to a previous snapshot:
+
+```sql
+CALL catalog.system.rollback_to_snapshot('catalog.default.orders', 4857209365014528)
+```
+
+This is not called automatically by the framework but is available for manual recovery. The rollback creates a new snapshot that points to the old data — no files are deleted or rewritten.
 
 ## Post-batch lifecycle
 
@@ -328,12 +399,45 @@ For each flow's table, the framework runs the enabled maintenance operations:
 
 | Operation | SQL | Purpose |
 |-----------|-----|---------|
-| Snapshot expiration | `CALL system.expire_snapshots(table, older_than)` | Removes snapshots older than the retention period. Frees metadata and data files no longer referenced. |
+| Snapshot expiration | `CALL system.expire_snapshots(table, older_than)` | Removes snapshots older than the retention period. Frees metadata and data files no longer referenced by any surviving snapshot. |
 | Data compaction | `CALL system.rewrite_data_files(table, target_size)` | Merges small files into larger ones (target: 128MB default). Improves scan performance. |
 | Orphan file cleanup | `CALL system.remove_orphan_files(table, older_than)` | Removes data files not referenced by any snapshot. Cleans up after failed writes. |
 | Manifest rewrite | `CALL system.rewrite_manifests(table)` | Consolidates manifest files for faster metadata operations. Disabled by default. |
 
-Each operation is wrapped in a try/catch: a maintenance failure is logged as a warning but does not fail the batch.
+**Important:** A maintenance failure causes the individual operation to fail but does not abort the batch. However, subsequent maintenance operations in the same batch may be skipped if the failure propagates. The batch result still reports SUCCESS if all flow writes completed — maintenance is best-effort.
+
+#### File accumulation in the warehouse
+
+Without maintenance enabled, Iceberg data files accumulate across runs. Each delta or full load write creates new data files but does not delete old ones — they remain on disk referenced by previous snapshots (or as orphans after snapshot expiration).
+
+A typical warehouse directory after several delta runs:
+
+```
+orders/data/order_date_month=2024-01/
+  00000-98-abc123.parquet   ← Run 1
+  00000-106-def456.parquet  ← Run 2 (replaced Run 1 under copy-on-write)
+  00000-106-ghi789.parquet  ← Run 3 (replaced Run 2)
+```
+
+Only the latest file per partition is referenced by the current snapshot. The older files are kept for time travel (if their snapshots still exist) or are orphans (if their snapshots were expired).
+
+To control file accumulation:
+1. **Snapshot expiration** removes snapshots and their exclusively-referenced data files
+2. **Orphan cleanup** removes data files that no surviving snapshot references
+3. **Compaction** rewrites many small files into fewer, larger files
+
+In production with daily runs and `snapshotRetentionDays: 7`, at most ~7 versions of each data file coexist. After expiration, orphan cleanup removes the old files.
+
+#### Orphan cleanup minimum retention
+
+Iceberg enforces a **minimum retention of 24 hours** (1440 minutes) for orphan file cleanup. This is a safety mechanism to prevent data corruption from concurrent operations — a file written by an in-progress operation could be mistakenly identified as an orphan if the retention is too short.
+
+If `orphanRetentionMinutes` is set below 1440, the framework automatically clamps it to 1440 and logs a warning:
+
+```
+WARN  orphanRetentionMinutes=60 is below Iceberg's 24-hour minimum.
+      Clamping to 1440 minutes to prevent data corruption.
+```
 
 ## Pipeline differences: Iceberg vs Parquet
 
@@ -360,75 +464,9 @@ Read -> PreTransform -> Merge (in-memory) -> Validate (merged data) -> PostTrans
 - Writes are `SaveMode.Overwrite` to Parquet
 - No built-in atomicity beyond Spark's output committer
 
-## Flow configuration example
+## Flow configuration examples
 
-### SCD2 with detect-deletes and Iceberg partitioning
-
-```yaml
-name: customers
-description: "Customer master data with full history"
-version: "1.0"
-owner: data-team
-
-source:
-  type: file
-  path: "data/customers.csv"
-  format: csv
-  options:
-    header: "true"
-
-schema:
-  enforce-schema: true
-  allow-extra-columns: false
-  columns:
-    - name: customer_id
-      type: integer
-      nullable: false
-      description: "Unique customer ID"
-    - name: name
-      type: string
-      nullable: false
-      description: "Customer name"
-    - name: email
-      type: string
-      nullable: true
-      description: "Email address"
-    - name: status
-      type: string
-      nullable: false
-      description: "Account status"
-
-load-mode:
-  type: scd2
-  valid-from-column: valid_from
-  valid-to-column: valid_to
-  is-current-column: is_current
-  is-active-column: is_active
-  compare-columns: [name, email, status]
-  detect-deletes: true
-
-validation:
-  primary-key: [customer_id]
-  foreign-keys: []
-  rules:
-    - type: not_null
-      column: name
-    - type: regex
-      column: email
-      pattern: "^[\\w.+-]+@[\\w-]+\\.[a-zA-Z]{2,}$"
-      on-failure: warn
-
-output:
-  format: parquet
-  iceberg-partitions:
-    - "year(valid_from)"
-  sort-order:
-    - customer_id
-  table-properties:
-    format-version: "2"
-```
-
-### Delta with FK and orphan action
+### Delta with FK validation and Iceberg partitioning
 
 ```yaml
 name: orders
@@ -444,52 +482,103 @@ source:
     header: "true"
 
 schema:
-  enforce-schema: true
-  allow-extra-columns: false
+  enforceSchema: true
+  allowExtraColumns: false
   columns:
     - name: order_id
       type: integer
       nullable: false
-      description: "Unique order ID"
     - name: customer_id
       type: integer
       nullable: false
-      description: "Customer reference"
-    - name: total
-      type: decimal(10,2)
+    - name: status
+      type: string
       nullable: false
-      description: "Order total"
+    - name: total_amount
+      type: double
+      nullable: false
     - name: order_date
       type: date
       nullable: false
-      description: "Date of the order"
 
-load-mode:
+loadMode:
   type: delta
 
 validation:
-  primary-key: [order_id]
-  foreign-keys:
+  primaryKey: [order_id]
+  foreignKeys:
     - name: fk_customer
       column: customer_id
       references:
         flow: customers
         column: customer_id
-      on-orphan: delete
+      onOrphan: warn
   rules:
+    - type: domain
+      column: status
+      domainName: order_status
+      onFailure: reject
     - type: range
-      column: total
-      min: "0"
+      column: total_amount
+      min: "0.01"
+      onFailure: reject
+
+output:
+  icebergPartitions:
+    - "month(order_date)"
+  tableProperties:
+    write.merge.mode: "merge-on-read"
+```
+
+### Full load (dimension table)
+
+```yaml
+name: customers
+description: "Customer master data — full reload each batch"
+version: "1.0"
+owner: data-team
+
+source:
+  type: file
+  path: "data/customers.csv"
+  format: csv
+  options:
+    header: "true"
+
+schema:
+  enforceSchema: true
+  allowExtraColumns: false
+  columns:
+    - name: customer_id
+      type: integer
+      nullable: false
+    - name: email
+      type: string
+      nullable: false
+    - name: country
+      type: string
+      nullable: false
+
+loadMode:
+  type: full
+
+validation:
+  primaryKey: [customer_id]
+  foreignKeys: []
+  rules:
+    - type: regex
+      column: email
+      pattern: "^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$"
+      onFailure: reject
 
 output:
   format: parquet
-  iceberg-partitions:
-    - "month(order_date)"
-    - "bucket(16, customer_id)"
-  sort-order:
-    - order_date
-    - customer_id
+  compression: snappy
 ```
+
+### SCD2 with detect-deletes
+
+See [scd2.md](scd2.md) for the full SCD2 flow configuration example and all available options.
 
 ## Time travel queries
 
@@ -512,16 +601,38 @@ FULL OUTER JOIN spark_catalog.default.customers VERSION AS OF 'batch_20260217_15
 WHERE curr.name != prev.name OR curr.customer_id IS NULL OR prev.customer_id IS NULL
 ```
 
+**Note:** time travel queries only work for snapshots that have not been expired by maintenance. If `snapshotRetentionDays: 7`, batches older than 7 days are no longer accessible via time travel.
+
 ## Design decisions
 
 **Why MERGE INTO instead of DataFrame API**: Iceberg's MERGE INTO is a single atomic SQL operation. The DataFrame API would require reading, transforming, and writing in separate steps with no transactional guarantee between them.
 
 **Why value-based change detection instead of a timestamp column**: An `update-timestamp-column` approach is fragile — it assumes the source always provides a reliable, monotonically increasing timestamp, and silently overwrites data when the timestamp is missing or stale. Value-based change detection using `<=>` makes no assumptions about the source: a row is updated if and only if at least one non-key column actually differs. This makes delta loads idempotent by default — re-running the same batch twice produces no writes and no data corruption.
 
-**Why the NULL merge-key trick for SCD2**: A single MERGE with three clauses (MATCHED, NOT MATCHED, NOT MATCHED BY SOURCE) is atomic. The alternative — a MERGE to close records followed by an INSERT for new versions — has a window between the two operations where the table is inconsistent. The NULL merge key forces Iceberg to treat changed records as both a match (to close the old version) and a non-match (to insert the new version) in one pass.
+**Why the NULL merge-key trick for SCD2**: A single MERGE with three clauses (MATCHED, NOT MATCHED, NOT MATCHED BY SOURCE) is atomic. The alternative — a MERGE to close records followed by an INSERT for new versions — has a window between the two operations where the table is inconsistent. The NULL merge key forces Iceberg to treat changed records as both a match (to close the old version) and a non-match (to insert the new version) in one pass. See [scd2.md](scd2.md) for the full explanation.
 
 **Why maintenance runs after orphan detection**: Snapshot expiration removes old snapshots. Orphan detection needs the previous snapshot for time travel. If maintenance ran first, it could expire the snapshot that orphan detection needs. Running orphan detection first guarantees the previous snapshot is still available.
 
 **Why Iceberg is optional**: Not every deployment has Iceberg infrastructure. The framework degrades gracefully to Parquet with in-memory merge, keeping the same configuration model and validation pipeline. Switching to Iceberg later requires only adding the `iceberg` block to `global.yaml`.
 
 **Why partition spec changes do not rewrite existing data**: Rewriting all existing files on a config change would be an unbounded, blocking operation — a table with years of history could take hours. The framework applies the new spec to future writes only and warns the operator. The decision to repartition existing data is an explicit operational action, not an automatic side effect of a config change.
+
+**Why copy-on-write is the default**: Copy-on-write has no read-time overhead — queries scan data files directly without merging delete files. For most ETL workloads where reads outnumber writes, this is the better default. Merge-on-read should be opted into explicitly via `tableProperties` for write-heavy flows or flows with frequent idempotent runs.
+
+## Limitations
+
+### Single writer per table
+
+The framework assumes a single writer per table per batch. Concurrent writes to the same table can cause commit conflicts. In multi-pipeline environments, ensure flows that write to the same table are serialized.
+
+### Hadoop catalog only
+
+Only the Hadoop catalog (`catalogType: hadoop`) is currently supported. Hive, REST, Nessie, and Glue catalogs require implementing the `ICatalogProvider` trait and registering in `CatalogFactory`.
+
+### No automatic column removal
+
+Schema evolution only adds columns, never removes them. If a column is removed from the flow's schema config, it remains in the Iceberg table with NULL values for new rows. To remove a column, use `ALTER TABLE DROP COLUMN` manually.
+
+### Maintenance is not transactional
+
+If a maintenance operation fails mid-way (e.g., compaction fails on one table), subsequent maintenance operations for other tables may still run. There is no all-or-nothing guarantee for maintenance across tables. Each operation is independent.

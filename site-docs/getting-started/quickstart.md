@@ -44,15 +44,10 @@ iceberg:
     enableManifestRewrite: false
 ```
 
-## 3. domains.yaml
+## 3. flows/customers.yaml
 
-```yaml
-domains: {}
-```
-
-An empty domains file is valid — domains are only needed for domain validation rules.
-
-## 4. flows/customers.yaml
+!!!tip "domains.yaml"
+    This quickstart doesn't use domain validation, so no `domains.yaml` is needed. When you want to validate column values against a predefined list (e.g. order statuses, country codes), create a `config/domains.yaml` file. See [Domains Configuration](../configuration/domains.md).
 
 ```yaml
 name: customers
@@ -100,7 +95,7 @@ validation:
 output: {}
 ```
 
-## 5. Create sample data
+## 4. Create sample data
 
 `data/customers.csv`:
 
@@ -112,7 +107,7 @@ customer_id,name,email
 4,Diana,diana@example.com
 ```
 
-## 6. Run the pipeline
+## 5. Run the pipeline
 
 ```scala
 import com.etl.framework.pipeline.IngestionPipeline

@@ -104,7 +104,7 @@ For the complete Iceberg integration guide, see [Iceberg Integration](../guides/
 | `catalogType` | `hadoop` | Catalog implementation: `hadoop`, `glue` |
 | `catalogName` | `spark_catalog` | Catalog name used in SQL queries |
 | `warehouse` | — (required) | Path to the Iceberg warehouse directory |
-| `fileFormat` | `parquet` | Default data file format |
+| `fileFormat` | `parquet` | Iceberg data file format: `parquet`, `orc`, `avro` |
 | `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel |
 | `catalogProperties` | `{}` | Additional key-value properties passed to the catalog provider |
 

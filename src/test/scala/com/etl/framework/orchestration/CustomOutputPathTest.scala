@@ -57,7 +57,7 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
       schema = SchemaConfig(
         enforceSchema = true,
         allowExtraColumns = false,
-        columns = Seq(ColumnConfig("id", "string", nullable = false, None, "ID"))
+        columns = Seq(ColumnConfig("id", "string", nullable = false, "ID"))
       ),
       loadMode = LoadModeConfig(`type` = LoadMode.Full),
       validation = ValidationConfig(
@@ -65,13 +65,10 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
         foreignKeys = Seq.empty,
         rules = Seq.empty
       ),
-      output = OutputConfig(path = None, rejectedPath = None)
+      output = OutputConfig()
     )
 
-    flowConfig.output.path shouldBe empty
-    val expectedDefaultPath =
-      s"${globalConfig.paths.outputPath}/${flowConfig.name}"
-    expectedDefaultPath should include("test_flow")
+    flowConfig.output.rejectedPath shouldBe empty
   }
 
   it should "support environment variable placeholders" in {

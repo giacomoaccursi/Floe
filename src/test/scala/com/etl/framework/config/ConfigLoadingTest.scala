@@ -103,9 +103,9 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
       enforceSchema = true,
       allowExtraColumns = false,
       columns = Seq(
-        ColumnConfig("id", "long", nullable = false, None, "Customer ID"),
-        ColumnConfig("name", "string", nullable = false, None, "Name"),
-        ColumnConfig("email", "string", nullable = true, None, "Email")
+        ColumnConfig("id", "long", nullable = false, "Customer ID"),
+        ColumnConfig("name", "string", nullable = false, "Name"),
+        ColumnConfig("email", "string", nullable = true, "Email")
       )
     ),
     loadMode = LoadModeConfig(`type` = LoadMode.Full),

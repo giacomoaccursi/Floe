@@ -59,8 +59,8 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
         enforceSchema = true,
         allowExtraColumns = false,
         columns = Seq(
-          ColumnConfig("id", "string", nullable = false, None, "Primary key"),
-          ColumnConfig("value", "string", nullable = true, None, "Value")
+          ColumnConfig("id", "string", nullable = false, "Primary key"),
+          ColumnConfig("value", "string", nullable = true, "Value")
         )
       ),
       loadMode = LoadModeConfig(`type` = LoadMode.Full),
@@ -70,11 +70,7 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
         rules = Seq.empty
       ),
       output = OutputConfig(
-        path = Some(s"$tempDir/output/$flowName"),
-        rejectedPath = Some(s"$tempDir/rejected/$flowName"),
-        format = FileFormat.Parquet,
-        compression = "snappy",
-        options = Map.empty
+        rejectedPath = Some(s"$tempDir/rejected/$flowName")
       )
     )
   }

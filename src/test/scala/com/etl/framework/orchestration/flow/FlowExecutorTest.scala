@@ -58,7 +58,7 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
       ),
       loadMode = LoadModeConfig(loadMode),
       validation = ValidationConfig(Seq.empty, Seq.empty, Seq.empty),
-      output = OutputConfig(path = Some(s"/tmp/flow_executor_test/output/$name"))
+      output = OutputConfig()
     )
   }
 
@@ -86,13 +86,6 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
 
     val deltaConfig = createFlowConfig("delta_flow", loadMode = LoadMode.Delta)
     deltaConfig.loadMode.`type` shouldBe LoadMode.Delta
-  }
-
-  it should "configure output path correctly" in {
-    val flowConfig = createFlowConfig("test_flow")
-
-    flowConfig.output.path shouldBe defined
-    flowConfig.output.path.get should include("test_flow")
   }
 
   it should "have validation config" in {

@@ -46,10 +46,10 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
         enforceSchema = true,
         allowExtraColumns = false,
         columns = Seq(
-          ColumnConfig("id", "int", nullable = false, None, ""),
-          ColumnConfig("email", "string", nullable = false, None, ""),
-          ColumnConfig("age", "int", nullable = false, None, ""),
-          ColumnConfig("status", "string", nullable = false, None, "")
+          ColumnConfig("id", "int", nullable = false, ""),
+          ColumnConfig("email", "string", nullable = false, ""),
+          ColumnConfig("age", "int", nullable = false, ""),
+          ColumnConfig("status", "string", nullable = false, "")
         )
       ),
       loadMode = LoadModeConfig(LoadMode.Full),
@@ -255,8 +255,8 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
         enforceSchema = true,
         allowExtraColumns = false,
         columns = Seq(
-          ColumnConfig("id", "string", nullable = false, None, ""),
-          ColumnConfig("score", "string", nullable = false, None, "")
+          ColumnConfig("id", "string", nullable = false, ""),
+          ColumnConfig("score", "string", nullable = false, "")
         )
       ),
       loadMode = LoadModeConfig(LoadMode.Full),
@@ -311,10 +311,10 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
         enforceSchema = true,
         allowExtraColumns = false,
         columns = Seq(
-          ColumnConfig("id", "int", nullable = false, None, ""),
-          ColumnConfig("email", "string", nullable = false, None, ""),
-          ColumnConfig("age", "int", nullable = false, None, ""),
-          ColumnConfig("status", "string", nullable = false, None, "")
+          ColumnConfig("id", "int", nullable = false, ""),
+          ColumnConfig("email", "string", nullable = false, ""),
+          ColumnConfig("age", "int", nullable = false, ""),
+          ColumnConfig("status", "string", nullable = false, "")
         )
       ),
       loadMode = LoadModeConfig(LoadMode.Full),

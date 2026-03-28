@@ -50,8 +50,8 @@ class SchemaValidatorTest extends AnyFlatSpec with Matchers {
     val df = spark.createDataFrame(data.asJava, schema)
 
     val columns = Seq(
-      ColumnConfig("id", "string", false, None, "pk"),
-      ColumnConfig("age", "integer", true, None, "age")
+      ColumnConfig("id", "string", false, "pk"),
+      ColumnConfig("age", "integer", true, "age")
     )
 
     val config = createConfig(columns)
@@ -79,8 +79,8 @@ class SchemaValidatorTest extends AnyFlatSpec with Matchers {
     val df = spark.createDataFrame(data.asJava, schema)
 
     val columns = Seq(
-      ColumnConfig("id", "string", false, None, "pk"),
-      ColumnConfig("age", "integer", true, None, "age")
+      ColumnConfig("id", "string", false, "pk"),
+      ColumnConfig("age", "integer", true, "age")
     )
 
     // enforceSchema = true
@@ -107,7 +107,7 @@ class SchemaValidatorTest extends AnyFlatSpec with Matchers {
     val df = spark.createDataFrame(data.asJava, schema)
 
     val columns = Seq(
-      ColumnConfig("id", "string", false, None, "pk")
+      ColumnConfig("id", "string", false, "pk")
     )
 
     // enforceSchema = true, allowExtraColumns false (default in ValidatingUtils?)

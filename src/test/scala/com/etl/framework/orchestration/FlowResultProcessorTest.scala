@@ -88,7 +88,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
       schema = SchemaConfig(true, true, Seq.empty),
       loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(Seq.empty, Seq.empty, Seq.empty),
-      output = OutputConfig(path = outputPath)
+      output = OutputConfig()
     )
   }
 

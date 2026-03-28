@@ -40,9 +40,8 @@ case class SchemaConfig(
   */
 case class ColumnConfig(
     name: String,
-    `type`: String, // Helper types are still String for now (Spark types)
+    `type`: String,
     nullable: Boolean,
-    default: Option[String] = None,
     description: String
 )
 
@@ -101,11 +100,7 @@ case class ValidationRule(
 /** Output configuration
   */
 case class OutputConfig(
-    path: Option[String] = None,
     rejectedPath: Option[String] = None,
-    format: FileFormat = FileFormat.Parquet,
-    compression: String = "snappy",
-    options: Map[String, String] = Map.empty,
     sortOrder: Seq[String] = Seq.empty,
     icebergPartitions: Seq[String] = Seq.empty,
     tableProperties: Map[String, String] = Map.empty

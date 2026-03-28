@@ -94,9 +94,9 @@ object PKValidationProperties extends Properties("PKValidation") {
       enforceSchema = true,
       allowExtraColumns = false,
       columns = Seq(
-        ColumnConfig("id", "int", nullable = false, None, "ID column"),
-        ColumnConfig("name", "string", nullable = true, None, "Name column"),
-        ColumnConfig("value", "double", nullable = true, None, "Value column")
+        ColumnConfig("id", "int", nullable = false, "ID column"),
+        ColumnConfig("name", "string", nullable = true, "Name column"),
+        ColumnConfig("value", "double", nullable = true, "Value column")
       )
     ),
     loadMode = LoadModeConfig(
@@ -107,13 +107,7 @@ object PKValidationProperties extends Properties("PKValidation") {
       foreignKeys = Seq.empty,
       rules = Seq.empty
     ),
-    output = OutputConfig(
-      path = None,
-      rejectedPath = None,
-      format = FileFormat.Parquet,
-      compression = "snappy",
-      options = Map.empty
-    )
+    output = OutputConfig()
   )
 
   // Helper function to create DataFrame from test records
@@ -228,21 +222,19 @@ object PKValidationProperties extends Properties("PKValidation") {
           enforceSchema = true,
           allowExtraColumns = false,
           columns = Seq(
-            ColumnConfig("id", "int", nullable = false, None, "ID column"),
+            ColumnConfig("id", "int", nullable = false, "ID column"),
             ColumnConfig(
-              "name",
-              "string",
-              nullable = false,
-              None,
-              "Name column"
-            ),
+          "name",
+          "string",
+          nullable = false,
+          "Name column"
+        ),
             ColumnConfig(
-              "value",
-              "double",
-              nullable = true,
-              None,
-              "Value column"
-            )
+          "value",
+          "double",
+          nullable = true,
+          "Value column"
+        )
           )
         ),
         loadMode = LoadModeConfig(
@@ -253,13 +245,7 @@ object PKValidationProperties extends Properties("PKValidation") {
           foreignKeys = Seq.empty,
           rules = Seq.empty
         ),
-        output = OutputConfig(
-          path = None,
-          rejectedPath = None,
-          format = FileFormat.Parquet,
-          compression = "snappy",
-          options = Map.empty
-        )
+        output = OutputConfig()
       )
 
       // Run validation
@@ -401,21 +387,19 @@ object PKValidationProperties extends Properties("PKValidation") {
           enforceSchema = true,
           allowExtraColumns = false,
           columns = Seq(
-            ColumnConfig("id", "int", nullable = false, None, "ID column"),
+            ColumnConfig("id", "int", nullable = false, "ID column"),
             ColumnConfig(
-              "name",
-              "string",
-              nullable = true,
-              None,
-              "Name column"
-            ),
+          "name",
+          "string",
+          nullable = true,
+          "Name column"
+        ),
             ColumnConfig(
-              "value",
-              "double",
-              nullable = true,
-              None,
-              "Value column"
-            )
+          "value",
+          "double",
+          nullable = true,
+          "Value column"
+        )
           )
         ),
         loadMode = LoadModeConfig(
@@ -426,13 +410,7 @@ object PKValidationProperties extends Properties("PKValidation") {
           foreignKeys = Seq.empty,
           rules = Seq.empty
         ),
-        output = OutputConfig(
-          path = None,
-          rejectedPath = None,
-          format = FileFormat.Parquet,
-          compression = "snappy",
-          options = Map.empty
-        )
+        output = OutputConfig()
       )
 
       // Run validation

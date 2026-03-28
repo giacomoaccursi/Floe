@@ -275,7 +275,6 @@ Each column has:
 | `name` | yes | — | Column name |
 | `type` | yes | — | Data type (see table below) |
 | `nullable` | yes | — | Whether the column allows NULL values. `false` triggers not-null validation. |
-| `default` | no | — | Default value (string). Not currently applied during read — reserved for future use. |
 | `description` | yes | — | Human-readable description |
 
 #### Column types

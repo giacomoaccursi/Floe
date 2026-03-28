@@ -99,7 +99,6 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 | `name` | yes | — | Column name |
 | `type` | yes | — | Data type |
 | `nullable` | yes | — | Allow NULLs (`false` triggers not-null validation) |
-| `default` | no | — | Default value (reserved) |
 | `description` | yes | — | Human-readable description |
 
 ### Column types
@@ -170,11 +169,7 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `path` | — | Output path (optional) |
 | `rejectedPath` | — | Override global rejectedPath |
-| `format` | `parquet` | Output format |
-| `compression` | `snappy` | Compression codec |
-| `options` | `{}` | Additional write options |
 | `sortOrder` | `[]` | Iceberg write sort order |
 | `icebergPartitions` | `[]` | Iceberg partition expressions |
 | `tableProperties` | `{}` | Iceberg table properties |

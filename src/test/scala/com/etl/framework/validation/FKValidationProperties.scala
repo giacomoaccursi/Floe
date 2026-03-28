@@ -114,19 +114,17 @@ object FKValidationProperties extends Properties("FKValidation") {
       enforceSchema = true,
       allowExtraColumns = false,
       columns = Seq(
-        ColumnConfig("child_id", "int", nullable = false, None, "Child ID"),
+        ColumnConfig("child_id", "int", nullable = false, "Child ID"),
         ColumnConfig(
           "parent_id",
           "int",
           nullable = false,
-          None,
           "Parent ID (FK)"
         ),
         ColumnConfig(
           "child_name",
           "string",
           nullable = true,
-          None,
           "Child name"
         )
       )
@@ -148,13 +146,7 @@ object FKValidationProperties extends Properties("FKValidation") {
       ),
       rules = Seq.empty
     ),
-    output = OutputConfig(
-      path = None,
-      rejectedPath = None,
-      format = FileFormat.Parquet,
-      compression = "snappy",
-      options = Map.empty
-    )
+    output = OutputConfig()
   )
 
   /** Property 10: Foreign Key Integrity Enforcement - Orphan Records Rejected For any dataset with Foreign Keys that
@@ -331,27 +323,24 @@ object FKValidationProperties extends Properties("FKValidation") {
               allowExtraColumns = false,
               columns = Seq(
                 ColumnConfig(
-                  "child_id",
-                  "int",
-                  nullable = false,
-                  None,
-                  "Child ID"
-                ),
+          "child_id",
+          "int",
+          nullable = false,
+          "Child ID"
+        ),
                 ColumnConfig(
-                  "parent1_id",
-                  "int",
-                  nullable = false,
-                  None,
-                  "Parent 1 ID"
-                ),
+          "parent1_id",
+          "int",
+          nullable = false,
+          "Parent 1 ID"
+        ),
                 ColumnConfig(
-                  "parent2_id",
-                  "int",
-                  nullable = false,
-                  None,
-                  "Parent 2 ID"
-                ),
-                ColumnConfig("name", "string", nullable = true, None, "Name")
+          "parent2_id",
+          "int",
+          nullable = false,
+          "Parent 2 ID"
+        ),
+                ColumnConfig("name", "string", nullable = true, "Name")
               )
             ),
             loadMode = LoadModeConfig(
@@ -379,13 +368,7 @@ object FKValidationProperties extends Properties("FKValidation") {
               ),
               rules = Seq.empty
             ),
-            output = OutputConfig(
-              path = None,
-              rejectedPath = None,
-              format = FileFormat.Parquet,
-              compression = "snappy",
-              options = Map.empty
-            )
+            output = OutputConfig()
           )
 
           val validatedFlows = Map(
@@ -690,28 +673,25 @@ object FKValidationProperties extends Properties("FKValidation") {
           enforceSchema = true,
           allowExtraColumns = false,
           columns = Seq(
-            ColumnConfig("child_id", "int", nullable = false, None, "Child ID"),
+            ColumnConfig("child_id", "int", nullable = false, "Child ID"),
             ColumnConfig(
-              "parent_id1",
-              "int",
-              nullable = false,
-              None,
-              "Parent ID 1"
-            ),
+          "parent_id1",
+          "int",
+          nullable = false,
+          "Parent ID 1"
+        ),
             ColumnConfig(
-              "parent_id2",
-              "int",
-              nullable = false,
-              None,
-              "Parent ID 2"
-            ),
+          "parent_id2",
+          "int",
+          nullable = false,
+          "Parent ID 2"
+        ),
             ColumnConfig(
-              "child_name",
-              "string",
-              nullable = true,
-              None,
-              "Child name"
-            )
+          "child_name",
+          "string",
+          nullable = true,
+          "Child name"
+        )
           )
         ),
         loadMode = LoadModeConfig(
@@ -733,13 +713,7 @@ object FKValidationProperties extends Properties("FKValidation") {
           ),
           rules = Seq.empty
         ),
-        output = OutputConfig(
-          path = None,
-          rejectedPath = None,
-          format = FileFormat.Parquet,
-          compression = "snappy",
-          options = Map.empty
-        )
+        output = OutputConfig()
       )
 
       val validatedFlows = Map("parent_flow" -> parentDf)

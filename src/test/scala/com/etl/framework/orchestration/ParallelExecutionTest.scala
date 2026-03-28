@@ -54,8 +54,8 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
         enforceSchema = true,
         allowExtraColumns = false,
         columns = Seq(
-          ColumnConfig("id", "string", nullable = false, None, "PK"),
-          ColumnConfig("value", "string", nullable = true, None, "Value")
+          ColumnConfig("id", "string", nullable = false, "PK"),
+          ColumnConfig("value", "string", nullable = true, "Value")
         )
       ),
       loadMode = LoadModeConfig(`type` = LoadMode.Full),
@@ -65,7 +65,6 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
         rules = Seq.empty
       ),
       output = OutputConfig(
-        path = Some(s"$tempDir/output/$flowName"),
         rejectedPath = Some(s"$tempDir/rejected/$flowName")
       )
     )
@@ -171,15 +170,14 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
           enforceSchema = true,
           allowExtraColumns = false,
           columns = Seq(
-            ColumnConfig("id", "string", nullable = false, None, "PK"),
-            ColumnConfig("a_id", "string", nullable = false, None, "FK"),
+            ColumnConfig("id", "string", nullable = false, "PK"),
+            ColumnConfig("a_id", "string", nullable = false, "FK"),
             ColumnConfig(
-              "value",
-              "string",
-              nullable = true,
-              None,
-              "Value"
-            )
+          "value",
+          "string",
+          nullable = true,
+          "Value"
+        )
           )
         ),
         loadMode = LoadModeConfig(`type` = LoadMode.Full),
@@ -195,7 +193,6 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
           rules = Seq.empty
         ),
         output = OutputConfig(
-          path = Some(s"$tempDir/output/flow_b"),
           rejectedPath = Some(s"$tempDir/rejected/flow_b")
         )
       )

@@ -43,7 +43,7 @@ class JoinStrategyExecutor {
     )
 
     val nestFieldName = joinConfig.nestAs.getOrElse("nested_records")
-    val childJoinKeys = joinConfig.on.map(_.right)
+    val childJoinKeys = joinConfig.conditions.map(_.right)
     val childStruct = struct(child.columns.map(child(_)): _*)
 
     val groupedChild = child
@@ -52,7 +52,7 @@ class JoinStrategyExecutor {
 
     val joined = parent.join(
       groupedChild,
-      joinConfig.on
+      joinConfig.conditions
         .map { cond =>
           parent(cond.left) === groupedChild(cond.right)
         }
@@ -82,7 +82,7 @@ class JoinStrategyExecutor {
 
     val parentColumns = parent.columns.toSet
     val childColumns = child.columns.toSet
-    val childJoinKeys = joinConfig.on.map(_.right).toSet
+    val childJoinKeys = joinConfig.conditions.map(_.right).toSet
     val childDataColumns = childColumns -- childJoinKeys
 
     val renamedChild = childDataColumns.foldLeft(child) { (df, childCol) =>
@@ -93,22 +93,24 @@ class JoinStrategyExecutor {
       }
     }
 
-    val joined = parent.join(
-      renamedChild,
-      joinConfig.on
-        .map { cond =>
-          parent(cond.left) === renamedChild(cond.right)
-        }
-        .reduce(_ && _),
-      joinConfig.`type`.sparkType
-    )
+    val joinExpr = joinConfig.conditions
+      .map { cond => parent(cond.left) === renamedChild(cond.right) }
+      .reduce(_ && _)
+
+    val joined = parent.join(renamedChild, joinExpr, joinConfig.`type`.sparkType)
+
+    // Drop child-side join key columns by DataFrame reference to resolve ambiguity
+    // when the join key has the same name in both parent and child
+    val withoutChildJoinKeys = joinConfig.conditions.foldLeft(joined) { (df, cond) =>
+      df.drop(renamedChild(cond.right))
+    }
 
     val finalChildColumns = childDataColumns.map { childCol =>
       if (parentColumns.contains(childCol)) s"child_$childCol" else childCol
     }
 
     val allColumns = parentColumns ++ finalChildColumns
-    joined.select(allColumns.toSeq.map(col): _*)
+    withoutChildJoinKeys.select(allColumns.toSeq.map(col): _*)
   }
 
   /** Applies aggregate join strategy - aggregates child records with functions
@@ -122,7 +124,7 @@ class JoinStrategyExecutor {
       s"Applying aggregate join strategy with ${joinConfig.aggregations.size} aggregations"
     )
 
-    val childJoinKeys = joinConfig.on.map(_.right)
+    val childJoinKeys = joinConfig.conditions.map(_.right)
 
     val aggExprs = joinConfig.aggregations.map { aggSpec =>
       import com.etl.framework.config.AggregationFunction._
@@ -152,7 +154,7 @@ class JoinStrategyExecutor {
 
     val result = parent.join(
       aggregatedChild,
-      joinConfig.on
+      joinConfig.conditions
         .map { cond =>
           parent(cond.left) === aggregatedChild(cond.right)
         }

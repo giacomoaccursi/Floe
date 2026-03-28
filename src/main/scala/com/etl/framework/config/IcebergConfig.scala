@@ -6,10 +6,11 @@ case class IcebergConfig(
     warehouse: String,
     catalogProperties: Map[String, String] = Map.empty,
     fileFormat: String = "parquet",
-    formatVersion: Int = 2,
     enableSnapshotTagging: Boolean = true,
     maintenance: MaintenanceConfig = MaintenanceConfig()
-)
+) {
+  val formatVersion: Int = 2
+}
 
 case class MaintenanceConfig(
     enableSnapshotExpiration: Boolean = true,

@@ -168,25 +168,8 @@ class GlobalConfigLoader extends ConfigLoader[GlobalConfig] {
   def load(
       path: String,
       variables: Map[String, String]
-  ): Either[ConfigurationException, GlobalConfig] = {
-    for {
-      config <- loadFromYamlFile(path, variables)
-      _      <- validateIcebergConfig(config, path)
-    } yield config
-  }
-
-  private def validateIcebergConfig(
-      config: GlobalConfig,
-      path: String
-  ): Either[ConfigurationException, Unit] =
-    if (config.iceberg.formatVersion != 1 && config.iceberg.formatVersion != 2)
-      Left(
-        ConfigFileException(
-          file = path,
-          message = s"Invalid formatVersion: ${config.iceberg.formatVersion}. Must be 1 or 2."
-        )
-      )
-    else Right(())
+  ): Either[ConfigurationException, GlobalConfig] =
+    loadFromYamlFile(path, variables)
 }
 
 /** Domains configuration loader

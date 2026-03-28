@@ -48,7 +48,6 @@ iceberg:
   catalogName: "spark_catalog"
   warehouse: "output/warehouse"
   fileFormat: "parquet"
-  formatVersion: 2
   enableSnapshotTagging: true
   maintenance:
     enableSnapshotExpiration: true
@@ -70,7 +69,6 @@ At startup, the pipeline validates the config and configures the SparkSession wi
 | `catalogName` | `spark_catalog` | Name used in SQL queries (`catalog.default.table`). |
 | `warehouse` | *required* | Path to the Iceberg warehouse directory. |
 | `fileFormat` | `parquet` | Default data file format. |
-| `formatVersion` | `2` | Iceberg format version. **Version 2 is required** for row-level operations (MERGE INTO, DELETE). Version 1 only supports append and overwrite — delta and SCD2 load modes will fail. |
 | `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel by batch ID. |
 | `maintenance.*` | see below | Post-batch maintenance settings. |
 

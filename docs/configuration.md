@@ -124,7 +124,6 @@ iceberg:
   catalogName: "spark_catalog"
   warehouse: "output/warehouse"
   fileFormat: "parquet"
-  formatVersion: 2
   enableSnapshotTagging: true
   catalogProperties: {}
   maintenance:
@@ -171,7 +170,6 @@ See [iceberg-integration.md](iceberg-integration.md) for the complete Iceberg co
 | `warehouse` | — (required) | Path to the Iceberg warehouse directory |
 | `catalogProperties` | `{}` | Additional key-value properties passed to the catalog provider |
 | `fileFormat` | `parquet` | Default data file format |
-| `formatVersion` | `2` | Iceberg format version. Must be `1` or `2`. Version 2 is required for row-level operations (MERGE INTO) — delta and SCD2 load modes fail on version 1 |
 | `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel |
 
 ## domains.yaml

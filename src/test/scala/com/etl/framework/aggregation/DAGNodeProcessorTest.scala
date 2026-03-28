@@ -116,4 +116,24 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
     val result = processor.executeNode(node, Map.empty)
     result.count() shouldBe 2
   }
+
+  it should "throw an exception when join parent is not found in node results" in {
+    val node = DAGNode(
+      id = "child_node",
+      description = "Node requiring missing parent",
+      sourceFlow = "child",
+      sourcePath = parquetDir.resolve("customers").toString,
+      dependencies = Seq("missing_parent"),
+      join = Some(JoinConfig(
+        `type` = JoinType.LeftOuter,
+        parent = "missing_parent",
+        conditions = Seq(JoinCondition("id", "id")),
+        strategy = JoinStrategy.Flatten
+      ))
+    )
+
+    an[IllegalStateException] should be thrownBy {
+      processor.executeNode(node, Map.empty)
+    }
+  }
 }

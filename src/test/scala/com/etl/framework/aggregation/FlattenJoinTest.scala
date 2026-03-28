@@ -130,4 +130,29 @@ class FlattenJoinTest extends AnyFlatSpec with Matchers {
     result.count() shouldBe 3L
     result.columns should contain allOf("product_id", "product_name", "order_id", "quantity")
   }
+
+  it should "preserve all parent records and produce NULLs for child columns when child DataFrame is empty" in {
+    val parentDF = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
+    val emptyChildDF = spark.createDataFrame(
+      spark.sparkContext.emptyRDD[org.apache.spark.sql.Row],
+      org.apache.spark.sql.types.StructType(Seq(
+        org.apache.spark.sql.types.StructField("parent_id", org.apache.spark.sql.types.IntegerType),
+        org.apache.spark.sql.types.StructField("score", org.apache.spark.sql.types.IntegerType)
+      ))
+    )
+
+    val joinConfig = JoinConfig(
+      `type` = JoinType.LeftOuter,
+      parent = "parent",
+      conditions = Seq(JoinCondition("id", "parent_id")),
+      strategy = JoinStrategy.Flatten
+    )
+
+    val executor = new JoinStrategyExecutor()
+    val result = executor.applyJoin(parentDF, emptyChildDF, joinConfig)
+
+    result.count() shouldBe 2L
+    result.columns should contain allOf("id", "name", "score")
+    result.filter("score IS NULL").count() shouldBe 2L
+  }
 }

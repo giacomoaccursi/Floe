@@ -140,4 +140,29 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
       children shouldBe empty
     }
   }
+
+  it should "produce empty arrays for parent records when child DataFrame is empty" in {
+    val parentDF = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
+    val emptyChildDF = spark.createDataFrame(
+      spark.sparkContext.emptyRDD[org.apache.spark.sql.Row],
+      org.apache.spark.sql.types.StructType(Seq(
+        org.apache.spark.sql.types.StructField("parent_id", org.apache.spark.sql.types.IntegerType),
+        org.apache.spark.sql.types.StructField("value", org.apache.spark.sql.types.StringType)
+      ))
+    )
+
+    val joinConfig = JoinConfig(
+      `type` = JoinType.LeftOuter,
+      parent = "parent",
+      conditions = Seq(JoinCondition("id", "parent_id")),
+      strategy = JoinStrategy.Nest,
+      nestAs = Some("children")
+    )
+
+    val executor = new JoinStrategyExecutor()
+    val result = executor.applyJoin(parentDF, emptyChildDF, joinConfig)
+
+    result.count() shouldBe 2L
+    result.filter(org.apache.spark.sql.functions.size(result("children")) === 0).count() shouldBe 2L
+  }
 }

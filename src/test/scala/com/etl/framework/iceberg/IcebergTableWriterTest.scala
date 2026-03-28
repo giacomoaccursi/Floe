@@ -323,6 +323,128 @@ class IcebergTableWriterTest
     result.icebergMetadata shouldBe None
   }
 
+  // --- Delta Load without Primary Key ---
+
+  "IcebergTableWriter.writeDeltaLoad" should "append records when no primary key is defined" in {
+    // no PK means fallback to append, not upsert
+    val fc = flowConfig("delta_no_pk", loadMode = LoadMode.Delta, primaryKey = Seq.empty)
+    val batch1 = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
+    writer.writeDeltaLoad(batch1, fc)
+
+    val batch2 = Seq((1, "Alice_dup"), (3, "Charlie")).toDF("id", "name")
+    writer.writeDeltaLoad(batch2, fc)
+
+    // With append semantics all records stack up — no deduplication
+    spark.sql("SELECT * FROM writer_catalog.default.delta_no_pk").count() shouldBe 4L
+  }
+
+  // --- SCD2 NULL handling ---
+
+  "IcebergTableWriter.writeSCD2Load" should "treat NULL-to-value change as a new version" in {
+    val fc = flowConfig(
+      "scd2_null_change",
+      loadMode = LoadMode.SCD2,
+      compareColumns = Seq("score"),
+      validFromColumn = Some("valid_from"),
+      validToColumn = Some("valid_to"),
+      isCurrentColumn = Some("is_current")
+    )
+
+    // Initial load: score is NULL for both records
+    val initial = Seq(
+      (1, null.asInstanceOf[java.lang.Integer]),
+      (2, null.asInstanceOf[java.lang.Integer])
+    ).toDF("id", "score")
+    writer.writeSCD2Load(initial, fc)
+
+    spark.sql("SELECT * FROM writer_catalog.default.scd2_null_change")
+      .filter("is_current = true").count() shouldBe 2L
+
+    // Second load: record 1 now has score=100 (NULL→value = change), record 2 stays NULL→NULL (no change)
+    val update = Seq(
+      (1, 100.asInstanceOf[java.lang.Integer]),
+      (2, null.asInstanceOf[java.lang.Integer])
+    ).toDF("id", "score")
+    writer.writeSCD2Load(update, fc)
+
+    val table = spark.sql("SELECT * FROM writer_catalog.default.scd2_null_change")
+    // record 1: 1 closed + 1 current = 2; record 2: unchanged = 1; total = 3
+    table.count() shouldBe 3L
+    table.filter("is_current = true").count() shouldBe 2L
+    // record 1 current version has score=100
+    val rec1Current = table.filter("id = 1 AND is_current = true").collect().head
+    rec1Current.getAs[java.lang.Integer]("score") shouldBe 100
+    // record 2 has only one version (no change)
+    table.filter("id = 2").count() shouldBe 1L
+  }
+
+  it should "treat value-to-NULL change as a new version" in {
+    val fc = flowConfig(
+      "scd2_to_null",
+      loadMode = LoadMode.SCD2,
+      compareColumns = Seq("score"),
+      validFromColumn = Some("valid_from"),
+      validToColumn = Some("valid_to"),
+      isCurrentColumn = Some("is_current")
+    )
+
+    val initial = Seq((1, 42.asInstanceOf[java.lang.Integer])).toDF("id", "score")
+    writer.writeSCD2Load(initial, fc)
+
+    // Now score becomes NULL → that is a change
+    val update = Seq((1, null.asInstanceOf[java.lang.Integer])).toDF("id", "score")
+    writer.writeSCD2Load(update, fc)
+
+    val table = spark.sql("SELECT * FROM writer_catalog.default.scd2_to_null")
+    // old version (score=42) closed + new version (score=NULL) current
+    table.count() shouldBe 2L
+    table.filter("is_current = true AND score IS NULL").count() shouldBe 1L
+    table.filter("is_current = false AND score = 42").count() shouldBe 1L
+  }
+
+  it should "handle empty DataFrame on first load without error" in {
+    val fc = flowConfig(
+      "scd2_empty_first",
+      loadMode = LoadMode.SCD2,
+      compareColumns = Seq("name"),
+      validFromColumn = Some("valid_from"),
+      validToColumn = Some("valid_to"),
+      isCurrentColumn = Some("is_current")
+    )
+
+    val emptyDf = spark.emptyDataFrame
+      .selectExpr("CAST(NULL AS INT) AS id", "CAST(NULL AS STRING) AS name")
+      .limit(0)
+    // Should not throw
+    writer.writeSCD2Load(emptyDf, fc)
+
+    spark.sql("SELECT * FROM writer_catalog.default.scd2_empty_first").count() shouldBe 0L
+
+    // Subsequent load with actual data should work normally
+    val data = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
+    writer.writeSCD2Load(data, fc)
+
+    spark.sql("SELECT * FROM writer_catalog.default.scd2_empty_first")
+      .filter("is_current = true").count() shouldBe 2L
+  }
+
+  // --- Full Load with empty DataFrame ---
+
+  "IcebergTableWriter.writeFullLoad" should "overwrite with empty DataFrame clearing all records" in {
+    val fc = flowConfig("full_empty")
+    val initial = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
+    writer.writeFullLoad(initial, fc)
+    spark.sql("SELECT * FROM writer_catalog.default.full_empty").count() shouldBe 2L
+
+    val emptyDf = spark.createDataFrame(
+      spark.sparkContext.emptyRDD[org.apache.spark.sql.Row],
+      initial.schema
+    )
+    val result = writer.writeFullLoad(emptyDf, fc)
+    result.recordsWritten shouldBe 0L
+    spark.sql("SELECT * FROM writer_catalog.default.full_empty").count() shouldBe 0L
+  }
+
   private val allTables = Seq(
     "full_test",
     "full_overwrite",
@@ -333,7 +455,12 @@ class IcebergTableWriterTest
     "scd2_change",
     "scd2_detect_del",
     "scd2_no_detect_del",
-    "tag_result_test"
+    "tag_result_test",
+    "delta_no_pk",
+    "scd2_null_change",
+    "scd2_to_null",
+    "scd2_empty_first",
+    "full_empty"
   )
 
   override def afterAll(): Unit = {

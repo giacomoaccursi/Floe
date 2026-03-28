@@ -2,9 +2,9 @@
 
 ## Overview
 
-The framework optionally integrates with Apache Iceberg to replace the default Parquet-based storage. When enabled, all write operations become atomic MERGE INTO statements, every batch produces a tagged snapshot for time travel, and post-batch maintenance runs automatically.
+The framework uses Apache Iceberg as its storage layer. All write operations are atomic MERGE INTO statements, every batch produces a tagged snapshot for time travel, and post-batch maintenance runs automatically.
 
-Iceberg is entirely opt-in: if the `iceberg` section is absent from `global.yaml`, the framework falls back to Parquet files with in-memory merge logic. No code changes are needed to switch between the two modes.
+The `iceberg` section is required in `global.yaml`. At startup, the pipeline validates the config and configures the SparkSession with the Iceberg catalog. If the section is missing or invalid, execution stops immediately (fail-fast).
 
 ## Prerequisites
 
@@ -38,9 +38,9 @@ run / javaOptions += "-Djava.security.manager=allow"
 
 Without this flag, Spark fails at startup with `UnsupportedOperationException: getSubject is supported only if a security manager is allowed`.
 
-## Enabling Iceberg
+## Configuring Iceberg
 
-Add an `iceberg` block to `global.yaml`:
+The `iceberg` block in `global.yaml` is required:
 
 ```yaml
 iceberg:
@@ -439,30 +439,17 @@ WARN  orphanRetentionMinutes=60 is below Iceberg's 24-hour minimum.
       Clamping to 1440 minutes to prevent data corruption.
 ```
 
-## Pipeline differences: Iceberg vs Parquet
+## Pipeline data flow
 
-The two storage backends result in different pipeline shapes:
-
-### With Iceberg
+Every flow follows the same pipeline:
 
 ```
-Read -> PreTransform -> Validate (new data only) -> PostTransform -> Write (MERGE INTO)
+Read -> PreTransform -> Validate (new data only) -> PostTransform -> Write (MERGE INTO / Iceberg)
 ```
 
 - Validation runs only on incoming data, not on data already in the table
 - Merge happens atomically during the write phase via SQL
 - Iceberg guarantees ACID semantics
-
-### Without Iceberg (Parquet fallback)
-
-```
-Read -> PreTransform -> Merge (in-memory) -> Validate (merged data) -> PostTransform -> Write
-```
-
-- Merge runs in-memory before validation using `DeltaMerger` implementations
-- Validation runs on the full merged dataset
-- Writes are `SaveMode.Overwrite` to Parquet
-- No built-in atomicity beyond Spark's output committer
 
 ## Flow configuration examples
 
@@ -613,7 +600,7 @@ WHERE curr.name != prev.name OR curr.customer_id IS NULL OR prev.customer_id IS 
 
 **Why maintenance runs after orphan detection**: Snapshot expiration removes old snapshots. Orphan detection needs the previous snapshot for time travel. If maintenance ran first, it could expire the snapshot that orphan detection needs. Running orphan detection first guarantees the previous snapshot is still available.
 
-**Why Iceberg is optional**: Not every deployment has Iceberg infrastructure. The framework degrades gracefully to Parquet with in-memory merge, keeping the same configuration model and validation pipeline. Switching to Iceberg later requires only adding the `iceberg` block to `global.yaml`.
+**Why Iceberg is required**: Parquet with `SaveMode.Overwrite` silently loses data on delta and SCD2 loads — a failed write mid-batch destroys the previous version with no recovery path. Without Iceberg there are no atomicity guarantees, no time travel, and no schema evolution. Enterprise pipelines need ACID semantics, and the Iceberg hadoop catalog provides them with zero additional infrastructure (just 3 lines of YAML). Keeping a Parquet fallback would add complexity to every code path and create a false sense of safety for a mode that cannot support the framework's core load modes reliably.
 
 **Why partition spec changes do not rewrite existing data**: Rewriting all existing files on a config change would be an unbounded, blocking operation — a table with years of history could take hours. The framework applies the new spec to future writes only and warns the operator. The decision to repartition existing data is an explicit operational action, not an automatic side effect of a config change.
 

@@ -2,6 +2,7 @@ package com.etl.framework.iceberg
 
 import com.etl.framework.config.{FlowConfig, IcebergConfig}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions.lit
 import org.slf4j.LoggerFactory
 
 case class WriteResult(
@@ -33,7 +34,10 @@ class IcebergTableWriter(
     // Cache df: write populates the cache, count() reuses it avoiding a second scan
     val cachedDf = df.cache()
     try {
-      cachedDf.writeTo(tableName).overwritePartitions()
+      // overwrite(lit(true)) replaces ALL existing rows regardless of partitioning,
+      // which is the correct semantic for a full load — even an empty source clears the table.
+      // overwritePartitions() would be a no-op with an empty DataFrame (no partitions to replace).
+      cachedDf.writeTo(tableName).overwrite(lit(true))
       val recordCount = cachedDf.count()
       val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
       snapshotId.foreach { sid =>

@@ -470,15 +470,6 @@ WHEN NOT MATCHED BY SOURCE AND target.is_current = true THEN UPDATE SET
 
 Tutto avviene in un singolo statement SQL atomico. In caso di errore, Iceberg esegue il rollback automatico e la tabella resta nello stato precedente.
 
-### Fallback Parquet (senza Iceberg)
-
-Quando Iceberg non è abilitato, il framework usa `SCD2Merger` nel modulo `merge`, che implementa la stessa logica tramite DataFrame API:
-- Full outer join tra sorgente e tabella esistente
-- Partizionamento in 6 categorie (chiusi, nuove versioni, nuovi record, invariati, eliminati, storici)
-- Unione dei risultati e scrittura in Parquet con `SaveMode.Overwrite`
-
-La semantica è identica, ma senza le garanzie di atomicità fornite da Iceberg.
-
 ## Continuità temporale
 
 Per ogni coppia di versioni consecutive dello stesso record, il `valid_to` della versione vecchia è uguale al `valid_from` della nuova:

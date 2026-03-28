@@ -125,7 +125,6 @@ class AutoDiscoveryTest extends AnyFlatSpec with Matchers {
         val table = sampleTables.find(_.tableName == node.sourceFlow)
         table shouldBe defined
         node.id shouldBe s"${table.get.tableName}_node"
-        node.sourcePath shouldBe table.get.path
       }
     } finally {
       cleanupDir(tempDir)
@@ -206,7 +205,6 @@ class AutoDiscoveryTest extends AnyFlatSpec with Matchers {
         id = "configured_node",
         description = "Configured node",
         sourceFlow = "test_flow",
-        sourcePath = "/data/validated/test_flow",
         dependencies = Seq.empty,
         join = None,
         select = Seq.empty,

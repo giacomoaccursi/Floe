@@ -21,7 +21,7 @@ class DAGOrchestrator(
   private val tableDiscovery = new AdditionalTableDiscovery(globalConfig)
   private val graphBuilder = new DAGGraphBuilder(globalConfig)
   private val joinExecutor = new JoinStrategyExecutor()
-  private val nodeProcessor = new DAGNodeProcessor(joinExecutor)
+  private val nodeProcessor = new DAGNodeProcessor(joinExecutor, globalConfig.iceberg.catalogName)
   private val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
   private val dagExecutor = new DAGExecutor(nodeProcessor, ExecutionContext.fromExecutorService(pool))
 

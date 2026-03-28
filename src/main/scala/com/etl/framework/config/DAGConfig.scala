@@ -15,7 +15,6 @@ case class DAGNode(
     id: String,
     description: String = "",
     sourceFlow: String,
-    sourcePath: String,
     dependencies: Seq[String],
     join: Option[JoinConfig] = None,
     select: Seq[String] = Seq.empty,

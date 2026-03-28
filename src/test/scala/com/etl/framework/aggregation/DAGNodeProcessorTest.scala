@@ -21,7 +21,7 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
   import spark.implicits._
 
   private val joinExecutor = new JoinStrategyExecutor()
-  private val processor = new DAGNodeProcessor(joinExecutor)
+  private val processor = new DAGNodeProcessor(joinExecutor, "test_catalog")
 
   private var parquetDir: java.nio.file.Path = _
 
@@ -43,13 +43,12 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
     super.afterAll()
   }
 
-  "DAGNodeProcessor" should "load source data from parquet path" in {
+  "DAGNodeProcessor" should "load source data from Iceberg table" in {
     val node = DAGNode(
       id = "customers",
-      description = "Customers from parquet",
       sourceFlow = "customers",
-      sourcePath = parquetDir.resolve("customers").toString,
-      dependencies = Seq.empty
+      dependencies = Seq.empty,
+      sourceTable = Some("test_customers_table")
     )
 
     val result = processor.executeNode(node, Map.empty)
@@ -62,7 +61,6 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
       id = "customers",
       description = "Customers from table",
       sourceFlow = "customers",
-      sourcePath = "",
       dependencies = Seq.empty,
       sourceTable = Some("test_customers_table")
     )
@@ -77,8 +75,8 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
       id = "customers",
       description = "Filtered customers",
       sourceFlow = "customers",
-      sourcePath = parquetDir.resolve("customers").toString,
       dependencies = Seq.empty,
+      sourceTable = Some("test_customers_table"),
       filters = Seq("amount > 150")
     )
 
@@ -92,8 +90,8 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
       id = "customers",
       description = "Selected columns",
       sourceFlow = "customers",
-      sourcePath = parquetDir.resolve("customers").toString,
       dependencies = Seq.empty,
+      sourceTable = Some("test_customers_table"),
       select = Seq("id", "name")
     )
 
@@ -102,13 +100,11 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
     result.columns should not contain "amount"
   }
 
-  it should "prefer sourceTable over sourcePath when both are provided" in {
-    // sourceTable points to a valid table, sourcePath points to a nonexistent path
+  it should "use sourceTable when explicitly provided" in {
     val node = DAGNode(
       id = "customers",
-      description = "Table takes priority",
+      description = "Explicit table name",
       sourceFlow = "customers",
-      sourcePath = "/nonexistent/path",
       dependencies = Seq.empty,
       sourceTable = Some("test_customers_table")
     )
@@ -122,8 +118,8 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
       id = "child_node",
       description = "Node requiring missing parent",
       sourceFlow = "child",
-      sourcePath = parquetDir.resolve("customers").toString,
       dependencies = Seq("missing_parent"),
+      sourceTable = Some("test_customers_table"),
       join = Some(
         JoinConfig(
           `type` = JoinType.LeftOuter,

@@ -21,7 +21,6 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
       id = id,
       description = s"Node $id",
       sourceFlow = s"flow_$id",
-      sourcePath = s"/path/$id",
       dependencies = dependencies
     )
   }
@@ -35,7 +34,6 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
       id = id,
       description = s"Node $id",
       sourceFlow = s"flow_$id",
-      sourcePath = s"/path/$id",
       dependencies = dependencies,
       join = Some(
         JoinConfig(

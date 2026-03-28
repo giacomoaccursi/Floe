@@ -35,7 +35,6 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
           id = s"${table.tableName}_node",
           description = table.dagMetadata.description.getOrElse(s"Auto-discovered table: ${table.tableName}"),
           sourceFlow = table.tableName,
-          sourcePath = table.path,
           dependencies = inferDependencies(table),
           join = inferJoinConfig(table),
           select = Seq.empty,

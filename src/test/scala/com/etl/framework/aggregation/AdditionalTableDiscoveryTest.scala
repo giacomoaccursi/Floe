@@ -77,7 +77,6 @@ class AdditionalTableDiscoveryTest extends AnyFlatSpec with Matchers {
       val node = nodes.head
       node.id shouldBe "order_items_node"
       node.sourceFlow shouldBe "order_items"
-      node.sourcePath shouldBe "/data/order_items"
       node.description shouldBe "Order items table"
     } finally {
       deleteRecursively(tempDir)

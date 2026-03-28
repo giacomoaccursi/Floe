@@ -34,7 +34,6 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
     id = id,
     description = s"Node $id",
     sourceFlow = s"flow_${id}",
-    sourcePath = s"/data/validated/flow_${id}",
     dependencies = dependencies,
     join = None,
     select = Seq.empty,

@@ -41,7 +41,7 @@ class ExecutionPlanBuilder(
       fc.validation.foreignKeys.foreach { fk =>
         if (!flowNames.contains(fk.references.flow)) {
           throw new IllegalArgumentException(
-            s"Flow '${fc.name}': FK '${fk.name}' references unknown flow '${fk.references.flow}'"
+            s"Flow '${fc.name}': FK '${fk.displayName}' references unknown flow '${fk.references.flow}'"
           )
         }
       }

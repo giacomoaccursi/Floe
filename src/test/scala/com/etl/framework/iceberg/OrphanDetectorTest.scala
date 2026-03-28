@@ -100,7 +100,6 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       "od_orders",
       foreignKeys = Seq(
         ForeignKeyConfig(
-          name = "fk_customer",
           column = "customer_id",
           references = ReferenceConfig(flow = "od_customers", column = "id"),
           onOrphan = OrphanAction.Warn
@@ -158,7 +157,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     reports.size shouldBe 1
     reports.head.flowName shouldBe "od_orders"
-    reports.head.fkName shouldBe "fk_customer"
+    reports.head.fkName shouldBe "customer_id -> od_customers.id"
     reports.head.parentFlowName shouldBe "od_customers"
     reports.head.orphanCount shouldBe 1
     reports.head.actionTaken shouldBe "warn"
@@ -175,7 +174,6 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       "od_orders_del",
       foreignKeys = Seq(
         ForeignKeyConfig(
-          name = "fk_customer",
           column = "customer_id",
           references = ReferenceConfig(flow = "od_cust_del", column = "id"),
           onOrphan = OrphanAction.Delete
@@ -256,7 +254,6 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       "od_orders_first",
       foreignKeys = Seq(
         ForeignKeyConfig(
-          name = "fk_customer",
           column = "customer_id",
           references = ReferenceConfig(flow = "od_cust_first", column = "id"),
           onOrphan = OrphanAction.Warn
@@ -317,7 +314,6 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       "od_orders_ign",
       foreignKeys = Seq(
         ForeignKeyConfig(
-          name = "fk_customer",
           column = "customer_id",
           references = ReferenceConfig(flow = "od_cust_ign", column = "id"),
           onOrphan = OrphanAction.Ignore
@@ -381,7 +377,6 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       "od_child_delta",
       foreignKeys = Seq(
         ForeignKeyConfig(
-          name = "fk_parent",
           column = "parent_id",
           references = ReferenceConfig(flow = "od_parent_delta", column = "id"),
           onOrphan = OrphanAction.Warn

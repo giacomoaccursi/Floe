@@ -136,7 +136,6 @@ object FKValidationProperties extends Properties("FKValidation") {
       primaryKey = Seq("child_id"),
       foreignKeys = Seq(
         ForeignKeyConfig(
-          name = fkName,
           column = fkColumn,
           references = ReferenceConfig(
             flow = refFlow,
@@ -350,7 +349,6 @@ object FKValidationProperties extends Properties("FKValidation") {
               primaryKey = Seq("child_id"),
               foreignKeys = Seq(
                 ForeignKeyConfig(
-                  name = "fk_parent1",
                   column = "parent1_id",
                   references = ReferenceConfig(
                     flow = "parent1_flow",
@@ -358,7 +356,6 @@ object FKValidationProperties extends Properties("FKValidation") {
                   )
                 ),
                 ForeignKeyConfig(
-                  name = "fk_parent2",
                   column = "parent2_id",
                   references = ReferenceConfig(
                     flow = "parent2_flow",
@@ -701,12 +698,10 @@ object FKValidationProperties extends Properties("FKValidation") {
           primaryKey = Seq("child_id"),
           foreignKeys = Seq(
             ForeignKeyConfig(
-              name = "fk_composite_parent",
               column = "parent_id1",
               references = ReferenceConfig(flow = "parent_flow", column = "parent_id1")
             ),
             ForeignKeyConfig(
-              name = "fk_composite_parent2",
               column = "parent_id2",
               references = ReferenceConfig(flow = "parent_flow", column = "parent_id2")
             )

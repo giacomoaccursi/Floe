@@ -82,7 +82,7 @@ class OrphanDetector(
 
       case _ =>
         logger.debug(
-          s"Skipping orphan check for ${childFlow.name}.${fk.name}: " +
+          s"Skipping orphan check for ${childFlow.name}.${fk.displayName}: " +
             s"parent flow '${fk.references.flow}' not found in results"
         )
         None
@@ -214,14 +214,14 @@ class OrphanDetector(
     fk.onOrphan match {
       case OrphanAction.Warn =>
         logger.warn(
-          s"Orphan detection: ${childFlow.name}.${fk.name} has $orphanCount " +
+          s"Orphan detection: ${childFlow.name}.${fk.displayName} has $orphanCount " +
             s"orphaned records (${removedCount} parent keys removed from ${fk.references.flow})"
         )
         // Warn does NOT propagate cascade
         Some(
           OrphanReport(
             flowName = childFlow.name,
-            fkName = fk.name,
+            fkName = fk.displayName,
             parentFlowName = fk.references.flow,
             orphanCount = orphanCount,
             removedParentKeyCount = removedCount,
@@ -232,7 +232,7 @@ class OrphanDetector(
       case OrphanAction.Delete =>
         logger.info(
           s"Orphan detection: deleting $orphanCount orphaned records " +
-            s"from ${childFlow.name} (FK: ${fk.name})"
+            s"from ${childFlow.name} (FK: ${fk.displayName})"
         )
 
         // Collect orphaned child PKs for cascade before deleting
@@ -243,7 +243,7 @@ class OrphanDetector(
           } else None
 
         // Delete orphaned records from child table
-        val removedPksView = s"_orphan_removed_pks_${childFlow.name}_${fk.name}"
+        val removedPksView = s"_orphan_removed_pks_${childFlow.name}_${fk.column}"
         removedParentKeys
           .withColumnRenamed(refCol, fkCol)
           .createOrReplaceTempView(removedPksView)
@@ -264,7 +264,7 @@ class OrphanDetector(
         Some(
           OrphanReport(
             flowName = childFlow.name,
-            fkName = fk.name,
+            fkName = fk.displayName,
             parentFlowName = fk.references.flow,
             orphanCount = orphanCount,
             removedParentKeyCount = removedCount,

@@ -62,15 +62,15 @@ class DependencyGraphTest extends AnyFlatSpec with Matchers {
     val flowB = createFlow(
       "flow_b",
       foreignKeys = Seq(
-        ForeignKeyConfig("fk_a", "a_id", ReferenceConfig("flow_a", "id"))
+        ForeignKeyConfig( "a_id", ReferenceConfig("flow_a", "id"))
       ),
       fkColumns = Seq(ColumnConfig("a_id", "string", false, "FK to A"))
     )
     val flowC = createFlow(
       "flow_c",
       foreignKeys = Seq(
-        ForeignKeyConfig("fk_a", "a_id", ReferenceConfig("flow_a", "id")),
-        ForeignKeyConfig("fk_b", "b_id", ReferenceConfig("flow_b", "id"))
+        ForeignKeyConfig( "a_id", ReferenceConfig("flow_a", "id")),
+        ForeignKeyConfig( "b_id", ReferenceConfig("flow_b", "id"))
       ),
       fkColumns = Seq(
         ColumnConfig("a_id", "string", false, "FK to A"),
@@ -98,14 +98,14 @@ class DependencyGraphTest extends AnyFlatSpec with Matchers {
     val flowB = createFlow(
       "flow_b",
       foreignKeys = Seq(
-        ForeignKeyConfig("fk_a", "a_id", ReferenceConfig("flow_a", "id"))
+        ForeignKeyConfig( "a_id", ReferenceConfig("flow_a", "id"))
       ),
       fkColumns = Seq(ColumnConfig("a_id", "string", false, "FK to A"))
     )
     val flowC = createFlow(
       "flow_c",
       foreignKeys = Seq(
-        ForeignKeyConfig("fk_b", "b_id", ReferenceConfig("flow_b", "id"))
+        ForeignKeyConfig( "b_id", ReferenceConfig("flow_b", "id"))
       ),
       fkColumns = Seq(ColumnConfig("b_id", "string", false, "FK to B"))
     )
@@ -126,21 +126,21 @@ class DependencyGraphTest extends AnyFlatSpec with Matchers {
     val flowA = createFlow(
       "flow_a",
       foreignKeys = Seq(
-        ForeignKeyConfig("fk_c", "c_id", ReferenceConfig("flow_c", "id"))
+        ForeignKeyConfig( "c_id", ReferenceConfig("flow_c", "id"))
       ),
       fkColumns = Seq(ColumnConfig("c_id", "string", false, "FK to C"))
     )
     val flowB = createFlow(
       "flow_b",
       foreignKeys = Seq(
-        ForeignKeyConfig("fk_a", "a_id", ReferenceConfig("flow_a", "id"))
+        ForeignKeyConfig( "a_id", ReferenceConfig("flow_a", "id"))
       ),
       fkColumns = Seq(ColumnConfig("a_id", "string", false, "FK to A"))
     )
     val flowC = createFlow(
       "flow_c",
       foreignKeys = Seq(
-        ForeignKeyConfig("fk_b", "b_id", ReferenceConfig("flow_b", "id"))
+        ForeignKeyConfig( "b_id", ReferenceConfig("flow_b", "id"))
       ),
       fkColumns = Seq(ColumnConfig("b_id", "string", false, "FK to B"))
     )

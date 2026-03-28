@@ -25,12 +25,11 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
   }
 
   def createForeignKey(
-      name: String,
       column: String,
       refFlow: String,
       refColumn: String
   ): ForeignKeyConfig = {
-    ForeignKeyConfig(name, column, ReferenceConfig(refFlow, refColumn))
+    ForeignKeyConfig(column, ReferenceConfig(refFlow, refColumn))
   }
 
   "DependencyGraphBuilder" should "build empty graph with no dependencies" in {
@@ -52,11 +51,11 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
     val flowA = createFlowConfig("flow_a")
     val flowB = createFlowConfig(
       "flow_b",
-      foreignKeys = Seq(createForeignKey("fk1", "col1", "flow_a", "id"))
+      foreignKeys = Seq(createForeignKey("col1", "flow_a", "id"))
     )
     val flowC = createFlowConfig(
       "flow_c",
-      foreignKeys = Seq(createForeignKey("fk2", "col2", "flow_b", "id"))
+      foreignKeys = Seq(createForeignKey("col2", "flow_b", "id"))
     )
 
     val builder = new DependencyGraphBuilder(Seq(flowA, flowB, flowC))
@@ -75,8 +74,8 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
     val flowD = createFlowConfig(
       "flow_d",
       foreignKeys = Seq(
-        createForeignKey("fk1", "col1", "flow_b", "id"),
-        createForeignKey("fk2", "col2", "flow_c", "id")
+        createForeignKey("col1", "flow_b", "id"),
+        createForeignKey("col2", "flow_c", "id")
       )
     )
 
@@ -192,11 +191,11 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
     val flowA = createFlowConfig("flow_a")
     val flowB = createFlowConfig(
       "flow_b",
-      foreignKeys = Seq(createForeignKey("fk1", "col1", "flow_a", "id"))
+      foreignKeys = Seq(createForeignKey("col1", "flow_a", "id"))
     )
     val flowC = createFlowConfig(
       "flow_c",
-      foreignKeys = Seq(createForeignKey("fk2", "col2", "flow_b", "id"))
+      foreignKeys = Seq(createForeignKey("col2", "flow_b", "id"))
     )
 
     val flows = Seq(flowA, flowB, flowC)
@@ -218,17 +217,17 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
     val flowA = createFlowConfig("flow_a")
     val flowB = createFlowConfig(
       "flow_b",
-      foreignKeys = Seq(createForeignKey("fk1", "col1", "flow_a", "id"))
+      foreignKeys = Seq(createForeignKey("col1", "flow_a", "id"))
     )
     val flowC = createFlowConfig(
       "flow_c",
-      foreignKeys = Seq(createForeignKey("fk2", "col2", "flow_a", "id"))
+      foreignKeys = Seq(createForeignKey("col2", "flow_a", "id"))
     )
     val flowD = createFlowConfig(
       "flow_d",
       foreignKeys = Seq(
-        createForeignKey("fk3", "col3", "flow_b", "id"),
-        createForeignKey("fk4", "col4", "flow_c", "id")
+        createForeignKey("col3", "flow_b", "id"),
+        createForeignKey("col4", "flow_c", "id")
       )
     )
 
@@ -285,17 +284,17 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
     val flowB = createFlowConfig("flow_b")
     val flowC = createFlowConfig(
       "flow_c",
-      foreignKeys = Seq(createForeignKey("fk1", "col1", "flow_a", "id"))
+      foreignKeys = Seq(createForeignKey("col1", "flow_a", "id"))
     )
     val flowD = createFlowConfig(
       "flow_d",
-      foreignKeys = Seq(createForeignKey("fk2", "col2", "flow_b", "id"))
+      foreignKeys = Seq(createForeignKey("col2", "flow_b", "id"))
     )
     val flowE = createFlowConfig(
       "flow_e",
       foreignKeys = Seq(
-        createForeignKey("fk3", "col3", "flow_c", "id"),
-        createForeignKey("fk4", "col4", "flow_d", "id")
+        createForeignKey("col3", "flow_c", "id"),
+        createForeignKey("col4", "flow_d", "id")
       )
     )
 

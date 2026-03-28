@@ -38,12 +38,11 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
   }
 
   def createForeignKey(
-      name: String,
       column: String,
       refFlow: String,
       refColumn: String
   ): ForeignKeyConfig = {
-    ForeignKeyConfig(name, column, ReferenceConfig(refFlow, refColumn))
+    ForeignKeyConfig(column, ReferenceConfig(refFlow, refColumn))
   }
 
   "ExecutionPlanBuilder" should "build plan with no dependencies" in {
@@ -67,11 +66,11 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
     val flowA = createFlowConfig("flow_a")
     val flowB = createFlowConfig(
       "flow_b",
-      foreignKeys = Seq(createForeignKey("fk1", "col1", "flow_a", "id"))
+      foreignKeys = Seq(createForeignKey("col1", "flow_a", "id"))
     )
     val flowC = createFlowConfig(
       "flow_c",
-      foreignKeys = Seq(createForeignKey("fk2", "col2", "flow_b", "id"))
+      foreignKeys = Seq(createForeignKey("col2", "flow_b", "id"))
     )
 
     val flows = Seq(flowA, flowB, flowC)
@@ -91,17 +90,17 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
     val flowA = createFlowConfig("flow_a")
     val flowB = createFlowConfig(
       "flow_b",
-      foreignKeys = Seq(createForeignKey("fk1", "col1", "flow_a", "id"))
+      foreignKeys = Seq(createForeignKey("col1", "flow_a", "id"))
     )
     val flowC = createFlowConfig(
       "flow_c",
-      foreignKeys = Seq(createForeignKey("fk2", "col2", "flow_a", "id"))
+      foreignKeys = Seq(createForeignKey("col2", "flow_a", "id"))
     )
     val flowD = createFlowConfig(
       "flow_d",
       foreignKeys = Seq(
-        createForeignKey("fk3", "col3", "flow_b", "id"),
-        createForeignKey("fk4", "col4", "flow_c", "id")
+        createForeignKey("col3", "flow_b", "id"),
+        createForeignKey("col4", "flow_c", "id")
       )
     )
 
@@ -166,17 +165,17 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
     val flowB = createFlowConfig("flow_b")
     val flowC = createFlowConfig(
       "flow_c",
-      foreignKeys = Seq(createForeignKey("fk1", "col1", "flow_a", "id"))
+      foreignKeys = Seq(createForeignKey("col1", "flow_a", "id"))
     )
     val flowD = createFlowConfig(
       "flow_d",
-      foreignKeys = Seq(createForeignKey("fk2", "col2", "flow_b", "id"))
+      foreignKeys = Seq(createForeignKey("col2", "flow_b", "id"))
     )
     val flowE = createFlowConfig(
       "flow_e",
       foreignKeys = Seq(
-        createForeignKey("fk3", "col3", "flow_c", "id"),
-        createForeignKey("fk4", "col4", "flow_d", "id")
+        createForeignKey("col3", "flow_c", "id"),
+        createForeignKey("col4", "flow_d", "id")
       )
     )
 
@@ -211,15 +210,15 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
     // Create circular dependency: flow_a -> flow_b -> flow_c -> flow_a
     val flowA = createFlowConfig(
       "flow_a",
-      foreignKeys = Seq(createForeignKey("fk1", "col1", "flow_c", "id"))
+      foreignKeys = Seq(createForeignKey("col1", "flow_c", "id"))
     )
     val flowB = createFlowConfig(
       "flow_b",
-      foreignKeys = Seq(createForeignKey("fk2", "col2", "flow_a", "id"))
+      foreignKeys = Seq(createForeignKey("col2", "flow_a", "id"))
     )
     val flowC = createFlowConfig(
       "flow_c",
-      foreignKeys = Seq(createForeignKey("fk3", "col3", "flow_b", "id"))
+      foreignKeys = Seq(createForeignKey("col3", "flow_b", "id"))
     )
 
     val flows = Seq(flowA, flowB, flowC)
@@ -253,11 +252,11 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
     val flowA = createFlowConfig("flow_a")
     val flowB = createFlowConfig(
       "flow_b",
-      foreignKeys = Seq(createForeignKey("fk1", "col1", "flow_a", "id"))
+      foreignKeys = Seq(createForeignKey("col1", "flow_a", "id"))
     )
     val flowC = createFlowConfig(
       "flow_c",
-      foreignKeys = Seq(createForeignKey("fk2", "col2", "flow_a", "id"))
+      foreignKeys = Seq(createForeignKey("col2", "flow_a", "id"))
     )
 
     val flows = Seq(flowA, flowB, flowC)

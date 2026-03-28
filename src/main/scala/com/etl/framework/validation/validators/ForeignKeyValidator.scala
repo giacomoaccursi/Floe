@@ -64,7 +64,7 @@ class ForeignKeyValidator(
                   val orphansWithMetadata = ValidationUtils.addRejectionMetadata(
                     orphans,
                     "FK_VIOLATION",
-                    s"Foreign key violation in flow $flowName: ${fk.name} (${fk.column} -> ${fk.references.flow}.${fk.references.column})",
+                    s"Foreign key violation in flow $flowName: ${fk.displayName} (${fk.column} -> ${fk.references.flow}.${fk.references.column})",
                     "fk_validation"
                   )
                   val newRejected = ValidationUtils.combineRejected(rejectedAcc, Some(orphansWithMetadata))

@@ -185,7 +185,6 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
           primaryKey = Seq("id"),
           foreignKeys = Seq(
             ForeignKeyConfig(
-              "fk_a",
               "a_id",
               ReferenceConfig("flow_a", "id")
             )

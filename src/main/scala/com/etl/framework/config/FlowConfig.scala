@@ -68,11 +68,12 @@ case class ValidationConfig(
 /** Foreign key configuration
   */
 case class ForeignKeyConfig(
-    name: String,
     column: String,
     references: ReferenceConfig,
     onOrphan: OrphanAction = OrphanAction.Warn
-)
+) {
+  def displayName: String = s"$column -> ${references.flow}.${references.column}"
+}
 
 /** Reference configuration
   */

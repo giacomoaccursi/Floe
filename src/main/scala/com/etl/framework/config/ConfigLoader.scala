@@ -182,9 +182,9 @@ class DomainsConfigLoader extends ConfigLoader[DomainsConfig] {
   */
 private[config] case class FlowConfigYaml(
     name: String,
-    description: String,
-    version: String,
-    owner: String,
+    description: String = "",
+    version: String = "",
+    owner: String = "",
     source: SourceConfig,
     schema: SchemaConfig,
     loadMode: LoadModeConfig,

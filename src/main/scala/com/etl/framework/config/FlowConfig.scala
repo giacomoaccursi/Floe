@@ -6,9 +6,9 @@ import com.etl.framework.core.FlowTransformation
   */
 case class FlowConfig(
     name: String,
-    description: String,
-    version: String,
-    owner: String,
+    description: String = "",
+    version: String = "",
+    owner: String = "",
     source: SourceConfig,
     schema: SchemaConfig,
     loadMode: LoadModeConfig,
@@ -42,7 +42,7 @@ case class ColumnConfig(
     name: String,
     `type`: String,
     nullable: Boolean,
-    description: String
+    description: String = ""
 )
 
 /** Load mode configuration

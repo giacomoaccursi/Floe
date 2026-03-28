@@ -4,8 +4,8 @@ package com.etl.framework.config
   */
 case class AggregationConfig(
     name: String,
-    description: String,
-    version: String,
+    description: String = "",
+    version: String = "",
     nodes: Seq[DAGNode]
 )
 
@@ -13,7 +13,7 @@ case class AggregationConfig(
   */
 case class DAGNode(
     id: String,
-    description: String,
+    description: String = "",
     sourceFlow: String,
     sourcePath: String,
     dependencies: Seq[String],

@@ -11,7 +11,8 @@ class AdditionalTableDiscoveryTest extends AnyFlatSpec with Matchers {
     GlobalConfig(
       paths = PathsConfig("/output", "/rejected", metadataPath),
       processing = ProcessingConfig("yyyyMMdd", failOnValidationError = false, maxRejectionRate = 0.1),
-      performance = PerformanceConfig(parallelFlows = true, parallelNodes = true)
+      performance = PerformanceConfig(parallelFlows = true, parallelNodes = true),
+      iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
     )
   }
 

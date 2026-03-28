@@ -32,7 +32,8 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
             maxRejectionRate = rejectionThreshold
           ),
           performance =
-            PerformanceConfig(parallelFlows = true, parallelNodes = true)
+            PerformanceConfig(parallelFlows = true, parallelNodes = true),
+          iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
         ),
         None
       ) {
@@ -70,7 +71,8 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
         maxRejectionRate = rejectionThreshold
       ),
       performance =
-        PerformanceConfig(parallelFlows = true, parallelNodes = true)
+        PerformanceConfig(parallelFlows = true, parallelNodes = true),
+      iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
     )
   }
 

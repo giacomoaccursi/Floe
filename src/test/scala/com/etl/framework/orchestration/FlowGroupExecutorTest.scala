@@ -29,7 +29,8 @@ class FlowGroupExecutorTest extends AnyFlatSpec with Matchers {
       failOnValidationError = failOnValidationError,
       maxRejectionRate = maxRejectionRate
     ),
-    performance = PerformanceConfig(parallelFlows = false, parallelNodes = false)
+    performance = PerformanceConfig(parallelFlows = false, parallelNodes = false),
+    iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )
 
   private def makeResult(

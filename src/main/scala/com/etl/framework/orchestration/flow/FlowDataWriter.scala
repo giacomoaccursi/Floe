@@ -16,65 +16,23 @@ import java.time.Instant
 class FlowDataWriter(
     flowConfig: FlowConfig,
     globalConfig: GlobalConfig,
-    icebergTableWriter: Option[IcebergTableWriter] = None
+    icebergTableWriter: IcebergTableWriter
 ) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
-  /** Writes validated data, using Iceberg if available or Parquet fallback
+  /** Writes validated data to Iceberg
     */
   def writeValidated(
       validData: DataFrame,
       batchId: String
   ): WriteResult = {
-    icebergTableWriter match {
-      case Some(writer) =>
-        writeWithIceberg(writer, validData, batchId)
-      case None =>
-        writeParquet(validData, batchId)
-    }
-  }
-
-  private def writeWithIceberg(
-      writer: IcebergTableWriter,
-      validData: DataFrame,
-      batchId: String
-  ): WriteResult = {
     val result = flowConfig.loadMode.`type` match {
-      case LoadMode.Full  => writer.writeFullLoad(validData, flowConfig)
-      case LoadMode.Delta => writer.writeDeltaLoad(validData, flowConfig)
-      case LoadMode.SCD2  => writer.writeSCD2Load(validData, flowConfig)
+      case LoadMode.Full  => icebergTableWriter.writeFullLoad(validData, flowConfig)
+      case LoadMode.Delta => icebergTableWriter.writeDeltaLoad(validData, flowConfig)
+      case LoadMode.SCD2  => icebergTableWriter.writeSCD2Load(validData, flowConfig)
     }
-    writer.tagBatchSnapshot(flowConfig, result, batchId)
-  }
-
-  private def writeParquet(
-      validData: DataFrame,
-      batchId: String
-  ): WriteResult = {
-    val outputPath = flowConfig.output.path.getOrElse(
-      s"${globalConfig.paths.outputPath}/${flowConfig.name}"
-    )
-
-    TimingUtil.timed(logger, s"Write validated data to $outputPath") {
-      var writer = validData.write
-        .mode(SaveMode.Overwrite)
-        .format(flowConfig.output.format.name)
-        .option("compression", flowConfig.output.compression)
-
-      flowConfig.output.options.foreach { case (key, value) =>
-        writer = writer.option(key, value)
-      }
-
-      if (flowConfig.output.partitionBy.nonEmpty) {
-        writer = writer.partitionBy(flowConfig.output.partitionBy: _*)
-      }
-
-      writer.save(outputPath)
-      logger.info("Validated data written successfully")
-
-      WriteResult(recordsWritten = 0L, snapshotId = None)
-    }
+    icebergTableWriter.tagBatchSnapshot(flowConfig, result, batchId)
   }
 
   /** Writes rejected data

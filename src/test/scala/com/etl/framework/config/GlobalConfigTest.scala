@@ -22,6 +22,8 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
         |performance:
         |  parallelFlows: true
         |  parallelNodes: false
+        |iceberg:
+        |  warehouse: "/tmp/test-warehouse"
       """.stripMargin
 
     import ConfigHints._
@@ -79,6 +81,8 @@ class GlobalConfigLoaderLogicTest extends AnyFlatSpec with Matchers {
         |performance:
         |  parallelFlows: true
         |  parallelNodes: true
+        |iceberg:
+        |  warehouse: "/tmp/test-warehouse"
       """.stripMargin
 
     val result = loader.testParse(yaml)

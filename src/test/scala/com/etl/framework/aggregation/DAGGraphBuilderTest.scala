@@ -11,7 +11,8 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
     GlobalConfig(
       paths = PathsConfig("/output", "/rejected", "/metadata"),
       processing = ProcessingConfig("yyyyMMdd", failOnValidationError = false, maxRejectionRate = 0.1),
-      performance = PerformanceConfig(parallelFlows = true, parallelNodes = parallelNodes)
+      performance = PerformanceConfig(parallelFlows = true, parallelNodes = parallelNodes),
+      iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
     )
   }
 

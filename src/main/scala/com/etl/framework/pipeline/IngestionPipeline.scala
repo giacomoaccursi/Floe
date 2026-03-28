@@ -29,8 +29,8 @@ class IngestionPipeline private(
   def execute(): IngestionResult = {
     logger.info("Executing Ingestion pipeline")
 
-    // Configure Spark for Iceberg if enabled
-    globalConfig.iceberg.foreach(configureSparkForIceberg(_, extraCatalogProviders))
+    // Configure Spark for Iceberg
+    configureSparkForIceberg(globalConfig.iceberg, extraCatalogProviders)
 
     // Apply transformations to flow configs
     val enrichedFlowConfigs = flowConfigs.map { flowConfig =>

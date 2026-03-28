@@ -167,16 +167,14 @@ class GlobalConfigLoader extends ConfigLoader[GlobalConfig] {
       config: GlobalConfig,
       path: String
   ): Either[ConfigurationException, Unit] =
-    config.iceberg match {
-      case Some(iceberg) if iceberg.formatVersion != 1 && iceberg.formatVersion != 2 =>
-        Left(
-          ConfigFileException(
-            file = path,
-            message = s"Invalid formatVersion: ${iceberg.formatVersion}. Must be 1 or 2."
-          )
+    if (config.iceberg.formatVersion != 1 && config.iceberg.formatVersion != 2)
+      Left(
+        ConfigFileException(
+          file = path,
+          message = s"Invalid formatVersion: ${config.iceberg.formatVersion}. Must be 1 or 2."
         )
-      case _ => Right(())
-    }
+      )
+    else Right(())
 }
 
 /** Domains configuration loader

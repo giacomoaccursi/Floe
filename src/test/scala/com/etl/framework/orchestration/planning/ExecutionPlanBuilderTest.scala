@@ -15,7 +15,8 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
         failOnValidationError = false,
         maxRejectionRate = 0.1
       ),
-      performance = PerformanceConfig(parallelFlows, parallelNodes = true)
+      performance = PerformanceConfig(parallelFlows, parallelNodes = true),
+      iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
     )
   }
 

@@ -20,7 +20,8 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
     performance = PerformanceConfig(
       parallelFlows = false,
       parallelNodes = false
-    )
+    ),
+    iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )
 
   "Custom output path" should "be different from default path" in {

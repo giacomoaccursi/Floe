@@ -66,7 +66,8 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
     performance = PerformanceConfig(
       parallelFlows = true,
       parallelNodes = true
-    )
+    ),
+    iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )
 
   private val sampleDomainsConfig = DomainsConfig(

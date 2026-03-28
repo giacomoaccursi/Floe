@@ -82,29 +82,17 @@ class FlowResultProcessor(
   }
 
   /**
-   * Loads validated data for a successful flow.
-   * When Iceberg is configured, reads directly from the Iceberg table so that
+   * Loads validated data for a successful flow from the Iceberg table so that
    * downstream flows that reference this flow via FK can find it in validatedFlows.
-   * Falls back to reading Parquet from the output path for non-Iceberg pipelines.
    */
   def loadValidatedData(
     result: FlowResult,
     validatedFlows: scala.collection.mutable.Map[String, DataFrame]
   ): Unit = {
-    val df = globalConfig.iceberg match {
-      case Some(icebergConfig) =>
-        val tableName = s"${icebergConfig.catalogName}.default.${result.flowName}"
-        scala.util.Try(spark.table(tableName)).toOption.orElse {
-          logger.warn(s"Could not load Iceberg table $tableName, falling back to Parquet")
-          scala.util.Try(spark.read.parquet(resolveOutputPath(result.flowName))).toOption
-        }
-      case None =>
-        scala.util.Try(spark.read.parquet(resolveOutputPath(result.flowName))).toOption
-    }
-
-    df match {
+    val tableName = s"${globalConfig.iceberg.catalogName}.default.${result.flowName}"
+    scala.util.Try(spark.table(tableName)).toOption match {
       case Some(data) => validatedFlows(result.flowName) = data
-      case None       => logger.warn(s"Could not load validated data for ${result.flowName}, FK checks against it will fail")
+      case None       => logger.warn(s"Could not load Iceberg table $tableName, FK checks against it will fail")
     }
   }
 
@@ -112,15 +100,8 @@ class FlowResultProcessor(
    * Loads validated data and returns Option for immutable operations.
    */
   def loadValidatedDataOpt(result: FlowResult): Option[DataFrame] = {
-    val outputPath = resolveOutputPath(result.flowName)
-    scala.util.Try(spark.read.parquet(outputPath)).toOption
-  }
-
-  private def resolveOutputPath(flowName: String): String = {
-    val flowConfig = flowConfigs.find(_.name == flowName)
-    flowConfig.flatMap(_.output.path).getOrElse {
-      s"${globalConfig.paths.outputPath}/$flowName"
-    }
+    val tableName = s"${globalConfig.iceberg.catalogName}.default.${result.flowName}"
+    scala.util.Try(spark.table(tableName)).toOption
   }
 }
 

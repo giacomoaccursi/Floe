@@ -23,7 +23,8 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
       "/data/metadata"
     ),
     processing = ProcessingConfig("yyyyMMdd_HHmmss", false, 0.1),
-    performance = PerformanceConfig(false, false)
+    performance = PerformanceConfig(false, false),
+    iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )
 
   private def createNode(

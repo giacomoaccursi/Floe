@@ -4,7 +4,7 @@ case class GlobalConfig(
     paths: PathsConfig,
     processing: ProcessingConfig,
     performance: PerformanceConfig,
-    iceberg: Option[IcebergConfig] = None
+    iceberg: IcebergConfig
 )
 
 case class PathsConfig(

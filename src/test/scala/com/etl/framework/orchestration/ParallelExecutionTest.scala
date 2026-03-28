@@ -83,7 +83,8 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
     performance = PerformanceConfig(
       parallelFlows = parallel,
       parallelNodes = false
-    )
+    ),
+    iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )
 
   private def cleanupTempDir(tempDir: String): Unit = {

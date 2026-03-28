@@ -157,30 +157,25 @@ class FlowOrchestrator(
     flowResults: Seq[FlowResult],
     plan: ExecutionPlan
   ): Seq[OrphanReport] = {
-    globalConfig.iceberg match {
-      case Some(icebergConfig) =>
-        val hasOrphanChecks = flowConfigs.exists(
-          _.validation.foreignKeys.exists(_.onOrphan != OrphanAction.Ignore)
+    val hasOrphanChecks = flowConfigs.exists(
+      _.validation.foreignKeys.exists(_.onOrphan != OrphanAction.Ignore)
+    )
+    if (!hasOrphanChecks) return Seq.empty
+
+    try {
+      val detector =
+        new OrphanDetector(spark, globalConfig.iceberg, flowConfigs, flowResults)
+      val reports = detector.detectAndResolveOrphans(plan)
+      if (reports.nonEmpty) {
+        logger.info(
+          s"Orphan detection completed: ${reports.size} reports generated"
         )
-        if (!hasOrphanChecks) return Seq.empty
-
-        try {
-          val detector =
-            new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-          val reports = detector.detectAndResolveOrphans(plan)
-          if (reports.nonEmpty) {
-            logger.info(
-              s"Orphan detection completed: ${reports.size} reports generated"
-            )
-          }
-          reports
-        } catch {
-          case e: Exception =>
-            logger.warn(s"Post-batch orphan detection failed: ${e.getMessage}")
-            Seq.empty
-        }
-
-      case None => Seq.empty
+      }
+      reports
+    } catch {
+      case e: Exception =>
+        logger.warn(s"Post-batch orphan detection failed: ${e.getMessage}")
+        Seq.empty
     }
   }
 
@@ -188,19 +183,18 @@ class FlowOrchestrator(
    * Runs Iceberg table maintenance on all flow tables after batch completion.
    */
   private def runPostBatchMaintenance(): Unit = {
-    globalConfig.iceberg.foreach { icebergConfig =>
-      val tableManager = new IcebergTableManager(spark, icebergConfig)
-      logger.info("Running post-batch Iceberg table maintenance")
+    val icebergConfig = globalConfig.iceberg
+    val tableManager = new IcebergTableManager(spark, icebergConfig)
+    logger.info("Running post-batch Iceberg table maintenance")
 
-      flowConfigs.foreach { flowConfig =>
-        try {
-          tableManager.runMaintenance(flowConfig, icebergConfig.maintenance)
-        } catch {
-          case e: Exception =>
-            logger.error(
-              s"Maintenance failed for flow ${flowConfig.name}: ${e.getMessage}"
-            )
-        }
+    flowConfigs.foreach { flowConfig =>
+      try {
+        tableManager.runMaintenance(flowConfig, icebergConfig.maintenance)
+      } catch {
+        case e: Exception =>
+          logger.error(
+            s"Maintenance failed for flow ${flowConfig.name}: ${e.getMessage}"
+          )
       }
     }
   }

@@ -10,12 +10,19 @@ import scala.util.Try
 
 class BatchMetadataTest extends AnyFlatSpec with Matchers {
 
+  private val warehousePath = Files.createTempDirectory("iceberg-warehouse").toString
+
   implicit val spark: SparkSession = SparkSession
     .builder()
     .appName("BatchMetadataTest")
     .master("local[*]")
     .config("spark.ui.enabled", "false")
     .config("spark.sql.shuffle.partitions", "2")
+    .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+    .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog")
+    .config("spark.sql.catalog.spark_catalog.type", "hadoop")
+    .config("spark.sql.catalog.spark_catalog.warehouse", warehousePath)
+    .config("spark.sql.defaultCatalog", "spark_catalog")
     .getOrCreate()
 
   import spark.implicits._
@@ -91,7 +98,8 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
       performance = PerformanceConfig(
         parallelFlows = false,
         parallelNodes = false
-      )
+      ),
+      iceberg = IcebergConfig(warehouse = warehousePath)
     )
   }
 

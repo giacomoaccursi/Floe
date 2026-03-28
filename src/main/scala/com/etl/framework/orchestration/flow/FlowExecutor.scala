@@ -3,14 +3,12 @@ package com.etl.framework.orchestration.flow
 import com.etl.framework.config.{
   DomainsConfig,
   FlowConfig,
-  GlobalConfig,
-  LoadMode
+  GlobalConfig
 }
 import com.etl.framework.core.AdditionalTableInfo
 import com.etl.framework.exceptions.InvariantViolationException
 import com.etl.framework.iceberg.{IcebergFlowMetadata, IcebergTableManager, IcebergTableWriter, WriteResult}
 import com.etl.framework.io.readers.DataReaderFactory
-import com.etl.framework.merge.DeltaMergerFactory
 import com.etl.framework.util.TimingUtil
 import com.etl.framework.validation.ValidationColumns._
 import com.etl.framework.validation.{ValidationEngine, ValidationResult}
@@ -20,9 +18,7 @@ import org.slf4j.LoggerFactory
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-/** Executes a single flow through Read -> Validate -> Transform -> Write
-  * With Iceberg: validation on new data only, merge via MERGE INTO during write
-  * Without Iceberg: Read -> Merge -> Validate -> Transform -> Write (Parquet fallback)
+/** Executes a single flow through Read -> Validate -> Transform -> Write (Iceberg)
   */
 class FlowExecutor(
     flowConfig: FlowConfig,
@@ -35,13 +31,10 @@ class FlowExecutor(
 
   private val additionalTables = mutable.Map[String, AdditionalTableInfo]()
 
-  private val icebergEnabled = globalConfig.iceberg.isDefined
-
-  private val icebergTableWriter: Option[IcebergTableWriter] =
-    globalConfig.iceberg.map { icebergConfig =>
-      val tableManager = new IcebergTableManager(spark, icebergConfig)
-      new IcebergTableWriter(spark, icebergConfig, tableManager)
-    }
+  private val icebergTableWriter: IcebergTableWriter = {
+    val tableManager = new IcebergTableManager(spark, globalConfig.iceberg)
+    new IcebergTableWriter(spark, globalConfig.iceberg, tableManager)
+  }
 
   private val dataWriter =
     new FlowDataWriter(flowConfig, globalConfig, icebergTableWriter)
@@ -72,7 +65,7 @@ class FlowExecutor(
   private def executeFlow(batchId: String): Try[FlowMetrics] = Try {
     logger.info(
       s"Starting flow ${flowConfig.name} - batchId: $batchId, " +
-        s"loadMode: ${flowConfig.loadMode.`type`.name}, iceberg: $icebergEnabled"
+        s"loadMode: ${flowConfig.loadMode.`type`.name}"
     )
 
     // 1. Read data from source
@@ -88,23 +81,7 @@ class FlowExecutor(
       transformer.applyPreValidationTransformation(rawData, batchId)
     val inputCount = preTransformedData.count()
 
-    if (icebergEnabled) {
-      // Iceberg pipeline: validate new data only, merge happens during write
-      executeIcebergPipeline(preTransformedData, inputCount, batchId)
-    } else {
-      // Parquet fallback: merge in-memory, then validate merged data
-      executeParquetPipeline(preTransformedData, inputCount, batchId)
-    }
-  }
-
-  /** Iceberg pipeline: Read -> PreTransform -> Validate (new only) -> PostTransform -> Write (MERGE INTO)
-    */
-  private def executeIcebergPipeline(
-      preTransformedData: DataFrame,
-      inputCount: Long,
-      batchId: String
-  ): FlowMetrics = {
-    // Validate new data only (existing data in Iceberg table was already validated)
+    // 3. Validate new data only, merge happens during Iceberg write
     val validationResult = TimingUtil.timed(logger, "Validate data") {
       validateData(preTransformedData)
     }
@@ -113,6 +90,7 @@ class FlowExecutor(
 
     logValidationResults(validationResult, inputCount, rejectedCount)
 
+    // 4. Apply post-validation transformations
     val postTransformedData = transformer.applyPostValidationTransformation(
       validationResult.valid,
       batchId,
@@ -121,50 +99,12 @@ class FlowExecutor(
 
     verifyInvariant(inputCount, validCount, rejectedCount)
 
+    // 5. Write to Iceberg
     val writeResult = writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
 
     FlowMetrics(
       inputCount = inputCount,
       mergedCount = inputCount,
-      validCount = validCount,
-      rejectedCount = rejectedCount,
-      rejectionReasons = validationResult.rejectionReasons,
-      icebergMetadata = writeResult.icebergMetadata
-    )
-  }
-
-  /** Parquet fallback pipeline: Read -> PreTransform -> Merge -> Validate -> PostTransform -> Write
-    */
-  private def executeParquetPipeline(
-      preTransformedData: DataFrame,
-      inputCount: Long,
-      batchId: String
-  ): FlowMetrics = {
-    // Merge with existing data (delta/scd2 mode only)
-    val mergedData = applyMerge(preTransformedData)
-    val mergedCount = mergedData.count()
-
-    val validationResult = TimingUtil.timed(logger, "Validate data") {
-      validateData(mergedData)
-    }
-    val rejectedCount = validationResult.rejectionReasons.values.sum
-    val validCount = mergedCount - rejectedCount
-
-    logValidationResults(validationResult, mergedCount, rejectedCount)
-
-    val postTransformedData = transformer.applyPostValidationTransformation(
-      validationResult.valid,
-      batchId,
-      validatedFlows
-    )
-
-    verifyInvariant(mergedCount, validCount, rejectedCount)
-
-    val writeResult = writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
-
-    FlowMetrics(
-      inputCount = inputCount,
-      mergedCount = mergedCount,
       validCount = validCount,
       rejectedCount = rejectedCount,
       rejectionReasons = validationResult.rejectionReasons,
@@ -179,43 +119,6 @@ class FlowExecutor(
     val reader =
       DataReaderFactory.create(flowConfig.source, Some(flowConfig.schema))
     reader.read()
-  }
-
-  private def applyMerge(data: DataFrame): DataFrame = {
-    flowConfig.loadMode.`type` match {
-      case LoadMode.Full =>
-        logger.debug("Full load mode, skipping merge")
-        data
-      case _ =>
-        TimingUtil.timed(logger, "Merge with existing data") {
-          mergeWithExisting(data)
-        }
-    }
-  }
-
-  private def mergeWithExisting(newData: DataFrame): DataFrame = {
-    val existingPath = flowConfig.output.path.getOrElse(
-      s"${globalConfig.paths.outputPath}/${flowConfig.name}"
-    )
-
-    val existingData = loadExistingData(existingPath)
-    val merger = DeltaMergerFactory.create(
-      flowConfig.loadMode,
-      flowConfig.validation.primaryKey
-    )
-    merger.merge(newData, existingData)
-  }
-
-  protected def loadExistingData(path: String): Option[DataFrame] = {
-    try {
-      Some(spark.read.parquet(path).drop(WARNINGS))
-    } catch {
-      case _: org.apache.spark.sql.AnalysisException =>
-        logger.info(
-          s"No existing data found at $path, treating as initial load"
-        )
-        None
-    }
   }
 
   protected def validateData(data: DataFrame): ValidationResult = {

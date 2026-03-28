@@ -36,16 +36,16 @@ val result = IngestionPipeline.builder()
   .execute()
 ```
 
-## Key features
+## What you get
 
-- **Declarative YAML configuration** — define flows, validation rules, and aggregations without code
-- **Apache Iceberg writes** — atomic MERGE INTO, snapshot tagging, time travel, automatic maintenance
-- **Data validation** — schema enforcement, PK/FK integrity, regex, range, domain, custom rules
-- **Three load modes** — full replace, delta upsert, SCD2 with history tracking
-- **DAG aggregation** — join flows with Nest, Flatten, or Aggregate strategies
-- **Transformation API** — pre/post-validation hooks with `TransformationContext`
-- **Orphan detection** — post-batch FK integrity with cascade support
-- **Cloud ready** — `withVariables` for Glue, EMR, Databricks parameter injection
+- **Write YAML, not code** — describe your data sources, schemas, and rules in config files. The framework reads, validates, and writes the data for you.
+- **Safe writes** — every write is atomic. If something fails mid-batch, your tables stay consistent. You can query any previous version of your data by batch ID.
+- **Data quality built in** — check for nulls, duplicates, invalid formats, value ranges, and referential integrity between tables. Bad records are separated and saved for review.
+- **Keep history** — track how records change over time with SCD2 (Slowly Changing Dimensions). The framework handles versioning, timestamps, and soft deletes automatically.
+- **Combine tables** — join data from multiple flows into aggregated views using a DAG. Nest child records, flatten columns, or compute summaries.
+- **Transform in code** — hook into the pipeline with Scala functions to enrich, filter, or reshape data before or after validation.
+- **Detect broken references** — after a batch, the framework checks if parent records were removed and child records are now orphaned. It can warn or clean up automatically.
+- **Run anywhere** — works locally, on Spark clusters, and on managed platforms like AWS Glue, EMR, and Databricks. Pass environment-specific parameters without changing your YAML files.
 
 ## Stack
 

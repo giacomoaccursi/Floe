@@ -71,24 +71,17 @@ class OrphanDetector(
 
     (parentFlowConfig, parentResult) match {
       case (Some(parentCfg), Some(parentRes)) =>
-        // Find removed PKs from parent via time travel or cascade
-        val removedPKs =
-          findRemovedParentKeys(parentCfg, parentRes, fk, removedKeysByFlow)
-
-        removedPKs.flatMap { removed =>
-          val removedCount = removed.count()
-          if (removedCount == 0) {
-            None
-          } else {
-            resolveOrphans(
-              childFlow,
-              fk,
-              removed,
-              removedCount,
-              removedKeysByFlow
-            )
+        findRemovedParentKeys(parentCfg, parentRes, fk, removedKeysByFlow)
+          .flatMap { removed =>
+            val cached = removed.cache()
+            try {
+              val removedCount = cached.count()
+              if (removedCount == 0) None
+              else resolveOrphans(childFlow, fk, cached, removedCount, removedKeysByFlow)
+            } finally {
+              cached.unpersist()
+            }
           }
-        }
 
       case _ =>
         logger.debug(

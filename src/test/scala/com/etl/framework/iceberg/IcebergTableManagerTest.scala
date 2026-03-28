@@ -264,9 +264,7 @@ class IcebergTableManagerTest
     data.writeTo("test_catalog.default.tag_test").append()
 
     val snapshotId = tableManager.getCurrentSnapshotId(flowConfig).get
-    noException should be thrownBy {
-      tableManager.tagSnapshot(flowConfig, snapshotId, "batch_001")
-    }
+    tableManager.tagSnapshot(flowConfig, snapshotId, "batch_001") shouldBe true
   }
 
   it should "collect snapshot metadata" in {
@@ -277,7 +275,7 @@ class IcebergTableManagerTest
     data.writeTo("test_catalog.default.metadata_test").append()
 
     val snapshotId = tableManager.getCurrentSnapshotId(flowConfig).get
-    val metadata = tableManager.getSnapshotMetadata(flowConfig, snapshotId, 2L, "batch_002")
+    val metadata = tableManager.getSnapshotMetadata(flowConfig, snapshotId, 2L, "batch_002", tagCreated = true)
 
     metadata shouldBe defined
     metadata.get.tableName shouldBe "test_catalog.default.metadata_test"

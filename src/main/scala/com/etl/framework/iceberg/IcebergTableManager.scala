@@ -208,8 +208,8 @@ class IcebergTableManager(
       flowConfig: FlowConfig,
       snapshotId: Long,
       batchId: String
-  ): Unit = {
-    if (!icebergConfig.enableSnapshotTagging) return
+  ): Boolean = {
+    if (!icebergConfig.enableSnapshotTagging) return false
 
     val tableName = resolveTableName(flowConfig)
     val tagName = s"batch_$batchId"
@@ -218,11 +218,13 @@ class IcebergTableManager(
         s"ALTER TABLE $tableName CREATE TAG `$tagName` AS OF VERSION $snapshotId"
       )
       logger.info(s"Tagged snapshot $snapshotId as '$tagName' on $tableName")
+      true
     } catch {
       case e: Exception =>
         logger.error(
           s"Failed to tag snapshot $snapshotId on $tableName: ${e.getMessage}"
         )
+        false
     }
   }
 
@@ -230,7 +232,8 @@ class IcebergTableManager(
       flowConfig: FlowConfig,
       snapshotId: Long,
       recordsWritten: Long,
-      batchId: String
+      batchId: String,
+      tagCreated: Boolean = false
   ): Option[IcebergFlowMetadata] = {
     val tableName = resolveTableName(flowConfig)
     try {
@@ -248,7 +251,7 @@ class IcebergTableManager(
       val summary = row.getMap[String, String](3).toMap
 
       val tag =
-        if (icebergConfig.enableSnapshotTagging) Some(s"batch_$batchId")
+        if (tagCreated) Some(s"batch_$batchId")
         else None
 
       Some(

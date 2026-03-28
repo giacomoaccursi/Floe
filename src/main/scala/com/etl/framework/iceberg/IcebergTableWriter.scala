@@ -295,12 +295,13 @@ class IcebergTableWriter(
   ): WriteResult = {
     writeResult.snapshotId match {
       case Some(sid) =>
-        tableManager.tagSnapshot(flowConfig, sid, batchId)
+        val tagged = tableManager.tagSnapshot(flowConfig, sid, batchId)
         val metadata = tableManager.getSnapshotMetadata(
           flowConfig,
           sid,
           writeResult.recordsWritten,
-          batchId
+          batchId,
+          tagCreated = tagged
         )
         writeResult.copy(icebergMetadata = metadata)
       case None =>

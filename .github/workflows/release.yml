@@ -46,13 +46,13 @@ jobs:
 
       - name: Publish to GitHub Packages
         if: steps.version.outputs.next != ''
-        run: sbt publish
+        run: sbt -J-Xss4m publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build fat JAR
         if: steps.version.outputs.next != ''
-        run: sbt assembly
+        run: sbt -J-Xss4m assembly
 
       - name: Generate changelog
         id: changelog

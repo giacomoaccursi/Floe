@@ -39,13 +39,13 @@ jobs:
       - uses: sbt/setup-sbt@v1
 
       - name: Scalafmt check
-        run: sbt scalafmtCheckAll
+        run: sbt -J-Xss4m scalafmtCheckAll
 
       - name: Compile
-        run: sbt compile
+        run: sbt -J-Xss4m compile
 
       - name: Test
-        run: sbt test
+        run: sbt -J-Xss4m test
 
       - name: Publish test results
         uses: dorny/test-reporter@v1

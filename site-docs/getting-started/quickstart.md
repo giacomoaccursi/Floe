@@ -7,7 +7,6 @@ A minimal pipeline that reads a CSV, validates it, and writes to Iceberg — in 
 ```
 config/
 ├── global.yaml
-├── domains.yaml
 └── flows/
     └── customers.yaml
 ```

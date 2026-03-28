@@ -7,7 +7,7 @@ The framework loads configuration from a directory with this layout:
 ```
 config/
 ├── global.yaml          # Global settings (paths, processing, performance, Iceberg)
-├── domains.yaml         # Domain value definitions for validation
+├── domains.yaml         # Optional: domain value definitions for validation
 └── flows/
     ├── customers.yaml   # One file per flow
     ├── orders.yaml
@@ -22,7 +22,7 @@ IngestionPipeline.builder()
   .build()
 ```
 
-All three sections (`global.yaml`, `domains.yaml`, `flows/`) are required when using directory-based loading. Flow files must have `.yaml` or `.yml` extension.
+`global.yaml` and `flows/` are required. `domains.yaml` is optional — if absent, the framework uses empty domains (domain validation rules will fail if they reference a domain).
 
 ## Naming convention
 

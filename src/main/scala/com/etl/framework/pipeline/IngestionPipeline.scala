@@ -310,9 +310,9 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       case Right(config) =>
         logger.info(s"Loaded ${config.domains.size} domains from domains.yaml")
         config
-      case Left(error) =>
-        logger.warn(s"Could not load domains.yaml: ${error.getMessage}")
-        throw error
+      case Left(_) =>
+        logger.info("No domains.yaml found, using empty domains")
+        DomainsConfig(Map.empty)
     }
 
     val flowConfigs = flowConfigLoader.loadAll(s"$directory/flows", configVariables) match {
@@ -348,9 +348,9 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       case Right(config) =>
         logger.info(s"Loaded ${config.domains.size} domains from domains.yaml")
         config
-      case Left(error) =>
-        logger.warn(s"Could not load domains.yaml: ${error.getMessage}")
-        throw error
+      case Left(_) =>
+        logger.info("No domains.yaml found, using empty domains")
+        DomainsConfig(Map.empty)
     }
 
     // Store domainsConfig in builder for later use

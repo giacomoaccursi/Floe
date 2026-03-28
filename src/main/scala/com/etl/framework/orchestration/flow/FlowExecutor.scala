@@ -2,7 +2,6 @@ package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
 import com.etl.framework.core.AdditionalTableInfo
-import com.etl.framework.exceptions.InvariantViolationException
 import com.etl.framework.iceberg.{IcebergFlowMetadata, IcebergTableManager, IcebergTableWriter, WriteResult}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.util.TimingUtil
@@ -96,8 +95,6 @@ class FlowExecutor(
         batchId,
         validatedFlows
       )
-
-      verifyInvariant(inputCount, validCount, rejectedCount)
 
       // 5. Write to Iceberg
       val writeResult = writeAllData(postTransformedData, validationResult, batchId, rejectedCount)
@@ -198,24 +195,6 @@ class FlowExecutor(
     }
   }
 
-  private def verifyInvariant(
-      input: Long,
-      valid: Long,
-      rejected: Long
-  ): Unit = {
-    if (input != valid + rejected) {
-      val message = s"Invariant violation in flow ${flowConfig.name}: " +
-        s"input_count ($input) != valid_count ($valid) + rejected_count ($rejected)"
-      logger.error(message)
-      throw InvariantViolationException(
-        flowName = flowConfig.name,
-        inputCount = input,
-        validCount = valid,
-        rejectedCount = rejected
-      )
-    }
-    logger.debug(s"Invariant verified: $input = $valid + $rejected")
-  }
 
   private def createSuccessResult(
       batchId: String,

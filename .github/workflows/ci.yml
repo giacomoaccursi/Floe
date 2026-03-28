@@ -9,6 +9,7 @@ on:
 env:
   SPARK_LOCAL_IP: "127.0.0.1"
   JAVA_OPTS: "-Xmx2G"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   lint-commits:

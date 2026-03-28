@@ -25,13 +25,32 @@ class CustomRulesValidator(
         case ((currentDf, rejectedAcc), customRule) =>
           val validator =
             ValidatorFactory.create(customRule, domainsConfig, flowName)
-          val result = validator.validate(currentDf, customRule)
+
+          val skipNull = customRule.skipNull.getOrElse(true)
+          val targetColumn = customRule.column
+
+          val (dfForValidation, nullRows) =
+            if (skipNull && targetColumn.isDefined) {
+              val nulls = currentDf.filter(col(targetColumn.get).isNull)
+              val nonNulls = currentDf.filter(col(targetColumn.get).isNotNull)
+              (nonNulls, Some(nulls))
+            } else {
+              (currentDf, None)
+            }
+
+          val result = validator.validate(dfForValidation, customRule)
+
+          val resultWithNulls = nullRows match {
+            case Some(nulls) =>
+              ValidationStepResult(result.valid.unionByName(nulls), result.rejected)
+            case None => result
+          }
 
           customRule.onFailure match {
             case OnFailureAction.Reject =>
-              processRejectRule(currentDf, result, rejectedAcc)
+              processRejectRule(currentDf, resultWithNulls, rejectedAcc)
             case OnFailureAction.Warn =>
-              processWarnRule(currentDf, result, customRule, rejectedAcc)
+              processWarnRule(currentDf, resultWithNulls, customRule, rejectedAcc)
             case OnFailureAction.Skip =>
               (currentDf, rejectedAcc)
           }

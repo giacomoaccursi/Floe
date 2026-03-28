@@ -58,3 +58,4 @@ jobs:
           report_paths: "target/test-reports/TEST-*.xml"
           check_name: "Test Results"
           fail_on_failure: true
+          require_passed_tests: true

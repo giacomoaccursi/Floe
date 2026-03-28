@@ -41,8 +41,7 @@ loadMode:
 validation:
   primaryKey: [order_id]
   foreignKeys:
-    - name: fk_customer
-      column: customer_id
+    - column: customer_id
       references:
         flow: customers
         column: customer_id
@@ -64,12 +63,12 @@ output:
 
 ## Top-level fields
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name` | yes | Flow name — maps to the Iceberg table name |
-| `description` | yes | Human-readable description |
-| `version` | yes | Flow version string |
-| `owner` | yes | Team or person responsible |
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `name` | yes | — | Flow name — maps to the Iceberg table name |
+| `description` | no | `""` | Human-readable description |
+| `version` | no | `""` | Flow version string |
+| `owner` | no | `""` | Team or person responsible |
 
 ## source
 
@@ -104,7 +103,7 @@ Defines the expected schema and controls enforcement during read.
 | `name` | yes | — | Column name |
 | `type` | yes | — | Data type (see table below) |
 | `nullable` | yes | — | Whether the column allows NULL values. `false` triggers not-null validation. |
-| `description` | yes | — | Human-readable description |
+| `description` | no | `""` | Human-readable description |
 
 ### Column types
 
@@ -155,8 +154,7 @@ Defines data quality rules. For the complete validation reference, see [Validati
 validation:
   primaryKey: [order_id]
   foreignKeys:
-    - name: fk_customer
-      column: customer_id
+    - column: customer_id
       references:
         flow: customers
         column: customer_id
@@ -174,11 +172,12 @@ validation:
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `name` | string | yes | — | Descriptive name for the FK constraint |
 | `column` | string | yes | — | Column in the current flow |
 | `references.flow` | string | yes | — | Name of the parent flow |
 | `references.column` | string | yes | — | Column in the parent flow |
 | `onOrphan` | string | — | `warn` | Post-batch orphan action: `warn`, `delete`, `ignore`. See [Orphan Detection](../guides/orphan-detection.md). |
+
+The FK is identified by an auto-generated display name in the format `column -> references.flow.references.column` (e.g. `customer_id -> customers.customer_id`).
 
 ### Rule fields
 

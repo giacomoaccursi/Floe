@@ -70,9 +70,9 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | yes | Flow name (maps to Iceberg table) |
-| `description` | yes | Human-readable description |
-| `version` | yes | Flow version |
-| `owner` | yes | Responsible team/person |
+| `description` | no | Human-readable description (default `""`) |
+| `version` | no | Flow version (default `""`) |
+| `owner` | no | Responsible team/person (default `""`) |
 
 ### source
 
@@ -99,7 +99,7 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 | `name` | yes | — | Column name |
 | `type` | yes | — | Data type |
 | `nullable` | yes | — | Allow NULLs (`false` triggers not-null validation) |
-| `description` | yes | — | Human-readable description |
+| `description` | no | `""` | Human-readable description |
 
 ### Column types
 
@@ -143,11 +143,12 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `name` | yes | — | FK constraint name |
 | `column` | yes | — | Column in current flow |
 | `references.flow` | yes | — | Parent flow name |
 | `references.column` | yes | — | Parent column |
 | `onOrphan` | no | `warn` | `warn`, `delete`, `ignore` |
+
+The FK is identified by an auto-generated display name in the format `column -> references.flow.references.column` (e.g. `customer_id -> customers.customer_id`).
 
 ### validation.rules[]
 
@@ -195,8 +196,8 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | yes | DAG name |
-| `description` | no | Description |
-| `version` | no | Version |
+| `description` | no | Description (default `""`) |
+| `version` | no | Version (default `""`) |
 | `nodes` | yes | List of node definitions |
 
 ### nodes[]
@@ -204,7 +205,7 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `id` | yes | — | Unique node ID |
-| `description` | yes | — | Description |
+| `description` | no | `""` | Description |
 | `sourceFlow` | yes | — | Source flow name |
 | `sourcePath` | yes | — | Path to source data |
 | `sourceTable` | no | — | Iceberg table (overrides sourcePath) |

@@ -489,8 +489,7 @@ loadMode:
 validation:
   primaryKey: [order_id]
   foreignKeys:
-    - name: fk_customer
-      column: customer_id
+    - column: customer_id
       references:
         flow: customers
         column: customer_id

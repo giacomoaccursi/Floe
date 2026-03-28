@@ -24,8 +24,7 @@ Validation is configured per-flow in the `validation` section of the flow YAML:
 validation:
   primaryKey: [order_id]
   foreignKeys:
-    - name: fk_customer
-      column: customer_id
+    - column: customer_id
       references:
         flow: customers
         column: customer_id
@@ -139,8 +138,7 @@ Foreign keys validate that values in a child flow's column exist in a parent flo
 
 ```yaml
 foreignKeys:
-  - name: fk_customer
-    column: customer_id
+  - column: customer_id
     references:
       flow: customers
       column: customer_id
@@ -151,11 +149,12 @@ foreignKeys:
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `name` | string | yes | — | Descriptive name for the FK constraint |
 | `column` | string | yes | — | Column in the current flow |
 | `references.flow` | string | yes | — | Name of the parent flow |
 | `references.column` | string | yes | — | Column in the parent flow |
 | `onOrphan` | string | — | `warn` | Post-batch orphan action: `warn`, `delete`, `ignore` |
+
+The FK is identified by an auto-generated display name in the format `column -> references.flow.references.column` (e.g. `customer_id -> customers.customer_id`).
 
 ### Behavior
 
@@ -415,8 +414,7 @@ loadMode:
 validation:
   primaryKey: [order_id]
   foreignKeys:
-    - name: fk_customer
-      column: customer_id
+    - column: customer_id
       references:
         flow: customers
         column: customer_id

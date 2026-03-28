@@ -39,7 +39,7 @@ nodes:
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `id` | string | yes | — | Unique node identifier |
-| `description` | string | yes | — | Human-readable description |
+| `description` | string | no | `""` | Human-readable description |
 | `sourceFlow` | string | yes | — | Name of the source flow |
 | `sourcePath` | string | yes | — | Path to source data (Parquet) |
 | `sourceTable` | string | — | — | Iceberg table name (overrides `sourcePath`) |

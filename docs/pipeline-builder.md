@@ -39,6 +39,7 @@ val result = pipeline.execute()
 | `withPreValidationTransformation(flow, fn)` | Shorthand for pre-validation only |
 | `withPostValidationTransformation(flow, fn)` | Shorthand for post-validation only |
 | `withCatalogProvider(type, provider)` | Registers a custom Iceberg catalog provider |
+| `withVariables(variables)` | Sets variables for YAML substitution (priority over env vars). See [configuration.md](configuration.md#variable-substitution) |
 | `build()` | Builds the pipeline (returns `IngestionPipeline`) |
 
 The builder does not have an `execute()` method — call `build()` first, then `execute()` on the returned pipeline.

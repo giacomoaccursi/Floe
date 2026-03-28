@@ -36,7 +36,7 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
   ): JoinConfig = JoinConfig(
     `type` = joinType,
     parent = "parent_node",
-    on = Seq(JoinCondition("id", "parent_id")),
+    conditions = Seq(JoinCondition("id", "parent_id")),
     strategy = JoinStrategy.Nest,
     nestAs = Some(nestAs),
     aggregations = Seq.empty

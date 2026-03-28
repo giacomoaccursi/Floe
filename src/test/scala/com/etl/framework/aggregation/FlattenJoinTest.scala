@@ -34,7 +34,7 @@ class FlattenJoinTest extends AnyFlatSpec with Matchers {
   ): JoinConfig = JoinConfig(
     `type` = joinType,
     parent = "parent_node",
-    on = Seq(JoinCondition("id", "parent_id")),
+    conditions = Seq(JoinCondition("id", "parent_id")),
     strategy = JoinStrategy.Flatten,
     nestAs = None,
     aggregations = Seq.empty
@@ -110,5 +110,24 @@ class FlattenJoinTest extends AnyFlatSpec with Matchers {
     val result = executor.applyJoin(parentDF, singleChildDF, joinConfig)
 
     result.count() shouldBe parentRecords.size.toLong
+  }
+
+  it should "handle join key with same name in both tables without ambiguity" in {
+    // Both parent and child share the same join key column name: "product_id"
+    val parentDF = Seq((1, "Widget"), (2, "Gadget")).toDF("product_id", "product_name")
+    val childDF  = Seq((10, 1, 5), (11, 1, 3), (12, 2, 7)).toDF("order_id", "product_id", "quantity")
+
+    val joinConfig = JoinConfig(
+      `type` = JoinType.Inner,
+      parent = "products",
+      conditions = Seq(JoinCondition("product_id", "product_id")),
+      strategy = JoinStrategy.Flatten
+    )
+
+    val executor = new JoinStrategyExecutor()
+    val result = executor.applyJoin(parentDF, childDF, joinConfig)
+
+    result.count() shouldBe 3L
+    result.columns should contain allOf("product_id", "product_name", "order_id", "quantity")
   }
 }

@@ -351,7 +351,7 @@ class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
             Seq(s"node '${node.id}' references missing join parent '${joinConfig.parent}'")
           else Seq.empty
         val emptyOn =
-          if (joinConfig.on.isEmpty)
+          if (joinConfig.conditions.isEmpty)
             Seq(s"node '${node.id}' has a join with no conditions")
           else Seq.empty
         missingParent ++ emptyOn

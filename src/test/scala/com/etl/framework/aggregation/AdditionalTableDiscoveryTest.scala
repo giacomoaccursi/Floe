@@ -141,9 +141,9 @@ class AdditionalTableDiscoveryTest extends AnyFlatSpec with Matchers {
       joinConfig.parent shouldBe "orders_node"
       joinConfig.strategy shouldBe JoinStrategy.Nest
       joinConfig.nestAs shouldBe Some("line_items")
-      joinConfig.on should have size 1
-      joinConfig.on.head.left shouldBe "order_id"
-      joinConfig.on.head.right shouldBe "order_id"
+      joinConfig.conditions should have size 1
+      joinConfig.conditions.head.left shouldBe "order_id"
+      joinConfig.conditions.head.right shouldBe "order_id"
     } finally {
       deleteRecursively(tempDir)
     }

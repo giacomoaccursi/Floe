@@ -123,7 +123,7 @@ class AdditionalTableDiscovery(globalConfig: GlobalConfig) {
       JoinConfig(
         `type` = LeftOuter,
         parent = s"${parentFlow}_node",
-        on = keys.map(key => JoinCondition(left = key, right = key)),
+        conditions = keys.map(key => JoinCondition(left = key, right = key)),
         strategy = Nest,
         nestAs = Some(table.tableName),
         aggregations = Seq.empty

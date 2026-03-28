@@ -40,7 +40,7 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
         JoinConfig(
           `type` = JoinType.LeftOuter,
           parent = joinParent,
-          on = Seq(JoinCondition("id", "id")),
+          conditions = Seq(JoinCondition("id", "id")),
           strategy = JoinStrategy.Nest
         )
       )

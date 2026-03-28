@@ -64,9 +64,9 @@ class DAGGraphBuilder(globalConfig: GlobalConfig) {
             s"Node '${node.id}' references join parent '${joinConfig.parent}' which does not exist"
           )
         }
-        if (joinConfig.on.isEmpty) {
+        if (joinConfig.conditions.isEmpty) {
           throw new IllegalStateException(
-            s"Node '${node.id}' has a join configuration with no join conditions (on is empty)"
+            s"Node '${node.id}' has a join configuration with no join conditions (conditions is empty)"
           )
         }
       }

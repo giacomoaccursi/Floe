@@ -185,10 +185,7 @@ object PKValidationProperties extends Properties("PKValidation") {
           // All records should be in valid DataFrame
           val allRecordsValid = result.valid.count() == records.size
 
-          // Valid records should have warnings column
-          val hasWarningsColumn = result.valid.columns.contains(WARNINGS)
-
-          noPKRejections && allRecordsValid && hasWarningsColumn
+          noPKRejections && allRecordsValid
         }
       }.getOrElse(false)
   }

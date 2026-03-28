@@ -63,7 +63,7 @@ class CustomValidatorSkipNullTest extends AnyFlatSpec with Matchers {
       ("2", None),
       ("3", Some("b"))
     ).toDF("id", "value")
-      .withColumn(ValidationColumns.WARNINGS, array().cast("array<string>"))
+      
 
     val flowConfig = makeFlowConfig(skipNull = true)
     val validator = new CustomRulesValidator(flowConfig, None, Some("test"))
@@ -80,7 +80,7 @@ class CustomValidatorSkipNullTest extends AnyFlatSpec with Matchers {
       ("2", None),
       ("3", Some("b"))
     ).toDF("id", "value")
-      .withColumn(ValidationColumns.WARNINGS, array().cast("array<string>"))
+      
 
     val flowConfig = makeFlowConfig(skipNull = false)
     val validator = new CustomRulesValidator(flowConfig, None, Some("test"))

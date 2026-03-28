@@ -39,7 +39,7 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
     )
   }
 
-  "ValidationEngine" should "initialize DataFrame with warnings column" in {
+  "ValidationEngine" should "not add internal columns to the valid DataFrame" in {
     val schema = StructType(Seq(StructField("id", StringType, false)))
     val data = Seq(Row("1"), Row("2"))
     val df = spark.createDataFrame(data.asJava, schema)
@@ -51,7 +51,7 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
 
     val result = engine.validate(df, flowConfig)
 
-    result.valid.columns should contain(WARNINGS)
+    result.valid.columns.filter(_.startsWith("_")) shouldBe empty
   }
 
   it should "chain multiple validators sequentially" in {

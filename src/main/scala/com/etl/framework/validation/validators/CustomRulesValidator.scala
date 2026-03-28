@@ -6,8 +6,8 @@ import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-/** Validator for custom validation rules with reject/warn support This validator orchestrates multiple validators, so
-  * it implements Validator directly rather than extending BaseValidator
+/** Validator for custom validation rules with reject/warn support. Orchestrates
+  * multiple validators and handles skipNull for all rule types.
   */
 class CustomRulesValidator(
     flowConfig: FlowConfig,
@@ -20,11 +20,10 @@ class CustomRulesValidator(
       df: DataFrame,
       rule: ValidationRule
   ): ValidationStepResult = {
-    val (finalDf, finalRejected) =
-      flowConfig.validation.rules.foldLeft((df, Option.empty[DataFrame])) {
-        case ((currentDf, rejectedAcc), customRule) =>
-          val validator =
-            ValidatorFactory.create(customRule, domainsConfig, flowName)
+    val (finalDf, finalRejected, finalWarned) =
+      flowConfig.validation.rules.foldLeft((df, Option.empty[DataFrame], Option.empty[DataFrame])) {
+        case ((currentDf, rejectedAcc, warnedAcc), customRule) =>
+          val validator = ValidatorFactory.create(customRule, domainsConfig, flowName)
 
           val skipNull = customRule.skipNull.getOrElse(true)
           val targetColumn = customRule.column
@@ -48,98 +47,42 @@ class CustomRulesValidator(
 
           customRule.onFailure match {
             case OnFailureAction.Reject =>
-              processRejectRule(currentDf, resultWithNulls, rejectedAcc)
+              val updatedRejected = ValidationUtils.combineRejected(rejectedAcc, resultWithNulls.rejected)
+              (resultWithNulls.valid, updatedRejected, warnedAcc)
+
             case OnFailureAction.Warn =>
-              processWarnRule(currentDf, resultWithNulls, customRule, rejectedAcc)
+              val updatedWarned = resultWithNulls.rejected match {
+                case Some(failedDf) if !failedDf.isEmpty =>
+                  val warningDf = buildWarningDf(failedDf, customRule)
+                  ValidationUtils.combineRejected(warnedAcc, Some(warningDf))
+                case _ => warnedAcc
+              }
+              // Record stays valid — do not remove from currentDf
+              (currentDf, rejectedAcc, updatedWarned)
+
             case OnFailureAction.Skip =>
-              (currentDf, rejectedAcc)
+              (currentDf, rejectedAcc, warnedAcc)
           }
       }
 
-    ValidationStepResult(finalDf, finalRejected)
+    ValidationStepResult(finalDf, finalRejected, finalWarned)
   }
 
-  /** Processes a rule with reject behavior
+  /** Builds a warning DataFrame with PK columns + warning metadata.
     */
-  private def processRejectRule(
-      currentDf: DataFrame,
-      result: ValidationStepResult,
-      rejectedAcc: Option[DataFrame]
-  ): (DataFrame, Option[DataFrame]) = {
-    val updatedRejected =
-      ValidationUtils.combineRejected(rejectedAcc, result.rejected)
-    (result.valid, updatedRejected)
-  }
+  private def buildWarningDf(failedDf: DataFrame, rule: ValidationRule): DataFrame = {
+    val pkColumns = flowConfig.validation.primaryKey
+    val pkSelect = if (pkColumns.nonEmpty) pkColumns else failedDf.columns.filterNot(_.startsWith("_")).toSeq
 
-  /** Processes a rule with warn behavior
-    */
-  private def processWarnRule(
-      currentDf: DataFrame,
-      result: ValidationStepResult,
-      rule: ValidationRule,
-      rejectedAcc: Option[DataFrame]
-  ): (DataFrame, Option[DataFrame]) = {
-    val updatedDf = addWarningsToFailedRecords(currentDf, result, rule)
-    (updatedDf, rejectedAcc)
-  }
-
-  /** Adds warning messages to records that failed validation
-    */
-  private def addWarningsToFailedRecords(
-      df: DataFrame,
-      result: ValidationStepResult,
-      rule: ValidationRule
-  ): DataFrame = {
-    result.rejected match {
-      case None                               => df
-      case Some(rejected) if rejected.isEmpty => df
-      case Some(rejected) =>
-        val pkColumns = getPrimaryKeyColumns(df)
-        val warningMessage = createWarningMessage(rule)
-        val failedRecords = rejected.select(pkColumns.map(col): _*)
-
-        joinWarningsToDataFrame(df, failedRecords, pkColumns, warningMessage)
-    }
-  }
-
-  /** Gets primary key columns for identifying records
-    */
-  private def getPrimaryKeyColumns(df: DataFrame): Seq[String] = {
-    if (flowConfig.validation.primaryKey.nonEmpty) {
-      flowConfig.validation.primaryKey
-    } else {
-      // If no PK defined, use all columns as identifier (excluding metadata columns)
-      df.columns.filterNot(_.startsWith("_")).toSeq
-    }
-  }
-
-  /** Creates a warning message for a validation rule
-    */
-  private def createWarningMessage(rule: ValidationRule): String = {
-    rule.description.getOrElse(
+    val warningMessage = rule.description.getOrElse(
       s"${rule.`type`.name} validation failed for column '${rule.column.getOrElse("unknown")}'"
     )
-  }
 
-  /** Joins warning messages to the DataFrame
-    */
-  private def joinWarningsToDataFrame(
-      df: DataFrame,
-      failedRecords: DataFrame,
-      pkColumns: Seq[String],
-      warningMessage: String
-  ): DataFrame = {
-    df.join(
-      failedRecords.withColumn(WARNING_MSG, lit(warningMessage)),
-      pkColumns,
-      "left"
-    ).withColumn(
-      WARNINGS,
-      when(
-        col(WARNING_MSG).isNotNull,
-        array_union(col(WARNINGS), array(col(WARNING_MSG)))
-      )
-        .otherwise(col(WARNINGS))
-    ).drop(WARNING_MSG)
+    failedDf
+      .select(pkSelect.map(col): _*)
+      .withColumn(WARNING_RULE, lit(rule.`type`.name))
+      .withColumn(WARNING_MESSAGE, lit(warningMessage))
+      .withColumn(WARNING_COLUMN, lit(rule.column.getOrElse("unknown")))
+      .withColumn(WARNED_AT, current_timestamp())
   }
 }

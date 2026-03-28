@@ -158,6 +158,10 @@ class FlowExecutor(
       dataWriter.writeRejected(validationResult.rejected.get, batchId)
     }
 
+    validationResult.warned.foreach { warnedDf =>
+      dataWriter.writeWarnings(warnedDf, batchId)
+    }
+
     writeAdditionalTables(batchId)
     writeResult
   }

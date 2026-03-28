@@ -31,7 +31,6 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit
   ): ValidationResult = {
 
     val flowName = Some(flowConfig.name)
-    val initialDf = df.withColumn(WARNINGS, array().cast("array<string>"))
 
     val validationSteps: Seq[ValidationStep] = Seq(
       ValidationStep(
@@ -64,7 +63,7 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit
     // Execute validation steps
     val finalState = validationSteps
       .filter(_.shouldExecute)
-      .foldLeft(ValidationState(initialDf, None)) { (state, step) =>
+      .foldLeft(ValidationState(df, None, None)) { (state, step) =>
         executeValidationStep(state, step)
       }
 
@@ -84,6 +83,7 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit
     ValidationResult(
       finalState.valid,
       finalState.rejected,
+      finalState.warned,
       rejectionReasons
     )
   }
@@ -98,7 +98,8 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit
 
     ValidationState(
       valid = result.valid,
-      rejected = ValidationUtils.combineRejected(state.rejected, result.rejected)
+      rejected = ValidationUtils.combineRejected(state.rejected, result.rejected),
+      warned = ValidationUtils.combineRejected(state.warned, result.warned)
     )
   }
 }
@@ -115,7 +116,8 @@ private case class ValidationStep(
   */
 private case class ValidationState(
     valid: DataFrame,
-    rejected: Option[DataFrame]
+    rejected: Option[DataFrame],
+    warned: Option[DataFrame]
 )
 
 /** Result of validation containing valid and rejected DataFrames
@@ -123,6 +125,7 @@ private case class ValidationState(
 case class ValidationResult(
     valid: DataFrame,
     rejected: Option[DataFrame],
+    warned: Option[DataFrame] = None,
     rejectionReasons: Map[String, Long] = Map.empty
 )
 
@@ -130,5 +133,6 @@ case class ValidationResult(
   */
 case class ValidationStepResult(
     valid: DataFrame,
-    rejected: Option[DataFrame]
+    rejected: Option[DataFrame],
+    warned: Option[DataFrame] = None
 )

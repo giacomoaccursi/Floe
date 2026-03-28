@@ -71,7 +71,6 @@ class SchemaValidationTest extends AnyFlatSpec with Matchers {
 
     result.valid.count() shouldBe 3
     result.rejected shouldBe None
-    result.valid.columns should contain(WARNINGS)
   }
 
   it should "reject all records when multiple required columns are missing" in {

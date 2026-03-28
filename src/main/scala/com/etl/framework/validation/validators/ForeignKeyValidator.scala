@@ -32,7 +32,7 @@ class ForeignKeyValidator(
           .toMap
 
       flowConfig.validation.foreignKeys.foldLeft(ValidationStepResult(df, None)) {
-        case (ValidationStepResult(currentDf, rejectedAcc), fk) =>
+        case (ValidationStepResult(currentDf, rejectedAcc, _), fk) =>
           broadcastedRefs.get((fk.references.flow, fk.references.column)) match {
             case None =>
               throw ValidationConfigException(

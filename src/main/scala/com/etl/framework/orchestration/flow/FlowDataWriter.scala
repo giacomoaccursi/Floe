@@ -54,6 +54,21 @@ class FlowDataWriter(
     }
   }
 
+  /** Writes validation warnings (PK + warning metadata) to a separate Parquet file.
+    */
+  def writeWarnings(warnedData: DataFrame, batchId: String): Unit = {
+    val warningsPath = s"${globalConfig.paths.rejectedPath}/${flowConfig.name}_warnings"
+
+    TimingUtil.timed(logger, s"Write warnings to $warningsPath") {
+      warnedData
+        .withColumn(BATCH_ID, lit(batchId))
+        .write
+        .mode(SaveMode.Overwrite)
+        .format("parquet")
+        .save(warningsPath)
+    }
+  }
+
   /** Writes an additional table
     */
   def writeAdditionalTable(

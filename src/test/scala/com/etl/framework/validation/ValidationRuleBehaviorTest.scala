@@ -140,7 +140,7 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
     result.rejected.forall(_.count() == 0) shouldBe true
   }
 
-  "Warn behavior" should "add warnings to failing records without rejecting them" in {
+  "Warn behavior" should "keep failing records in valid without rejecting them" in {
     val df = allRecords.toDF()
     val flowConfig = flowConfigWithRegexRule(OnFailureAction.Warn)
 
@@ -154,45 +154,24 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
     }
     noRegexRejections shouldBe true
 
-    result.valid.columns should contain(WARNINGS)
-
-    val invalidEmailRecords = result.valid
-      .filter(!f.col("email").rlike(emailPattern))
-
-    if (!invalidEmailRecords.isEmpty) {
-      invalidEmailRecords
-        .filter(f.size(f.col(WARNINGS)) > 0)
-        .count() shouldBe invalidEmailRecords.count()
-    }
+    // All records (valid and invalid emails) should be in the valid DataFrame
+    result.valid.count() should be >= allRecords.size.toLong
   }
 
-  it should "produce descriptive warning content" in {
+  it should "produce warned DataFrame with warning metadata" in {
     val df = allRecords.toDF()
     val flowConfig = flowConfigWithRegexRule(OnFailureAction.Warn)
 
     val engine = new ValidationEngine()
     val result = engine.validate(df, flowConfig)
 
-    val invalidEmailRecords = result.valid
-      .filter(!f.col("email").rlike(emailPattern))
-
-    if (!invalidEmailRecords.isEmpty) {
-      invalidEmailRecords
-        .select(WARNINGS)
-        .collect()
-        .foreach { row =>
-          val warnings = row.getSeq[String](0)
-          warnings should not be empty
-          warnings.exists { w =>
-            w.toLowerCase.contains("email") ||
-            w.toLowerCase.contains("validation") ||
-            w.toLowerCase.contains("pattern")
-          } shouldBe true
-        }
-    }
+    result.warned shouldBe defined
+    val warned = result.warned.get
+    warned.columns should contain allOf (WARNING_RULE, WARNING_MESSAGE, WARNING_COLUMN, WARNED_AT)
+    warned.count() should be > 0L
   }
 
-  it should "leave empty warnings on passing records" in {
+  it should "not produce warnings for passing records" in {
     val onlyValidRecords = validRecords
     val df = onlyValidRecords.toDF()
     val flowConfig = flowConfigWithRegexRule(OnFailureAction.Warn)
@@ -200,13 +179,10 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
     val engine = new ValidationEngine()
     val result = engine.validate(df, flowConfig)
 
-    result.valid
-      .select(WARNINGS)
-      .collect()
-      .foreach { row =>
-        val warnings = row.getSeq[String](0)
-        warnings.filter(w => w.toLowerCase.contains("email") && w.toLowerCase.contains("pattern")) shouldBe empty
-      }
+    result.warned match {
+      case Some(warned) => warned.isEmpty shouldBe true
+      case None         => succeed
+    }
   }
 
   it should "preserve record count (input = valid + rejected)" in {
@@ -230,7 +206,6 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
     val result = engine.validate(df, flowConfig)
 
     result.valid.count() shouldBe 0
-    result.valid.columns should contain(WARNINGS)
   }
 
   "RangeValidator on string column" should "use numeric comparison, not lexicographic" in {

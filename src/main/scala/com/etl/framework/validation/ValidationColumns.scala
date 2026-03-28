@@ -10,9 +10,9 @@ object ValidationColumns {
   val BATCH_ID = "_batch_id"
   val VALIDATION_STEP = "_validation_step"
 
-  // Validation warning columns
-  val WARNINGS = "_warnings"
-
-  // Internal processing columns
-  private[validation] val WARNING_MSG = "_warning_msg"
+  // Warning tracking columns (written to separate Parquet, not to Iceberg)
+  val WARNING_RULE = "_warning_rule"
+  val WARNING_MESSAGE = "_warning_message"
+  val WARNING_COLUMN = "_warning_column"
+  val WARNED_AT = "_warned_at"
 }

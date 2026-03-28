@@ -102,6 +102,26 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
     parentColumns.subsetOf(result.columns.toSet) shouldBe true
   }
 
+  it should "handle join key with same name in both tables without ambiguity" in {
+    val parentDF = Seq((1, "Alice"), (2, "Bob")).toDF("customer_id", "name")
+    val childDF  = Seq((10, 1, "shipped"), (11, 1, "pending"), (12, 2, "shipped"))
+      .toDF("order_id", "customer_id", "status")
+
+    val joinConfig = JoinConfig(
+      `type` = JoinType.LeftOuter,
+      parent = "customers",
+      conditions = Seq(JoinCondition("customer_id", "customer_id")),
+      strategy = JoinStrategy.Nest,
+      nestAs = Some("orders")
+    )
+
+    val executor = new JoinStrategyExecutor()
+    val result = executor.applyJoin(parentDF, childDF, joinConfig)
+
+    result.columns should contain allOf("customer_id", "name", "orders")
+    result.count() shouldBe 2L
+  }
+
   it should "produce empty arrays for parents without children" in {
     val parentDF = parentRecords.toDF("id", "name", "value")
     val emptyChildDF =

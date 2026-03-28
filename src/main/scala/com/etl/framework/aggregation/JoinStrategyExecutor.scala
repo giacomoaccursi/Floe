@@ -60,7 +60,9 @@ class JoinStrategyExecutor {
       joinConfig.`type`.sparkType
     )
 
-    val columnsToKeep = parent.columns.map(joined(_)) :+
+    // Use parent-qualified column references to avoid ambiguity when the join key
+    // has the same name in both parent and groupedChild
+    val columnsToKeep = parent.columns.map(parent(_)) :+
       coalesce(
         joined(nestFieldName),
         array().cast(joined.schema(nestFieldName).dataType)
@@ -162,7 +164,10 @@ class JoinStrategyExecutor {
       joinConfig.`type`.sparkType
     )
 
-    val columnsToKeep = parent.columns ++ joinConfig.aggregations.map(_.alias)
-    result.select(columnsToKeep.map(col): _*)
+    // Use parent-qualified references for parent columns and aggregatedChild references
+    // for aggregation aliases to avoid ambiguity on shared join key names
+    val parentSelects = parent.columns.map(parent(_))
+    val aggSelects    = joinConfig.aggregations.map(spec => aggregatedChild(spec.alias))
+    result.select((parentSelects ++ aggSelects): _*)
   }
 }

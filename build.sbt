@@ -56,6 +56,7 @@ scalacOptions ++= Seq(
 // Test options
 Test / parallelExecution := false
 Test / fork := true
+Test / testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-u", "target/test-reports")
 Test / javaOptions ++= Seq(
   "-Xmx2G",
   // Java 17+ module access for Spark

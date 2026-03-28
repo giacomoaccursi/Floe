@@ -30,7 +30,7 @@ Source File(s)
      │ Final DataFrame
      ▼
 ┌─────────┐
-│  Write  │  MERGE INTO (delta) / overwritePartitions (full) / SCD2
+│  Write  │  MERGE INTO (delta) / overwrite (full) / SCD2
 └────┬────┘
      │
      ▼
@@ -123,7 +123,7 @@ The `IcebergTableWriter` selects the write strategy based on `loadMode.type`:
 
 ### Full load
 
-`writeTo().overwritePartitions()` — atomically replaces all data. Previous data remains accessible via time travel until snapshot expiration.
+`writeTo().overwrite(lit(true))` — atomically replaces all existing rows regardless of partitioning. Even an empty source clears the table. Previous data remains accessible via time travel until snapshot expiration.
 
 ### Delta (upsert)
 

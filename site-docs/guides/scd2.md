@@ -207,7 +207,7 @@ Example: if `compareColumns: [tier, credit_limit]` and only the email changes, n
 - Columns that change every batch without historical value (update timestamps, technical flags)
 - Primary key columns (cannot change by definition)
 
-**If `compareColumns` is empty:** all non-PK and non-SCD2 columns are compared. This is the default but tends to generate versions even for irrelevant changes.
+**If `compareColumns` is empty:** the config loader rejects the configuration. `compareColumns` is required and must be non-empty for SCD2.
 
 ## is_current vs is_active
 

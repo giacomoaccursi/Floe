@@ -21,9 +21,9 @@ case class FlowConfig(
 /** Source configuration
   */
 case class SourceConfig(
-    `type`: SourceType, // "file" | "jdbc" | "api" | "kafka"
+    `type`: SourceType, // "file"
     path: String,
-    format: FileFormat, // "csv" | "parquet" | "json" | "avro"
+    format: FileFormat, // "csv" | "parquet" | "json"
     options: Map[String, String],
     filePattern: Option[String] = None
 )

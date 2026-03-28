@@ -14,7 +14,8 @@ High-level architecture of the Spark ETL Framework: how modules interact, the en
                ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │                      orchestration                                │
-│  BatchOrchestrator · FlowOrchestrator · MetadataManager          │
+│  FlowOrchestrator · FlowGroupExecutor · ExecutionPlanBuilder     │
+│  BatchMetadataWriter · ExecutionLogger                           │
 │  Flow ordering (FK deps) · Parallel execution · Batch lifecycle  │
 └──────┬──────────┬──────────┬──────────┬─────────────────────────┘
        │          │          │          │

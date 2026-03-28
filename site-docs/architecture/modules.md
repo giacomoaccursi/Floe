@@ -10,7 +10,7 @@ Detailed responsibilities of each module in the framework.
 | `validation` | Validation engine (schema, not-null, PK, FK, custom rules) |
 | `merge` | *(dead code)* Pre-Iceberg in-memory merge — no longer used |
 | `iceberg` | Iceberg table writes (full/delta/SCD2) |
-| `io` | Data readers: file (CSV, Parquet, JSON), JDBC |
+| `io` | Data readers: file (CSV, Parquet, JSON) |
 | `aggregation` | DAG execution for layered joins and aggregations |
 | `orchestration` | Flow and batch orchestration, metadata, logging |
 | `pipeline` | Ingestion pipeline entry point and fluent builder API |
@@ -53,7 +53,7 @@ See [Validation Engine](../guides/validation.md).
 Handles all Iceberg table operations:
 
 - **Table management**: CREATE TABLE IF NOT EXISTS, schema evolution (ADD COLUMN), partition spec updates, table property updates
-- **Write strategies**: full load (overwritePartitions), delta (MERGE INTO with value-based change detection), SCD2 (NULL merge-key trick)
+- **Write strategies**: full load (overwrite), delta (MERGE INTO with value-based change detection), SCD2 (NULL merge-key trick)
 - **Snapshot management**: tagging, metadata capture, rollback
 - **Maintenance**: snapshot expiration, data compaction, orphan file cleanup, manifest rewrite
 - **Orphan detection**: post-batch FK integrity using time travel
@@ -69,7 +69,7 @@ Data readers for various source types. Currently supports file-based sources:
 - **Parquet** — self-describing format, minimal options needed
 - **JSON** — JSON lines format
 
-Uses `DataReaderFactory` to create the appropriate reader based on `source.type`. Supports optional schema enforcement during read (converts `SchemaConfig` to Spark `StructType`).
+Uses `DataReaderFactory` to create the appropriate reader based on `source.type`. Only `file` is supported. Supports optional schema enforcement during read (converts `SchemaConfig` to Spark `StructType`).
 
 See [Data Sources](../guides/data-sources.md).
 
@@ -90,9 +90,11 @@ See [DAG Aggregation](../guides/dag-aggregation.md).
 
 Coordinates batch and flow execution:
 
-- **BatchOrchestrator** — manages the batch lifecycle: flow ordering, execution, post-batch operations
 - **FlowOrchestrator** — executes a single flow: read → transform → validate → transform → write
-- **MetadataManager** — writes batch and flow metadata JSON files
+- **FlowGroupExecutor** — manages the batch lifecycle: flow ordering, execution, post-batch operations
+- **ExecutionPlanBuilder** — analyzes FK dependencies, topological sort, groups independent flows
+- **BatchMetadataWriter** — writes batch and flow metadata JSON files
+- **ExecutionLogger** — structured logging for batch and flow execution
 - **Flow ordering** — analyzes FK dependencies, topological sort, groups independent flows
 - **Parallel execution** — bounded thread pool for concurrent flow/node execution
 

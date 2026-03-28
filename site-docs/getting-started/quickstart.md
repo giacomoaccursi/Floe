@@ -98,8 +98,7 @@ validation:
       skipNull: true
       onFailure: reject
 
-output:
-  compression: snappy
+output: {}
 ```
 
 ## 5. Create sample data

@@ -175,7 +175,7 @@ YAML configuration:
 
 Custom validators interact with the standard `skipNull` and `onFailure` settings:
 
-- **skipNull**: the framework handles NULL filtering before calling your validator when `skipNull: true` (default). Your `validate` method receives a DataFrame where NULL values in the target column have already been separated. If `skipNull: false`, NULLs are included and your validator must handle them.
+- **skipNull**: the built-in validators (regex, range, domain) extend `BaseValidator`, which handles `skipNull` automatically. Custom class validators implement `Validator` directly and receive the full DataFrame — your `validate` method must handle NULL values itself. Check `rule.skipNull` and filter NULLs in your implementation if needed.
 
 - **onFailure**: the framework applies the `onFailure` action (reject, warn, skip) based on the `ValidationStepResult` you return. If `onFailure: skip`, your validator is never called.
 

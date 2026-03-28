@@ -21,12 +21,12 @@ domains:
 
 ## Domain fields
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `name` | — | Domain identifier (must match the map key) |
-| `description` | — | Human-readable description |
-| `values` | — | List of allowed values |
-| `caseSensitive` | `true` | If false, comparison is case-insensitive |
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `name` | yes | — | Domain identifier (must match the map key) |
+| `description` | yes | — | Human-readable description |
+| `values` | yes | — | List of allowed values |
+| `caseSensitive` | no | `true` | If false, comparison is case-insensitive |
 
 ## Usage in flow validation
 

@@ -109,6 +109,7 @@ Each flow produces a `FlowResult`:
 | `validRecords` | `Long` | Records that passed validation |
 | `rejectedRecords` | `Long` | Records that failed validation |
 | `rejectionRate` | `Double` | `rejectedRecords / inputRecords` |
+| `mergedRecords` | `Long` | Records after merge (equals inputRecords in current implementation) |
 | `executionTimeMs` | `Long` | Flow execution time in milliseconds |
 | `rejectionReasons` | `Map[String, Long]` | Count of rejections per validation step |
 | `error` | `Option[String]` | Error message if the flow failed |

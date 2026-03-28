@@ -36,7 +36,7 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 | `warehouse` | — (required) | Iceberg warehouse directory |
 | `fileFormat` | `parquet` | Default data file format |
 | `enableSnapshotTagging` | `true` | Tag snapshots with batch ID |
-| `catalogProperties` | `{}` | Additional catalog key-value properties |
+| `catalogProperties` | `{}` | Additional key-value properties passed to the catalog provider |
 
 ### iceberg.maintenance
 
@@ -70,9 +70,9 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | yes | Flow name (maps to Iceberg table) |
-| `description` | no | Human-readable description |
-| `version` | no | Flow version |
-| `owner` | no | Responsible team/person |
+| `description` | yes | Human-readable description |
+| `version` | yes | Flow version |
+| `owner` | yes | Responsible team/person |
 
 ### source
 
@@ -86,11 +86,11 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 
 ### schema
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `enforceSchema` | — | Validate columns and apply Spark schema during read |
-| `allowExtraColumns` | — | Reject data with undeclared columns |
-| `columns` | — | List of column definitions |
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `enforceSchema` | yes | — | Validate columns and apply Spark schema during read |
+| `allowExtraColumns` | yes | — | Reject data with undeclared columns |
+| `columns` | yes | — | List of column definitions |
 
 ### schema.columns[]
 
@@ -135,7 +135,7 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `primaryKey` | yes | List of PK columns (must not be empty) |
+| `primaryKey` | yes | List of PK columns. Must be non-empty for SCD2; for other modes an empty list skips PK validation |
 | `foreignKeys` | no | List of FK definitions |
 | `rules` | no | List of validation rules |
 

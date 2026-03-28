@@ -122,14 +122,14 @@ In the child flow's YAML configuration, each FK declares its own `onOrphan`:
 
 ```yaml
 validation:
-  primary-key: [order_id]
-  foreign-keys:
+  primaryKey: [order_id]
+  foreignKeys:
     - name: fk_customer
       column: customer_id
       references:
         flow: customers
         column: customer_id
-      on-orphan: warn      # warn | delete | ignore
+      onOrphan: warn      # warn | delete | ignore
 ```
 
 The default is `warn`: report the problem without touching the data.

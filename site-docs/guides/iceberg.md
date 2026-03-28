@@ -92,7 +92,7 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 
 ### Catalog provider
 
-The catalog system is pluggable. `ICatalogProvider` is a trait with three methods: `catalogType`, `configureCatalog`, and `validateConfig`. The built-in `HadoopCatalogProvider` configures SparkSession with:
+The catalog system is pluggable. `CatalogProvider` is a trait with methods: `catalogType`, `sparkSessionConfig`, `configureCatalog`, and `validateConfig`. The built-in `HadoopCatalogProvider` configures SparkSession with:
 
 ```
 spark.sql.catalog.{name}          = org.apache.iceberg.spark.SparkCatalog
@@ -101,7 +101,7 @@ spark.sql.catalog.{name}.warehouse = {path}
 spark.sql.extensions               = org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
 ```
 
-`CatalogFactory` maps the `catalog-type` string to the right provider. Adding a new catalog type (Hive, REST, Nessie, Glue) means implementing the trait and registering it in the factory. See [Pipeline Builder — Custom catalog providers](pipeline-builder.md#custom-catalog-providers) for details.
+`CatalogFactory` maps the `catalogType` string to the right provider. Adding a new catalog type (Hive, REST, Nessie, Glue) means implementing the trait and registering it in the factory. See [Pipeline Builder — Custom catalog providers](pipeline-builder.md#custom-catalog-providers) for details.
 
 ### Table naming
 
@@ -227,13 +227,12 @@ All writes go through `IcebergTableWriter`, which selects the appropriate strate
 
 ### Full load
 
-Replaces all data atomically using `writeTo().overwritePartitions()`. The previous data is not deleted from disk until snapshot expiration runs; it remains accessible via time travel.
+Replaces all data atomically using `writeTo().overwrite(lit(true))`. This replaces all existing rows regardless of partitioning — even an empty source clears the table. The previous data is not deleted from disk until snapshot expiration runs; it remains accessible via time travel.
 
-The snapshot summary includes `replace-partitions: true` to distinguish full reloads from delta writes:
+The snapshot summary includes `overwritten-records` to distinguish full reloads from delta writes:
 
 ```json
 {
-  "replace-partitions": "true",
   "added-records": "35",
   "deleted-records": "35",
   "total-records": "35"
@@ -370,7 +369,6 @@ The snapshot summary contains file-level statistics, not row-level change counts
 | `added-data-files` | Number of new data files written |
 | `deleted-data-files` | Number of old data files replaced |
 | `changed-partition-count` | Number of partitions with file changes |
-| `replace-partitions` | `true` for full load (overwrite), absent for delta |
 
 !!!note
     A `deleted-records = 35, added-records = 35` on a delta run does **not** mean 35 rows were updated — it means the files containing those 35 rows were rewritten (copy-on-write). The actual number of changed rows can be 0.
@@ -555,9 +553,7 @@ validation:
       pattern: "^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$"
       onFailure: reject
 
-output:
-  format: parquet
-  compression: snappy
+output: {}
 ```
 
 ### SCD2 with detect-deletes

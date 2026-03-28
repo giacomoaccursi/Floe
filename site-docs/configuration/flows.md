@@ -67,9 +67,9 @@ output:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | yes | Flow name — maps to the Iceberg table name |
-| `description` | no | Human-readable description |
-| `version` | no | Flow version string |
-| `owner` | no | Team or person responsible |
+| `description` | yes | Human-readable description |
+| `version` | yes | Flow version string |
+| `owner` | yes | Team or person responsible |
 
 ## source
 
@@ -91,11 +91,11 @@ For details on each file format and their options, see [Data Sources](../guides/
 
 Defines the expected schema and controls enforcement during read.
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `enforceSchema` | — | If true, validate column presence and apply Spark schema during read |
-| `allowExtraColumns` | — | If false, reject data with columns not defined in `columns` |
-| `columns` | — | List of column definitions |
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `enforceSchema` | yes | — | If true, validate column presence and apply Spark schema during read |
+| `allowExtraColumns` | yes | — | If false, reject data with columns not defined in `columns` |
+| `columns` | yes | — | List of column definitions |
 
 ### Column definition
 
@@ -104,7 +104,6 @@ Defines the expected schema and controls enforcement during read.
 | `name` | yes | — | Column name |
 | `type` | yes | — | Data type (see table below) |
 | `nullable` | yes | — | Whether the column allows NULL values. `false` triggers not-null validation. |
-| `default` | no | — | Default value (string). Reserved for future use. |
 | `description` | yes | — | Human-readable description |
 
 ### Column types
@@ -169,7 +168,7 @@ validation:
       onFailure: reject
 ```
 
-`primaryKey` is required — the framework throws an error if empty. `foreignKeys` and `rules` can be empty lists.
+`primaryKey` is required in the YAML. For SCD2 mode, it must be non-empty. For other modes, an empty list is accepted and PK uniqueness validation is skipped. `foreignKeys` and `rules` can be empty lists.
 
 ### Foreign key fields
 

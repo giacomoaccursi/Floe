@@ -207,8 +207,7 @@ The FK is identified by an auto-generated display name in the format `column -> 
 | `id` | yes | — | Unique node ID |
 | `description` | no | `""` | Description |
 | `sourceFlow` | yes | — | Source flow name |
-| `sourcePath` | yes | — | Path to source data |
-| `sourceTable` | no | — | Iceberg table (overrides sourcePath) |
+| `sourceTable` | no | — | Iceberg table (overrides the default `{catalogName}.default.{sourceFlow}`) |
 | `dependencies` | yes | — | List of dependency node IDs |
 | `join` | no | — | Join configuration |
 | `select` | no | all | Columns to select |

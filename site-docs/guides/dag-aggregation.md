@@ -2,7 +2,7 @@
 
 ## Overview
 
-The DAG aggregation module builds a directed acyclic graph of data transformations that join, filter, and aggregate data from multiple flows. Each node in the DAG represents a data source (a flow's output or an Iceberg table) and optionally joins its data with a parent node using one of three strategies: Nest, Flatten, or Aggregate.
+The DAG aggregation module builds a directed acyclic graph of data transformations that join, filter, and aggregate data from multiple flows. Each node in the DAG represents a data source (an Iceberg table derived from a flow) and optionally joins its data with a parent node using one of three strategies: Nest, Flatten, or Aggregate.
 
 The DAG is defined in a YAML configuration file. At execution time, the framework resolves dependencies, detects cycles, groups independent nodes for parallel execution, and produces a single output DataFrame from the root node.
 
@@ -32,14 +32,12 @@ nodes:
   - id: customers_node
     description: "Customer base table"
     sourceFlow: customers
-    sourcePath: "output/warehouse/customers"
     dependencies: []
     select: [customer_id, name, email, country]
 
   - id: orders_node
     description: "Orders joined to customers"
     sourceFlow: orders
-    sourcePath: "output/warehouse/orders"
     dependencies: [customers_node]
     join:
       type: left_outer
@@ -56,7 +54,6 @@ nodes:
   - id: order_items_node
     description: "Order items aggregated per order"
     sourceFlow: order_items
-    sourcePath: "output/warehouse/order_items"
     dependencies: [orders_node]
     join:
       type: left_outer
@@ -83,8 +80,7 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 | `id` | string | yes | — | Unique node identifier |
 | `description` | string | yes | — | Human-readable description |
 | `sourceFlow` | string | yes | — | Name of the source flow |
-| `sourcePath` | string | yes | — | Path to source data (Parquet) |
-| `sourceTable` | string | — | — | Iceberg table name (overrides `sourcePath` if set) |
+| `sourceTable` | string | — | — | Iceberg table name (overrides the default `{catalogName}.default.{sourceFlow}`) |
 | `dependencies` | list | yes | — | List of node IDs this node depends on |
 | `join` | object | — | — | Join configuration (absent for root/leaf nodes with no parent) |
 | `select` | list | — | all columns | Columns to select from source data |
@@ -116,18 +112,17 @@ Supported aggregation functions: `sum`, `count`, `avg` (alias: `average`), `min`
 
 ## sourceTable — reading from Iceberg
 
-By default, a node reads its source data from Parquet files at `sourcePath`. Setting `sourceTable` overrides this behavior and reads directly from an Iceberg table using `spark.table()`:
+By default, a node reads from the Iceberg table `{catalogName}.default.{sourceFlow}`, where `catalogName` is the Iceberg catalog configured in `global.yaml` and `sourceFlow` is the node's source flow name. Setting `sourceTable` overrides this default and reads from a different Iceberg table:
 
 ```yaml
 - id: customers_node
-  description: "Customers from Iceberg"
+  description: "Customers from a different catalog"
   sourceFlow: customers
-  sourcePath: "output/warehouse/customers"  # fallback, not used when sourceTable is set
-  sourceTable: "spark_catalog.default.customers"
+  sourceTable: "other_catalog.default.customers"
   dependencies: []
 ```
 
-This is useful when the DAG needs to read the latest committed state of a table (including data from previous batches) rather than the raw output files of the current batch.
+This is useful when the DAG needs to read from a table in a different catalog or namespace than the default.
 
 ## Join strategies
 
@@ -288,7 +283,6 @@ nodes:
   - id: customers_node
     description: "Customer dimension"
     sourceFlow: customers
-    sourcePath: "output/warehouse/customers"
     sourceTable: "spark_catalog.default.customers"
     dependencies: []
     select: [customer_id, name, email, country, segment]
@@ -296,7 +290,6 @@ nodes:
   - id: orders_node
     description: "Orders nested into customers"
     sourceFlow: orders
-    sourcePath: "output/warehouse/orders"
     dependencies: [customers_node]
     filters:
       - "order_date >= '2024-01-01'"
@@ -313,7 +306,6 @@ nodes:
   - id: items_node
     description: "Item counts and totals per order"
     sourceFlow: order_items
-    sourcePath: "output/warehouse/order_items"
     dependencies: [orders_node]
     join:
       type: left_outer
@@ -336,7 +328,6 @@ nodes:
   - id: shipping_node
     description: "Shipping details flattened into orders"
     sourceFlow: shipping
-    sourcePath: "output/warehouse/shipping"
     dependencies: [orders_node]
     join:
       type: left_outer

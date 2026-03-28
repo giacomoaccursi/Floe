@@ -12,14 +12,12 @@ nodes:
   - id: customers_node
     description: "Customer base table"
     sourceFlow: customers
-    sourcePath: "output/warehouse/customers"
     dependencies: []
     select: [customer_id, name, email, country]
 
   - id: orders_node
     description: "Orders joined to customers"
     sourceFlow: orders
-    sourcePath: "output/warehouse/orders"
     dependencies: [customers_node]
     join:
       type: left_outer
@@ -41,8 +39,7 @@ nodes:
 | `id` | string | yes | — | Unique node identifier |
 | `description` | string | no | `""` | Human-readable description |
 | `sourceFlow` | string | yes | — | Name of the source flow |
-| `sourcePath` | string | yes | — | Path to source data (Parquet) |
-| `sourceTable` | string | — | — | Iceberg table name (overrides `sourcePath`) |
+| `sourceTable` | string | — | — | Iceberg table name (overrides the default `{catalogName}.default.{sourceFlow}`) |
 | `dependencies` | list | yes | — | List of node IDs this node depends on |
 | `join` | object | — | — | Join configuration |
 | `select` | list | — | all columns | Columns to select from source data |

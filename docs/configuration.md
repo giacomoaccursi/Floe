@@ -252,28 +252,13 @@ output:
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `type` | yes | — | Source type: `file`, `jdbc` |
-| `path` | yes | — | Path to source data (for file) or JDBC URL (for jdbc) |
-| `format` | yes | — | File format: `csv`, `parquet`, `json`. Ignored for JDBC. |
+| `type` | yes | — | Source type: `file` |
+| `path` | yes | — | Path to source data |
+| `format` | yes | — | File format: `csv`, `parquet`, `json` |
 | `options` | no | `{}` | Format-specific options passed to the Spark reader |
 | `filePattern` | no | — | Glob pattern for file matching (appended to `path`) |
 
 Common options for CSV: `header: "true"`, `delimiter: ";"`, `quote: "\""`, `escape: "\\"`, `nullValue: ""`.
-
-JDBC source example:
-
-```yaml
-source:
-  type: jdbc
-  path: ""
-  format: csv    # ignored for JDBC, but required by schema
-  options:
-    url: "jdbc:postgresql://host:5432/mydb"
-    dbtable: "public.customers"
-    user: "${DB_USER}"
-    password: "${DB_PASSWORD}"
-    driver: "org.postgresql.Driver"
-```
 
 ### schema
 

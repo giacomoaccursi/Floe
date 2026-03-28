@@ -37,11 +37,10 @@ object DataReaderFactory {
   )(implicit spark: SparkSession): DataReader = {
     sourceConfig.`type` match {
       case SourceType.File => new FileDataReader(sourceConfig, schemaConfig)
-      case SourceType.JDBC => new JDBCDataReader(sourceConfig)
       case unsupported =>
         throw UnsupportedOperationException(
           operation = s"source type '${unsupported.name}'",
-          details = "Supported types: file ('csv', 'parquet', 'json'), jdbc"
+          details = "Supported types: file ('csv', 'parquet', 'json')"
         )
     }
   }

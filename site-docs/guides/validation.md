@@ -341,33 +341,43 @@ The rule is not executed at all. Useful for temporarily disabling a rule without
 
 ## Validation pipeline data flow
 
-```
-Input DataFrame
-  │
-  ▼
-Schema Validation ──rejected──▶ SCHEMA_VALIDATION_FAILED / SCHEMA_EXTRA_COLUMNS
-  │ valid
-  ▼
-Not-Null Validation ──rejected──▶ NOT_NULL_VIOLATION
-  │ valid
-  ▼
-PK Uniqueness ──rejected──▶ PK_DUPLICATE
-  │ valid
-  ▼
-FK Integrity ──rejected──▶ FK_VIOLATION
-  │ valid
-  ▼
-Custom Rules (in order)
-  │  ├─ onFailure=reject ──rejected──▶ {RULE}_VALIDATION_FAILED
-  │  ├─ onFailure=warn ──warning──▶ written to {rejectedPath}/{flowName}_warnings/
-  │  └─ onFailure=skip ──(no-op)──
-  │
-  ▼
-ValidationResult
-  ├─ valid: DataFrame (clean records, business columns only)
-  ├─ rejected: Option[DataFrame] (all rejected records with metadata)
-  ├─ warned: Option[DataFrame] (warning records with PK + warning metadata)
-  └─ rejectionReasons: Map[String, Long] (count per validation step)
+```mermaid
+graph TD
+    Input["Input DataFrame"]
+    Schema["Schema Validation"]
+    SchemaRej["SCHEMA_VALIDATION_FAILED<br/>SCHEMA_EXTRA_COLUMNS"]
+    NotNull["Not-Null Validation"]
+    NotNullRej["NOT_NULL_VIOLATION"]
+    PK["PK Uniqueness"]
+    PKRej["PK_DUPLICATE"]
+    FK["FK Integrity"]
+    FKRej["FK_VIOLATION"]
+    Custom["Custom Rules (in order)"]
+    CustomRej["{RULE}_VALIDATION_FAILED"]
+    CustomWarn["written to<br/>{rejectedPath}/{flowName}_warnings/"]
+    Result["ValidationResult"]
+    Valid["valid: DataFrame<br/>(clean records, business columns only)"]
+    Rejected["rejected: Option[DataFrame]<br/>(all rejected records with metadata)"]
+    Warned["warned: Option[DataFrame]<br/>(warning records with PK + warning metadata)"]
+    Reasons["rejectionReasons: Map[String, Long]<br/>(count per validation step)"]
+
+    Input --> Schema
+    Schema -->|"rejected"| SchemaRej
+    Schema -->|"valid"| NotNull
+    NotNull -->|"rejected"| NotNullRej
+    NotNull -->|"valid"| PK
+    PK -->|"rejected"| PKRej
+    PK -->|"valid"| FK
+    FK -->|"rejected"| FKRej
+    FK -->|"valid"| Custom
+    Custom -->|"onFailure=reject"| CustomRej
+    Custom -->|"onFailure=warn"| CustomWarn
+    Custom -->|"onFailure=skip (no-op)"| Result
+    Custom -->|"valid"| Result
+    Result --> Valid
+    Result --> Rejected
+    Result --> Warned
+    Result --> Reasons
 ```
 
 ## Complete flow example

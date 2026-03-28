@@ -4,49 +4,46 @@ High-level architecture of the Spark ETL Framework: how modules interact, the en
 
 ## Module diagram
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        pipeline                                  │
-│  IngestionPipeline.builder() → build() → execute()              │
-│  TransformationContext                                           │
-└──────────────┬──────────────────────────────────────────────────┘
-               │
-               ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                      orchestration                                │
-│  FlowOrchestrator · FlowGroupExecutor · ExecutionPlanBuilder     │
-│  BatchMetadataWriter · ExecutionLogger                           │
-│  Flow ordering (FK deps) · Parallel execution · Batch lifecycle  │
-└──────┬──────────┬──────────┬──────────┬─────────────────────────┘
-       │          │          │          │
-       ▼          ▼          ▼          ▼
-┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────────┐
-│   config │ │    io    │ │validation│ │       iceberg        │
-│          │ │          │ │          │ │                      │
-│ YAML     │ │ File     │ │ Schema   │ │ IcebergTableWriter   │
-│ loading  │ │ readers  │ │ Not-null │ │ IcebergTableManager  │
-│ Variable │ │ CSV      │ │ PK/FK    │ │ CatalogProvider      │
-│ substit. │ │ Parquet  │ │ Regex    │ │ Maintenance          │
-│ PureConf │ │ JSON     │ │ Range    │ │ Orphan detection     │
-│          │ │          │ │ Domain   │ │                      │
-│          │ │          │ │ Custom   │ │                      │
-└──────────┘ └──────────┘ └──────────┘ └──────────────────────┘
-                                              │
-                                              ▼
-                                   ┌──────────────────────┐
-                                   │    aggregation       │
-                                   │                      │
-                                   │ DAGOrchestrator      │
-                                   │ DAGGraphBuilder      │
-                                   │ DAGExecutor          │
-                                   │ JoinStrategyExecutor │
-                                   └──────────────────────┘
+```mermaid
+graph TD
+    subgraph pipeline
+        P["IngestionPipeline.builder() → build() → execute()<br/>TransformationContext"]
+    end
 
-┌──────────────────────────────────────────────────────────────────┐
-│                       exceptions                                  │
-│  FrameworkException hierarchy · Error codes · Context maps        │
-│  (used by all modules)                                           │
-└──────────────────────────────────────────────────────────────────┘
+    subgraph orchestration
+        O["FlowOrchestrator · FlowGroupExecutor · ExecutionPlanBuilder<br/>BatchMetadataWriter · ExecutionLogger<br/>Flow ordering (FK deps) · Parallel execution · Batch lifecycle"]
+    end
+
+    subgraph config
+        C["YAML loading<br/>Variable substitution<br/>PureConfig"]
+    end
+
+    subgraph io
+        I["File readers<br/>CSV · Parquet · JSON"]
+    end
+
+    subgraph validation
+        V["Schema · Not-null<br/>PK/FK · Regex<br/>Range · Domain · Custom"]
+    end
+
+    subgraph iceberg
+        IC["IcebergTableWriter<br/>IcebergTableManager<br/>CatalogProvider<br/>Maintenance · Orphan detection"]
+    end
+
+    subgraph aggregation
+        A["DAGOrchestrator<br/>DAGGraphBuilder<br/>DAGExecutor<br/>JoinStrategyExecutor"]
+    end
+
+    subgraph exceptions
+        E["FrameworkException hierarchy · Error codes · Context maps<br/>(used by all modules)"]
+    end
+
+    P --> O
+    O --> C
+    O --> I
+    O --> V
+    O --> IC
+    IC --> A
 ```
 
 ## End-to-end data flow

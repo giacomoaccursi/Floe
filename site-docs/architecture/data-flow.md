@@ -4,37 +4,24 @@ Detailed walkthrough of the Read → PreTransform → Validate → PostTransform
 
 ## Pipeline overview
 
-```
-Source File(s)
-     │
-     ▼
-┌─────────┐
-│  Read   │  FileDataReader: load CSV/Parquet/JSON, apply schema
-└────┬────┘
-     │ Raw DataFrame
-     ▼
-┌──────────────┐
-│ PreTransform │  User-defined: enrich, cleanse, filter
-└────┬─────────┘
-     │ Enriched DataFrame
-     ▼
-┌──────────┐
-│ Validate │  Schema → Not-null → PK → FK → Custom rules
-└────┬─────┘
-     │ Valid DataFrame          Rejected DataFrame
-     │                          → written to rejectedPath
-     ▼
-┌───────────────┐
-│ PostTransform │  User-defined: derived fields, cross-flow lookups
-└────┬──────────┘
-     │ Final DataFrame
-     ▼
-┌─────────┐
-│  Write  │  MERGE INTO (delta) / overwrite (full) / SCD2
-└────┬────┘
-     │
-     ▼
-  Iceberg Table (snapshot tagged)
+```mermaid
+graph TD
+    Source["Source File(s)"]
+    Read["Read<br/>FileDataReader: load CSV/Parquet/JSON, apply schema"]
+    PreTransform["PreTransform<br/>User-defined: enrich, cleanse, filter"]
+    Validate["Validate<br/>Schema → Not-null → PK → FK → Custom rules"]
+    Rejected["Rejected DataFrame<br/>→ written to rejectedPath"]
+    PostTransform["PostTransform<br/>User-defined: derived fields, cross-flow lookups"]
+    Write["Write<br/>MERGE INTO (delta) / overwrite (full) / SCD2"]
+    IcebergTable["Iceberg Table (snapshot tagged)"]
+
+    Source -->|"Raw DataFrame"| Read
+    Read -->|"Raw DataFrame"| PreTransform
+    PreTransform -->|"Enriched DataFrame"| Validate
+    Validate -->|"Valid DataFrame"| PostTransform
+    Validate -->|"Rejected DataFrame"| Rejected
+    PostTransform -->|"Final DataFrame"| Write
+    Write --> IcebergTable
 ```
 
 ## Step 1: Read

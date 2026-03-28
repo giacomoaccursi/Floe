@@ -71,35 +71,47 @@ This follows the Spark best practice of never using the global execution context
 
 A complete batch execution follows this sequence:
 
-```
-1. Build phase
-   ├─ Load configuration (YAML or programmatic)
-   ├─ Validate all configs
-   ├─ Configure Iceberg catalog on SparkSession
-   └─ Register transformations and catalog providers
+```mermaid
+graph TD
+    subgraph Phase1["1. Build phase"]
+        B1["Load configuration<br/>(YAML or programmatic)"]
+        B2["Validate all configs"]
+        B3["Configure Iceberg catalog<br/>on SparkSession"]
+        B4["Register transformations<br/>and catalog providers"]
+        B1 --> B2 --> B3 --> B4
+    end
 
-2. Execution phase
-   ├─ Generate batch ID (from batchIdFormat)
-   ├─ Analyze FK dependencies → topological sort → group flows
-   └─ For each group (sequential):
-       └─ For each flow in group (parallel if enabled):
-           ├─ Read source data
-           ├─ Run pre-validation transformation
-           ├─ Run validation pipeline
-           ├─ Check rejection rate against threshold
-           ├─ Run post-validation transformation
-           └─ Write to Iceberg (MERGE INTO / overwrite / SCD2)
+    subgraph Phase2["2. Execution phase"]
+        E1["Generate batch ID<br/>(from batchIdFormat)"]
+        E2["Analyze FK dependencies<br/>→ topological sort → group flows"]
+        E3["For each group (sequential)"]
+        E4["For each flow in group<br/>(parallel if enabled)"]
+        E5["Read source data"]
+        E6["Run pre-validation transformation"]
+        E7["Run validation pipeline"]
+        E8["Check rejection rate<br/>against threshold"]
+        E9["Run post-validation transformation"]
+        E10["Write to Iceberg<br/>(MERGE INTO / overwrite / SCD2)"]
+        E1 --> E2 --> E3 --> E4
+        E4 --> E5 --> E6 --> E7 --> E8 --> E9 --> E10
+    end
 
-3. Post-batch phase
-   ├─ Orphan detection (time travel, cascade)
-   ├─ Write batch metadata JSON
-   └─ Table maintenance (expire, compact, cleanup, rewrite)
+    subgraph Phase3["3. Post-batch phase"]
+        P1["Orphan detection<br/>(time travel, cascade)"]
+        P2["Write batch metadata JSON"]
+        P3["Table maintenance<br/>(expire, compact, cleanup, rewrite)"]
+        P1 --> P2 --> P3
+    end
 
-4. DAG phase (if configured)
-   ├─ Load DAG config
-   ├─ Auto-discover additional tables
-   ├─ Build dependency graph → topological sort → group nodes
-   └─ Execute nodes group by group
+    subgraph Phase4["4. DAG phase (if configured)"]
+        D1["Load DAG config"]
+        D2["Auto-discover additional tables"]
+        D3["Build dependency graph<br/>→ topological sort → group nodes"]
+        D4["Execute nodes group by group"]
+        D1 --> D2 --> D3 --> D4
+    end
+
+    Phase1 --> Phase2 --> Phase3 --> Phase4
 ```
 
 ### Batch ID

@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [develop, main]
 
+permissions:
+  contents: read
+  checks: write
+
 env:
   SPARK_LOCAL_IP: "127.0.0.1"
   JAVA_OPTS: "-Xmx2G"
@@ -54,11 +58,3 @@ jobs:
           report_paths: "target/test-reports/TEST-*.xml"
           check_name: "Test Results"
           fail_on_failure: true
-
-      - name: Upload coverage
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: target/scala-2.12/scoverage-report/
-          retention-days: 7

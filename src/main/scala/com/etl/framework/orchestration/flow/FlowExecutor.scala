@@ -79,11 +79,15 @@ class FlowExecutor(
     // 2. Apply pre-validation transformations
     val preTransformedData =
       transformer.applyPreValidationTransformation(rawData, batchId)
-    val inputCount = preTransformedData.count()
+
+    val cachedInput = preTransformedData.cache()
+    try {
+
+    val inputCount = cachedInput.count()
 
     // 3. Validate new data only, merge happens during Iceberg write
     val validationResult = TimingUtil.timed(logger, "Validate data") {
-      validateData(preTransformedData)
+      validateData(cachedInput)
     }
     val rejectedCount = validationResult.rejectionReasons.values.sum
     val validCount = inputCount - rejectedCount
@@ -110,6 +114,10 @@ class FlowExecutor(
       rejectionReasons = validationResult.rejectionReasons,
       icebergMetadata = writeResult.icebergMetadata
     )
+
+    } finally {
+      cachedInput.unpersist()
+    }
   }
 
   protected def readData(): DataFrame = {

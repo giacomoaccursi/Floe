@@ -51,9 +51,9 @@ class PostValidationTransformationTest extends AnyFlatSpec with Matchers {
   "Post-validation transformation" should "have access to validated flows" in {
     var receivedFlows: Map[String, DataFrame] = Map.empty
 
-    val transformation: TransformationContext => DataFrame = { ctx =>
+    val transformation: TransformationContext => TransformationContext = { ctx =>
       receivedFlows = ctx.validatedFlows
-      ctx.currentData
+      ctx
     }
 
     val df = currentData.toDF("id", "value", "status")
@@ -71,9 +71,9 @@ class PostValidationTransformationTest extends AnyFlatSpec with Matchers {
   it should "access specific flow via getFlow" in {
     var accessedFlow: Option[DataFrame] = None
 
-    val transformation: TransformationContext => DataFrame = { ctx =>
+    val transformation: TransformationContext => TransformationContext = { ctx =>
       accessedFlow = ctx.getFlow("customers")
-      ctx.currentData
+      ctx
     }
 
     val df = currentData.toDF("id", "value", "status")
@@ -87,9 +87,9 @@ class PostValidationTransformationTest extends AnyFlatSpec with Matchers {
   it should "return None for non-existent flow" in {
     var accessedFlow: Option[DataFrame] = None
 
-    val transformation: TransformationContext => DataFrame = { ctx =>
+    val transformation: TransformationContext => TransformationContext = { ctx =>
       accessedFlow = ctx.getFlow("non_existent")
-      ctx.currentData
+      ctx
     }
 
     val df = currentData.toDF("id", "value", "status")
@@ -99,12 +99,12 @@ class PostValidationTransformationTest extends AnyFlatSpec with Matchers {
   }
 
   it should "join with other flows" in {
-    val transformation: TransformationContext => DataFrame = { ctx =>
+    val transformation: TransformationContext => TransformationContext = { ctx =>
       ctx.getFlow("other_flow") match {
         case Some(otherDf) =>
-          ctx.currentData.join(otherDf, Seq("id"), "left")
+          ctx.withData(ctx.currentData.join(otherDf, Seq("id"), "left"))
         case None =>
-          ctx.currentData
+          ctx
       }
     }
 
@@ -117,14 +117,14 @@ class PostValidationTransformationTest extends AnyFlatSpec with Matchers {
     val result =
       transformation(createContext(df, Map("other_flow" -> otherDf)))
 
-    result.count() shouldBe 3L
-    result.columns.length should be >= df.columns.length
+    result.currentData.count() shouldBe 3L
+    result.currentData.columns.length should be >= df.columns.length
   }
 
   it should "preserve current data when accessing other flows" in {
-    val transformation: TransformationContext => DataFrame = { ctx =>
+    val transformation: TransformationContext => TransformationContext = { ctx =>
       ctx.validatedFlows.foreach { case (_, vdf) => vdf.count() }
-      ctx.currentData
+      ctx
     }
 
     val df = currentData.toDF("id", "value", "status")
@@ -135,20 +135,20 @@ class PostValidationTransformationTest extends AnyFlatSpec with Matchers {
     val result =
       transformation(createContext(df, Map("customers" -> customersDf)))
 
-    result.count() shouldBe originalCount
-    result.schema shouldBe originalSchema
+    result.currentData.count() shouldBe originalCount
+    result.currentData.schema shouldBe originalSchema
   }
 
   it should "enrich data from other flows" in {
-    val transformation: TransformationContext => DataFrame = { ctx =>
+    val transformation: TransformationContext => TransformationContext = { ctx =>
       ctx.getFlow("enrichment_flow") match {
         case Some(enrichmentDf) =>
           val enriched = enrichmentDf
             .groupBy("status")
             .agg(f.avg("value").as("avg_value_by_status"))
-          ctx.currentData.join(enriched, Seq("status"), "left")
+          ctx.withData(ctx.currentData.join(enriched, Seq("status"), "left"))
         case None =>
-          ctx.currentData
+          ctx
       }
     }
 
@@ -163,7 +163,7 @@ class PostValidationTransformationTest extends AnyFlatSpec with Matchers {
       createContext(df, Map("enrichment_flow" -> enrichmentDf))
     )
 
-    result.columns should contain("avg_value_by_status")
-    result.columns.length should be > df.columns.length
+    result.currentData.columns should contain("avg_value_by_status")
+    result.currentData.columns.length should be > df.columns.length
   }
 }

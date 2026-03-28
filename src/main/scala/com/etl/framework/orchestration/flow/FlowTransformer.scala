@@ -32,14 +32,13 @@ class FlowTransformer(
             batchId = batchId,
             spark = spark
           )
-          val transformed = transformation(context)
+          val result = transformation(context)
 
-          // Store additional tables if any were created
-          context.getAdditionalTables.foreach { case (name, info) =>
+          result.getAdditionalTables.foreach { case (name, info) =>
             additionalTables(name) = info
           }
 
-          transformed
+          result.currentData
         }
       
       case None =>
@@ -65,14 +64,13 @@ class FlowTransformer(
             batchId = batchId,
             spark = spark
           )
-          val transformed = transformation(context)
+          val result = transformation(context)
 
-          // Store additional tables if any were created
-          context.getAdditionalTables.foreach { case (name, info) =>
+          result.getAdditionalTables.foreach { case (name, info) =>
             additionalTables(name) = info
           }
 
-          transformed
+          result.currentData
         }
       
       case None =>

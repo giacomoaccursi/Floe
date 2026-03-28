@@ -43,6 +43,12 @@ final case class TransformationContext private(
    * Get all additional tables that were added during transformation
    */
   def getAdditionalTables: Map[String, AdditionalTableInfo] = additionalTables
+
+  /**
+   * Return a new context with a different DataFrame, preserving everything else.
+   */
+  def withData(newData: DataFrame): TransformationContext =
+    copy(currentData = newData)
 }
 
 object TransformationContext {

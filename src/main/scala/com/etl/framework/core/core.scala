@@ -6,5 +6,5 @@ package object core {
   /**
    * Function type for flow transformations
    */
-  type FlowTransformation = TransformationContext => DataFrame
+  type FlowTransformation = TransformationContext => TransformationContext
 }

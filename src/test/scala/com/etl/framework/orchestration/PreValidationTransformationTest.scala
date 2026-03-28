@@ -42,10 +42,10 @@ class PreValidationTransformationTest extends AnyFlatSpec with Matchers {
     var transformationCalled = false
     var transformationRecordCount: Long = 0
 
-    val transformation: TransformationContext => DataFrame = { ctx =>
+    val transformation: TransformationContext => TransformationContext = { ctx =>
       transformationCalled = true
       transformationRecordCount = ctx.currentData.count()
-      ctx.currentData.withColumn("_pre_transformation_marker", f.lit(true))
+      ctx.withData(ctx.currentData.withColumn("_pre_transformation_marker", f.lit(true)))
     }
 
     val df = testData.toDF("id", "value", "status")
@@ -53,15 +53,15 @@ class PreValidationTransformationTest extends AnyFlatSpec with Matchers {
 
     transformationCalled shouldBe true
     transformationRecordCount shouldBe 5L
-    result.columns should contain("_pre_transformation_marker")
+    result.currentData.columns should contain("_pre_transformation_marker")
   }
 
   it should "receive correct context with flow name and batch ID" in {
     var receivedContext: Option[TransformationContext] = None
 
-    val transformation: TransformationContext => DataFrame = { ctx =>
+    val transformation: TransformationContext => TransformationContext = { ctx =>
       receivedContext = Some(ctx)
-      ctx.currentData
+      ctx
     }
 
     val df = testData.toDF("id", "value", "status")
@@ -74,25 +74,25 @@ class PreValidationTransformationTest extends AnyFlatSpec with Matchers {
   }
 
   it should "make modifications visible to subsequent processing" in {
-    val transformation: TransformationContext => DataFrame = { ctx =>
-      ctx.currentData.filter(f.col("value") > 500)
+    val transformation: TransformationContext => TransformationContext = { ctx =>
+      ctx.withData(ctx.currentData.filter(f.col("value") > 500))
     }
 
     val df = testData.toDF("id", "value", "status")
     val result = transformation(createContext(df))
 
-    result.count() shouldBe 2L
+    result.currentData.count() shouldBe 2L
   }
 
   it should "preserve schema when not modifying columns" in {
-    val transformation: TransformationContext => DataFrame = { ctx =>
-      ctx.currentData.filter(f.col("value") > 0)
+    val transformation: TransformationContext => TransformationContext = { ctx =>
+      ctx.withData(ctx.currentData.filter(f.col("value") > 0))
     }
 
     val df = testData.toDF("id", "value", "status")
     val originalSchema = df.schema
     val result = transformation(createContext(df))
 
-    result.schema shouldBe originalSchema
+    result.currentData.schema shouldBe originalSchema
   }
 }

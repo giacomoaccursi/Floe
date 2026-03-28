@@ -46,14 +46,6 @@ If the domain name is not found in `domains.yaml`, the error message lists all a
 
 For the full validation reference, see [Validation Engine](../guides/validation.md#domain-validation).
 
-## Empty domains file
-
-An empty domains file is valid — domains are only needed when flows use domain validation rules:
-
-```yaml
-domains: {}
-```
-
 ## Case sensitivity
 
 When `caseSensitive: false`, the comparison converts both the column value and the domain values to lowercase before matching. This means `"Shipped"`, `"SHIPPED"`, and `"shipped"` all match a domain value of `"shipped"`.

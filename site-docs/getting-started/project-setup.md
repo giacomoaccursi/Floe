@@ -39,23 +39,9 @@ libraryDependencies ++= Seq(
 )
 
 run / fork := true
-run / javaOptions ++= Seq(
-  "-Xmx2G",
-  "--add-opens=java.base/java.lang=ALL-UNNAMED",
-  "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
-  "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
-  "--add-opens=java.base/java.io=ALL-UNNAMED",
-  "--add-opens=java.base/java.net=ALL-UNNAMED",
-  "--add-opens=java.base/java.nio=ALL-UNNAMED",
-  "--add-opens=java.base/java.util=ALL-UNNAMED",
-  "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED",
-  "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED",
-  "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
-  "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED",
-  "--add-opens=java.base/sun.security.action=ALL-UNNAMED",
-  "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED",
-  "-Djava.security.manager=allow"
-)
+run / javaOptions += "-Xmx2G"
+// Add --add-opens flags required by Spark on Java 17+
+// See: https://spark.apache.org/docs/latest/
 ```
 
 ## Entry point

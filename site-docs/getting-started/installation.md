@@ -19,32 +19,21 @@ Spark is a `provided` dependency — the framework expects it on the classpath a
 
 ## Java 17+ compatibility
 
-Spark on Java 17+ requires JVM module access flags. Add to your `build.sbt`:
+Spark on Java 17+ requires JVM module access flags (`--add-opens`) to work correctly. Without them, Spark fails at startup with `InaccessibleObjectException`.
 
-```scala
-run / javaOptions ++= Seq(
-  "--add-opens=java.base/java.lang=ALL-UNNAMED",
-  "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
-  "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
-  "--add-opens=java.base/java.io=ALL-UNNAMED",
-  "--add-opens=java.base/java.net=ALL-UNNAMED",
-  "--add-opens=java.base/java.nio=ALL-UNNAMED",
-  "--add-opens=java.base/java.util=ALL-UNNAMED",
-  "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED",
-  "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED",
-  "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
-  "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED",
-  "--add-opens=java.base/sun.security.action=ALL-UNNAMED",
-  "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED",
-  "-Djava.security.manager=allow"
-)
-```
+This is a Spark requirement, not specific to this framework. The exact flags depend on your Spark and Java version. Refer to the [Apache Spark documentation](https://spark.apache.org/docs/latest/) for the flags required by your version.
 
-On Java 18+, the `-Djava.security.manager=allow` flag is required for Hadoop's `UserGroupInformation`.
+On Java 18+, you also need `-Djava.security.manager=allow` for Hadoop's `UserGroupInformation`.
 
-## SparkSession extensions
+## SparkSession setup
 
-Iceberg SQL extensions must be configured before the SparkSession is created:
+The framework requires Iceberg SQL extensions to be registered on the SparkSession **before** it is created. Spark does not allow adding extensions after session creation.
+
+There are two ways to set this up:
+
+### Option 1: Manual configuration
+
+Set the extensions directly on the SparkSession builder:
 
 ```scala
 val spark = SparkSession.builder()
@@ -55,16 +44,43 @@ val spark = SparkSession.builder()
   .getOrCreate()
 ```
 
-The framework configures all other Iceberg catalog settings automatically from `global.yaml`. Only the extensions must be set at session creation time.
+All other Iceberg settings (catalog name, warehouse path, catalog type) are configured automatically by the framework from `global.yaml` — you only need the extensions line.
 
-For programmatic session creation, use the `requiredSparkConfig` helper:
+### Option 2: requiredSparkConfig helper
+
+If you want the framework to tell you exactly which Spark properties are needed, use `IngestionPipeline.requiredSparkConfig()`. It returns a `Map[String, String]` with all properties that must be set before session creation:
 
 ```scala
+import com.etl.framework.pipeline.IngestionPipeline
+import com.etl.framework.config.IcebergConfig
+
+// Define your Iceberg config (or load it from YAML)
 val icebergConfig = IcebergConfig(warehouse = "output/warehouse")
-val spark = IngestionPipeline
-  .requiredSparkConfig(icebergConfig)
+
+// Get the required Spark properties
+val requiredProps: Map[String, String] = IngestionPipeline.requiredSparkConfig(icebergConfig)
+// Returns: Map("spark.sql.extensions" -> "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+
+// Apply them to the session builder
+val spark = requiredProps
   .foldLeft(SparkSession.builder().appName("my-app").master("local[*]")) {
-    case (b, (k, v)) => b.config(k, v)
+    case (builder, (key, value)) => builder.config(key, value)
   }
   .getOrCreate()
 ```
+
+This is useful when:
+
+- You use a custom catalog provider (Glue, Nessie) that may require additional session-level properties
+- You want to keep the session setup in sync with the framework's requirements automatically
+
+If you registered custom catalog providers, pass them so their properties are included:
+
+```scala
+val extraProviders = Map("nessie" -> (() => new NessieCatalogProvider()))
+val requiredProps = IngestionPipeline.requiredSparkConfig(icebergConfig, extraProviders)
+```
+
+### On managed platforms
+
+On Databricks, EMR, Dataproc, and Glue, the SparkSession is pre-created by the platform. The Iceberg extensions are typically configured at the cluster level or via job parameters — you don't need to set them in code. Check your platform's documentation for how to add `spark.sql.extensions`.

@@ -46,9 +46,6 @@ iceberg:
 
 ## 3. flows/customers.yaml
 
-!!!tip "domains.yaml"
-    This quickstart doesn't use domain validation, so no `domains.yaml` is needed. When you want to validate column values against a predefined list (e.g. order statuses, country codes), create a `config/domains.yaml` file. See [Domains Configuration](../configuration/domains.md).
-
 ```yaml
 name: customers
 description: "Customer master data"
@@ -148,3 +145,4 @@ object QuickstartApp extends App {
 - [Project Setup](project-setup.md) — full project structure
 - [Configuration Overview](../configuration/overview.md) — all config options
 - [Validation Engine](../guides/validation.md) — all validation rule types
+- [Domains Configuration](../configuration/domains.md) — validate values against predefined lists

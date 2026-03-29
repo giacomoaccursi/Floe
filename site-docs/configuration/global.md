@@ -107,14 +107,24 @@ For the complete Iceberg integration guide, see [Iceberg Integration](../guides/
 
 ### Catalog types
 
+A catalog is the component that keeps track of which Iceberg tables exist and where their data files are stored. Think of it as a registry: when the framework writes to `spark_catalog.default.orders`, the catalog knows where to find (or create) that table.
+
 The framework ships with two built-in catalog providers:
 
-| `catalogType` | Provider | Description |
-|---------------|----------|-------------|
-| `hadoop` | `HadoopCatalogProvider` | Local/HDFS filesystem catalog. Zero infrastructure. |
-| `glue` | `GlueCatalogProvider` | AWS Glue Data Catalog. Requires S3 and Glue permissions. |
+| `catalogType` | When to use | Description |
+|---------------|-------------|-------------|
+| `hadoop` | Local development, HDFS, S3 without Glue | Stores table metadata as files in the warehouse directory. No external service needed. |
+| `glue` | AWS with Glue Data Catalog | Registers tables in AWS Glue, making them queryable from Athena, Redshift Spectrum, and EMR. Requires S3 and Glue IAM permissions. |
 
-For Glue, pass additional properties via `catalogProperties`:
+For local development, `hadoop` is the simplest choice — it works out of the box with no infrastructure:
+
+```yaml
+iceberg:
+  catalogType: "hadoop"
+  warehouse: "output/warehouse"
+```
+
+For AWS production deployments with Glue:
 
 ```yaml
 iceberg:
@@ -124,6 +134,8 @@ iceberg:
   catalogProperties:
     glue.skip-name-validation: "true"
 ```
+
+`catalogProperties` is a pass-through map — any key-value pair you add is set as a Spark configuration property on the catalog (`spark.sql.catalog.{catalogName}.{key}`). Use it for catalog-specific settings that the framework doesn't expose directly.
 
 Custom catalog providers (Hive, REST, Nessie) can be registered via the [Pipeline Builder API](../guides/pipeline-builder.md#custom-catalog-providers).
 

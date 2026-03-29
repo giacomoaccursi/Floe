@@ -43,10 +43,10 @@ loadMode:
 validation:
   primaryKey: [order_id]
   foreignKeys:
-    - column: customer_id
+    - columns: [customer_id]
       references:
         flow: customers
-        column: customer_id
+        columns: [customer_id]
       onOrphan: warn
   rules:
     - type: regex
@@ -177,10 +177,10 @@ Defines data quality rules. For the complete validation reference, see [Validati
 validation:
   primaryKey: [order_id]
   foreignKeys:
-    - column: customer_id
+    - columns: [customer_id]
       references:
         flow: customers
-        column: customer_id
+        columns: [customer_id]
       onOrphan: warn
   rules:
     - type: regex
@@ -195,12 +195,12 @@ The entire `validation` section is optional. If omitted, no validation is perfor
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `column` | string | yes | — | Column in the current flow |
+| `columns` | string | yes | — | Column(s) in the current flow |
 | `references.flow` | string | yes | — | Name of the parent flow |
-| `references.column` | string | yes | — | Column in the parent flow |
+| `references.columns` | string | yes | — | Column(s) in the parent flow (same order as `columns`) |
 | `onOrphan` | string | — | `warn` | Post-batch orphan action: `warn`, `delete`, `ignore`. See [Orphan Detection](../guides/orphan-detection.md). |
 
-The FK is identified by an auto-generated display name in the format `column -> references.flow.references.column` (e.g. `customer_id -> customers.customer_id`).
+The FK is identified by an auto-generated display name (e.g. `(customer_id) -> customers.(customer_id)`).
 
 ### Rule fields
 

@@ -489,10 +489,10 @@ loadMode:
 validation:
   primaryKey: [order_id]
   foreignKeys:
-    - column: customer_id
+    - columns: [customer_id]
       references:
         flow: customers
-        column: customer_id
+        columns: [customer_id]
       onOrphan: warn
   rules:
     - type: domain

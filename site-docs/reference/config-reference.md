@@ -141,12 +141,12 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `column` | yes | — | Column in current flow |
+| `columns` | yes | — | Column(s) in current flow |
 | `references.flow` | yes | — | Parent flow name |
-| `references.column` | yes | — | Parent column |
+| `references.columns` | yes | — | Parent column(s) (same order as `columns`) |
 | `onOrphan` | no | `warn` | `warn`, `delete`, `ignore` |
 
-The FK is identified by an auto-generated display name in the format `column -> references.flow.references.column` (e.g. `customer_id -> customers.customer_id`).
+The FK is identified by an auto-generated display name (e.g. `(customer_id) -> customers.(customer_id)`).
 
 ### validation.rules[]
 

@@ -51,7 +51,7 @@ If no previous snapshot exists (first-ever execution of the parent), there's not
 
 #### 3. Find orphaned records in children
 
-With the removed parent keys, the detector looks for child records that reference them. The comparison is on the child's FK column against the parent's referenced column. Any matches are orphans.
+With the removed parent keys, the detector looks for child records that reference them. The comparison is on the child's FK columns against the parent's referenced columns. Any matches are orphans.
 
 #### 4. Apply the configured action
 
@@ -124,10 +124,10 @@ In the child flow's YAML configuration, each FK declares its own `onOrphan`:
 validation:
   primaryKey: [order_id]
   foreignKeys:
-    - column: customer_id
+    - columns: [customer_id]
       references:
         flow: customers
-        column: customer_id
+        columns: [customer_id]
       onOrphan: warn      # warn | delete | ignore
 ```
 

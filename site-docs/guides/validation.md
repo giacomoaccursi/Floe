@@ -24,10 +24,10 @@ Validation is configured per-flow in the `validation` section of the flow YAML:
 validation:
   primaryKey: [order_id]
   foreignKeys:
-    - column: customer_id
+    - columns: [customer_id]
       references:
         flow: customers
-        column: customer_id
+        columns: [customer_id]
       onOrphan: warn
   rules:
     - type: regex
@@ -133,10 +133,10 @@ Foreign keys validate that values in a child flow's column exist in a parent flo
 
 ```yaml
 foreignKeys:
-  - column: customer_id
+  - columns: [customer_id]
     references:
       flow: customers
-      column: customer_id
+      columns: [customer_id]
     onOrphan: warn
 ```
 
@@ -144,17 +144,26 @@ foreignKeys:
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `column` | string | yes | — | Column in the current flow |
+| `columns` | list | yes | — | Column(s) in the current flow. Use a list for composite FKs. |
 | `references.flow` | string | yes | — | Name of the parent flow |
-| `references.column` | string | yes | — | Column in the parent flow |
+| `references.columns` | list | yes | — | Column(s) in the parent flow (same order as `columns`) |
 | `onOrphan` | string | — | `warn` | Post-batch orphan action: `warn`, `delete`, `ignore` |
 
-The FK is identified by an auto-generated display name in the format `column -> references.flow.references.column` (e.g. `customer_id -> customers.customer_id`).
+Composite FK example:
+
+```yaml
+foreignKeys:
+  - columns: [order_id, line_item_id]
+    references:
+      flow: order_items
+      columns: [order_id, line_item_id]
+    onOrphan: warn
+```
 
 ### Behavior
 
 - NULL FK values are not considered violations. A NULL means "no reference" (standard SQL semantics) and passes FK validation.
-- The referenced parent DataFrame is broadcast-joined for performance. Multiple FK constraints referencing the same parent flow/column pair share a single broadcast.
+- The referenced parent DataFrame is broadcast-joined for performance. Multiple FK constraints referencing the same parent flow/columns share a single broadcast.
 - If the referenced flow has not been processed yet, a `ValidationConfigException` is thrown. Flow execution order matters — the framework orders flows by FK dependencies automatically.
 - Rejection code: `FK_VIOLATION`.
 
@@ -437,10 +446,10 @@ loadMode:
 validation:
   primaryKey: [order_id]
   foreignKeys:
-    - column: customer_id
+    - columns: [customer_id]
       references:
         flow: customers
-        column: customer_id
+        columns: [customer_id]
       onOrphan: warn
   rules:
     - type: regex

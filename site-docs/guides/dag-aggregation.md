@@ -145,7 +145,7 @@ Given a parent `customers` and child `orders`:
 | 2 | Bob | [{order_id: 103, total: 75.0}] |
 | 3 | Charlie | [] |
 
-If a parent has no matching children (left outer join), the nested array is empty (`[]`), not NULL.
+With a `left_outer` join, parents with no matching children get an empty array (`[]`), not NULL. With an `inner` join, those parents are excluded from the result.
 
 The child records are grouped by the join key columns using `collect_list(struct(*))`. The `nestAs` field controls the output column name (defaults to `nested_records`).
 

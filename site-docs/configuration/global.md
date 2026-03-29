@@ -76,6 +76,8 @@ Controls batch execution and validation behavior. This entire section is optiona
 
 The comparison uses strict `>` (not `>=`): a rejection rate exactly equal to the threshold does not trigger a stop.
 
+Individual flows can override the global threshold with their own `maxRejectionRate` field. See [Flow Configuration](../configuration/flows.md).
+
 For the full validation pipeline, see [Validation Engine](../guides/validation.md).
 
 ## performance

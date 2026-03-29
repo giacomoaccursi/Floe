@@ -72,6 +72,7 @@ output:
 | `version` | no | `""` | Flow version string |
 | `owner` | no | `""` | Team or person responsible |
 | `dependsOn` | no | `[]` | List of flow names that must execute before this flow |
+| `maxRejectionRate` | no | — | Per-flow rejection rate threshold. Overrides the global `processing.maxRejectionRate`. |
 
 ### dependsOn
 

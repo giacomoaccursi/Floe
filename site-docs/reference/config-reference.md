@@ -74,6 +74,7 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 | `version` | no | Flow version (default `""`) |
 | `owner` | no | Responsible team/person (default `""`) |
 | `dependsOn` | no | List of flow names that must execute before this flow (default `[]`) |
+| `maxRejectionRate` | no | Per-flow rejection rate threshold. Overrides the global setting. |
 
 ### source
 

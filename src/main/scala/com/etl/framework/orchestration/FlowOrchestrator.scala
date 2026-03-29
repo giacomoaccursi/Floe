@@ -67,11 +67,12 @@ class FlowOrchestrator(
 
     executionLogger.logBatchStart(batchId, flowConfigs.size)
 
-    val plan = buildExecutionPlan()
     val flowResults = mutable.ArrayBuffer[FlowResult]()
     val validatedFlows = mutable.Map[String, DataFrame]()
 
     try {
+      val plan = buildExecutionPlan()
+
       plan.groups.foreach { group =>
         executionLogger.logGroupStart(group)
 

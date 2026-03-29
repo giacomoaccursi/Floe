@@ -130,20 +130,25 @@ When `sourceTable` is set, `sourceFlow` is not needed. Use one or the other:
 
 ### Nest
 
-Groups child records into a nested array column on the parent. The result is a denormalized structure where each parent row contains an array of its related child records.
+Combines a parent table with a child table by grouping all matching child records into a nested array column on each parent row. Use this when you want a denormalized structure — for example, a customer row with all their orders embedded as an array.
 
 ```yaml
-join:
-  type: left_outer
-  parent: customers_node
-  conditions:
-    - left: customer_id
-      right: customer_id
-  strategy: nest
-  nestAs: orders
+- id: orders_node
+  sourceFlow: orders
+  dependencies: [customers_node]
+  join:
+    type: left_outer
+    parent: customers_node
+    conditions:
+      - left: customer_id
+        right: customer_id
+    strategy: nest
+    nestAs: orders
 ```
 
-Given a parent `customers` and child `orders`:
+In `conditions`, `left` refers to the parent node's column and `right` refers to the current (child) node's column.
+
+Result (parent `customers` joined with child `orders`):
 
 | customer_id | name | orders |
 |-------------|------|--------|
@@ -157,13 +162,22 @@ The child records are grouped by the join key columns using `collect_list(struct
 
 ### Flatten
 
-Flattens child columns directly into the parent row. This is a standard join where child columns are added alongside parent columns.
+Combines a parent table with a child table by adding the child's columns directly alongside the parent's columns — a standard SQL join. Use this when the relationship is 1:1 or when you want one row per match.
 
 ```yaml
-strategy: flatten
+- id: shipping_node
+  sourceFlow: shipping
+  dependencies: [orders_node]
+  join:
+    type: left_outer
+    parent: orders_node
+    conditions:
+      - left: order_id
+        right: order_id
+    strategy: flatten
 ```
 
-Given a parent `orders` and child `shipping`:
+Result (parent `orders` joined with child `shipping`):
 
 | order_id | status | shipping_date | carrier |
 |----------|--------|---------------|---------|
@@ -177,20 +191,29 @@ If a child column has the same name as a parent column (excluding join keys), it
 
 ### Aggregate
 
-Aggregates child records using specified functions and joins the results to the parent. This is the most flexible strategy for producing summary statistics.
+Combines a parent table with a child table by computing summary statistics from the child records and joining them back to the parent. Use this when you want one row per parent with aggregated values from the children.
 
 ```yaml
-strategy: aggregate
-aggregations:
-  - column: quantity
-    function: sum
-    alias: total_quantity
-  - column: item_id
-    function: count
-    alias: item_count
-  - column: unit_price
-    function: avg
-    alias: avg_price
+- id: items_node
+  sourceFlow: order_items
+  dependencies: [orders_node]
+  join:
+    type: left_outer
+    parent: orders_node
+    conditions:
+      - left: order_id
+        right: order_id
+    strategy: aggregate
+    aggregations:
+      - column: quantity
+        function: sum
+        alias: total_quantity
+      - column: item_id
+        function: count
+        alias: item_count
+      - column: unit_price
+        function: avg
+        alias: avg_price
 ```
 
 At least one aggregation is required — an empty `aggregations` list throws `ValidationConfigException`.

@@ -290,6 +290,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       tableName: String,
       fn: DerivedTableContext => DataFrame
   ): IngestionPipelineBuilder = {
+    if (derivedTables.exists(_._1 == tableName))
+      throw new IllegalArgumentException(s"Derived table '$tableName' is already registered")
     logger.info(s"Registering derived table: $tableName")
     derivedTables += ((tableName, fn))
     this

@@ -563,4 +563,46 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
     result.right.get should have size 1
     result.right.get.head.name shouldBe "valid_flow"
   }
+
+  it should "reject duplicate flow names in loadAll" in {
+    val tempDir = Files.createTempDirectory("dup-flow-test").toFile
+    tempDir.deleteOnExit()
+
+    val flowYaml =
+      """
+        |name: same_name
+        |source:
+        |  type: file
+        |  path: "data/test.csv"
+        |  format: csv
+        |  options: {}
+        |schema:
+        |  enforceSchema: false
+        |  allowExtraColumns: true
+        |  columns: []
+        |loadMode:
+        |  type: full
+        |validation:
+        |  primaryKey: [id]
+        |  foreignKeys: []
+        |  rules: []
+        |output:
+        |  options: {}
+      """.stripMargin
+
+    Seq("flow_a.yaml", "flow_b.yaml").foreach { fileName =>
+      val f = new java.io.File(tempDir, fileName)
+      f.deleteOnExit()
+      val pw = new PrintWriter(f)
+      try pw.write(flowYaml)
+      finally pw.close()
+    }
+
+    val loader = new FlowConfigLoader()
+    val result = loader.loadAll(tempDir.getAbsolutePath)
+
+    result.isLeft shouldBe true
+    result.left.get.getMessage should include("Duplicate flow names")
+    result.left.get.getMessage should include("same_name")
+  }
 }

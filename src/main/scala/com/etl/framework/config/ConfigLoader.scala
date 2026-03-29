@@ -312,7 +312,17 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
               errors.map(e => s"  - ${e.getMessage}").mkString("\n")
           )
         )
-      else Right(configs)
+      else {
+        val duplicates = configs.groupBy(_.name).collect { case (name, dups) if dups.size > 1 => name }.toSeq
+        if (duplicates.nonEmpty)
+          Left(
+            ConfigFileException(
+              file = directory,
+              message = s"Duplicate flow names: ${duplicates.mkString(", ")}. Each flow must have a unique name."
+            )
+          )
+        else Right(configs)
+      }
     }
   }
 }

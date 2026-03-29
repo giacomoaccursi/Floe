@@ -261,4 +261,16 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     val tags = refs.filter(col("type") === "TAG").select("name").collect().map(_.getString(0))
     tags should not contain "batch_batch_no_tag"
   }
+
+  "IngestionPipelineBuilder" should "reject duplicate derived table names" in {
+    val fn: DerivedTableContext => DataFrame = _ => spark.emptyDataFrame
+    val builder = IngestionPipeline.builder()
+      .withDerivedTable("my_table", fn)
+
+    val ex = intercept[IllegalArgumentException] {
+      builder.withDerivedTable("my_table", fn)
+    }
+    ex.getMessage should include("my_table")
+    ex.getMessage should include("already registered")
+  }
 }

@@ -26,36 +26,19 @@ A DAG is defined in a YAML file with this structure:
 
 ```yaml
 name: customer_orders_aggregation
-description: "Aggregates customers with their orders and order items"
-version: "1.0"
-nodes:
-  - id: customers_node
-    description: "Customer base table"
-    sourceFlow: customers
+description: "Customers with nested orders and item counts"
 
-    select: [customer_id, name, email, country]
+nodes:
+  - id: order_items_node
+    sourceFlow: order_items
 
   - id: orders_node
-    description: "Orders joined to customers"
     sourceFlow: orders
-    joins:
-      - type: left_outer
-        with: customers_node
-        conditions:
-          - left: customer_id
-            right: customer_id
-        strategy: nest
-        nestAs: orders
-    select: [order_id, customer_id, status, total_amount, order_date]
     filters:
       - "status != 'cancelled'"
-
-  - id: order_items_node
-    description: "Order items aggregated per order"
-    sourceFlow: order_items
     joins:
       - type: left_outer
-        with: orders_node
+        with: order_items_node
         conditions:
           - left: order_id
             right: order_id
@@ -67,6 +50,18 @@ nodes:
           - column: item_id
             function: count
             alias: item_count
+
+  - id: customers_node
+    sourceFlow: customers
+    select: [customer_id, name, email, country]
+    joins:
+      - type: left_outer
+        with: orders_node
+        conditions:
+          - left: customer_id
+            right: customer_id
+        strategy: nest
+        nestAs: orders
 ```
 
 For the field reference, see [DAG Configuration](../configuration/dag.md).
@@ -129,11 +124,11 @@ When `sourceTable` is set, `sourceFlow` is not needed. Use one or the other:
 Combines a parent table with a child table by grouping all matching child records into a nested array column on each parent row. Use this when you want a denormalized structure — for example, a customer row with all their orders embedded as an array.
 
 ```yaml
-- id: orders_node
-  sourceFlow: orders
+- id: customers_node
+  sourceFlow: customers
   joins:
     - type: left_outer
-      with: customers_node
+      with: orders_node
       conditions:
         - left: customer_id
           right: customer_id
@@ -143,7 +138,7 @@ Combines a parent table with a child table by grouping all matching child record
 
 In `conditions`, `left` refers to the current node's column and `right` refers to the `with` node's column.
 
-Result (parent `customers` joined with child `orders`):
+Result (`customers` with nested `orders`):
 
 | customer_id | name | orders |
 |-------------|------|--------|
@@ -160,18 +155,18 @@ The child records are grouped by the join key columns using `collect_list(struct
 Combines a parent table with a child table by adding the child's columns directly alongside the parent's columns — a standard SQL join. Use this when the relationship is 1:1 or when you want one row per match.
 
 ```yaml
-- id: shipping_node
-  sourceFlow: shipping
+- id: orders_node
+  sourceFlow: orders
   joins:
     - type: left_outer
-      with: orders_node
+      with: shipping_node
       conditions:
         - left: order_id
           right: order_id
       strategy: flatten
 ```
 
-Result (`orders` joined with `shipping`):
+Result (`orders` with `shipping` columns flattened in):
 
 | order_id | status | shipping_date | carrier |
 |----------|--------|---------------|---------|
@@ -188,11 +183,11 @@ If a child column has the same name as a parent column (excluding join keys), it
 Combines a parent table with a child table by computing summary statistics from the child records and joining them back to the parent. Use this when you want one row per parent with aggregated values from the children.
 
 ```yaml
-- id: items_node
-  sourceFlow: order_items
+- id: orders_node
+  sourceFlow: orders
   joins:
     - type: left_outer
-      with: orders_node
+      with: order_items_node
       conditions:
         - left: order_id
           right: order_id
@@ -268,33 +263,21 @@ name: customer_360
 description: "Customer 360 view with orders, items, and shipping"
 version: "1.0"
 nodes:
-  - id: customers_node
-    description: "Customer dimension"
-    sourceFlow: customers
+  - id: order_items_node
+    sourceFlow: order_items
 
-    select: [customer_id, name, email, country, segment]
+  - id: shipping_node
+    sourceFlow: shipping
 
   - id: orders_node
-    description: "Orders nested into customers"
+    description: "Orders enriched with item aggregates and shipping"
     sourceFlow: orders
     filters:
       - "order_date >= '2024-01-01'"
     select: [order_id, customer_id, status, total_amount, order_date]
     joins:
       - type: left_outer
-        with: customers_node
-        conditions:
-          - left: customer_id
-            right: customer_id
-        strategy: nest
-        nestAs: orders
-
-  - id: items_node
-    description: "Item counts and totals per order"
-    sourceFlow: order_items
-    joins:
-      - type: left_outer
-        with: orders_node
+        with: order_items_node
         conditions:
           - left: order_id
             right: order_id
@@ -309,27 +292,33 @@ nodes:
           - column: product_id
             function: collect_set
             alias: unique_products
-
-  - id: shipping_node
-    description: "Shipping details flattened into orders"
-    sourceFlow: shipping
-    joins:
       - type: left_outer
-        with: orders_node
+        with: shipping_node
         conditions:
           - left: order_id
             right: order_id
         strategy: flatten
+
+  - id: customers_node
+    description: "Customer 360 with nested orders"
+    sourceFlow: customers
+    select: [customer_id, name, email, country, segment]
+    joins:
+      - type: left_outer
+        with: orders_node
+        conditions:
+          - left: customer_id
+            right: customer_id
+        strategy: nest
+        nestAs: orders
 ```
 
 In this DAG:
 
-- `customers_node` is a leaf node (no join, no dependencies) — it loads customer data from Iceberg
-- `orders_node` depends on `customers_node` and nests orders as an array column
-- `items_node` and `shipping_node` both depend on `orders_node` and can execute in parallel
-- `items_node` aggregates order items per order
-- `shipping_node` flattens shipping columns into the order record
-- The root node is determined automatically (the node no other node depends on)
+- `order_items_node` and `shipping_node` are leaf nodes — they load data from Iceberg
+- `orders_node` joins with both `order_items_node` (aggregate) and `shipping_node` (flatten) — multiple joins on a single node
+- `customers_node` is the root — it nests the enriched orders into each customer
+- `order_items_node` and `shipping_node` can execute in parallel (no dependency between them)
 
 ## Error handling
 

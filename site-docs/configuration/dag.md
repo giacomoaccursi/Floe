@@ -6,20 +6,20 @@ Brief reference for DAG YAML files. For the complete guide including join strate
 
 ```yaml
 name: customer_orders_aggregation
-description: "Aggregates customers with their orders"
+description: "Customers with nested orders"
 
 nodes:
-  - id: customers_node
-    sourceFlow: customers
-    select: [customer_id, name, email, country]
-
   - id: orders_node
     sourceFlow: orders
     filters:
       - "status != 'cancelled'"
+
+  - id: customers_node
+    sourceFlow: customers
+    select: [customer_id, name, email, country]
     joins:
       - type: left_outer
-        with: customers_node
+        with: orders_node
         conditions:
           - left: customer_id
             right: customer_id

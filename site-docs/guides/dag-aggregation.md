@@ -241,11 +241,10 @@ The DAG is executed in topological order. The framework:
 
 ### Parallel execution
 
-Nodes within the same execution group can run in parallel if `performance.parallelNodes` is `true` in `global.yaml`:
+Nodes within the same execution group can run in parallel if `parallelNodes` is `true` in the DAG YAML:
 
 ```yaml
-performance:
-  parallelNodes: true
+parallelNodes: true
 ```
 
 Parallel execution uses a bounded thread pool sized at `availableProcessors * 2` to avoid saturating the driver. The timeout for parallel groups is 2 hours.

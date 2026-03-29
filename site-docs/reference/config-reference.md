@@ -25,7 +25,6 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 | Field | Default | Description |
 |-------|---------|-------------|
 | `parallelFlows` | `false` | Execute independent flows in parallel |
-| `parallelNodes` | `false` | Execute independent DAG nodes in parallel |
 
 ### iceberg
 
@@ -196,6 +195,7 @@ The FK is identified by an auto-generated display name (e.g. `(customer_id) -> c
 | `name` | yes | DAG name |
 | `description` | no | Description (default `""`) |
 | `version` | no | Version (default `""`) |
+| `parallelNodes` | no | Execute independent nodes in parallel (default `false`) |
 | `nodes` | yes | List of node definitions |
 
 ### nodes[]

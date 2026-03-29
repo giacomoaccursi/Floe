@@ -22,18 +22,7 @@ class DomainValidator(
 
   override protected def rejectionReason(rule: ValidationRule, column: String): String = {
     val domainName = rule.domainName.getOrElse("unknown")
-    val domainValues = domainsConfig
-      .flatMap(_.domains.get(domainName))
-      .map(_.values)
-      .getOrElse(Seq.empty)
-
-    val valuesSample = if (domainValues.size <= 3) {
-      domainValues.mkString(", ")
-    } else {
-      domainValues.take(3).mkString(", ") + "..."
-    }
-
-    s"Value in column '$column' is not in domain '$domainName' (allowed: $valuesSample)"
+    s"Value in column '$column' is not in domain '$domainName'"
   }
 
   override protected def buildValidationCondition(
@@ -56,9 +45,8 @@ class DomainValidator(
 
     // Load domain configuration
     val domainConfig = domainsConfig.get.domains.get(domainName).getOrElse {
-      val availableDomains = domainsConfig.get.domains.keys.toSeq.sorted
       throw ValidationConfigException(
-        s"Domain '$domainName' not found for column '$column'${flowContext}. Available: ${availableDomains.mkString(", ")}"
+        s"Domain '$domainName' not found for column '$column'${flowContext}. Check your domains.yaml."
       )
     }
 

@@ -32,21 +32,20 @@ nodes:
   - id: customers_node
     description: "Customer base table"
     sourceFlow: customers
-    dependencies: []
+
     select: [customer_id, name, email, country]
 
   - id: orders_node
     description: "Orders joined to customers"
     sourceFlow: orders
-    dependencies: [customers_node]
-    join:
-      type: left_outer
-      parent: customers_node
-      conditions:
-        - left: customer_id
-          right: customer_id
-      strategy: nest
-      nestAs: orders
+    joins:
+      - type: left_outer
+        with: customers_node
+        conditions:
+          - left: customer_id
+            right: customer_id
+        strategy: nest
+        nestAs: orders
     select: [order_id, customer_id, status, total_amount, order_date]
     filters:
       - "status != 'cancelled'"
@@ -54,21 +53,20 @@ nodes:
   - id: order_items_node
     description: "Order items aggregated per order"
     sourceFlow: order_items
-    dependencies: [orders_node]
-    join:
-      type: left_outer
-      parent: orders_node
-      conditions:
-        - left: order_id
-          right: order_id
-      strategy: aggregate
-      aggregations:
-        - column: quantity
-          function: sum
-          alias: total_quantity
-        - column: item_id
-          function: count
-          alias: item_count
+    joins:
+      - type: left_outer
+        with: orders_node
+        conditions:
+          - left: order_id
+            right: order_id
+        strategy: aggregate
+        aggregations:
+          - column: quantity
+            function: sum
+            alias: total_quantity
+          - column: item_id
+            function: count
+            alias: item_count
 ```
 
 For the field reference, see [DAG Configuration](../configuration/dag.md).
@@ -81,8 +79,7 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 | `description` | string | yes | — | Human-readable description |
 | `sourceFlow` | string | — | — | Name of the source flow. Reads from `{catalogName}.default.{sourceFlow}`. Required if `sourceTable` is not set. |
 | `sourceTable` | string | — | — | Full Iceberg table name. Use instead of `sourceFlow` for external tables. |
-| `dependencies` | list | yes | — | List of node IDs this node depends on |
-| `join` | object | — | — | Join configuration (absent for root/leaf nodes with no parent) |
+| `joins` | list | — | `[]` | List of join configurations. Dependencies are inferred automatically. |
 | `select` | list | — | all columns | Columns to select from source data |
 | `filters` | list | — | none | SQL filter expressions applied to source data |
 
@@ -91,8 +88,8 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `type` | string | yes | — | Join type: `inner`, `left_outer` (or `left`), `right_outer` (or `right`), `full_outer` (or `full`) |
-| `parent` | string | yes | — | ID of the parent node to join with |
-| `conditions` | list | yes | — | Join conditions: `left` = column on the **parent** node, `right` = column on the **current** (child) node |
+| `with` | string | yes | — | ID of the node to join with |
+| `conditions` | list | yes | — | Join conditions: `left` = column on the current node, `right` = column on the `with` node |
 | `strategy` | string | yes | — | Join strategy: `nest`, `flatten`, `aggregate` |
 | `nestAs` | string | — | `nested_records` | Field name for nested array (Nest strategy only) |
 | `aggregations` | list | — | — | Aggregation specs (Aggregate strategy only) |
@@ -118,7 +115,6 @@ By default, a node reads from `{catalogName}.default.{sourceFlow}`. If you need 
 - id: external_customers_node
   description: "Customers from external catalog"
   sourceTable: "other_catalog.analytics.customers"
-  dependencies: []
 ```
 
 When `sourceTable` is set, `sourceFlow` is not needed. Use one or the other:
@@ -135,18 +131,17 @@ Combines a parent table with a child table by grouping all matching child record
 ```yaml
 - id: orders_node
   sourceFlow: orders
-  dependencies: [customers_node]
-  join:
-    type: left_outer
-    parent: customers_node
-    conditions:
-      - left: customer_id
-        right: customer_id
-    strategy: nest
-    nestAs: orders
+  joins:
+    - type: left_outer
+      with: customers_node
+      conditions:
+        - left: customer_id
+          right: customer_id
+      strategy: nest
+      nestAs: orders
 ```
 
-In `conditions`, `left` refers to the parent node's column and `right` refers to the current (child) node's column.
+In `conditions`, `left` refers to the current node's column and `right` refers to the `with` node's column.
 
 Result (parent `customers` joined with child `orders`):
 
@@ -167,17 +162,16 @@ Combines a parent table with a child table by adding the child's columns directl
 ```yaml
 - id: shipping_node
   sourceFlow: shipping
-  dependencies: [orders_node]
-  join:
-    type: left_outer
-    parent: orders_node
-    conditions:
-      - left: order_id
-        right: order_id
-    strategy: flatten
+  joins:
+    - type: left_outer
+      with: orders_node
+      conditions:
+        - left: order_id
+          right: order_id
+      strategy: flatten
 ```
 
-Result (parent `orders` joined with child `shipping`):
+Result (`orders` joined with `shipping`):
 
 | order_id | status | shipping_date | carrier |
 |----------|--------|---------------|---------|
@@ -196,24 +190,23 @@ Combines a parent table with a child table by computing summary statistics from 
 ```yaml
 - id: items_node
   sourceFlow: order_items
-  dependencies: [orders_node]
-  join:
-    type: left_outer
-    parent: orders_node
-    conditions:
-      - left: order_id
-        right: order_id
-    strategy: aggregate
-    aggregations:
-      - column: quantity
-        function: sum
-        alias: total_quantity
-      - column: item_id
-        function: count
-        alias: item_count
-      - column: unit_price
-        function: avg
-        alias: avg_price
+  joins:
+    - type: left_outer
+      with: orders_node
+      conditions:
+        - left: order_id
+          right: order_id
+      strategy: aggregate
+      aggregations:
+        - column: quantity
+          function: sum
+          alias: total_quantity
+        - column: item_id
+          function: count
+          alias: item_count
+        - column: unit_price
+          function: avg
+          alias: avg_price
 ```
 
 At least one aggregation is required — an empty `aggregations` list throws `ValidationConfigException`.
@@ -278,58 +271,55 @@ nodes:
   - id: customers_node
     description: "Customer dimension"
     sourceFlow: customers
-    dependencies: []
+
     select: [customer_id, name, email, country, segment]
 
   - id: orders_node
     description: "Orders nested into customers"
     sourceFlow: orders
-    dependencies: [customers_node]
     filters:
       - "order_date >= '2024-01-01'"
     select: [order_id, customer_id, status, total_amount, order_date]
-    join:
-      type: left_outer
-      parent: customers_node
-      conditions:
-        - left: customer_id
-          right: customer_id
-      strategy: nest
-      nestAs: orders
+    joins:
+      - type: left_outer
+        with: customers_node
+        conditions:
+          - left: customer_id
+            right: customer_id
+        strategy: nest
+        nestAs: orders
 
   - id: items_node
     description: "Item counts and totals per order"
     sourceFlow: order_items
-    dependencies: [orders_node]
-    join:
-      type: left_outer
-      parent: orders_node
-      conditions:
-        - left: order_id
-          right: order_id
-      strategy: aggregate
-      aggregations:
-        - column: quantity
-          function: sum
-          alias: total_items
-        - column: line_total
-          function: sum
-          alias: items_total
-        - column: product_id
-          function: collect_set
-          alias: unique_products
+    joins:
+      - type: left_outer
+        with: orders_node
+        conditions:
+          - left: order_id
+            right: order_id
+        strategy: aggregate
+        aggregations:
+          - column: quantity
+            function: sum
+            alias: total_items
+          - column: line_total
+            function: sum
+            alias: items_total
+          - column: product_id
+            function: collect_set
+            alias: unique_products
 
   - id: shipping_node
     description: "Shipping details flattened into orders"
     sourceFlow: shipping
-    dependencies: [orders_node]
-    join:
-      type: left_outer
-      parent: orders_node
-      conditions:
-        - left: order_id
-          right: order_id
-      strategy: flatten
+    joins:
+      - type: left_outer
+        with: orders_node
+        conditions:
+          - left: order_id
+            right: order_id
+        strategy: flatten
 ```
 
 In this DAG:

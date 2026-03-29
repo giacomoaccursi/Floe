@@ -313,7 +313,7 @@ Once written, derived tables are regular Iceberg tables. Reference them in a DAG
 nodes:
   - id: summary_node
     sourceFlow: order_summary    # reads from the derived table
-    dependencies: []
+
 ```
 
 ## Custom catalog providers

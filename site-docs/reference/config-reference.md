@@ -206,8 +206,7 @@ The FK is identified by an auto-generated display name (e.g. `(customer_id) -> c
 | `description` | no | `""` | Description |
 | `sourceFlow` | conditional | — | Source flow name. Required if `sourceTable` is not set. |
 | `sourceTable` | conditional | — | Full Iceberg table name. Use instead of `sourceFlow` for external tables. |
-| `dependencies` | yes | — | List of dependency node IDs |
-| `join` | no | — | Join configuration |
+| `joins` | no | `[]` | List of join configurations. Dependencies are inferred automatically. |
 | `select` | no | all | Columns to select |
 | `filters` | no | none | SQL filter expressions |
 
@@ -216,8 +215,8 @@ The FK is identified by an auto-generated display name (e.g. `(customer_id) -> c
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `type` | yes | — | `inner`, `left_outer`, `right_outer`, `full_outer` |
-| `parent` | yes | — | Parent node ID |
-| `conditions` | yes | — | Join conditions (left=parent, right=child) |
+| `with` | yes | — | Node ID to join with |
+| `conditions` | yes | — | Join conditions (left=current node, right=with node) |
 | `strategy` | yes | — | `nest`, `flatten`, `aggregate` |
 | `nestAs` | no | `nested_records` | Nest column name |
 | `aggregations` | no | — | Aggregation specs |

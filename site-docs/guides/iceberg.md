@@ -373,16 +373,6 @@ The snapshot summary contains file-level statistics, not row-level change counts
 !!!note
     A `deleted-records = 35, added-records = 35` on a delta run does **not** mean 35 rows were updated — it means the files containing those 35 rows were rewritten (copy-on-write). The actual number of changed rows can be 0.
 
-### Rollback
-
-The `IcebergTableManager` exposes a `rollbackToSnapshot` method that can revert a table to a previous snapshot:
-
-```sql
-CALL catalog.system.rollback_to_snapshot('catalog.default.orders', 4857209365014528)
-```
-
-This is not called automatically by the framework but is available for manual recovery. The rollback creates a new snapshot that points to the old data — no files are deleted or rewritten.
-
 ## Post-batch lifecycle
 
 After all flows execute successfully, three things happen in order:

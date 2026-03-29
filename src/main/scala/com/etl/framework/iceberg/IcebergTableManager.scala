@@ -278,17 +278,6 @@ class IcebergTableManager(
     }
   }
 
-  def rollbackToSnapshot(
-      flowConfig: FlowConfig,
-      snapshotId: Long
-  ): Unit = {
-    val tableName = resolveTableName(flowConfig)
-    spark.sql(
-      s"CALL ${icebergConfig.catalogName}.system.rollback_to_snapshot('$tableName', $snapshotId)"
-    )
-    logger.info(s"Rolled back $tableName to snapshot $snapshotId")
-  }
-
   def runMaintenance(
       flowConfig: FlowConfig,
       config: MaintenanceConfig

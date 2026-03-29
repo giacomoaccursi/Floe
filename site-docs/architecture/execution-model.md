@@ -47,16 +47,16 @@ If `parallelFlows` is `false`, all flows execute sequentially in topological ord
 
 ### DAG node parallelism
 
-When `performance.parallelNodes` is `true`, independent DAG nodes within the same execution group run concurrently:
+When `parallelNodes` is `true` in the DAG YAML, independent DAG nodes within the same execution group run concurrently:
 
 ```yaml
-performance:
-  parallelNodes: true
+# In the DAG YAML file
+parallelNodes: true
 ```
 
 The thread pool is sized at `availableProcessors * 2`. The timeout for parallel groups is 2 hours.
 
-If `parallelNodes` is `false`, all DAG nodes execute sequentially regardless of independence.
+If `parallelNodes` is `false` (default), all DAG nodes execute sequentially regardless of independence.
 
 ### Thread pool management
 

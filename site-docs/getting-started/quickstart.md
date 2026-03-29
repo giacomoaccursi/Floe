@@ -21,7 +21,6 @@ paths:
 
 performance:
   parallelFlows: false
-  parallelNodes: false
 
 iceberg:
   catalogType: "hadoop"

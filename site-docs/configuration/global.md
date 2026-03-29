@@ -17,7 +17,6 @@ processing:
 
 performance:
   parallelFlows: true
-  parallelNodes: true
 
 iceberg:
   catalogType: "hadoop"

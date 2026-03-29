@@ -282,6 +282,8 @@ You can also use `ctx.spark` for arbitrary Spark operations (reading external da
 1. All flows execute (read → validate → transform → write to Iceberg)
 2. Derived tables execute in registration order
 3. Each derived table writes to `{catalogName}.default.{tableName}` as a full-load overwrite
+4. Each successful write is tagged with the batch ID (if `enableSnapshotTagging` is `true` in `global.yaml`)
+5. Iceberg maintenance runs on all successfully written derived tables (same settings as flow tables — see [Iceberg maintenance](../configuration/global.md#maintenance))
 
 If a derived table fails, the error is logged and the remaining derived tables continue executing. The `IngestionResult.derivedTableResults` contains the outcome of each derived table.
 

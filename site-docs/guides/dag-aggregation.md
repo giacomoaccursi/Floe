@@ -79,8 +79,8 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 |-------|------|----------|---------|-------------|
 | `id` | string | yes | — | Unique node identifier |
 | `description` | string | yes | — | Human-readable description |
-| `sourceFlow` | string | yes | — | Name of the source flow |
-| `sourceTable` | string | — | — | Iceberg table name (overrides the default `{catalogName}.default.{sourceFlow}`) |
+| `sourceFlow` | string | — | — | Name of the source flow. Reads from `{catalogName}.default.{sourceFlow}`. Required if `sourceTable` is not set. |
+| `sourceTable` | string | — | — | Full Iceberg table name. Use instead of `sourceFlow` for external tables. |
 | `dependencies` | list | yes | — | List of node IDs this node depends on |
 | `join` | object | — | — | Join configuration (absent for root/leaf nodes with no parent) |
 | `select` | list | — | all columns | Columns to select from source data |
@@ -110,19 +110,21 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 
 Supported aggregation functions: `sum`, `count`, `avg` (alias: `average`), `min`, `max`, `first`, `last`, `collect_list`, `collect_set`.
 
-## sourceTable — reading from Iceberg
+## sourceTable — reading from external Iceberg tables
 
-By default, a node reads from the Iceberg table `{catalogName}.default.{sourceFlow}`, where `catalogName` is the Iceberg catalog configured in `global.yaml` and `sourceFlow` is the node's source flow name. Setting `sourceTable` overrides this default and reads from a different Iceberg table:
+By default, a node reads from `{catalogName}.default.{sourceFlow}`. If you need to read from a table outside the framework's naming convention (e.g. a table created by another system, or in a different catalog/namespace), use `sourceTable` instead of `sourceFlow`:
 
 ```yaml
-- id: customers_node
-  description: "Customers from a different catalog"
-  sourceFlow: customers
-  sourceTable: "other_catalog.default.customers"
+- id: external_customers_node
+  description: "Customers from external catalog"
+  sourceTable: "other_catalog.analytics.customers"
   dependencies: []
 ```
 
-This is useful when the DAG needs to read from a table in a different catalog or namespace than the default.
+When `sourceTable` is set, `sourceFlow` is not needed. Use one or the other:
+
+- `sourceFlow: customers` → reads from `{catalogName}.default.customers` (framework-managed table)
+- `sourceTable: "other_catalog.analytics.customers"` → reads from the exact table specified
 
 ## Join strategies
 
@@ -250,7 +252,6 @@ nodes:
   - id: customers_node
     description: "Customer dimension"
     sourceFlow: customers
-    sourceTable: "spark_catalog.default.customers"
     dependencies: []
     select: [customer_id, name, email, country, segment]
 

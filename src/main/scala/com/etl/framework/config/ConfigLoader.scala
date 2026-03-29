@@ -366,6 +366,10 @@ class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
       .toSeq
 
     def validateNode(node: DAGNode): Either[ConfigurationException, Unit] = {
+      val sourceErrors =
+        if (node.sourceFlow.isEmpty && node.sourceTable.isEmpty)
+          Seq(s"node '${node.id}' must have either sourceFlow or sourceTable")
+        else Seq.empty
       val missingDeps = node.dependencies.filterNot(nodeIds.contains)
       val joinErrors = node.join.toSeq.flatMap { joinConfig =>
         val missingParent =
@@ -378,7 +382,7 @@ class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
           else Seq.empty
         missingParent ++ emptyOn
       }
-      val allErrors =
+      val allErrors = sourceErrors ++
         missingDeps.map(d => s"node '${node.id}' references missing dependency '$d'") ++
           joinErrors
       allErrors.headOption.fold[Either[ConfigurationException, Unit]](Right(()))(err)

@@ -204,8 +204,8 @@ The FK is identified by an auto-generated display name (e.g. `(customer_id) -> c
 |-------|----------|---------|-------------|
 | `id` | yes | — | Unique node ID |
 | `description` | no | `""` | Description |
-| `sourceFlow` | yes | — | Source flow name |
-| `sourceTable` | no | — | Iceberg table (overrides the default `{catalogName}.default.{sourceFlow}`) |
+| `sourceFlow` | conditional | — | Source flow name. Required if `sourceTable` is not set. |
+| `sourceTable` | conditional | — | Full Iceberg table name. Use instead of `sourceFlow` for external tables. |
 | `dependencies` | yes | — | List of dependency node IDs |
 | `join` | no | — | Join configuration |
 | `select` | no | all | Columns to select |

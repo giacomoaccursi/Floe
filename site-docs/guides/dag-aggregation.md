@@ -133,8 +133,14 @@ When `sourceTable` is set, `sourceFlow` is not needed. Use one or the other:
 Groups child records into a nested array column on the parent. The result is a denormalized structure where each parent row contains an array of its related child records.
 
 ```yaml
-strategy: nest
-nestAs: orders
+join:
+  type: left_outer
+  parent: customers_node
+  conditions:
+    - left: customer_id
+      right: customer_id
+  strategy: nest
+  nestAs: orders
 ```
 
 Given a parent `customers` and child `orders`:

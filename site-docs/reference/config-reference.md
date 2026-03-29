@@ -153,7 +153,7 @@ The FK is identified by an auto-generated display name in the format `column -> 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `type` | yes | — | `regex`, `range`, `domain`, `custom` |
-| `column` | yes* | — | Column to validate |
+| `column` | conditional | — | Column to validate. Required for `regex`, `range`, `domain`. Optional for `custom`. |
 | `pattern` | regex | — | Regex pattern |
 | `min` | range | — | Minimum value |
 | `max` | range | — | Maximum value |

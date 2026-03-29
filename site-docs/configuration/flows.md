@@ -207,7 +207,7 @@ The FK is identified by an auto-generated display name in the format `column -> 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `type` | string | yes | — | Rule type: `regex`, `range`, `domain`, `custom` |
-| `column` | string | yes* | — | Column to validate |
+| `column` | string | conditional | — | Column to validate. Required for `regex`, `range`, `domain`. Optional for `custom` (custom validators can do cross-column validation). |
 | `pattern` | string | — | — | Regex pattern (for `regex` type) |
 | `min` | string | — | — | Minimum value (for `range` type) |
 | `max` | string | — | — | Maximum value (for `range` type) |

@@ -5,6 +5,7 @@ import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetector, OrphanRep
 import com.etl.framework.orchestration.batch.{BatchMetadataWriter, FlowGroupExecutor}
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.ExecutionPlanBuilder
+import com.etl.framework.validation.Validator
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
@@ -216,11 +217,12 @@ object FlowOrchestrator {
   def apply(
       globalConfig: GlobalConfig,
       flowConfigs: Seq[FlowConfig],
-      domainsConfig: Option[DomainsConfig] = None
+      domainsConfig: Option[DomainsConfig] = None,
+      customValidators: Map[String, () => Validator] = Map.empty
   )(implicit spark: SparkSession): FlowOrchestrator = {
     val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
     val ec = ExecutionContext.fromExecutorService(pool)
-    val groupExecutor = new FlowGroupExecutor(globalConfig, domainsConfig, ec)
+    val groupExecutor = new FlowGroupExecutor(globalConfig, domainsConfig, ec, customValidators)
     val metadataWriter = new BatchMetadataWriter(globalConfig, flowConfigs)
     val planBuilder = new ExecutionPlanBuilder(flowConfigs, globalConfig)
     val resultProcessor = new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor)

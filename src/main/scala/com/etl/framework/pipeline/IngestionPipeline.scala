@@ -13,6 +13,7 @@ import com.etl.framework.core.FlowTransformation
 import com.etl.framework.exceptions.MissingConfigFieldException
 import com.etl.framework.iceberg.catalog.{CatalogFactory, CatalogProvider}
 import com.etl.framework.orchestration.{FlowOrchestrator, IngestionResult}
+import com.etl.framework.validation.Validator
 import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
 import scala.collection._
@@ -24,7 +25,8 @@ class IngestionPipeline private (
     flowConfigs: Seq[FlowConfig],
     flowTransformations: Map[String, FlowTransformations],
     domainsConfig: Option[DomainsConfig],
-    extraCatalogProviders: Map[String, () => CatalogProvider]
+    extraCatalogProviders: Map[String, () => CatalogProvider],
+    customValidators: Map[String, () => Validator] = Map.empty
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -51,7 +53,7 @@ class IngestionPipeline private (
     }
 
     // Create and execute orchestrator with DomainsConfig
-    val orchestrator = FlowOrchestrator(globalConfig, enrichedFlowConfigs, domainsConfig)
+    val orchestrator = FlowOrchestrator(globalConfig, enrichedFlowConfigs, domainsConfig, customValidators.toMap)
     orchestrator.execute()
   }
 
@@ -98,6 +100,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private var domainsConfigOpt: Option[DomainsConfig] = None
   private val flowTransformations = mutable.Map[String, FlowTransformations]()
   private val extraCatalogProviders = mutable.Map[String, () => CatalogProvider]()
+  private val customValidators = mutable.Map[String, () => Validator]()
   private var configVariables: scala.collection.immutable.Map[String, String] = scala.collection.immutable.Map.empty
 
   /** Sets the configuration directory path Loads global.yaml, domains.yaml, and flows/ *.yaml from this directory
@@ -244,6 +247,21 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     this
   }
 
+  /** Registers a custom validator by name.
+    * Use the same name in the flow YAML `class` field to reference it.
+    *
+    * @param name Short name for the validator (e.g. "luhn")
+    * @param factory Factory function that creates the validator instance
+    * @return This builder for chaining
+    */
+  def withCustomValidator(
+      name: String,
+      factory: () => Validator
+  ): IngestionPipelineBuilder = {
+    customValidators(name) = factory
+    this
+  }
+
   /** Builds the IngestionPipeline
     *
     * @return
@@ -288,7 +306,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       flowConfigs,
       flowTransformations.toMap,
       domainsConfigOpt,
-      extraCatalogProviders.toMap
+      extraCatalogProviders.toMap,
+      customValidators.toMap
     )
   }
 
@@ -374,9 +393,17 @@ object IngestionPipeline {
       flowConfigs: Seq[FlowConfig],
       flowTransformations: Map[String, FlowTransformations],
       domainsConfig: Option[DomainsConfig],
-      extraCatalogProviders: Map[String, () => CatalogProvider]
+      extraCatalogProviders: Map[String, () => CatalogProvider],
+      customValidators: Map[String, () => Validator] = Map.empty
   )(implicit spark: SparkSession): IngestionPipeline = {
-    new IngestionPipeline(globalConfig, flowConfigs, flowTransformations, domainsConfig, extraCatalogProviders)
+    new IngestionPipeline(
+      globalConfig,
+      flowConfigs,
+      flowTransformations,
+      domainsConfig,
+      extraCatalogProviders,
+      customValidators
+    )
   }
 
   /** Creates a new IngestionPipeline builder

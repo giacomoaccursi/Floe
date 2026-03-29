@@ -6,7 +6,7 @@ import com.etl.framework.iceberg.{IcebergFlowMetadata, IcebergTableManager, Iceb
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.util.TimingUtil
 import com.etl.framework.validation.ValidationColumns._
-import com.etl.framework.validation.{ValidationEngine, ValidationResult}
+import com.etl.framework.validation.{ValidationEngine, ValidationResult, Validator}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
@@ -19,7 +19,8 @@ class FlowExecutor(
     flowConfig: FlowConfig,
     globalConfig: GlobalConfig,
     validatedFlows: Map[String, DataFrame] = Map.empty,
-    domainsConfig: Option[DomainsConfig] = None
+    domainsConfig: Option[DomainsConfig] = None,
+    customValidators: Map[String, () => Validator] = Map.empty
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -123,7 +124,7 @@ class FlowExecutor(
   }
 
   protected def validateData(data: DataFrame): ValidationResult = {
-    val engine = new ValidationEngine(domainsConfig)
+    val engine = new ValidationEngine(domainsConfig, customValidators)
     engine.validate(data, flowConfig, validatedFlows)
   }
 

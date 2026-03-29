@@ -2,6 +2,7 @@ package com.etl.framework.orchestration.batch
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
 import com.etl.framework.orchestration.flow.{FlowExecutor, FlowResult}
+import com.etl.framework.validation.Validator
 import com.etl.framework.orchestration.ExecutionGroup
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
@@ -15,7 +16,8 @@ import scala.concurrent.duration._
 class FlowGroupExecutor(
     globalConfig: GlobalConfig,
     domainsConfig: Option[DomainsConfig],
-    parallelEc: ExecutionContext
+    parallelEc: ExecutionContext,
+    customValidators: Map[String, () => Validator] = Map.empty
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -70,7 +72,7 @@ class FlowGroupExecutor(
   ): FlowResult = {
     logger.debug(s"Starting flow ${flowConfig.name} - batchId: $batchId")
 
-    val executor = new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig)
+    val executor = new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig, customValidators)
     executor.execute(batchId)
   }
 

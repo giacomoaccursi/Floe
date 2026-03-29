@@ -39,20 +39,50 @@ object ValidatorFactory {
   def create(
       rule: ValidationRule,
       domainsConfig: Option[DomainsConfig] = None,
-      flowName: Option[String] = None
+      flowName: Option[String] = None,
+      customValidators: Map[String, () => Validator] = Map.empty
   ): Validator = {
     rule.`type` match {
       case ValidationRuleType.Regex => new RegexValidator(flowName)
       case ValidationRuleType.Range => new RangeValidator(flowName)
       case ValidationRuleType.Domain =>
         new DomainValidator(domainsConfig, flowName)
-      case ValidationRuleType.Custom => createCustomValidator(rule, flowName)
+      case ValidationRuleType.Custom => resolveCustomValidator(rule, flowName, customValidators)
       case unsupported =>
         val flowContext = flowName.map(f => s" in flow '$f'").getOrElse("")
         throw UnsupportedOperationException(
           operation = s"validator type '${unsupported.name}'",
           details = s"Supported validators: regex, range, domain, custom$flowContext"
         )
+    }
+  }
+
+  /** Resolves a custom validator: tries the registry first, falls back to reflection.
+    */
+  private def resolveCustomValidator(
+      rule: ValidationRule,
+      flowName: Option[String],
+      customValidators: Map[String, () => Validator]
+  ): Validator = {
+    val flowContext = flowName.map(f => s" in flow '$f'").getOrElse("")
+    val name = rule.`class`.getOrElse {
+      throw ValidationConfigException(
+        s"Custom validator error$flowContext: 'class' field is required"
+      )
+    }
+
+    // Try registry by name first, fall back to reflection
+    customValidators.get(name) match {
+      case Some(factory) =>
+        val validator = factory()
+        validator match {
+          case configurable: ConfigurableValidator =>
+            configurable.configure(rule.config.getOrElse(Map.empty))
+          case _ =>
+        }
+        validator
+      case None =>
+        createCustomValidator(rule, flowName)
     }
   }
 

@@ -12,7 +12,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 class CustomRulesValidator(
     flowConfig: FlowConfig,
     domainsConfig: Option[DomainsConfig] = None,
-    flowName: Option[String] = None
+    flowName: Option[String] = None,
+    customValidators: Map[String, () => Validator] = Map.empty
 )(implicit spark: SparkSession)
     extends Validator {
 
@@ -23,7 +24,7 @@ class CustomRulesValidator(
     val (finalDf, finalRejected, finalWarned) =
       flowConfig.validation.rules.foldLeft((df, Option.empty[DataFrame], Option.empty[DataFrame])) {
         case ((currentDf, rejectedAcc, warnedAcc), customRule) =>
-          val validator = ValidatorFactory.create(customRule, domainsConfig, flowName)
+          val validator = ValidatorFactory.create(customRule, domainsConfig, flowName, customValidators)
 
           val skipNull = customRule.skipNull.getOrElse(true)
           val targetColumn = customRule.column

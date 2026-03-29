@@ -9,9 +9,10 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 /** Core validation engine that coordinates all validation steps Delegates actual validation logic to specialized
   * validators
   */
-class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit
-    spark: SparkSession
-) {
+class ValidationEngine(
+    domainsConfig: Option[DomainsConfig] = None,
+    customValidators: Map[String, () => Validator] = Map.empty
+)(implicit spark: SparkSession) {
 
   /** Validates a DataFrame according to the flow configuration
     *
@@ -55,7 +56,7 @@ class ValidationEngine(domainsConfig: Option[DomainsConfig] = None)(implicit
       ),
       ValidationStep(
         flowConfig.validation.rules.nonEmpty,
-        new CustomRulesValidator(flowConfig, domainsConfig, flowName),
+        new CustomRulesValidator(flowConfig, domainsConfig, flowName, customValidators),
         ValidationRule(ValidationRuleType.Custom)
       )
     )

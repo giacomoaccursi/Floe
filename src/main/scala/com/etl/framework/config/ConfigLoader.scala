@@ -189,7 +189,8 @@ private[config] case class FlowConfigYaml(
     schema: SchemaConfig,
     loadMode: LoadModeConfig,
     validation: ValidationConfig,
-    output: OutputConfig
+    output: OutputConfig,
+    dependsOn: Seq[String] = Seq.empty
 ) {
   def toFlowConfig: FlowConfig = FlowConfig(
     name = name,
@@ -201,6 +202,7 @@ private[config] case class FlowConfigYaml(
     loadMode = loadMode,
     validation = validation,
     output = output,
+    dependsOn = dependsOn,
     preValidationTransformation = None,
     postValidationTransformation = None
   )
@@ -216,7 +218,8 @@ private[config] object FlowConfigYaml {
     schema = fc.schema,
     loadMode = fc.loadMode,
     validation = fc.validation,
-    output = fc.output
+    output = fc.output,
+    dependsOn = fc.dependsOn
   )
 }
 

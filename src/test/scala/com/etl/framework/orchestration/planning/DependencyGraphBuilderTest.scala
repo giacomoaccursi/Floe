@@ -326,4 +326,68 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
     groups(2).flows.map(_.name) should contain("flow_e")
     groups(2).parallel shouldBe false
   }
+
+  "dependsOn" should "add explicit dependency edges to the graph" in {
+    val flowA = createFlowConfig("flow_a")
+    val flowB = createFlowConfig("flow_b").copy(dependsOn = Seq("flow_a"))
+
+    val builder = new DependencyGraphBuilder(Seq(flowA, flowB))
+    val graph = builder.buildGraph()
+
+    graph("flow_a") shouldBe empty
+    graph("flow_b") shouldBe Set("flow_a")
+  }
+
+  it should "combine with FK dependencies" in {
+    val flowA = createFlowConfig("flow_a")
+    val flowB = createFlowConfig("flow_b")
+    val flowC = createFlowConfig(
+      "flow_c",
+      foreignKeys = Seq(createForeignKey("col1", "flow_a", "id"))
+    ).copy(dependsOn = Seq("flow_b"))
+
+    val builder = new DependencyGraphBuilder(Seq(flowA, flowB, flowC))
+    val graph = builder.buildGraph()
+
+    graph("flow_c") shouldBe Set("flow_a", "flow_b")
+  }
+
+  it should "enforce execution order in topological sort" in {
+    val flowA = createFlowConfig("flow_a")
+    val flowB = createFlowConfig("flow_b")
+    val flowC = createFlowConfig("flow_c").copy(dependsOn = Seq("flow_a", "flow_b"))
+
+    val builder = new DependencyGraphBuilder(Seq(flowA, flowB, flowC))
+    val graph = builder.buildGraph()
+    val sorted = builder.topologicalSort(graph)
+
+    sorted.indexOf("flow_a") should be < sorted.indexOf("flow_c")
+    sorted.indexOf("flow_b") should be < sorted.indexOf("flow_c")
+  }
+
+  it should "prevent parallel execution of dependent flows" in {
+    val flowA = createFlowConfig("flow_a")
+    val flowB = createFlowConfig("flow_b").copy(dependsOn = Seq("flow_a"))
+
+    val builder = new DependencyGraphBuilder(Seq(flowA, flowB))
+    val graph = builder.buildGraph()
+    val sorted = builder.topologicalSort(graph)
+    val groups = builder.groupForParallelExecution(sorted, graph, parallelEnabled = true)
+
+    groups.size shouldBe 2
+    groups(0).flows.map(_.name) should contain("flow_a")
+    groups(1).flows.map(_.name) should contain("flow_b")
+  }
+
+  it should "detect circular dependency via dependsOn" in {
+    val flowA = createFlowConfig("flow_a").copy(dependsOn = Seq("flow_b"))
+    val flowB = createFlowConfig("flow_b").copy(dependsOn = Seq("flow_a"))
+
+    val builder = new DependencyGraphBuilder(Seq(flowA, flowB))
+    val graph = builder.buildGraph()
+
+    intercept[CircularDependencyException] {
+      builder.topologicalSort(graph)
+    }
+  }
 }

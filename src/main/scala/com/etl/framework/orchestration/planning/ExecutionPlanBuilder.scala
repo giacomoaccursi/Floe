@@ -45,6 +45,18 @@ class ExecutionPlanBuilder(
           )
         }
       }
+      fc.dependsOn.foreach { dep =>
+        if (!flowNames.contains(dep)) {
+          throw new IllegalArgumentException(
+            s"Flow '${fc.name}': dependsOn references unknown flow '$dep'"
+          )
+        }
+        if (dep == fc.name) {
+          throw new IllegalArgumentException(
+            s"Flow '${fc.name}': dependsOn cannot reference itself"
+          )
+        }
+      }
     }
   }
 }

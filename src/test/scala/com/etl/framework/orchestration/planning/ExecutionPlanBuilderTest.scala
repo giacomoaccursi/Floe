@@ -284,4 +284,23 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
 
     plan.groups should not be empty
   }
+
+  it should "reject dependsOn referencing unknown flow" in {
+    val flowA = createFlowConfig("flow_a").copy(dependsOn = Seq("nonexistent"))
+    val globalConfig = createGlobalConfig()
+    val builder = new ExecutionPlanBuilder(Seq(flowA), globalConfig)
+
+    val ex = intercept[IllegalArgumentException] { builder.build() }
+    ex.getMessage should include("dependsOn")
+    ex.getMessage should include("nonexistent")
+  }
+
+  it should "reject dependsOn referencing itself" in {
+    val flowA = createFlowConfig("flow_a").copy(dependsOn = Seq("flow_a"))
+    val globalConfig = createGlobalConfig()
+    val builder = new ExecutionPlanBuilder(Seq(flowA), globalConfig)
+
+    val ex = intercept[IllegalArgumentException] { builder.build() }
+    ex.getMessage should include("cannot reference itself")
+  }
 }

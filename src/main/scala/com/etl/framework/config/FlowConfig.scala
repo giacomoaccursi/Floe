@@ -14,6 +14,7 @@ case class FlowConfig(
     loadMode: LoadModeConfig,
     validation: ValidationConfig,
     output: OutputConfig,
+    dependsOn: Seq[String] = Seq.empty,
     preValidationTransformation: Option[FlowTransformation] = None,
     postValidationTransformation: Option[FlowTransformation] = None
 )

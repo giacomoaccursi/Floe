@@ -27,10 +27,12 @@ class DependencyGraphBuilder(flowConfigs: Seq[FlowConfig]) {
     flowConfigs.foreach { flow =>
       flow.validation.foreignKeys.foreach { fk =>
         val referencedFlow = fk.references.flow
-
-        // flow depends on referencedFlow
-        // So referencedFlow must execute before flow
         graph.getOrElseUpdate(flow.name, mutable.Set.empty).add(referencedFlow)
+      }
+
+      // Add edges based on explicit dependsOn
+      flow.dependsOn.foreach { dep =>
+        graph.getOrElseUpdate(flow.name, mutable.Set.empty).add(dep)
       }
     }
 

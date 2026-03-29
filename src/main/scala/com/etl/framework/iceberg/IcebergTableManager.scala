@@ -296,15 +296,9 @@ class IcebergTableManager(
     val tableName = resolveTableName(flowConfig)
     logger.info(s"Running maintenance on $tableName")
 
-    if (config.enableSnapshotExpiration) {
-      expireSnapshots(tableName, config.snapshotRetentionDays)
-    }
-    if (config.enableCompaction) {
-      compactDataFiles(tableName, config.targetFileSizeMb)
-    }
-    if (config.enableOrphanCleanup) {
-      removeOrphanFiles(tableName, config.orphanRetentionMinutes)
-    }
+    config.snapshotRetentionDays.foreach(days => expireSnapshots(tableName, days))
+    config.targetFileSizeMb.foreach(size => compactDataFiles(tableName, size))
+    config.orphanRetentionMinutes.foreach(mins => removeOrphanFiles(tableName, mins))
     if (config.enableManifestRewrite) {
       rewriteManifests(tableName)
     }

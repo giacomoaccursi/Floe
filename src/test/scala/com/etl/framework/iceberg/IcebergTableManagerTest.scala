@@ -307,12 +307,9 @@ class IcebergTableManagerTest extends AnyFlatSpec with Matchers with BeforeAndAf
       .append()
 
     val maintenanceConfig = MaintenanceConfig(
-      enableSnapshotExpiration = true,
-      snapshotRetentionDays = 0,
-      enableCompaction = false,
-      targetFileSizeMb = 128,
-      enableOrphanCleanup = false,
-      orphanRetentionMinutes = 1440,
+      snapshotRetentionDays = Some(0),
+      targetFileSizeMb = None,
+      orphanRetentionMinutes = None,
       enableManifestRewrite = false
     )
     noException should be thrownBy {
@@ -330,12 +327,9 @@ class IcebergTableManagerTest extends AnyFlatSpec with Matchers with BeforeAndAf
       .append()
 
     val maintenanceConfig = MaintenanceConfig(
-      enableSnapshotExpiration = false,
-      snapshotRetentionDays = 7,
-      enableCompaction = false,
-      targetFileSizeMb = 128,
-      enableOrphanCleanup = true,
-      orphanRetentionMinutes = 1440,
+      snapshotRetentionDays = None,
+      targetFileSizeMb = None,
+      orphanRetentionMinutes = Some(1440),
       enableManifestRewrite = false
     )
     noException should be thrownBy {

@@ -42,12 +42,9 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `enableSnapshotExpiration` | `true` | Expire old snapshots |
-| `snapshotRetentionDays` | `7` | Days to retain snapshots |
-| `enableCompaction` | `true` | Compact small files |
-| `targetFileSizeMb` | `128` | Target file size after compaction |
-| `enableOrphanCleanup` | `true` | Remove orphaned files |
-| `orphanRetentionMinutes` | `1440` | Grace period (min 1440) |
+| `snapshotRetentionDays` | `7` | Snapshot retention. Remove to disable expiration. |
+| `targetFileSizeMb` | `128` | Target file size for compaction. Remove to disable. |
+| `orphanRetentionMinutes` | `1440` | Orphan file grace period (min 1440). Remove to disable. |
 | `enableManifestRewrite` | `false` | Rewrite manifest files |
 
 → [Global Configuration](../configuration/global.md)

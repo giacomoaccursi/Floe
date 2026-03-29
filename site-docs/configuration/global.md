@@ -27,11 +27,8 @@ iceberg:
   enableSnapshotTagging: true
   catalogProperties: {}
   maintenance:
-    enableSnapshotExpiration: true
     snapshotRetentionDays: 7
-    enableCompaction: true
     targetFileSizeMb: 128
-    enableOrphanCleanup: true
     orphanRetentionMinutes: 1440
     enableManifestRewrite: false
 ```
@@ -136,12 +133,9 @@ Post-batch table maintenance settings. Maintenance runs after all flows execute 
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `enableSnapshotExpiration` | `true` | Expire snapshots older than the retention period |
-| `snapshotRetentionDays` | `7` | Days to retain snapshots before expiration |
-| `enableCompaction` | `true` | Compact small data files into larger ones |
-| `targetFileSizeMb` | `128` | Target file size after compaction |
-| `enableOrphanCleanup` | `true` | Remove orphaned files left by failed operations |
-| `orphanRetentionMinutes` | `1440` | Grace period before orphan files become eligible for cleanup |
+| `snapshotRetentionDays` | `7` | Days to retain snapshots. Set to expire old snapshots after this period. Remove to disable. |
+| `targetFileSizeMb` | `128` | Target file size after compaction. Remove to disable compaction. |
+| `orphanRetentionMinutes` | `1440` | Grace period before orphan files are removed (min 1440). Remove to disable. |
 | `enableManifestRewrite` | `false` | Rewrite manifest files for scan optimization |
 
 !!!warning "Orphan cleanup minimum retention"

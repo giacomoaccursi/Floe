@@ -13,11 +13,8 @@ case class IcebergConfig(
 }
 
 case class MaintenanceConfig(
-    enableSnapshotExpiration: Boolean = true,
-    snapshotRetentionDays: Int = 7,
-    enableCompaction: Boolean = true,
-    targetFileSizeMb: Int = 128,
-    enableOrphanCleanup: Boolean = true,
-    orphanRetentionMinutes: Int = 60,
+    snapshotRetentionDays: Option[Int] = Some(7),
+    targetFileSizeMb: Option[Int] = Some(128),
+    orphanRetentionMinutes: Option[Int] = Some(1440),
     enableManifestRewrite: Boolean = false
 )

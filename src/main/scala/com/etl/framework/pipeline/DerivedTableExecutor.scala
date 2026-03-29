@@ -97,23 +97,23 @@ class DerivedTableExecutor(
     tableNames.foreach { tableName =>
       val fullTableName = resolveTableName(tableName)
       try {
-        if (maintenance.enableSnapshotExpiration) {
-          val olderThan = java.time.Instant.now().minusSeconds(maintenance.snapshotRetentionDays.toLong * 86400)
+        maintenance.snapshotRetentionDays.foreach { days =>
+          val olderThan = java.time.Instant.now().minusSeconds(days.toLong * 86400)
           spark.sql(
             s"CALL ${icebergConfig.catalogName}.system.expire_snapshots(" +
               s"table => '$fullTableName', " +
               s"older_than => TIMESTAMP '${sqlTimestampFmt.format(olderThan)}')"
           )
         }
-        if (maintenance.enableCompaction) {
+        maintenance.targetFileSizeMb.foreach { size =>
           spark.sql(
             s"CALL ${icebergConfig.catalogName}.system.rewrite_data_files(" +
               s"table => '$fullTableName', " +
-              s"options => map('target-file-size-bytes', '${maintenance.targetFileSizeMb.toLong * 1024 * 1024}'))"
+              s"options => map('target-file-size-bytes', '${size.toLong * 1024 * 1024}'))"
           )
         }
-        if (maintenance.enableOrphanCleanup) {
-          val retentionMinutes = math.max(maintenance.orphanRetentionMinutes, 1440)
+        maintenance.orphanRetentionMinutes.foreach { mins =>
+          val retentionMinutes = math.max(mins, 1440)
           val olderThan = java.time.Instant.now().minusSeconds(retentionMinutes.toLong * 60)
           spark.sql(
             s"CALL ${icebergConfig.catalogName}.system.remove_orphan_files(" +

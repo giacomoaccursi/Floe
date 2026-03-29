@@ -224,4 +224,41 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     val written = spark.table("spark_catalog.default.order_summary")
     written.columns should contain("cnt")
   }
+
+  it should "tag snapshots with batch ID after write" in {
+    val orders = Seq((1, "A", 10.0)).toDF("id", "category", "amount")
+    seedIcebergTable("orders", orders)
+
+    val executor = new DerivedTableExecutor(icebergConfig)
+    val derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq(
+      "order_summary" -> { ctx: DerivedTableContext =>
+        ctx.table("orders").groupBy("category").agg(sum("amount").as("total"))
+      }
+    )
+
+    executor.execute(derivedTables, "batch_tag_test")
+
+    val refs = spark.sql("SELECT * FROM spark_catalog.default.order_summary.refs")
+    val tags = refs.filter(col("type") === "TAG").select("name").collect().map(_.getString(0))
+    tags should contain("batch_batch_tag_test")
+  }
+
+  it should "not tag snapshots when tagging is disabled" in {
+    val orders = Seq((1, "A", 10.0)).toDF("id", "category", "amount")
+    seedIcebergTable("orders", orders)
+
+    val noTagConfig = icebergConfig.copy(enableSnapshotTagging = false)
+    val executor = new DerivedTableExecutor(noTagConfig)
+    val derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq(
+      "order_summary" -> { ctx: DerivedTableContext =>
+        ctx.table("orders").groupBy("category").agg(sum("amount").as("total"))
+      }
+    )
+
+    executor.execute(derivedTables, "batch_no_tag")
+
+    val refs = spark.sql("SELECT * FROM spark_catalog.default.order_summary.refs")
+    val tags = refs.filter(col("type") === "TAG").select("name").collect().map(_.getString(0))
+    tags should not contain "batch_batch_no_tag"
+  }
 }

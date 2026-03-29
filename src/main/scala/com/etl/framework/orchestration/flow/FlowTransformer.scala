@@ -1,19 +1,14 @@
 package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config.FlowConfig
-import com.etl.framework.core.{AdditionalTableInfo, TransformationContext}
+import com.etl.framework.core.TransformationContext
 import com.etl.framework.util.TimingUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
-import scala.collection.mutable
-
 /** Handles pre and post validation transformations
   */
-class FlowTransformer(
-    flowConfig: FlowConfig,
-    additionalTables: mutable.Map[String, AdditionalTableInfo]
-)(implicit spark: SparkSession) {
+class FlowTransformer(flowConfig: FlowConfig)(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -26,21 +21,13 @@ class FlowTransformer(
           val context = TransformationContext(
             currentFlow = flowConfig.name,
             currentData = data,
-            validatedFlows = Map.empty, // No validated flows available yet
+            validatedFlows = Map.empty,
             batchId = batchId,
             spark = spark
           )
-          val result = transformation(context)
-
-          result.getAdditionalTables.foreach { case (name, info) =>
-            additionalTables(name) = info
-          }
-
-          result.currentData
+          transformation(context).currentData
         }
-
-      case None =>
-        data
+      case None => data
     }
   }
 
@@ -61,17 +48,9 @@ class FlowTransformer(
             batchId = batchId,
             spark = spark
           )
-          val result = transformation(context)
-
-          result.getAdditionalTables.foreach { case (name, info) =>
-            additionalTables(name) = info
-          }
-
-          result.currentData
+          transformation(context).currentData
         }
-
-      case None =>
-        data
+      case None => data
     }
   }
 }

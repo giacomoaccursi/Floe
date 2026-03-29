@@ -1,7 +1,6 @@
 package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
-import com.etl.framework.core.AdditionalTableInfo
 import com.etl.framework.iceberg.{IcebergFlowMetadata, IcebergTableManager, IcebergTableWriter, WriteResult}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.util.TimingUtil
@@ -10,7 +9,6 @@ import com.etl.framework.validation.{ValidationEngine, ValidationResult, Validat
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
-import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
 /** Executes a single flow through Read -> Validate -> Transform -> Write (Iceberg)
@@ -25,8 +23,6 @@ class FlowExecutor(
 
   private val logger = LoggerFactory.getLogger(getClass)
 
-  private val additionalTables = mutable.Map[String, AdditionalTableInfo]()
-
   private val icebergTableWriter: IcebergTableWriter = {
     val tableManager = new IcebergTableManager(spark, globalConfig.iceberg)
     new IcebergTableWriter(spark, globalConfig.iceberg, tableManager)
@@ -35,7 +31,7 @@ class FlowExecutor(
   private val dataWriter =
     new FlowDataWriter(flowConfig, globalConfig, icebergTableWriter)
   private val metadataWriter = new FlowMetadataWriter(flowConfig, globalConfig)
-  private val transformer = new FlowTransformer(flowConfig, additionalTables)
+  private val transformer = new FlowTransformer(flowConfig)
 
   /** Executes the complete flow
     */
@@ -160,42 +156,8 @@ class FlowExecutor(
       dataWriter.writeWarnings(warnedDf, batchId)
     }
 
-    writeAdditionalTables(batchId)
     writeResult
   }
-
-  private def writeAdditionalTables(batchId: String): Unit = {
-    additionalTables.foreach { case (tableName, tableInfo) =>
-      val outputPath = tableInfo.outputPath.getOrElse(
-        s"${globalConfig.paths.outputPath}/${flowConfig.name}_${tableName}"
-      )
-
-      // Cache before write: the write action populates the cache, count() reuses it
-      // instead of re-executing the full DAG transformation plan
-      val cachedData = tableInfo.data.cache()
-      try {
-        dataWriter.writeAdditionalTable(
-          tableName,
-          cachedData,
-          Some(outputPath),
-          tableInfo.dagMetadata
-        )
-
-        val recordCount = cachedData.count()
-        metadataWriter.writeAdditionalTableMetadata(
-          tableName,
-          cachedData,
-          recordCount,
-          outputPath,
-          tableInfo.dagMetadata,
-          batchId
-        )
-      } finally {
-        cachedData.unpersist()
-      }
-    }
-  }
-
 
   private def createSuccessResult(
       batchId: String,

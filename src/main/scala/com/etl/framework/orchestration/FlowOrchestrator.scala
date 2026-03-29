@@ -5,6 +5,7 @@ import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetector, OrphanRep
 import com.etl.framework.orchestration.batch.{BatchMetadataWriter, FlowGroupExecutor}
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.ExecutionPlanBuilder
+import com.etl.framework.pipeline.DerivedTableResult
 import com.etl.framework.validation.Validator
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
@@ -261,5 +262,6 @@ case class IngestionResult(
     batchId: String,
     flowResults: Seq[FlowResult],
     success: Boolean,
-    error: Option[String] = None
+    error: Option[String] = None,
+    derivedTableResults: Seq[DerivedTableResult] = Seq.empty
 )

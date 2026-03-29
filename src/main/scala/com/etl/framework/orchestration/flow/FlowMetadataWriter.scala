@@ -1,8 +1,6 @@
 package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
-import com.etl.framework.core.AdditionalTableMetadata
-import org.apache.spark.sql.DataFrame
 import org.json4s._
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.write
@@ -57,48 +55,6 @@ class FlowMetadataWriter(
 
     writeJsonToFile(metadata, metadataPath)
     logger.debug(s"Flow metadata written: ${flowConfig.name} → $metadataPath")
-  }
-
-  /** Writes metadata for an additional table
-    */
-  def writeAdditionalTableMetadata(
-      tableName: String,
-      data: DataFrame,
-      recordCount: Long,
-      outputPath: String,
-      dagMetadata: Option[AdditionalTableMetadata],
-      batchId: String
-  ): Unit = {
-    val metadataPath = s"${globalConfig.paths.metadataPath}/$batchId/additional_tables/${tableName}.json"
-
-    val metadata = Map(
-      "table_name" -> tableName,
-      "table_type" -> "additional",
-      "created_by_flow" -> flowConfig.name,
-      "record_count" -> recordCount,
-      "path" -> outputPath,
-      "dag_metadata" -> dagMetadata
-        .map { dm =>
-          Map(
-            "primary_key" -> dm.primaryKey,
-            "join_keys" -> dm.joinKeys,
-            "description" -> dm.description.getOrElse(""),
-            "partition_by" -> dm.partitionBy
-          )
-        }
-        .getOrElse(Map.empty),
-      "schema" -> Map(
-        "fields" -> data.schema.fields.map { field =>
-          Map(
-            "name" -> field.name,
-            "type" -> field.dataType.typeName
-          )
-        }
-      )
-    )
-
-    writeJsonToFile(metadata, metadataPath)
-    logger.debug(s"Additional table metadata written: $tableName → $metadataPath")
   }
 
   /** Writes a map as JSON to a file

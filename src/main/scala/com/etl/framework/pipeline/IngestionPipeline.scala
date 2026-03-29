@@ -14,7 +14,7 @@ import com.etl.framework.exceptions.MissingConfigFieldException
 import com.etl.framework.iceberg.catalog.{CatalogFactory, CatalogProvider}
 import com.etl.framework.orchestration.{FlowOrchestrator, IngestionResult}
 import com.etl.framework.validation.Validator
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 import scala.collection._
 
@@ -26,7 +26,8 @@ class IngestionPipeline private (
     flowTransformations: Map[String, FlowTransformations],
     domainsConfig: Option[DomainsConfig],
     extraCatalogProviders: Map[String, () => CatalogProvider],
-    customValidators: Map[String, () => Validator] = Map.empty
+    customValidators: Map[String, () => Validator] = Map.empty,
+    derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq.empty
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -54,7 +55,21 @@ class IngestionPipeline private (
 
     // Create and execute orchestrator with DomainsConfig
     val orchestrator = FlowOrchestrator(globalConfig, enrichedFlowConfigs, domainsConfig, customValidators.toMap)
-    orchestrator.execute()
+    val result = orchestrator.execute()
+
+    // Execute derived tables after all flows have been written to Iceberg
+    if (derivedTables.nonEmpty && result.success) {
+      logger.info(s"Executing ${derivedTables.size} derived tables")
+      val executor = new DerivedTableExecutor(globalConfig.iceberg)
+      val derivedResults = executor.execute(derivedTables, result.batchId)
+      val failures = derivedResults.filterNot(_.success)
+      if (failures.nonEmpty) {
+        logger.warn(s"${failures.size} derived tables failed: ${failures.flatMap(_.error).mkString(", ")}")
+      }
+      result.copy(derivedTableResults = derivedResults)
+    } else {
+      result
+    }
   }
 
   private def configureSparkForIceberg(
@@ -101,6 +116,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private val flowTransformations = mutable.Map[String, FlowTransformations]()
   private val extraCatalogProviders = mutable.Map[String, () => CatalogProvider]()
   private val customValidators = mutable.Map[String, () => Validator]()
+  private val derivedTables = mutable.ListBuffer[(String, DerivedTableContext => DataFrame)]()
   private var configVariables: scala.collection.immutable.Map[String, String] = scala.collection.immutable.Map.empty
 
   /** Sets the configuration directory path Loads global.yaml, domains.yaml, and flows/ *.yaml from this directory
@@ -262,6 +278,23 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     this
   }
 
+  /** Registers a derived table that will be computed after all flows are written to Iceberg.
+    * The function receives a DerivedTableContext with access to Iceberg tables (full history).
+    * The result is written to Iceberg as a full-load table.
+    *
+    * @param tableName Name of the derived table (becomes the Iceberg table name)
+    * @param fn Function that produces the derived DataFrame
+    * @return This builder for chaining
+    */
+  def withDerivedTable(
+      tableName: String,
+      fn: DerivedTableContext => DataFrame
+  ): IngestionPipelineBuilder = {
+    logger.info(s"Registering derived table: $tableName")
+    derivedTables += ((tableName, fn))
+    this
+  }
+
   /** Builds the IngestionPipeline
     *
     * @return
@@ -307,7 +340,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       flowTransformations.toMap,
       domainsConfigOpt,
       extraCatalogProviders.toMap,
-      customValidators.toMap
+      customValidators.toMap,
+      derivedTables.toSeq
     )
   }
 
@@ -394,7 +428,8 @@ object IngestionPipeline {
       flowTransformations: Map[String, FlowTransformations],
       domainsConfig: Option[DomainsConfig],
       extraCatalogProviders: Map[String, () => CatalogProvider],
-      customValidators: Map[String, () => Validator] = Map.empty
+      customValidators: Map[String, () => Validator] = Map.empty,
+      derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq.empty
   )(implicit spark: SparkSession): IngestionPipeline = {
     new IngestionPipeline(
       globalConfig,
@@ -402,7 +437,8 @@ object IngestionPipeline {
       flowTransformations,
       domainsConfig,
       extraCatalogProviders,
-      customValidators
+      customValidators,
+      derivedTables
     )
   }
 

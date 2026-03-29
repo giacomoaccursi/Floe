@@ -56,8 +56,7 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
     val dagConfig = createDagConfig(Seq(nodeA, nodeB, nodeC))
     val orchestrator = new DAGOrchestrator(
       dagConfig,
-      globalConfig,
-      autoDiscoverAdditionalTables = false
+      globalConfig
     )
 
     val plan = orchestrator.buildExecutionPlan()
@@ -95,8 +94,7 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
     val dagConfig = createDagConfig(Seq(nodeA, nodeB, nodeC))
     val orchestrator = new DAGOrchestrator(
       dagConfig,
-      globalConfig,
-      autoDiscoverAdditionalTables = false
+      globalConfig
     )
 
     intercept[CircularDependencyException] {
@@ -108,8 +106,7 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
     val dagConfig = createDagConfig(Seq.empty)
     val orchestrator = new DAGOrchestrator(
       dagConfig,
-      globalConfig,
-      autoDiscoverAdditionalTables = false
+      globalConfig
     )
 
     try {
@@ -127,8 +124,7 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
     val dagConfig = createDagConfig(Seq(node))
     val orchestrator = new DAGOrchestrator(
       dagConfig,
-      globalConfig,
-      autoDiscoverAdditionalTables = false
+      globalConfig
     )
 
     val plan = orchestrator.buildExecutionPlan()

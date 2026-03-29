@@ -95,7 +95,6 @@ class BatchMetadataWriter(
     )
 
     writeJsonToFile(metadata, metadataPath)
-    createLatestSymlink(batchId)
 
     logger.debug(s"Batch metadata written - batchId: $batchId, path: $metadataPath")
   }
@@ -107,27 +106,6 @@ class BatchMetadataWriter(
     val path = Paths.get(filePath)
     Files.createDirectories(path.getParent)
     Files.write(path, jsonString.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
-  }
-
-  /** Creates a "latest" symlink pointing to the current batch
-    */
-  private def createLatestSymlink(batchId: String): Unit = {
-    val latestPath = Paths.get(s"${globalConfig.paths.metadataPath}/latest")
-    val targetPath = Paths.get(s"${globalConfig.paths.metadataPath}/$batchId")
-
-    try {
-      // Delete existing symlink if it exists
-      if (Files.exists(latestPath)) {
-        Files.delete(latestPath)
-      }
-
-      // Create new symlink
-      Files.createSymbolicLink(latestPath, targetPath)
-      logger.debug(s"Created 'latest' symlink for batch $batchId")
-    } catch {
-      case e: Exception =>
-        logger.warn(s"Could not create 'latest' symlink: ${e.getMessage}")
-    }
   }
 
   /** Generates a unique batch ID

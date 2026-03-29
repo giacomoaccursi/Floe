@@ -11,14 +11,11 @@ import scala.concurrent.ExecutionContext
   */
 class DAGOrchestrator(
     dagConfig: AggregationConfig,
-    globalConfig: GlobalConfig,
-    autoDiscoverAdditionalTables: Boolean = false
+    globalConfig: GlobalConfig
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
-  // Initialize components
-  private val tableDiscovery = new AdditionalTableDiscovery(globalConfig)
   private val graphBuilder = new DAGGraphBuilder(globalConfig)
   private val joinExecutor = new JoinStrategyExecutor()
   private val nodeProcessor = new DAGNodeProcessor(joinExecutor, globalConfig.iceberg.catalogName)
@@ -29,22 +26,9 @@ class DAGOrchestrator(
     */
   def buildExecutionPlan(): DAGExecutionPlan = {
     logger.info("Building DAG execution plan")
-
-    val configuredNodes = dagConfig.nodes
-    logger.info(s"Loaded ${configuredNodes.size} configured DAG nodes")
-
-    val additionalNodes = if (autoDiscoverAdditionalTables) {
-      logger.info("Auto-discovery enabled, discovering additional tables")
-      tableDiscovery.discoverAdditionalTables()
-    } else {
-      Seq.empty
-    }
-    logger.info(s"Discovered ${additionalNodes.size} additional table nodes")
-
-    val allNodes = configuredNodes ++ additionalNodes
-    logger.info(s"Total DAG nodes: ${allNodes.size}")
-
-    graphBuilder.buildExecutionPlan(allNodes)
+    val nodes = dagConfig.nodes
+    logger.info(s"Total DAG nodes: ${nodes.size}")
+    graphBuilder.buildExecutionPlan(nodes)
   }
 
   /** Executes the DAG

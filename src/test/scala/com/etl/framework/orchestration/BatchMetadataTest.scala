@@ -229,30 +229,6 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     }
   }
 
-  it should "update latest symlink to most recent batch" in {
-    val tempDir = Files.createTempDirectory("latest-symlink-test").toString
-    try {
-      val flow = createFlow("test_flow", tempDir)
-      val globalConfig = createGlobalConfig(tempDir, "timestamp")
-
-      val orchestrator1 = FlowOrchestrator(globalConfig, Seq(flow))
-      orchestrator1.execute()
-      Thread.sleep(50)
-
-      val orchestrator2 = FlowOrchestrator(globalConfig, Seq(flow))
-      val result2 = orchestrator2.execute()
-
-      val latestPath = Paths.get(s"$tempDir/metadata/latest")
-      Files.exists(latestPath) shouldBe true
-      Files.isSymbolicLink(latestPath) shouldBe true
-
-      val target = Files.readSymbolicLink(latestPath)
-      target.toString should include(result2.batchId)
-    } finally {
-      cleanupTempDir(tempDir)
-    }
-  }
-
   it should "produce valid metadata for empty flow list" in {
     val tempDir =
       Files.createTempDirectory("empty-metadata-test").toString

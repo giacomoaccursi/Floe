@@ -12,7 +12,7 @@ paths:
   warningsPath: "output/warnings"   # optional, defaults to {outputPath}/warnings
 
 processing:
-  batchIdFormat: "yyyyMMdd_HHmmss"
+  batchIdFormat: "yyyyMMdd"
   maxRejectionRate: 0.1
 
 performance:
@@ -60,7 +60,7 @@ Controls batch execution and validation behavior. This entire section is optiona
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `batchIdFormat` | `yyyyMMdd_HHmmss` | Java `DateTimeFormatter` pattern for batch ID generation (e.g. `yyyyMMdd_HHmmss` → `20260328_150000`). Use `timestamp` for epoch millis. |
+| `batchIdFormat` | `yyyyMMdd_HHmmss` | Java `DateTimeFormatter` pattern for batch ID generation. Use `timestamp` for epoch millis (e.g. `1711648200000`). |
 | `maxRejectionRate` | — (disabled) | If set, the batch stops when any flow's rejection rate exceeds this threshold (0.1 = 10%). If omitted, the batch never stops for rejected records. |
 
 ### Rejection behavior

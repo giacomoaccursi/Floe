@@ -91,7 +91,7 @@ Defines where data is read from.
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `type` | yes | — | Source type: `file` |
+| `type` | no | `file` | Source type. Currently only `file` is supported. |
 | `path` | yes | — | Path to source data: a single file (`data/orders.csv`), a directory (`data/orders/`), or a glob pattern (`data/orders_*.csv`) |
 | `format` | yes | — | File format: `csv`, `parquet`, `json` |
 | `options` | no | `{}` | Format-specific options passed to the Spark reader |

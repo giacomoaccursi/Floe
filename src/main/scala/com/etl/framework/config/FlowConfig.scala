@@ -23,10 +23,10 @@ case class FlowConfig(
 /** Source configuration
   */
 case class SourceConfig(
-    `type`: SourceType, // "file"
+    `type`: SourceType = SourceType.File,
     path: String,
-    format: FileFormat, // "csv" | "parquet" | "json"
-    options: Map[String, String]
+    format: FileFormat,
+    options: Map[String, String] = Map.empty
 )
 
 /** Schema configuration

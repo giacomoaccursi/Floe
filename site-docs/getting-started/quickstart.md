@@ -36,7 +36,6 @@ name: customers
 description: "Customer master data"
 
 source:
-  type: file
   path: "data/customers.csv"
   format: csv
   options:

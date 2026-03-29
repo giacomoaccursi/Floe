@@ -7,6 +7,7 @@ Brief reference for DAG YAML files. For the complete guide including join strate
 ```yaml
 name: customer_orders_aggregation
 description: "Customers with nested orders"
+parallelNodes: true
 
 nodes:
   - id: orders_node
@@ -26,6 +27,16 @@ nodes:
         strategy: nest
         nestAs: orders
 ```
+
+## Top-level fields
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `name` | yes | — | DAG name |
+| `description` | no | `""` | Human-readable description |
+| `version` | no | `""` | Version string |
+| `parallelNodes` | no | `false` | Execute independent nodes in parallel |
+| `nodes` | yes | — | List of node definitions |
 
 ## Node fields
 

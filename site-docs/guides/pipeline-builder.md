@@ -277,6 +277,9 @@ ctx.table("customers")  // reads spark_catalog.default.customers
 
 You can also use `ctx.spark` for arbitrary Spark operations (reading external data, SQL queries, etc.).
 
+!!!note "No validation on derived tables"
+    Derived tables are not validated by the framework's validation engine. Their input data comes from Iceberg tables that have already been validated during ingestion, so the source data is clean. If your derived table function introduces logic that could produce unexpected results (e.g. NULLs from left joins), handle it in the function itself.
+
 ### Execution order
 
 1. All flows execute (read → validate → transform → write to Iceberg)

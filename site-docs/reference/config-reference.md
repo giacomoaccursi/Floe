@@ -133,7 +133,7 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `primaryKey` | yes | List of PK columns. Must be non-empty for SCD2; for other modes an empty list skips PK validation |
+| `primaryKey` | no | List of PK columns (default `[]`). Must be non-empty for SCD2 and delta. If empty, PK validation is skipped. |
 | `foreignKeys` | no | List of FK definitions |
 | `rules` | no | List of validation rules |
 

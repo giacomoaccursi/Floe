@@ -188,7 +188,7 @@ private[config] case class FlowConfigYaml(
     source: SourceConfig,
     schema: SchemaConfig,
     loadMode: LoadModeConfig,
-    validation: ValidationConfig,
+    validation: ValidationConfig = ValidationConfig(),
     output: OutputConfig = OutputConfig(),
     dependsOn: Seq[String] = Seq.empty,
     maxRejectionRate: Option[Double] = None

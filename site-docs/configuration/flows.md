@@ -189,7 +189,7 @@ validation:
       onFailure: reject
 ```
 
-`primaryKey` is required in the YAML. For SCD2 mode, it must be non-empty. For other modes, an empty list is accepted and PK uniqueness validation is skipped. `foreignKeys` and `rules` can be empty lists.
+The entire `validation` section is optional. If omitted, no validation is performed. `primaryKey` must be non-empty for SCD2 and delta modes (the framework validates this at startup).
 
 ### Foreign key fields
 

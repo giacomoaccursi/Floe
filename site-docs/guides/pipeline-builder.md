@@ -290,6 +290,10 @@ You can also use `ctx.spark` for arbitrary Spark operations (reading external da
 
 If a derived table fails, the error is logged and the remaining derived tables continue executing. The `IngestionResult.derivedTableResults` contains the outcome of each derived table.
 
+!!!warning "Known limitations"
+    - Derived tables always perform a full overwrite. There is no delta/merge mode — the entire table is recomputed each batch. For most use cases (aggregations, splits, denormalizations) this is correct because the result depends on the full dataset.
+    - If a derived table reads from another derived table (via `ctx.table("other_derived")`), registration order matters. Register the dependency first. The framework does not validate or resolve inter-derived-table dependencies automatically.
+
 ### DerivedTableResult
 
 | Field | Type | Description |

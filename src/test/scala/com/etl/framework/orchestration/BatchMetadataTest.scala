@@ -85,9 +85,7 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
         metadataPath = s"$tempDir/metadata"
       ),
       processing = ProcessingConfig(
-        batchIdFormat = batchIdFormat,
-        failOnValidationError = false,
-        maxRejectionRate = 1.0
+        batchIdFormat = batchIdFormat
       ),
       performance = PerformanceConfig(
         parallelFlows = false,

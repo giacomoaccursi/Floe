@@ -17,7 +17,6 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
         |  metadataPath: "/data/metadata"
         |processing:
         |  batchIdFormat: "yyyyMMdd_HHmmss"
-        |  failOnValidationError: true
         |  maxRejectionRate: 0.05
         |performance:
         |  parallelFlows: true
@@ -32,7 +31,7 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
     val c = config.toOption.get
 
     c.paths.outputPath shouldBe "/data/output"
-    c.processing.maxRejectionRate shouldBe 0.05
+    c.processing.maxRejectionRate shouldBe Some(0.05)
     c.performance.parallelFlows shouldBe true
   }
 }
@@ -76,8 +75,6 @@ class GlobalConfigLoaderLogicTest extends AnyFlatSpec with Matchers {
         |  metadataPath: "/out/meta"
         |processing:
         |  batchIdFormat: "timestamp"
-        |  failOnValidationError: false
-        |  maxRejectionRate: 0.1
         |performance:
         |  parallelFlows: true
         |  parallelNodes: true

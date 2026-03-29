@@ -85,25 +85,15 @@ class FlowGroupExecutor(
     }
 
     // Check if rejection rate exceeds threshold
-    if (
-      globalConfig.processing.maxRejectionRate > 0 &&
-      result.rejectionRate > globalConfig.processing.maxRejectionRate
-    ) {
-      logger.warn(
-        f"Flow ${result.flowName} rejection rate ${result.rejectionRate}%.2f%% " +
-          f"exceeds threshold ${globalConfig.processing.maxRejectionRate}%.2f%% " +
-          f"(${result.rejectedRecords} records)"
-      )
-      return globalConfig.processing.failOnValidationError
-    }
-
-    // Check if there are any rejected records and fail_on_validation_error is true
-    if (globalConfig.processing.failOnValidationError && result.rejectedRecords > 0) {
-      logger.warn(
-        s"Flow ${result.flowName} has ${result.rejectedRecords} rejected records " +
-          s"and failOnValidationError is enabled"
-      )
-      return true
+    globalConfig.processing.maxRejectionRate match {
+      case Some(threshold) if result.rejectedRecords > 0 && result.rejectionRate > threshold =>
+        logger.warn(
+          f"Flow ${result.flowName} rejection rate ${result.rejectionRate}%.2f%% " +
+            f"exceeds threshold ${threshold}%.2f%% " +
+            f"(${result.rejectedRecords} records)"
+        )
+        return true
+      case _ =>
     }
 
     false

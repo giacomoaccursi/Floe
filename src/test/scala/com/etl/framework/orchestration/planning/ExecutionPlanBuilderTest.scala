@@ -11,9 +11,7 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
     GlobalConfig(
       paths = PathsConfig("/output", "/rejected", "/metadata"),
       processing = ProcessingConfig(
-        "yyyyMMdd",
-        failOnValidationError = false,
-        maxRejectionRate = 0.1
+        "yyyyMMdd"
       ),
       performance = PerformanceConfig(parallelFlows, parallelNodes = true),
       iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")

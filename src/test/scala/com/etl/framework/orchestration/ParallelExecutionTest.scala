@@ -78,7 +78,7 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
       rejectedPath = s"$tempDir/rejected",
       metadataPath = s"$tempDir/metadata"
     ),
-    processing = ProcessingConfig("yyyyMMdd_HHmmss", false, 1.0),
+    processing = ProcessingConfig("yyyyMMdd_HHmmss"),
     performance = PerformanceConfig(
       parallelFlows = parallel,
       parallelNodes = false

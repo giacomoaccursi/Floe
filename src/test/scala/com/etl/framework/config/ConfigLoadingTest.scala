@@ -59,9 +59,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
       metadataPath = "/data/metadata/meta"
     ),
     processing = ProcessingConfig(
-      batchIdFormat = "yyyyMMdd_HHmmss",
-      failOnValidationError = false,
-      maxRejectionRate = 0.1
+      batchIdFormat = "yyyyMMdd_HHmmss"
     ),
     performance = PerformanceConfig(
       parallelFlows = true,
@@ -165,8 +163,6 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
       """
         |processing:
         |  batchIdFormat: yyyyMMdd_HHmmss
-        |  failOnValidationError: false
-        |  maxRejectionRate: 0.1
         |performance:
         |  parallelFlows: true
         |  parallelNodes: true

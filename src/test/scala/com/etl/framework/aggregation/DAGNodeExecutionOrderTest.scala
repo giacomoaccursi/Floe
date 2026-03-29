@@ -22,7 +22,7 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
       "/data/rejected",
       "/data/metadata"
     ),
-    processing = ProcessingConfig("yyyyMMdd_HHmmss", false, 0.1),
+    processing = ProcessingConfig("yyyyMMdd_HHmmss"),
     performance = PerformanceConfig(false, false),
     iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )

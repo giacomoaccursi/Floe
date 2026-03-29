@@ -42,9 +42,7 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
         metadataPath = tempDir.resolve("metadata").toString
       ),
       processing = ProcessingConfig(
-        batchIdFormat = "yyyyMMdd",
-        failOnValidationError = false,
-        maxRejectionRate = 0.1
+        batchIdFormat = "yyyyMMdd"
       ),
       performance = PerformanceConfig(parallelFlows = false, parallelNodes = false),
       iceberg = IcebergConfig(warehouse = tempDir.resolve("warehouse").toString)

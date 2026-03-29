@@ -25,9 +25,7 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
         "/tmp/flow_executor_test/metadata"
       ),
       processing = ProcessingConfig(
-        "yyyyMMdd",
-        failOnValidationError = false,
-        maxRejectionRate = 0.1
+        "yyyyMMdd"
       ),
       performance = PerformanceConfig(parallelFlows = false, parallelNodes = false),
       iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")

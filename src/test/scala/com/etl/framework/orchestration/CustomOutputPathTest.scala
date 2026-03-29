@@ -13,9 +13,7 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
       metadataPath = "/tmp/metadata"
     ),
     processing = ProcessingConfig(
-      batchIdFormat = "yyyyMMdd_HHmmss",
-      failOnValidationError = false,
-      maxRejectionRate = 0.1
+      batchIdFormat = "yyyyMMdd_HHmmss"
     ),
     performance = PerformanceConfig(
       parallelFlows = false,

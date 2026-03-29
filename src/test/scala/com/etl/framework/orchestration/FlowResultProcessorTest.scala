@@ -27,9 +27,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
         GlobalConfig(
           paths = PathsConfig("/output", "/rejected", "/metadata"),
           processing = ProcessingConfig(
-            "yyyyMMdd",
-            failOnValidationError = false,
-            maxRejectionRate = rejectionThreshold
+            maxRejectionRate = if (stopOnHighRejectionRate) Some(rejectionThreshold) else None
           ),
           performance = PerformanceConfig(parallelFlows = true, parallelNodes = true),
           iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
@@ -66,9 +64,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     GlobalConfig(
       paths = PathsConfig("/tmp/output", "/tmp/rejected", "/tmp/metadata"),
       processing = ProcessingConfig(
-        "yyyyMMdd",
-        failOnValidationError = false,
-        maxRejectionRate = rejectionThreshold
+        maxRejectionRate = Some(rejectionThreshold)
       ),
       performance = PerformanceConfig(parallelFlows = true, parallelNodes = true),
       iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")

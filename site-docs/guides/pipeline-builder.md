@@ -63,11 +63,11 @@ If neither a config directory nor the required configs are provided, `build()` t
 
 ## Flow execution order
 
-Flows are not executed in config file order. The framework builds an execution plan based on foreign key dependencies:
+Flows are not executed in config file order. The framework builds an execution plan based on dependencies:
 
-1. FK references between flows are analyzed to build a dependency graph
-2. Flows are topologically sorted so that parent flows execute before children
-3. Independent flows (no FK relationship) are grouped for potential parallel execution
+1. FK references and explicit `dependsOn` declarations are analyzed to build a dependency graph
+2. Flows are topologically sorted so that dependencies execute before dependents
+3. Independent flows (no dependency relationship) are grouped for potential parallel execution
 
 If `performance.parallelFlows` is `true` in `global.yaml`, independent flows within the same group run in parallel using a bounded thread pool.
 
@@ -76,7 +76,7 @@ performance:
   parallelFlows: true
 ```
 
-This means if flow `orders` has a FK referencing `customers`, `customers` is guaranteed to execute first — regardless of the order in the YAML files or the `withFlowConfigs()` list.
+This means if flow `orders` has a FK referencing `customers` (or declares `dependsOn: [customers]`), `customers` is guaranteed to execute first — regardless of the order in the YAML files or the `withFlowConfigs()` list.
 
 ## IngestionResult
 
@@ -231,7 +231,7 @@ val postTransform: FlowTransformation = { ctx =>
 }
 ```
 
-Flow availability depends on execution order. The framework orders flows by FK dependencies (see [Flow execution order](#flow-execution-order)), so if `orders` has a FK to `customers`, `customers` is always validated first and available via `getFlow("customers")`.
+Flow availability depends on execution order. The framework orders flows by FK dependencies and `dependsOn` declarations (see [Flow execution order](#flow-execution-order)), so if `orders` has a FK to `customers` (or declares `dependsOn: [customers]`), `customers` is always validated first and available via `getFlow("customers")`.
 
 ## Derived tables
 

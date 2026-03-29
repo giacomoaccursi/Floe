@@ -71,6 +71,18 @@ output:
 | `description` | no | `""` | Human-readable description |
 | `version` | no | `""` | Flow version string |
 | `owner` | no | `""` | Team or person responsible |
+| `dependsOn` | no | `[]` | List of flow names that must execute before this flow |
+
+### dependsOn
+
+Declares explicit execution dependencies on other flows. Use this when a flow's transformation needs data from another flow (via `ctx.getFlow()`) but there is no FK relationship between them.
+
+```yaml
+name: order_report
+dependsOn: [customers, products]
+```
+
+Dependencies declared via `dependsOn` are merged with FK-inferred dependencies. The framework validates that all referenced flow names exist and rejects self-references. Circular dependencies (including via `dependsOn`) are detected at startup.
 
 ## source
 

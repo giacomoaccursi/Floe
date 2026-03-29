@@ -74,6 +74,7 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 | `description` | no | Human-readable description (default `""`) |
 | `version` | no | Flow version (default `""`) |
 | `owner` | no | Responsible team/person (default `""`) |
+| `dependsOn` | no | List of flow names that must execute before this flow (default `[]`) |
 
 ### source
 

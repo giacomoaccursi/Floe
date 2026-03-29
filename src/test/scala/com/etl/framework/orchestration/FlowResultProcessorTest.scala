@@ -35,7 +35,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
         None,
         scala.concurrent.ExecutionContext.global
       ) {
-    override def shouldStopExecution(result: FlowResult): Boolean = {
+    override def shouldStopExecution(result: FlowResult, flowConfig: FlowConfig): Boolean = {
       if (!result.success) return true
       if (stopOnHighRejectionRate && result.rejectionRate > rejectionThreshold)
         return true

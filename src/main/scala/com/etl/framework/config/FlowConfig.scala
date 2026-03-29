@@ -15,6 +15,7 @@ case class FlowConfig(
     validation: ValidationConfig,
     output: OutputConfig,
     dependsOn: Seq[String] = Seq.empty,
+    maxRejectionRate: Option[Double] = None,
     preValidationTransformation: Option[FlowTransformation] = None,
     postValidationTransformation: Option[FlowTransformation] = None
 )

@@ -68,7 +68,10 @@ class FlowResultProcessor(
           error = Some(s"Flow ${result.flowName} failed: ${result.error.getOrElse("Unknown error")}")
         )
       )
-    } else if (groupExecutor.shouldStopExecution(result)) {
+    } else if ({
+      val flowConfig = flowConfigs.find(_.name == result.flowName)
+      flowConfig.exists(fc => groupExecutor.shouldStopExecution(result, fc))
+    }) {
       logger.warn(
         s"Stopping execution - flow ${result.flowName} " +
           f"rejection rate: ${result.rejectionRate}%.2f%%, rejected: ${result.rejectedRecords}"

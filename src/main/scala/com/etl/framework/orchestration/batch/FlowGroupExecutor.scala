@@ -37,7 +37,7 @@ class FlowGroupExecutor(
       results.append(result)
 
       // Check if we should stop execution immediately on failure
-      if (!result.success || shouldStopExecution(result)) {
+      if (!result.success || shouldStopExecution(result, flowConfig)) {
         // Stop executing remaining flows in this group
         return results.toSeq
       }
@@ -76,26 +76,26 @@ class FlowGroupExecutor(
     executor.execute(batchId)
   }
 
-  /** Determines if execution should stop based on result
+  /** Determines if execution should stop based on result.
+    * Per-flow maxRejectionRate overrides the global setting.
     */
-  def shouldStopExecution(result: FlowResult): Boolean = {
+  def shouldStopExecution(result: FlowResult, flowConfig: FlowConfig): Boolean = {
     if (!result.success) {
-      // Flow failed completely
       return true
     }
 
-    // Check if rejection rate exceeds threshold
-    globalConfig.processing.maxRejectionRate match {
-      case Some(threshold) if result.rejectedRecords > 0 && result.rejectionRate > threshold =>
+    val threshold = flowConfig.maxRejectionRate.orElse(globalConfig.processing.maxRejectionRate)
+
+    threshold match {
+      case Some(rate) if result.rejectedRecords > 0 && result.rejectionRate > rate =>
         logger.warn(
           f"Flow ${result.flowName} rejection rate ${result.rejectionRate}%.2f%% " +
-            f"exceeds threshold ${threshold}%.2f%% " +
+            f"exceeds threshold ${rate}%.2f%% " +
             f"(${result.rejectedRecords} records)"
         )
-        return true
+        true
       case _ =>
+        false
     }
-
-    false
   }
 }

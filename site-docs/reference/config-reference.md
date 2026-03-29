@@ -31,7 +31,7 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `catalogType` | `hadoop` | Catalog: `hadoop`, `glue` |
+| `catalogType` | `hadoop` | Catalog: `hadoop`, `glue`, or custom (via builder) |
 | `catalogName` | `spark_catalog` | Catalog name for SQL queries |
 | `warehouse` | — (required) | Iceberg warehouse directory |
 | `fileFormat` | `parquet` | Default data file format |

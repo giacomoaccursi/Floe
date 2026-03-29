@@ -164,7 +164,7 @@ foreignKeys:
 
 - NULL FK values are not considered violations. A NULL means "no reference" (standard SQL semantics) and passes FK validation.
 - The referenced parent DataFrame is broadcast-joined for performance. Multiple FK constraints referencing the same parent flow/columns share a single broadcast.
-- If the referenced flow has not been processed yet, a `ValidationConfigException` is thrown. Flow execution order matters — the framework orders flows by FK dependencies automatically.
+- If the referenced flow name does not exist in the batch configuration, a `ValidationConfigException` is thrown at startup.
 - Rejection code: `FK_VIOLATION`.
 
 The `onOrphan` field does not affect intra-batch validation — it controls post-batch orphan detection behavior. See [Orphan Detection](orphan-detection.md).

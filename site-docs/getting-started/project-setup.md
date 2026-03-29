@@ -7,23 +7,20 @@ my-etl-project/
 ├── build.sbt
 ├── config/
 │   ├── global.yaml
-│   ├── domains.yaml
+│   ├── domains.yaml          # optional
 │   └── flows/
 │       ├── customers.yaml
 │       ├── orders.yaml
 │       └── order_items.yaml
-├── data/                          # Source data files
+├── data/                     # Source data files
 │   ├── customers.csv
 │   └── orders.csv
-├── output/                        # Generated at runtime
-│   ├── data/
-│   ├── rejected/
-│   ├── metadata/
-│   └── warehouse/                 # Iceberg tables
 └── src/main/scala/
     └── com/mycompany/
-        └── MyPipeline.scala       # Entry point
+        └── MyPipeline.scala  # Entry point
 ```
+
+The `output/` directory (data, rejected, metadata, warehouse) is created automatically at runtime based on the paths in `global.yaml`.
 
 ## build.sbt
 

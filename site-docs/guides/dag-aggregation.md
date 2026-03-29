@@ -18,7 +18,7 @@ The module is composed of five components:
 | `DAGNodeProcessor` | Executes a single node: loads source data, applies filters/select, joins with parent. |
 | `JoinStrategyExecutor` | Implements the three join strategies (Nest, Flatten, Aggregate). |
 
-Additionally, `AdditionalTableDiscovery` can auto-discover tables registered during transformations (via `TransformationContext.addTable()`) and inject them as DAG nodes.
+DAG nodes can reference any Iceberg table in the catalog, including [derived tables](pipeline-builder.md#derived-tables) produced by the pipeline.
 
 ## DAG configuration
 
@@ -240,39 +240,6 @@ If `parallelNodes` is `false`, all groups execute sequentially regardless of ind
 
 The root node is the node that no other node depends on — it produces the final output DataFrame. If multiple root nodes exist, the first one is used (with a warning). If no root node exists (all nodes are dependencies of others), an error is thrown.
 
-## Auto-discovery of additional tables
-
-When `autoDiscoverAdditionalTables` is enabled on the `DAGOrchestrator`, the framework scans the metadata directory for tables registered during transformations via `TransformationContext.addTable()`.
-
-Each discovered table is converted into a DAG node with:
-
-- ID: `{tableName}_node`
-- Dependencies inferred from `joinKeys` metadata
-- Join configuration inferred from the first entry in `joinKeys` (left outer, Nest strategy)
-
-The discovered nodes are appended to the configured nodes before the execution plan is built. This allows transformation-generated tables to participate in the DAG without explicit YAML configuration.
-
-Discovery reads JSON metadata files from `{metadataPath}/latest/additional_tables/`. Each file must contain:
-
-```json
-{
-  "table_name": "order_summaries",
-  "path": "output/warehouse/order_summaries",
-  "dag_metadata": {
-    "primary_key": ["order_id"],
-    "join_keys": {
-      "customers": ["customer_id"]
-    },
-    "description": "Order summaries by customer",
-    "partition_by": ["order_date"]
-  }
-}
-```
-
-If the metadata directory does not exist or contains no valid files, discovery returns an empty list silently.
-
-For details on registering additional tables, see [Pipeline Builder — addTable](pipeline-builder.md#addtabletablename-data-outputpath-dagmetadata).
-
 ## Complete DAG example
 
 ```yaml
@@ -363,6 +330,6 @@ In this DAG:
 ## Related
 
 - [DAG Configuration](../configuration/dag.md) — YAML field reference
-- [Pipeline Builder — addTable](pipeline-builder.md#addtabletablename-data-outputpath-dagmetadata) — registering tables for auto-discovery
+- [Pipeline Builder — Derived Tables](pipeline-builder.md#derived-tables) — producing Iceberg tables for DAG consumption
 - [Architecture: Execution Model](../architecture/execution-model.md) — how DAG nodes are scheduled
 - [Reference: Exceptions](../reference/exceptions.md) — exception hierarchy

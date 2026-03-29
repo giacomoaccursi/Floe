@@ -105,7 +105,6 @@ graph TD
 
     subgraph Phase4["4. DAG phase (if configured)"]
         D1["Load DAG config"]
-        D2["Auto-discover additional tables"]
         D3["Build dependency graph<br/>→ topological sort → group nodes"]
         D4["Execute nodes group by group"]
         D1 --> D2 --> D3 --> D4

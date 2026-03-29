@@ -66,5 +66,5 @@ nodes:
 
 ## Learn more
 
-- [DAG Aggregation Guide](../guides/dag-aggregation.md) — join strategies, execution model, auto-discovery, complete examples
+- [DAG Aggregation Guide](../guides/dag-aggregation.md) — join strategies, execution model, complete examples
 - [Architecture: Execution Model](../architecture/execution-model.md) — how DAG nodes are scheduled

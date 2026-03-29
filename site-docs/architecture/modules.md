@@ -82,7 +82,6 @@ DAG-based aggregation module for joining and aggregating data across multiple fl
 - **DAGExecutor** — executes the plan group by group
 - **DAGNodeProcessor** — loads source data, applies filters/select, joins with parent
 - **JoinStrategyExecutor** — implements Nest, Flatten, and Aggregate join strategies
-- **AdditionalTableDiscovery** — auto-discovers tables from transformation metadata
 
 See [DAG Aggregation](../guides/dag-aggregation.md).
 

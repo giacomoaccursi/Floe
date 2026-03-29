@@ -4,7 +4,7 @@
 
 `IngestionPipeline` is the public entry point of the framework. It provides a fluent builder API for configuring and executing ETL pipelines. The builder loads configuration (from YAML files or programmatic objects), registers transformations, configures catalog providers, and produces an executable pipeline.
 
-`TransformationContext` is the immutable context passed to every transformation function. It provides access to the current flow's data, previously validated flows, the batch ID, the SparkSession, and a mechanism to register additional tables for downstream DAG aggregation.
+`TransformationContext` is the immutable context passed to every transformation function. It provides access to the current flow's data, previously validated flows, the batch ID, and the SparkSession.
 
 ## IngestionPipeline.builder()
 
@@ -40,6 +40,7 @@ val result = pipeline.execute()
 | `withPostValidationTransformation(flow, fn)` | Shorthand for post-validation only |
 | `withCustomValidator(name, factory)` | Registers a custom validator by name. Use the same name in the flow YAML `class` field. |
 | `withCatalogProvider(type, provider)` | Registers a custom Iceberg catalog provider |
+| `withDerivedTable(name, fn)` | Registers a derived table computed after all flows are written to Iceberg |
 | `withVariables(variables)` | Sets variables for YAML substitution (priority over env vars). See [Configuration Overview](../configuration/overview.md#variable-substitution) |
 | `build()` | Builds the pipeline (returns `IngestionPipeline`) |
 
@@ -86,7 +87,8 @@ case class IngestionResult(
   batchId: String,
   flowResults: Seq[FlowResult],
   success: Boolean,
-  error: Option[String] = None
+  error: Option[String] = None,
+  derivedTableResults: Seq[DerivedTableResult] = Seq.empty
 )
 ```
 
@@ -96,6 +98,7 @@ case class IngestionResult(
 | `flowResults` | `Seq[FlowResult]` | Results for each executed flow |
 | `success` | `Boolean` | `true` if all flows completed without fatal errors |
 | `error` | `Option[String]` | Error message if the batch failed |
+| `derivedTableResults` | `Seq[DerivedTableResult]` | Results for each derived table (empty if none registered) |
 
 ### FlowResult
 
@@ -152,7 +155,6 @@ Run after validation, on the valid records only. The `TransformationContext` now
 Use cases:
 
 - Computing derived fields from validated data
-- Creating additional tables for DAG aggregation
 - Cross-flow lookups using `ctx.getFlow()`
 
 ```scala
@@ -200,7 +202,6 @@ The context is immutable. Every method that modifies state returns a new instanc
 | `validatedFlows` | `Map[String, DataFrame]` | All flows validated so far in this batch |
 | `batchId` | `String` | Current batch identifier |
 | `spark` | `SparkSession` | The active SparkSession |
-| `additionalTables` | `Map[String, AdditionalTableInfo]` | Tables registered via `addTable()` |
 
 ### withData(newData)
 
@@ -232,59 +233,77 @@ val postTransform: FlowTransformation = { ctx =>
 
 Flow availability depends on execution order. The framework orders flows by FK dependencies (see [Flow execution order](#flow-execution-order)), so if `orders` has a FK to `customers`, `customers` is always validated first and available via `getFlow("customers")`.
 
-### addTable(tableName, data, outputPath, dagMetadata)
+## Derived tables
 
-Registers an additional table created during transformation. The table is saved to the output path and made available for [DAG aggregation](dag-aggregation.md).
+Derived tables are Iceberg tables computed after all flows have been written. They read from the Iceberg catalog (full history, not just the current batch delta) and write the result as a full-load Iceberg table.
 
-```scala
-val createSummary: FlowTransformation = { ctx =>
-  val summary = ctx.currentData
-    .groupBy("customer_id")
-    .agg(
-      sum("total_amount").as("lifetime_value"),
-      count("order_id").as("order_count")
-    )
+This is the recommended way to produce aggregations, splits, denormalizations, or any other output derived from your ingested data. Derived tables are first-class Iceberg tables — they have snapshots, time travel, schema evolution, and can be referenced by the DAG or queried directly.
 
-  ctx
-    .addTable(
-      tableName = "customer_summaries",
-      data = summary,
-      outputPath = Some("output/warehouse/customer_summaries"),
-      dagMetadata = Some(AdditionalTableMetadata(
-        primaryKey = Seq("customer_id"),
-        joinKeys = Map("customers" -> Seq("customer_id")),
-        description = Some("Customer lifetime value summaries"),
-        partitionBy = Seq.empty
-      ))
-    )
-}
-```
-
-`addTable` returns a new context with the table registered. The framework reads additional tables from the returned context, so they are automatically persisted and forwarded to the DAG. If you also need to modify the flow's DataFrame, chain `withData` before or after `addTable`:
+### Registering derived tables
 
 ```scala
-ctx
-  .withData(enrichedDf)
-  .addTable("summary", summary, ...)
+IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .withDerivedTable("order_summary") { ctx =>
+    ctx.table("orders")
+      .groupBy("category")
+      .agg(
+        sum("total_amount").as("total_revenue"),
+        count("*").as("order_count")
+      )
+  }
+  .withDerivedTable("orders_domestic") { ctx =>
+    ctx.table("orders").filter(col("country") === "IT")
+  }
+  .build()
 ```
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `tableName` | `String` | yes | Unique name for the table |
-| `data` | `DataFrame` | yes | The table's data |
-| `outputPath` | `Option[String]` | no | Where to save the table. Defaults to `{globalConfig.paths.outputPath}/{flowName}_{tableName}` |
-| `dagMetadata` | `Option[AdditionalTableMetadata]` | no | Metadata for DAG auto-discovery |
+Each derived table function receives a `DerivedTableContext`:
 
-#### AdditionalTableMetadata
+| Field | Type | Description |
+|-------|------|-------------|
+| `spark` | `SparkSession` | The active SparkSession |
+| `batchId` | `String` | Current batch identifier |
+| `catalogName` | `String` | Iceberg catalog name (from `global.yaml`) |
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `primaryKey` | `Seq[String]` | — | Primary key columns |
-| `joinKeys` | `Map[String, Seq[String]]` | `Map.empty` | Map of parent flow name → join key columns |
-| `description` | `Option[String]` | `None` | Human-readable description |
-| `partitionBy` | `Seq[String]` | `Seq.empty` | Partition columns for output |
+### ctx.table(name)
 
-Tables registered with `dagMetadata` are automatically discovered by the DAG aggregation module when auto-discovery is enabled. See [DAG Aggregation](dag-aggregation.md#auto-discovery-of-additional-tables) for details.
+Reads a table from the Iceberg catalog. Returns the full table content (all historical data), not just the records from the current batch. This is the key difference from transformations, where `ctx.currentData` contains only the current batch's data.
+
+```scala
+ctx.table("orders")     // reads spark_catalog.default.orders
+ctx.table("customers")  // reads spark_catalog.default.customers
+```
+
+You can also use `ctx.spark` for arbitrary Spark operations (reading external data, SQL queries, etc.).
+
+### Execution order
+
+1. All flows execute (read → validate → transform → write to Iceberg)
+2. Derived tables execute in registration order
+3. Each derived table writes to `{catalogName}.default.{tableName}` as a full-load overwrite
+
+If a derived table fails, the error is logged and the remaining derived tables continue executing. The `IngestionResult.derivedTableResults` contains the outcome of each derived table.
+
+### DerivedTableResult
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tableName` | `String` | Name of the derived table |
+| `success` | `Boolean` | Whether the table was written successfully |
+| `recordsWritten` | `Long` | Number of records written (0 on failure) |
+| `error` | `Option[String]` | Error message on failure |
+
+### Using derived tables in the DAG
+
+Once written, derived tables are regular Iceberg tables. Reference them in a DAG YAML like any flow:
+
+```yaml
+nodes:
+  - id: summary_node
+    sourceFlow: order_summary    # reads from the derived table
+    dependencies: []
+```
 
 ## Custom catalog providers
 

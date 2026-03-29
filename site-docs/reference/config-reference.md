@@ -17,9 +17,8 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `batchIdFormat` | — | Java `DateTimeFormatter` pattern for batch ID (e.g. `yyyyMMdd_HHmmss`) |
-| `failOnValidationError` | `false` | Stop batch when any flow has rejected records |
-| `maxRejectionRate` | `0.1` | Rejection rate threshold (0.1 = 10%) |
+| `batchIdFormat` | `yyyyMMdd_HHmmss` | Java `DateTimeFormatter` pattern for batch ID |
+| `maxRejectionRate` | — (disabled) | Rejection rate threshold (0.1 = 10%). Batch stops when exceeded. |
 
 ### performance
 

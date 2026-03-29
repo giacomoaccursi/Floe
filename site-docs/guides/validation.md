@@ -65,27 +65,22 @@ Every rule in the `rules` list has this structure:
 
 ## Batch-level rejection behavior
 
-Two settings in `global.yaml` control what happens when records are rejected:
+One setting in `global.yaml` controls what happens when records are rejected:
 
 ```yaml
 processing:
-  failOnValidationError: true
   maxRejectionRate: 0.05
 ```
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `failOnValidationError` | `false` | If `true`, the batch stops when any flow has rejected records |
-| `maxRejectionRate` | `0.1` | Rejection rate threshold (0.05 = 5%). Only evaluated when `failOnValidationError` is `true` |
+| `maxRejectionRate` | — (disabled) | Rejection rate threshold (0.05 = 5%). If set, the batch stops when any flow exceeds this rate. If omitted, the batch never stops for rejected records. |
 
-The interaction between these two settings:
-
-| `failOnValidationError` | Rejection rate vs threshold | Behavior |
-|------------------------|---------------------------|----------|
-| `false` | any | Batch continues. Rejected records are written to `rejectedPath`, valid records proceed to Iceberg. |
-| `true` | `rate > maxRejectionRate` | Batch stops. Remaining flows in the group are not executed. |
-| `true` | `rate <= maxRejectionRate` but `rejectedRecords > 0` | Batch stops. Any rejection is a failure when `failOnValidationError` is enabled. |
-| `true` | `rejectedRecords == 0` | Batch continues normally. |
+| `maxRejectionRate` | Rejection rate vs threshold | Behavior |
+|-------------------|---------------------------|----------|
+| not set | any | Batch continues. Rejected records are written to `rejectedPath`, valid records proceed to Iceberg. |
+| set | `rate > maxRejectionRate` | Batch stops. Remaining flows in the group are not executed. |
+| set | `rate <= maxRejectionRate` | Batch continues. |
 
 The comparison uses strict `>` (not `>=`): a rejection rate exactly equal to the threshold does not trigger a stop.
 

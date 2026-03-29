@@ -13,7 +13,6 @@ paths:
 
 processing:
   batchIdFormat: "yyyyMMdd_HHmmss"
-  failOnValidationError: false
   maxRejectionRate: 0.1
 
 performance:
@@ -60,24 +59,20 @@ paths:
 
 ## processing
 
-Controls batch execution and validation behavior.
+Controls batch execution and validation behavior. This entire section is optional — if omitted, the framework uses sensible defaults.
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `batchIdFormat` | — | Java `DateTimeFormatter` pattern for batch ID generation (e.g. `yyyyMMdd_HHmmss` → `20260328_150000`) |
-| `failOnValidationError` | `false` | Stop batch execution when any flow has rejected records |
-| `maxRejectionRate` | `0.1` | Rejection rate threshold (0.1 = 10%). Only evaluated when `failOnValidationError` is `true` |
+| `batchIdFormat` | `yyyyMMdd_HHmmss` | Java `DateTimeFormatter` pattern for batch ID generation (e.g. `yyyyMMdd_HHmmss` → `20260328_150000`). Use `timestamp` for epoch millis. |
+| `maxRejectionRate` | — (disabled) | If set, the batch stops when any flow's rejection rate exceeds this threshold (0.1 = 10%). If omitted, the batch never stops for rejected records. |
 
 ### Rejection behavior
 
-The interaction between `failOnValidationError` and `maxRejectionRate`:
-
-| `failOnValidationError` | Rejection rate vs threshold | Behavior |
-|------------------------|---------------------------|----------|
-| `false` | any | Batch continues. Rejected records are written to `rejectedPath`, valid records proceed to Iceberg. |
-| `true` | `rate > maxRejectionRate` | Batch stops. Remaining flows in the group are not executed. |
-| `true` | `rate <= maxRejectionRate` but `rejectedRecords > 0` | Batch stops. Any rejection is a failure when `failOnValidationError` is enabled. |
-| `true` | `rejectedRecords == 0` | Batch continues normally. |
+| `maxRejectionRate` | Rejection rate vs threshold | Behavior |
+|-------------------|---------------------------|----------|
+| not set | any | Batch continues. Rejected records are written to `rejectedPath`, valid records proceed to Iceberg. |
+| set | `rate > maxRejectionRate` | Batch stops. Remaining flows in the group are not executed. |
+| set | `rate <= maxRejectionRate` | Batch continues. |
 
 The comparison uses strict `>` (not `>=`): a rejection rate exactly equal to the threshold does not trigger a stop.
 

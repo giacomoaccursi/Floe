@@ -224,15 +224,13 @@ The child is grouped by the join key columns, aggregated, then joined to the par
 
 Filters and select are applied to the node's source data **before** any join with the parent.
 
-Filters are SQL expressions:
+Filters are SQL expressions passed to `DataFrame.filter()`. Multiple filters in the list are applied sequentially (implicit AND). You can use `AND`, `OR`, `NOT`, and any Spark SQL predicate within a single filter:
 
 ```yaml
 filters:
   - "status != 'cancelled'"
-  - "order_date >= '2024-01-01'"
+  - "total_amount > 0 OR is_refund = true"
 ```
-
-Filters are applied sequentially using `DataFrame.filter()`. Each filter expression must be a valid Spark SQL predicate.
 
 Select restricts which columns are kept:
 

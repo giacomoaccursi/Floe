@@ -81,7 +81,6 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
     processing = ProcessingConfig("yyyyMMdd_HHmmss"),
     performance = PerformanceConfig(
       parallelFlows = parallel,
-      parallelNodes = false
     ),
     iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )

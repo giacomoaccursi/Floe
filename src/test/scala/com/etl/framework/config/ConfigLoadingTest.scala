@@ -63,7 +63,6 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
     ),
     performance = PerformanceConfig(
       parallelFlows = true,
-      parallelNodes = true
     ),
     iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )
@@ -165,7 +164,6 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |  batchIdFormat: yyyyMMdd_HHmmss
         |performance:
         |  parallelFlows: true
-        |  parallelNodes: true
       """.stripMargin
     val result = writeInvalidYaml(yaml, new GlobalConfigLoader())
     result.isLeft shouldBe true

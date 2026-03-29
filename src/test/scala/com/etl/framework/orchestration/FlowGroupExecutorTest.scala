@@ -11,7 +11,7 @@ class FlowGroupExecutorTest extends AnyFlatSpec with Matchers {
   private def makeConfig(maxRejectionRate: Option[Double]): GlobalConfig = GlobalConfig(
     paths = PathsConfig("/out", "/rej", "/meta"),
     processing = ProcessingConfig(maxRejectionRate = maxRejectionRate),
-    performance = PerformanceConfig(parallelFlows = false, parallelNodes = false),
+    performance = PerformanceConfig(parallelFlows = false),
     iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )
 

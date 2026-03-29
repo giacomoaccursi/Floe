@@ -1,6 +1,6 @@
 package com.etl.framework.aggregation
 
-import com.etl.framework.config.{DAGNode, GlobalConfig}
+import com.etl.framework.config.DAGNode
 import com.etl.framework.exceptions.CircularDependencyException
 import org.slf4j.LoggerFactory
 
@@ -8,7 +8,7 @@ import scala.collection.mutable
 
 /** Builds and analyzes DAG dependency graphs
   */
-class DAGGraphBuilder(globalConfig: GlobalConfig) {
+class DAGGraphBuilder(parallelNodes: Boolean) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -157,7 +157,7 @@ class DAGGraphBuilder(globalConfig: GlobalConfig) {
           nodes.find(_.id == nodeId)
         }
 
-        val parallel = globalConfig.performance.parallelNodes && currentGroup.size > 1
+        val parallel = parallelNodes && currentGroup.size > 1
 
         groups.append(DAGExecutionGroup(nodesInGroup.toSeq, parallel))
         logger.info(s"Created execution group with ${nodesInGroup.size} nodes (parallel=$parallel)")

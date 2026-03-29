@@ -13,7 +13,7 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
       processing = ProcessingConfig(
         "yyyyMMdd"
       ),
-      performance = PerformanceConfig(parallelFlows, parallelNodes = true),
+      performance = PerformanceConfig(parallelFlows),
       iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
     )
   }

@@ -18,7 +18,7 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
 
   private val globalConfig = GlobalConfig(
     paths = PathsConfig("/data/output", "/data/rejected", "/data/metadata"),
-    performance = PerformanceConfig(false, false),
+    performance = PerformanceConfig(false),
     iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )
 

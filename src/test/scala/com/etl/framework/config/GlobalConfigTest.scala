@@ -20,7 +20,6 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
         |  maxRejectionRate: 0.05
         |performance:
         |  parallelFlows: true
-        |  parallelNodes: false
         |iceberg:
         |  warehouse: "/tmp/test-warehouse"
       """.stripMargin
@@ -77,7 +76,6 @@ class GlobalConfigLoaderLogicTest extends AnyFlatSpec with Matchers {
         |  batchIdFormat: "timestamp"
         |performance:
         |  parallelFlows: true
-        |  parallelNodes: true
         |iceberg:
         |  warehouse: "/tmp/test-warehouse"
       """.stripMargin
@@ -87,6 +85,5 @@ class GlobalConfigLoaderLogicTest extends AnyFlatSpec with Matchers {
     val config = result.toOption.get
 
     config.paths.outputPath shouldBe "/out/output"
-    config.performance.parallelNodes shouldBe true
   }
 }

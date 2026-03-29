@@ -17,7 +17,6 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
     ),
     performance = PerformanceConfig(
       parallelFlows = false,
-      parallelNodes = false
     ),
     iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )

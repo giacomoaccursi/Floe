@@ -20,6 +20,5 @@ case class ProcessingConfig(
 )
 
 case class PerformanceConfig(
-    parallelFlows: Boolean,
-    parallelNodes: Boolean
+    parallelFlows: Boolean = false
 )

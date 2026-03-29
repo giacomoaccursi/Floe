@@ -89,7 +89,6 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
       ),
       performance = PerformanceConfig(
         parallelFlows = false,
-        parallelNodes = false
       ),
       iceberg = IcebergConfig(warehouse = warehousePath)
     )

@@ -23,7 +23,7 @@ class DependencyGraphTest extends AnyFlatSpec with Matchers {
       "/data/metadata"
     ),
     processing = ProcessingConfig("yyyyMMdd_HHmmss"),
-    performance = PerformanceConfig(false, false),
+    performance = PerformanceConfig(false),
     iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )
 

@@ -44,7 +44,7 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       processing = ProcessingConfig(
         batchIdFormat = "yyyyMMdd"
       ),
-      performance = PerformanceConfig(parallelFlows = false, parallelNodes = false),
+      performance = PerformanceConfig(parallelFlows = false),
       iceberg = IcebergConfig(warehouse = tempDir.resolve("warehouse").toString)
     )
 

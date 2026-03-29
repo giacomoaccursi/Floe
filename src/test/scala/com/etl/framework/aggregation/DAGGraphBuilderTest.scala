@@ -7,10 +7,10 @@ import org.scalatest.matchers.should.Matchers
 
 class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
 
-  def createGlobalConfig(parallelNodes: Boolean = true): GlobalConfig = {
+  def createGlobalConfig(parallelFlows: Boolean = true): GlobalConfig = {
     GlobalConfig(
       paths = PathsConfig("/output", "/rejected", "/metadata"),
-      performance = PerformanceConfig(parallelFlows = true, parallelNodes = parallelNodes),
+      performance = PerformanceConfig(parallelFlows = parallelFlows),
       iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
     )
   }
@@ -31,7 +31,7 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
     )
 
   "DAGGraphBuilder" should "build dependency graph with no joins" in {
-    val builder = new DAGGraphBuilder(createGlobalConfig())
+    val builder = new DAGGraphBuilder(parallelNodes = false)
     val graph = builder.buildDependencyGraph(Seq(leaf("A"), leaf("B"), leaf("C")))
 
     graph.size shouldBe 3
@@ -41,7 +41,7 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
   }
 
   it should "infer dependency from join parent" in {
-    val builder = new DAGGraphBuilder(createGlobalConfig())
+    val builder = new DAGGraphBuilder(parallelNodes = false)
     val graph = builder.buildDependencyGraph(Seq(leaf("A"), child("B", "A")))
 
     graph("A") shouldBe empty
@@ -49,7 +49,7 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
   }
 
   it should "build linear chain from joins" in {
-    val builder = new DAGGraphBuilder(createGlobalConfig())
+    val builder = new DAGGraphBuilder(parallelNodes = false)
     val graph = builder.buildDependencyGraph(Seq(leaf("A"), child("B", "A"), child("C", "B")))
 
     graph("A") shouldBe empty
@@ -58,7 +58,7 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
   }
 
   it should "build diamond execution plan" in {
-    val builder = new DAGGraphBuilder(createGlobalConfig())
+    val builder = new DAGGraphBuilder(parallelNodes = false)
     // A <- B <- C (linear chain)
     val nodes = Seq(leaf("A"), child("B", "A"), child("C", "B"))
 
@@ -71,27 +71,27 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
   }
 
   it should "identify root node (node with no dependents)" in {
-    val builder = new DAGGraphBuilder(createGlobalConfig())
+    val builder = new DAGGraphBuilder(parallelNodes = false)
     val plan = builder.buildExecutionPlan(Seq(leaf("A"), child("B", "A"), child("C", "B")))
     plan.rootNode shouldBe "C"
   }
 
   it should "detect circular dependency via join parents" in {
-    val builder = new DAGGraphBuilder(createGlobalConfig())
+    val builder = new DAGGraphBuilder(parallelNodes = false)
     intercept[CircularDependencyException] {
       builder.buildExecutionPlan(Seq(child("A", "B"), child("B", "A")))
     }
   }
 
   it should "reject self-referential join" in {
-    val builder = new DAGGraphBuilder(createGlobalConfig())
+    val builder = new DAGGraphBuilder(parallelNodes = false)
     intercept[Exception] {
       builder.buildExecutionPlan(Seq(child("A", "A")))
     }
   }
 
   it should "group independent nodes for parallel execution" in {
-    val builder = new DAGGraphBuilder(createGlobalConfig(parallelNodes = true))
+    val builder = new DAGGraphBuilder(parallelNodes = true)
     val plan = builder.buildExecutionPlan(Seq(leaf("A"), leaf("B"), leaf("C")))
 
     plan.groups.size shouldBe 1
@@ -100,14 +100,14 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
   }
 
   it should "disable parallel when parallelNodes is false" in {
-    val builder = new DAGGraphBuilder(createGlobalConfig(parallelNodes = false))
+    val builder = new DAGGraphBuilder(parallelNodes = false)
     val plan = builder.buildExecutionPlan(Seq(leaf("A"), leaf("B")))
 
     plan.groups.head.parallel shouldBe false
   }
 
   it should "handle single node DAG" in {
-    val builder = new DAGGraphBuilder(createGlobalConfig())
+    val builder = new DAGGraphBuilder(parallelNodes = false)
     val plan = builder.buildExecutionPlan(Seq(leaf("A")))
 
     plan.groups.size shouldBe 1

@@ -27,7 +27,7 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
       processing = ProcessingConfig(
         "yyyyMMdd"
       ),
-      performance = PerformanceConfig(parallelFlows = false, parallelNodes = false),
+      performance = PerformanceConfig(parallelFlows = false),
       iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
     )
   }

@@ -40,7 +40,7 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
       refFlow: String,
       refColumn: String
   ): ForeignKeyConfig = {
-    ForeignKeyConfig(column, ReferenceConfig(refFlow, refColumn))
+    ForeignKeyConfig(Seq(column), ReferenceConfig(refFlow, Seq(refColumn)))
   }
 
   "ExecutionPlanBuilder" should "build plan with no dependencies" in {

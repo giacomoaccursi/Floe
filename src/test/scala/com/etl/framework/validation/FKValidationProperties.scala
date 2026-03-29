@@ -135,10 +135,10 @@ object FKValidationProperties extends Properties("FKValidation") {
       primaryKey = Seq("child_id"),
       foreignKeys = Seq(
         ForeignKeyConfig(
-          column = fkColumn,
+          columns = Seq(fkColumn),
           references = ReferenceConfig(
             flow = refFlow,
-            column = refColumn
+            columns = Seq(refColumn)
           )
         )
       ),
@@ -347,17 +347,17 @@ object FKValidationProperties extends Properties("FKValidation") {
               primaryKey = Seq("child_id"),
               foreignKeys = Seq(
                 ForeignKeyConfig(
-                  column = "parent1_id",
+                  columns = Seq("parent1_id"),
                   references = ReferenceConfig(
                     flow = "parent1_flow",
-                    column = "parent1_id"
+                    columns = Seq("parent1_id")
                   )
                 ),
                 ForeignKeyConfig(
-                  column = "parent2_id",
+                  columns = Seq("parent2_id"),
                   references = ReferenceConfig(
                     flow = "parent2_flow",
-                    column = "parent2_id"
+                    columns = Seq("parent2_id")
                   )
                 )
               ),
@@ -695,12 +695,12 @@ object FKValidationProperties extends Properties("FKValidation") {
           primaryKey = Seq("child_id"),
           foreignKeys = Seq(
             ForeignKeyConfig(
-              column = "parent_id1",
-              references = ReferenceConfig(flow = "parent_flow", column = "parent_id1")
+              columns = Seq("parent_id1"),
+              references = ReferenceConfig(flow = "parent_flow", columns = Seq("parent_id1"))
             ),
             ForeignKeyConfig(
-              column = "parent_id2",
-              references = ReferenceConfig(flow = "parent_flow", column = "parent_id2")
+              columns = Seq("parent_id2"),
+              references = ReferenceConfig(flow = "parent_flow", columns = Seq("parent_id2"))
             )
           ),
           rules = Seq.empty

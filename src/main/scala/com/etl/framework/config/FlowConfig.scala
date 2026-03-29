@@ -69,18 +69,22 @@ case class ValidationConfig(
 /** Foreign key configuration
   */
 case class ForeignKeyConfig(
-    column: String,
+    columns: Seq[String],
     references: ReferenceConfig,
     onOrphan: OrphanAction = OrphanAction.Warn
 ) {
-  def displayName: String = s"$column -> ${references.flow}.${references.column}"
+  def displayName: String = {
+    val cols = columns.mkString(", ")
+    val refCols = references.columns.mkString(", ")
+    s"($cols) -> ${references.flow}.($refCols)"
+  }
 }
 
 /** Reference configuration
   */
 case class ReferenceConfig(
     flow: String,
-    column: String
+    columns: Seq[String]
 )
 
 /** Validation rule configuration

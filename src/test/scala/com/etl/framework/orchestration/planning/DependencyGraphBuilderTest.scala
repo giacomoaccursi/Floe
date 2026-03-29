@@ -29,7 +29,7 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
       refFlow: String,
       refColumn: String
   ): ForeignKeyConfig = {
-    ForeignKeyConfig(column, ReferenceConfig(refFlow, refColumn))
+    ForeignKeyConfig(Seq(column), ReferenceConfig(refFlow, Seq(refColumn)))
   }
 
   "DependencyGraphBuilder" should "build empty graph with no dependencies" in {

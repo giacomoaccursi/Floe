@@ -1,12 +1,12 @@
 package com.etl.framework.validation.validators
 
-import com.etl.framework.config.{FlowConfig, ValidationRule}
+import com.etl.framework.config.{FlowConfig, ForeignKeyConfig, ValidationRule}
 import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{broadcast, col, lit}
 
-/** Validator for Foreign Key integrity Validates that foreign key values exist in referenced tables
+/** Validator for Foreign Key integrity. Supports composite (multi-column) foreign keys.
   */
 class ForeignKeyValidator(
     flowConfig: FlowConfig,
@@ -18,66 +18,82 @@ class ForeignKeyValidator(
     if (flowConfig.validation.foreignKeys.isEmpty) {
       ValidationUtils.validResult(df)
     } else {
-      // Pre-compute broadcast refs deduplicated by (flow, column): if multiple FK
-      // constraints reference the same flow/column pair the broadcast is created once
-      val broadcastedRefs: Map[(String, String), DataFrame] =
+      // Pre-compute broadcast refs deduplicated by (flow, columns)
+      val broadcastedRefs: Map[(String, Seq[String]), DataFrame] =
         flowConfig.validation.foreignKeys
-          .map(fk => (fk.references.flow, fk.references.column))
+          .map(fk => (fk.references.flow, fk.references.columns))
           .distinct
-          .flatMap { case (refFlow, refCol) =>
+          .flatMap { case (refFlow, refCols) =>
             validatedFlows.get(refFlow).map { refDf =>
-              (refFlow, refCol) -> broadcast(refDf.select(refCol))
+              (refFlow, refCols) -> broadcast(refDf.select(refCols.map(col): _*))
             }
           }
           .toMap
 
       flowConfig.validation.foreignKeys.foldLeft(ValidationStepResult(df, None)) {
         case (ValidationStepResult(currentDf, rejectedAcc, _), fk) =>
-          broadcastedRefs.get((fk.references.flow, fk.references.column)) match {
+          broadcastedRefs.get((fk.references.flow, fk.references.columns)) match {
             case None =>
               throw ValidationConfigException(
                 s"Referenced flow '${fk.references.flow}' not found in flow $flowName"
               )
-
             case Some(refKeys) =>
-              // Single left join with a marker column replaces the previous left_anti +
-              // left_anti double-join pattern (one on nonNullCurrentDf, one on currentDf).
-              // NULL FK values are excluded upfront: they are not referential violations
-              // (NULL means "no reference", consistent with standard SQL semantics).
-              val nonNullCurrentDf = currentDf.filter(col(fk.column).isNotNull)
-              val markedRef = refKeys
-                .withColumnRenamed(fk.references.column, "_fk_ref_key")
-                .withColumn("_fk_ref_exists", lit(true))
-              val joinCondition = nonNullCurrentDf(fk.column) === col("_fk_ref_key")
-              val joinedWithRef = nonNullCurrentDf
-                .join(markedRef, joinCondition, "left")
-                .drop("_fk_ref_key")
-                .cache()
-
-              try {
-                val orphans = joinedWithRef.filter(col("_fk_ref_exists").isNull).drop("_fk_ref_exists")
-                val validNonNull = joinedWithRef.filter(col("_fk_ref_exists").isNotNull).drop("_fk_ref_exists")
-
-                if (orphans.isEmpty) {
-                  ValidationStepResult(currentDf, rejectedAcc)
-                } else {
-                  val orphansWithMetadata = ValidationUtils.addRejectionMetadata(
-                    orphans,
-                    "FK_VIOLATION",
-                    s"Foreign key violation in flow $flowName: ${fk.displayName} (${fk.column} -> ${fk.references.flow}.${fk.references.column})",
-                    "fk_validation"
-                  )
-                  val newRejected = ValidationUtils.combineRejected(rejectedAcc, Some(orphansWithMetadata))
-                  // Reconstruct valid records: non-null FK records that passed + null FK records
-                  val nullFkRecords = currentDf.filter(col(fk.column).isNull)
-                  val newCurrent = validNonNull.unionByName(nullFkRecords)
-                  ValidationStepResult(newCurrent, newRejected)
-                }
-              } finally {
-                joinedWithRef.unpersist()
-              }
+              validateSingleFk(currentDf, rejectedAcc, fk, refKeys)
           }
       }
+    }
+  }
+
+  private def validateSingleFk(
+      currentDf: DataFrame,
+      rejectedAcc: Option[DataFrame],
+      fk: ForeignKeyConfig,
+      refKeys: DataFrame
+  ): ValidationStepResult = {
+    // Exclude rows where ANY FK column is NULL (standard SQL semantics)
+    val nonNullCondition = fk.columns.map(c => col(c).isNotNull).reduce(_ && _)
+    val nullCondition = fk.columns.map(c => col(c).isNull).reduce(_ || _)
+    val nonNullCurrentDf = currentDf.filter(nonNullCondition)
+
+    // Rename ref columns to avoid ambiguity, add marker
+    val renamedPairs = fk.columns.zip(fk.references.columns)
+    var markedRef = refKeys
+    renamedPairs.foreach { case (_, refCol) =>
+      markedRef = markedRef.withColumnRenamed(refCol, s"_fk_ref_$refCol")
+    }
+    markedRef = markedRef.withColumn("_fk_ref_exists", lit(true))
+
+    val joinCondition = renamedPairs
+      .map { case (localCol, refCol) => nonNullCurrentDf(localCol) === col(s"_fk_ref_$refCol") }
+      .reduce(_ && _)
+
+    val refColsToDrop = renamedPairs.map { case (_, refCol) => s"_fk_ref_$refCol" }
+
+    val joinedWithRef = nonNullCurrentDf
+      .join(markedRef, joinCondition, "left")
+      .drop(refColsToDrop: _*)
+      .cache()
+
+    try {
+      val orphans = joinedWithRef.filter(col("_fk_ref_exists").isNull).drop("_fk_ref_exists")
+      val validNonNull = joinedWithRef.filter(col("_fk_ref_exists").isNotNull).drop("_fk_ref_exists")
+
+      if (orphans.isEmpty) {
+        ValidationStepResult(currentDf, rejectedAcc)
+      } else {
+        val orphansWithMetadata = ValidationUtils.addRejectionMetadata(
+          orphans,
+          "FK_VIOLATION",
+          s"Foreign key violation in flow $flowName: ${fk.displayName}",
+          "fk_validation"
+        )
+        val newRejected = ValidationUtils.combineRejected(rejectedAcc, Some(orphansWithMetadata))
+        val nullFkRecords = currentDf.filter(nullCondition)
+        val newCurrent = validNonNull.unionByName(nullFkRecords)
+        ValidationStepResult(newCurrent, newRejected)
+      }
+    } finally {
+      joinedWithRef.unpersist()
     }
   }
 }

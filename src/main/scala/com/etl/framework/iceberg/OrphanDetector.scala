@@ -102,7 +102,7 @@ class OrphanDetector(
     removedKeysByFlow.get(parentCfg.name) match {
       case Some(cascadedKeys) =>
         // Map cascaded PKs to the FK reference column
-        val parentPkCol = fk.references.column
+        val parentPkCol = fk.references.columns.head
         if (cascadedKeys.columns.contains(parentPkCol)) {
           Some(cascadedKeys.select(parentPkCol))
         } else {
@@ -145,7 +145,7 @@ class OrphanDetector(
 
       case Some(prevSnapshotId) =>
         val tableName = tableManager.resolveTableName(parentCfg)
-        val refCol = fk.references.column
+        val refCol = fk.references.columns.head
 
         try {
           // Previous snapshot: all PKs that existed before this batch
@@ -197,8 +197,8 @@ class OrphanDetector(
       removedKeysByFlow: mutable.Map[String, DataFrame]
   ): Option[OrphanReport] = {
     val childTableName = tableManager.resolveTableName(childFlow)
-    val fkCol = fk.column
-    val refCol = fk.references.column
+    val fkCol = fk.columns.head
+    val refCol = fk.references.columns.head
 
     // Find orphaned child records
     val childTable = spark.sql(s"SELECT * FROM $childTableName")
@@ -243,7 +243,7 @@ class OrphanDetector(
           } else None
 
         // Delete orphaned records from child table
-        val removedPksView = s"_orphan_removed_pks_${childFlow.name}_${fk.column}"
+        val removedPksView = s"_orphan_removed_pks_${childFlow.name}_${fk.columns.head}"
         removedParentKeys
           .withColumnRenamed(refCol, fkCol)
           .createOrReplaceTempView(removedPksView)

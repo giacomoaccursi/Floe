@@ -100,8 +100,8 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       "od_orders",
       foreignKeys = Seq(
         ForeignKeyConfig(
-          column = "customer_id",
-          references = ReferenceConfig(flow = "od_customers", column = "id"),
+          columns = Seq("customer_id"),
+          references = ReferenceConfig(flow = "od_customers", columns = Seq("id")),
           onOrphan = OrphanAction.Warn
         )
       )
@@ -157,7 +157,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     reports.size shouldBe 1
     reports.head.flowName shouldBe "od_orders"
-    reports.head.fkName shouldBe "customer_id -> od_customers.id"
+    reports.head.fkName shouldBe "(customer_id) -> od_customers.(id)"
     reports.head.parentFlowName shouldBe "od_customers"
     reports.head.orphanCount shouldBe 1
     reports.head.actionTaken shouldBe "warn"
@@ -174,8 +174,8 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       "od_orders_del",
       foreignKeys = Seq(
         ForeignKeyConfig(
-          column = "customer_id",
-          references = ReferenceConfig(flow = "od_cust_del", column = "id"),
+          columns = Seq("customer_id"),
+          references = ReferenceConfig(flow = "od_cust_del", columns = Seq("id")),
           onOrphan = OrphanAction.Delete
         )
       )
@@ -254,8 +254,8 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       "od_orders_first",
       foreignKeys = Seq(
         ForeignKeyConfig(
-          column = "customer_id",
-          references = ReferenceConfig(flow = "od_cust_first", column = "id"),
+          columns = Seq("customer_id"),
+          references = ReferenceConfig(flow = "od_cust_first", columns = Seq("id")),
           onOrphan = OrphanAction.Warn
         )
       )
@@ -314,8 +314,8 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       "od_orders_ign",
       foreignKeys = Seq(
         ForeignKeyConfig(
-          column = "customer_id",
-          references = ReferenceConfig(flow = "od_cust_ign", column = "id"),
+          columns = Seq("customer_id"),
+          references = ReferenceConfig(flow = "od_cust_ign", columns = Seq("id")),
           onOrphan = OrphanAction.Ignore
         )
       )
@@ -377,8 +377,8 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       "od_child_delta",
       foreignKeys = Seq(
         ForeignKeyConfig(
-          column = "parent_id",
-          references = ReferenceConfig(flow = "od_parent_delta", column = "id"),
+          columns = Seq("parent_id"),
+          references = ReferenceConfig(flow = "od_parent_delta", columns = Seq("id")),
           onOrphan = OrphanAction.Warn
         )
       )

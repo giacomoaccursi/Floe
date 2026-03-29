@@ -81,7 +81,7 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     written.count() shouldBe 2L
   }
 
-  it should "add REJECTED_AT and BATCH_ID audit columns to rejected records" in {
+  it should "add BATCH_ID audit column to rejected records" in {
     val rejectedPath = tempDir.resolve("rejected_audit").toString
     val flowConfig = createFlowConfig("audit_flow", rejectedPath = Some(rejectedPath))
     val globalConfig = createGlobalConfig()
@@ -91,7 +91,6 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     writer.writeRejected(rejectedDF, "batch_42")
 
     val written = spark.read.parquet(rejectedPath)
-    written.columns should contain("_rejected_at")
     written.columns should contain("_batch_id")
     written.first().getAs[String]("_batch_id") shouldBe "batch_42"
   }

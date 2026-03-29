@@ -8,8 +8,6 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SaveMode}
 import org.slf4j.LoggerFactory
 
-import java.time.Instant
-
 /** Handles writing of validated, rejected, and additional table data
   */
 class FlowDataWriter(
@@ -43,7 +41,6 @@ class FlowDataWriter(
 
     TimingUtil.timed(logger, s"Write rejected data to $rejectedPath") {
       val rejectedWithAudit = rejectedData
-        .withColumn(REJECTED_AT, lit(Instant.now().toString))
         .withColumn(BATCH_ID, lit(batchId))
 
       rejectedWithAudit.write

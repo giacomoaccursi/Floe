@@ -330,7 +330,8 @@ The record is removed from the valid DataFrame and added to the rejected DataFra
 | `_rejection_code` | Machine-readable code (e.g. `REGEX_VALIDATION_FAILED`) |
 | `_rejection_reason` | Human-readable explanation |
 | `_validation_step` | Which validation step rejected the record |
-| `_rejected_at` | Timestamp of rejection |
+| `_rejected_at` | Timestamp of the validation step execution |
+| `_batch_id` | Batch identifier |
 
 Rejected records are written to the flow's `rejectedPath`.
 

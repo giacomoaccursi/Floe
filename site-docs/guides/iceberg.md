@@ -66,7 +66,7 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `catalogType` | `hadoop` | Iceberg catalog implementation: `hadoop`, `glue` |
+| `catalogType` | `hadoop` | Iceberg catalog implementation: `hadoop`, `glue`, or a custom type registered via the [Pipeline Builder](pipeline-builder.md#custom-catalog-providers) |
 | `catalogName` | `spark_catalog` | Name used in SQL queries (`catalog.default.table`) |
 | `warehouse` | *required* | Path to the Iceberg warehouse directory |
 | `fileFormat` | `parquet` | Default data file format |

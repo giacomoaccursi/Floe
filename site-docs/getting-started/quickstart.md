@@ -19,11 +19,6 @@ paths:
   rejectedPath: "output/rejected"
   metadataPath: "output/metadata"
 
-processing:
-  batchIdFormat: "yyyyMMdd_HHmmss"
-  failOnValidationError: false
-  maxRejectionRate: 0.1
-
 performance:
   parallelFlows: false
   parallelNodes: false
@@ -32,16 +27,6 @@ iceberg:
   catalogType: "hadoop"
   catalogName: "spark_catalog"
   warehouse: "output/warehouse"
-  fileFormat: "parquet"
-  enableSnapshotTagging: true
-  maintenance:
-    enableSnapshotExpiration: true
-    snapshotRetentionDays: 7
-    enableCompaction: true
-    targetFileSizeMb: 128
-    enableOrphanCleanup: true
-    orphanRetentionMinutes: 1440
-    enableManifestRewrite: false
 ```
 
 ## 3. flows/customers.yaml

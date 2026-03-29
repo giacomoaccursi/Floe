@@ -30,7 +30,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = LeftOuter,
-      parent = "parent",
+      `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = Nest,
       nestAs = Some("orders")
@@ -53,7 +53,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = LeftOuter,
-      parent = "parent",
+      `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = Nest,
       nestAs = None
@@ -72,7 +72,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = LeftOuter,
-      parent = "parent",
+      `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = Nest,
       nestAs = Some("orders")
@@ -94,7 +94,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = Inner,
-      parent = "parent",
+      `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = Flatten
     )
@@ -113,7 +113,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = Inner,
-      parent = "parent",
+      `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = Flatten
     )
@@ -131,7 +131,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = Inner,
-      parent = "parent",
+      `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = Flatten
     )
@@ -153,7 +153,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = LeftOuter,
-      parent = "parent",
+      `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = Aggregate,
       aggregations = Seq(AggregationSpec("amount", Sum, "total_amount"))
@@ -175,7 +175,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = LeftOuter,
-      parent = "parent",
+      `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = Aggregate,
       aggregations = Seq(AggregationSpec("item", Count, "item_count"))
@@ -196,7 +196,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = LeftOuter,
-      parent = "parent",
+      `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = Aggregate,
       aggregations = Seq(
@@ -225,7 +225,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = LeftOuter,
-      parent = "customers",
+      `with` = "customers",
       conditions = Seq(JoinCondition("customer_id", "customer_id")),
       strategy = Aggregate,
       aggregations = Seq(AggregationSpec("amount", Sum, "total_spent"))
@@ -245,7 +245,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = LeftOuter,
-      parent = "parent",
+      `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = Aggregate,
       aggregations = Seq.empty

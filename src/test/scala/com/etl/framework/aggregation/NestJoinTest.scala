@@ -34,7 +34,7 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
       joinType: JoinType = JoinType.LeftOuter
   ): JoinConfig = JoinConfig(
     `type` = joinType,
-    parent = "parent_node",
+    `with` = "parent_node",
     conditions = Seq(JoinCondition("id", "parent_id")),
     strategy = JoinStrategy.Nest,
     nestAs = Some(nestAs),
@@ -108,7 +108,7 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = JoinType.LeftOuter,
-      parent = "customers",
+      `with` = "customers",
       conditions = Seq(JoinCondition("customer_id", "customer_id")),
       strategy = JoinStrategy.Nest,
       nestAs = Some("orders")
@@ -155,7 +155,7 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = JoinType.LeftOuter,
-      parent = "parent",
+      `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = JoinStrategy.Nest,
       nestAs = Some("children")

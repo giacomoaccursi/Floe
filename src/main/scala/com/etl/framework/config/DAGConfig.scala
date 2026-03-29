@@ -15,8 +15,7 @@ case class DAGNode(
     id: String,
     description: String = "",
     sourceFlow: String = "",
-    dependencies: Seq[String],
-    join: Option[JoinConfig] = None,
+    joins: Seq[JoinConfig] = Seq.empty,
     select: Seq[String] = Seq.empty,
     filters: Seq[String] = Seq.empty,
     sourceTable: Option[String] = None
@@ -26,7 +25,7 @@ case class DAGNode(
   */
 case class JoinConfig(
     `type`: JoinType,
-    parent: String,
+    `with`: String,
     conditions: Seq[JoinCondition],
     strategy: JoinStrategy,
     nestAs: Option[String] = None,

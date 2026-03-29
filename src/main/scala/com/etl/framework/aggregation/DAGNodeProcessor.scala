@@ -23,19 +23,20 @@ class DAGNodeProcessor(joinExecutor: JoinStrategyExecutor, catalogName: String)(
     val filtered = applyFilters(sourceData, node.filters)
     val selected = applySelect(filtered, node.select)
 
-    val result = node.join match {
-      case Some(joinConfig) =>
-        val parentData = nodeResults.getOrElse(
-          joinConfig.parent,
+    val result = if (node.joins.isEmpty) {
+      selected
+    } else {
+      node.joins.foldLeft(selected) { (currentDf, joinConfig) =>
+        val withData = nodeResults.getOrElse(
+          joinConfig.`with`,
           throw new IllegalStateException(
-            s"Node '${node.id}' requires parent '${joinConfig.parent}' " +
+            s"Node '${node.id}' requires '${joinConfig.`with`}' " +
               s"but it was not found in node results. " +
               s"Available nodes: ${nodeResults.keys.mkString(", ")}"
           )
         )
-        joinExecutor.applyJoin(parentData, selected, joinConfig)
-      case None =>
-        selected
+        joinExecutor.applyJoin(currentDf, withData, joinConfig)
+      }
     }
 
     logger.info(s"Node ${node.id} execution completed")

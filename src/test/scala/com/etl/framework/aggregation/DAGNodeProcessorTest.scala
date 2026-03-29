@@ -47,7 +47,6 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
     val node = DAGNode(
       id = "customers",
       sourceFlow = "customers",
-      dependencies = Seq.empty,
       sourceTable = Some("test_customers_table")
     )
 
@@ -61,7 +60,6 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
       id = "customers",
       description = "Customers from table",
       sourceFlow = "customers",
-      dependencies = Seq.empty,
       sourceTable = Some("test_customers_table")
     )
 
@@ -75,7 +73,6 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
       id = "customers",
       description = "Filtered customers",
       sourceFlow = "customers",
-      dependencies = Seq.empty,
       sourceTable = Some("test_customers_table"),
       filters = Seq("amount > 150")
     )
@@ -90,7 +87,6 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
       id = "customers",
       description = "Selected columns",
       sourceFlow = "customers",
-      dependencies = Seq.empty,
       sourceTable = Some("test_customers_table"),
       select = Seq("id", "name")
     )
@@ -105,7 +101,6 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
       id = "customers",
       description = "Explicit table name",
       sourceFlow = "customers",
-      dependencies = Seq.empty,
       sourceTable = Some("test_customers_table")
     )
 
@@ -118,12 +113,11 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
       id = "child_node",
       description = "Node requiring missing parent",
       sourceFlow = "child",
-      dependencies = Seq("missing_parent"),
       sourceTable = Some("test_customers_table"),
-      join = Some(
+      joins = Seq(
         JoinConfig(
           `type` = JoinType.LeftOuter,
-          parent = "missing_parent",
+          `with` = "missing_parent",
           conditions = Seq(JoinCondition("id", "id")),
           strategy = JoinStrategy.Flatten
         )

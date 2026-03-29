@@ -33,7 +33,7 @@ class FlattenJoinTest extends AnyFlatSpec with Matchers {
       joinType: JoinType = JoinType.LeftOuter
   ): JoinConfig = JoinConfig(
     `type` = joinType,
-    parent = "parent_node",
+    `with` = "parent_node",
     conditions = Seq(JoinCondition("id", "parent_id")),
     strategy = JoinStrategy.Flatten,
     nestAs = None,
@@ -119,7 +119,7 @@ class FlattenJoinTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = JoinType.Inner,
-      parent = "products",
+      `with` = "products",
       conditions = Seq(JoinCondition("product_id", "product_id")),
       strategy = JoinStrategy.Flatten
     )
@@ -145,7 +145,7 @@ class FlattenJoinTest extends AnyFlatSpec with Matchers {
 
     val joinConfig = JoinConfig(
       `type` = JoinType.LeftOuter,
-      parent = "parent",
+      `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = JoinStrategy.Flatten
     )

@@ -370,21 +370,18 @@ class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
         if (node.sourceFlow.isEmpty && node.sourceTable.isEmpty)
           Seq(s"node '${node.id}' must have either sourceFlow or sourceTable")
         else Seq.empty
-      val missingDeps = node.dependencies.filterNot(nodeIds.contains)
-      val joinErrors = node.join.toSeq.flatMap { joinConfig =>
-        val missingParent =
-          if (!nodeIds.contains(joinConfig.parent))
-            Seq(s"node '${node.id}' references missing join parent '${joinConfig.parent}'")
+      val joinErrors = node.joins.flatMap { joinConfig =>
+        val missingWith =
+          if (!nodeIds.contains(joinConfig.`with`))
+            Seq(s"node '${node.id}' references missing join target '${joinConfig.`with`}'")
           else Seq.empty
         val emptyOn =
           if (joinConfig.conditions.isEmpty)
             Seq(s"node '${node.id}' has a join with no conditions")
           else Seq.empty
-        missingParent ++ emptyOn
+        missingWith ++ emptyOn
       }
-      val allErrors = sourceErrors ++
-        missingDeps.map(d => s"node '${node.id}' references missing dependency '$d'") ++
-          joinErrors
+      val allErrors = sourceErrors ++ joinErrors
       allErrors.headOption.fold[Either[ConfigurationException, Unit]](Right(()))(err)
     }
 

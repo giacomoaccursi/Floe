@@ -15,8 +15,8 @@ class JoinStrategyExecutor {
   /** Applies join based on strategy
     */
   def applyJoin(
-      parent: DataFrame,
-      child: DataFrame,
+      left: DataFrame,
+      right: DataFrame,
       joinConfig: JoinConfig
   ): DataFrame = {
     logger.info(
@@ -25,17 +25,17 @@ class JoinStrategyExecutor {
 
     import com.etl.framework.config.JoinStrategy._
     joinConfig.strategy match {
-      case Nest      => applyNestJoin(parent, child, joinConfig)
-      case Flatten   => applyFlattenJoin(parent, child, joinConfig)
-      case Aggregate => applyAggregateJoin(parent, child, joinConfig)
+      case Nest      => applyNestJoin(left, right, joinConfig)
+      case Flatten   => applyFlattenJoin(left, right, joinConfig)
+      case Aggregate => applyAggregateJoin(left, right, joinConfig)
     }
   }
 
   /** Applies nest join strategy - creates nested array with related records
     */
   private def applyNestJoin(
-      parent: DataFrame,
-      child: DataFrame,
+      left: DataFrame,
+      right: DataFrame,
       joinConfig: JoinConfig
   ): DataFrame = {
     logger.info(
@@ -43,26 +43,26 @@ class JoinStrategyExecutor {
     )
 
     val nestFieldName = joinConfig.nestAs.getOrElse("nested_records")
-    val childJoinKeys = joinConfig.conditions.map(_.right)
-    val childStruct = struct(child.columns.map(child(_)): _*)
+    val rightJoinKeys = joinConfig.conditions.map(_.right)
+    val rightStruct = struct(right.columns.map(right(_)): _*)
 
-    val groupedChild = child
-      .groupBy(childJoinKeys.map(child(_)): _*)
-      .agg(collect_list(childStruct).as(nestFieldName))
+    val groupedRight = right
+      .groupBy(rightJoinKeys.map(right(_)): _*)
+      .agg(collect_list(rightStruct).as(nestFieldName))
 
-    val joined = parent.join(
-      groupedChild,
+    val joined = left.join(
+      groupedRight,
       joinConfig.conditions
         .map { cond =>
-          parent(cond.left) === groupedChild(cond.right)
+          left(cond.left) === groupedRight(cond.right)
         }
         .reduce(_ && _),
       joinConfig.`type`.sparkType
     )
 
     // Use parent-qualified column references to avoid ambiguity when the join key
-    // has the same name in both parent and groupedChild
-    val columnsToKeep = parent.columns.map(parent(_)) :+
+    // has the same name in both parent and groupedRight
+    val columnsToKeep = left.columns.map(left(_)) :+
       coalesce(
         joined(nestFieldName),
         array().cast(joined.schema(nestFieldName).dataType)
@@ -74,72 +74,72 @@ class JoinStrategyExecutor {
   /** Applies flatten join strategy - flattens child fields into parent record
     */
   private def applyFlattenJoin(
-      parent: DataFrame,
-      child: DataFrame,
+      left: DataFrame,
+      right: DataFrame,
       joinConfig: JoinConfig
   ): DataFrame = {
     logger.info(
       s"Applying flatten join strategy with type ${joinConfig.`type`.name}"
     )
 
-    val parentColumns = parent.columns.toSet
-    val childColumns = child.columns.toSet
-    val childJoinKeys = joinConfig.conditions.map(_.right).toSet
-    val childDataColumns = childColumns -- childJoinKeys
+    val leftColumns = left.columns.toSet
+    val rightColumns = right.columns.toSet
+    val rightJoinKeys = joinConfig.conditions.map(_.right).toSet
+    val rightDataColumns = rightColumns -- rightJoinKeys
 
-    val renamedChild = childDataColumns.foldLeft(child) { (df, childCol) =>
-      if (parentColumns.contains(childCol)) {
-        df.withColumnRenamed(childCol, s"child_$childCol")
+    val renamedRight = rightDataColumns.foldLeft(right) { (df, rightCol) =>
+      if (leftColumns.contains(rightCol)) {
+        df.withColumnRenamed(rightCol, s"child_$rightCol")
       } else {
         df
       }
     }
 
     val joinExpr = joinConfig.conditions
-      .map { cond => parent(cond.left) === renamedChild(cond.right) }
+      .map { cond => left(cond.left) === renamedRight(cond.right) }
       .reduce(_ && _)
 
-    val joined = parent.join(renamedChild, joinExpr, joinConfig.`type`.sparkType)
+    val joined = left.join(renamedRight, joinExpr, joinConfig.`type`.sparkType)
 
     // Drop child-side join key columns by DataFrame reference to resolve ambiguity
-    // when the join key has the same name in both parent and child
-    val withoutChildJoinKeys = joinConfig.conditions.foldLeft(joined) { (df, cond) =>
-      df.drop(renamedChild(cond.right))
+    // when the join key has the same name in both parent and right
+    val withoutRightJoinKeys = joinConfig.conditions.foldLeft(joined) { (df, cond) =>
+      df.drop(renamedRight(cond.right))
     }
 
-    val finalChildColumns = childDataColumns.map { childCol =>
-      if (parentColumns.contains(childCol)) s"child_$childCol" else childCol
+    val finalRightColumns = rightDataColumns.map { rightCol =>
+      if (leftColumns.contains(rightCol)) s"child_$rightCol" else rightCol
     }
 
-    val allColumns = parentColumns ++ finalChildColumns
-    withoutChildJoinKeys.select(allColumns.toSeq.map(col): _*)
+    val allColumns = leftColumns ++ finalRightColumns
+    withoutRightJoinKeys.select(allColumns.toSeq.map(col): _*)
   }
 
   /** Applies aggregate join strategy - aggregates child records with functions
     */
   private def applyAggregateJoin(
-      parent: DataFrame,
-      child: DataFrame,
+      left: DataFrame,
+      right: DataFrame,
       joinConfig: JoinConfig
   ): DataFrame = {
     logger.info(
       s"Applying aggregate join strategy with ${joinConfig.aggregations.size} aggregations"
     )
 
-    val childJoinKeys = joinConfig.conditions.map(_.right)
+    val rightJoinKeys = joinConfig.conditions.map(_.right)
 
     val aggExprs = joinConfig.aggregations.map { aggSpec =>
       import com.etl.framework.config.AggregationFunction._
       val aggFunc = aggSpec.function match {
-        case Sum         => sum(child(aggSpec.column))
-        case Count       => count(child(aggSpec.column))
-        case Avg         => avg(child(aggSpec.column))
-        case Min         => min(child(aggSpec.column))
-        case Max         => max(child(aggSpec.column))
-        case First       => first(child(aggSpec.column))
-        case Last        => last(child(aggSpec.column))
-        case CollectList => collect_list(child(aggSpec.column))
-        case CollectSet  => collect_set(child(aggSpec.column))
+        case Sum         => sum(right(aggSpec.column))
+        case Count       => count(right(aggSpec.column))
+        case Avg         => avg(right(aggSpec.column))
+        case Min         => min(right(aggSpec.column))
+        case Max         => max(right(aggSpec.column))
+        case First       => first(right(aggSpec.column))
+        case Last        => last(right(aggSpec.column))
+        case CollectList => collect_list(right(aggSpec.column))
+        case CollectSet  => collect_set(right(aggSpec.column))
       }
       aggFunc.as(aggSpec.alias)
     }
@@ -150,24 +150,24 @@ class JoinStrategyExecutor {
       )
     }
 
-    val aggregatedChild = child
-      .groupBy(childJoinKeys.map(child(_)): _*)
+    val aggregatedRight = right
+      .groupBy(rightJoinKeys.map(right(_)): _*)
       .agg(aggExprs.head, aggExprs.tail: _*)
 
-    val result = parent.join(
-      aggregatedChild,
+    val result = left.join(
+      aggregatedRight,
       joinConfig.conditions
         .map { cond =>
-          parent(cond.left) === aggregatedChild(cond.right)
+          left(cond.left) === aggregatedRight(cond.right)
         }
         .reduce(_ && _),
       joinConfig.`type`.sparkType
     )
 
-    // Use parent-qualified references for parent columns and aggregatedChild references
+    // Use parent-qualified references for parent columns and aggregatedRight references
     // for aggregation aliases to avoid ambiguity on shared join key names
-    val parentSelects = parent.columns.map(parent(_))
-    val aggSelects = joinConfig.aggregations.map(spec => aggregatedChild(spec.alias))
-    result.select((parentSelects ++ aggSelects): _*)
+    val leftSelects = left.columns.map(left(_))
+    val aggSelects = joinConfig.aggregations.map(spec => aggregatedRight(spec.alias))
+    result.select((leftSelects ++ aggSelects): _*)
   }
 }

@@ -44,21 +44,15 @@ class DAGGraphBuilder(globalConfig: GlobalConfig) {
     }
 
     nodes.foreach { node =>
-      val missingDeps = node.dependencies.filterNot(nodeIds.contains)
-      if (missingDeps.nonEmpty) {
-        throw new IllegalStateException(
-          s"Node '${node.id}' declares dependencies that do not exist: ${missingDeps.mkString(", ")}"
-        )
-      }
-      node.join.foreach { joinConfig =>
-        if (joinConfig.parent == node.id) {
+      node.joins.foreach { joinConfig =>
+        if (joinConfig.`with` == node.id) {
           throw new IllegalStateException(
-            s"Node '${node.id}' has a self-referential join (join parent is itself)"
+            s"Node '${node.id}' has a self-referential join (join with itself)"
           )
         }
-        if (!nodeIds.contains(joinConfig.parent)) {
+        if (!nodeIds.contains(joinConfig.`with`)) {
           throw new IllegalStateException(
-            s"Node '${node.id}' references join parent '${joinConfig.parent}' which does not exist"
+            s"Node '${node.id}' references join target '${joinConfig.`with`}' which does not exist"
           )
         }
         if (joinConfig.conditions.isEmpty) {
@@ -80,13 +74,9 @@ class DAGGraphBuilder(globalConfig: GlobalConfig) {
     }
 
     nodes.foreach { node =>
-      node.dependencies.foreach { dep =>
-        graph.getOrElseUpdate(node.id, mutable.Set.empty).add(dep)
-      }
-      // The join parent is an implicit dependency: the node cannot execute
-      // before its join parent, even if it is not listed in `dependencies`.
-      node.join.foreach { joinConfig =>
-        graph.getOrElseUpdate(node.id, mutable.Set.empty).add(joinConfig.parent)
+      // Dependencies are inferred from joins
+      node.joins.foreach { joinConfig =>
+        graph.getOrElseUpdate(node.id, mutable.Set.empty).add(joinConfig.`with`)
       }
     }
 

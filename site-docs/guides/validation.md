@@ -332,7 +332,7 @@ Rejected records are written to the flow's `rejectedPath`.
 
 ### warn
 
-The record stays in the valid DataFrame unchanged (no extra columns are added). A separate warning record is written to a Parquet file at `{rejectedPath}/{flowName}_warnings/`. Each warning record contains the flow's primary key columns plus warning metadata:
+The record stays in the valid DataFrame unchanged (no extra columns are added). A separate warning record is written to a Parquet file at `{warningsPath}/{flowName}/` (defaults to `{outputPath}/warnings/{flowName}/` if `warningsPath` is not configured in `global.yaml`). Each warning record contains the flow's primary key columns plus warning metadata:
 
 | Column | Description |
 |--------|-------------|
@@ -372,7 +372,7 @@ graph TD
     FKRej["FK_VIOLATION"]
     Custom["Custom Rules (in order)"]
     CustomRej["{RULE}_VALIDATION_FAILED"]
-    CustomWarn["written to<br/>{rejectedPath}/{flowName}_warnings/"]
+    CustomWarn["written to<br/>{warningsPath}/{flowName}/"]
     Result["ValidationResult"]
     Valid["valid: DataFrame<br/>(clean records, business columns only)"]
     Rejected["rejected: Option[DataFrame]<br/>(all rejected records with metadata)"]

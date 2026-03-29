@@ -6,11 +6,12 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 
 ### paths
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `outputPath` | yes | Base directory for flow output data |
-| `rejectedPath` | yes | Directory for rejected records |
-| `metadataPath` | yes | Directory for batch and flow metadata JSON |
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `outputPath` | yes | — | Base directory for flow output data |
+| `rejectedPath` | yes | — | Directory for rejected records |
+| `metadataPath` | yes | — | Directory for batch and flow metadata JSON |
+| `warningsPath` | no | `{outputPath}/warnings` | Directory for validation warning records |
 
 ### processing
 

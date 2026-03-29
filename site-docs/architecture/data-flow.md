@@ -79,7 +79,7 @@ For each FK, checks that values exist in the referenced parent flow's DataFrame 
 Processes rules in order. Each rule is dispatched to its validator (regex, range, domain, custom class). Based on `onFailure`:
 
 - `reject` — record moves to rejected DataFrame
-- `warn` — record stays valid, warning record written to separate Parquet file at `{rejectedPath}/{flowName}_warnings/`
+- `warn` — record stays valid, warning record written to separate Parquet file at `{warningsPath}/{flowName}/`
 - `skip` — rule not executed
 
 ### Output
@@ -102,7 +102,7 @@ If a post-validation transformation is registered, it runs on the valid records 
 - `currentData` — the valid DataFrame from step 3
 - `validatedFlows` — populated with all flows validated so far in this batch
 
-Common operations: computing derived fields, cross-flow lookups via `ctx.getFlow()`, creating additional tables via `ctx.addTable()`.
+Common operations: computing derived fields, cross-flow lookups via `ctx.getFlow()`.
 
 ## Step 5: Write
 

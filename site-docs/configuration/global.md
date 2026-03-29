@@ -9,6 +9,7 @@ paths:
   outputPath: "output/data"
   rejectedPath: "output/rejected"
   metadataPath: "output/metadata"
+  warningsPath: "output/warnings"   # optional, defaults to {outputPath}/warnings
 
 processing:
   batchIdFormat: "yyyyMMdd_HHmmss"
@@ -40,19 +41,21 @@ iceberg:
 
 Base directories for all pipeline output.
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `outputPath` | yes | Base directory for flow output data |
-| `rejectedPath` | yes | Directory for rejected records |
-| `metadataPath` | yes | Directory for batch and flow metadata JSON |
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `outputPath` | yes | — | Base directory for flow output data |
+| `rejectedPath` | yes | — | Directory for rejected records |
+| `metadataPath` | yes | — | Directory for batch and flow metadata JSON |
+| `warningsPath` | no | `{outputPath}/warnings` | Directory for validation warning records. If not set, defaults to `{outputPath}/warnings`. Each flow's warnings are written to `{warningsPath}/{flowName}/`. |
 
-All three paths are required. They can use [variable substitution](overview.md#variable-substitution):
+The first three paths are required. `warningsPath` is optional — if omitted, warnings go to `{outputPath}/warnings`. They can use [variable substitution](overview.md#variable-substitution):
 
 ```yaml
 paths:
   outputPath: "${OUTPUT_PATH}/data"
   rejectedPath: "${OUTPUT_PATH}/rejected"
   metadataPath: "${OUTPUT_PATH}/metadata"
+  warningsPath: "${OUTPUT_PATH}/warnings"   # optional
 ```
 
 ## processing

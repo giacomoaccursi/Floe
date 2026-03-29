@@ -1,7 +1,6 @@
 package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config._
-import com.etl.framework.core.AdditionalTableMetadata
 import com.etl.framework.iceberg.{IcebergTableManager, IcebergTableWriter}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfterAll
@@ -120,55 +119,34 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     written.count() shouldBe 0L
   }
 
-  "FlowDataWriter.writeAdditionalTable" should "write data to the specified output path" in {
-    val outputPath = tempDir.resolve("additional_table_out").toString
-    val flowConfig = createFlowConfig("addl_flow")
+  "FlowDataWriter.writeWarnings" should "write warnings to default path when warningsPath is not configured" in {
+    val flowConfig = createFlowConfig("warn_flow")
     val globalConfig = createGlobalConfig()
     val writer = createWriter(flowConfig, globalConfig)
 
-    val data = Seq((1, "a"), (2, "b"), (3, "c")).toDF("id", "value")
-    writer.writeAdditionalTable("my_table", data, Some(outputPath), None)
+    val warnedDF = Seq(("id1", "rule1", "msg1")).toDF("pk", "_warning_rule", "_warning_message")
+    writer.writeWarnings(warnedDF, "batch_w1")
 
-    val written = spark.read.parquet(outputPath)
-    written.count() shouldBe 3L
-    written.columns should contain allOf ("id", "value")
+    val expectedPath = s"${globalConfig.paths.outputPath}/warnings/warn_flow"
+    val written = spark.read.parquet(expectedPath)
+    written.count() shouldBe 1L
+    written.columns should contain("_batch_id")
   }
 
-  it should "partition data when dagMetadata specifies partitionBy" in {
-    val outputPath = tempDir.resolve("additional_partitioned").toString
-    val flowConfig = createFlowConfig("partitioned_flow")
-    val globalConfig = createGlobalConfig()
+  it should "write warnings to custom warningsPath when configured" in {
+    val customWarningsPath = tempDir.resolve("custom_warnings").toString
+    val flowConfig = createFlowConfig("warn_flow2")
+    val globalConfig = createGlobalConfig().copy(
+      paths = createGlobalConfig().paths.copy(warningsPath = Some(customWarningsPath))
+    )
     val writer = createWriter(flowConfig, globalConfig)
 
-    val data = Seq((1, "2024"), (2, "2024"), (3, "2025")).toDF("id", "year")
-    val dagMetadata = AdditionalTableMetadata(
-      primaryKey = Seq("id"),
-      partitionBy = Seq("year")
-    )
-    writer.writeAdditionalTable("partitioned_table", data, Some(outputPath), Some(dagMetadata))
+    val warnedDF = Seq(("id1", "rule1", "msg1")).toDF("pk", "_warning_rule", "_warning_message")
+    writer.writeWarnings(warnedDF, "batch_w2")
 
-    val written = spark.read.parquet(outputPath)
-    written.count() shouldBe 3L
-
-    val partitionDirs = new java.io.File(outputPath).listFiles().filter(_.isDirectory).map(_.getName)
-    partitionDirs should contain("year=2024")
-    partitionDirs should contain("year=2025")
-  }
-
-  it should "write without partitioning when dagMetadata has empty partitionBy" in {
-    val outputPath = tempDir.resolve("additional_no_partition").toString
-    val flowConfig = createFlowConfig("no_partition_flow")
-    val globalConfig = createGlobalConfig()
-    val writer = createWriter(flowConfig, globalConfig)
-
-    val data = Seq((1, "x"), (2, "y")).toDF("id", "value")
-    val dagMetadata = AdditionalTableMetadata(
-      primaryKey = Seq("id"),
-      partitionBy = Seq.empty
-    )
-    writer.writeAdditionalTable("no_partition_table", data, Some(outputPath), Some(dagMetadata))
-
-    val written = spark.read.parquet(outputPath)
-    written.count() shouldBe 2L
+    val expectedPath = s"$customWarningsPath/warn_flow2"
+    val written = spark.read.parquet(expectedPath)
+    written.count() shouldBe 1L
+    written.first().getAs[String]("_batch_id") shouldBe "batch_w2"
   }
 }

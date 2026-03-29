@@ -1,7 +1,6 @@
 package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config.{FlowConfig, GlobalConfig, LoadMode}
-import com.etl.framework.core.AdditionalTableMetadata
 import com.etl.framework.iceberg.{IcebergTableWriter, WriteResult}
 import com.etl.framework.util.TimingUtil
 import com.etl.framework.validation.ValidationColumns._
@@ -57,7 +56,8 @@ class FlowDataWriter(
   /** Writes validation warnings (PK + warning metadata) to a separate Parquet file.
     */
   def writeWarnings(warnedData: DataFrame, batchId: String): Unit = {
-    val warningsPath = s"${globalConfig.paths.rejectedPath}/${flowConfig.name}_warnings"
+    val basePath = globalConfig.paths.warningsPath.getOrElse(s"${globalConfig.paths.outputPath}/warnings")
+    val warningsPath = s"$basePath/${flowConfig.name}"
 
     TimingUtil.timed(logger, s"Write warnings to $warningsPath") {
       warnedData
@@ -69,30 +69,4 @@ class FlowDataWriter(
     }
   }
 
-  /** Writes an additional table
-    */
-  def writeAdditionalTable(
-      tableName: String,
-      data: DataFrame,
-      outputPath: Option[String],
-      dagMetadata: Option[AdditionalTableMetadata]
-  ): Unit = {
-    val path = outputPath.getOrElse(
-      s"${globalConfig.paths.outputPath}/${flowConfig.name}_${tableName}"
-    )
-
-    var writer = data.write
-      .mode(SaveMode.Overwrite)
-      .format("parquet")
-
-    dagMetadata.foreach { metadata =>
-      if (metadata.partitionBy.nonEmpty) {
-        writer = writer.partitionBy(metadata.partitionBy: _*)
-      }
-    }
-
-    writer.save(path)
-
-    logger.info(s"Additional table $tableName written to $path")
-  }
 }

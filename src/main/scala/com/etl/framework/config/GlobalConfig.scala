@@ -10,7 +10,8 @@ case class GlobalConfig(
 case class PathsConfig(
     outputPath: String,
     rejectedPath: String,
-    metadataPath: String
+    metadataPath: String,
+    warningsPath: Option[String] = None
 )
 
 case class ProcessingConfig(

@@ -42,7 +42,7 @@ validation:
       onFailure: reject
 ```
 
-If the domain name is not found in `domains.yaml`, the error message lists all available domains.
+If the domain name referenced in a flow YAML is not found in `domains.yaml`, the framework throws a `ValidationConfigException` at runtime.
 
 For the full validation reference, see [Validation Engine](../guides/validation.md#domain-validation).
 

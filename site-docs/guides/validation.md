@@ -57,7 +57,7 @@ Every rule in the `rules` list has this structure:
 | `min` | string | — | — | Minimum value (for `range` type, at least one of min/max required) |
 | `max` | string | — | — | Maximum value (for `range` type) |
 | `domainName` | string | — | — | Domain name from `domains.yaml` (required for `domain` type) |
-| `class` | string | — | — | Fully qualified class name (required for `custom` type) |
+| `class` | string | — | — | Validator name (registered via builder) or fully qualified class name (required for `custom` type) |
 | `config` | map | — | — | Key-value config passed to custom validators |
 | `description` | string | — | — | Human-readable description (used in warning messages) |
 | `skipNull` | boolean | — | `true` | If true, NULL values pass validation without being checked |
@@ -234,7 +234,27 @@ For domain configuration details, see [Domains Configuration](../configuration/d
 
 ### Custom class validation
 
-For validation logic that cannot be expressed with regex, range, or domain rules, provide a custom validator class:
+For validation logic that cannot be expressed with regex, range, or domain rules, provide a custom validator class. There are two ways to wire it up:
+
+1. **Registry (recommended)** — register the validator by name on the pipeline builder, then reference that name in YAML:
+
+```scala
+IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .withCustomValidator("luhn", () => new LuhnCheckValidator())
+  .build()
+```
+
+```yaml
+- type: custom
+  class: luhn
+  column: credit_card_number
+  config:
+    strict: "true"
+  onFailure: reject
+```
+
+2. **Reflection** — use the fully qualified class name directly in YAML (the framework loads it via `Class.forName`):
 
 ```yaml
 - type: custom
@@ -245,7 +265,9 @@ For validation logic that cannot be expressed with regex, range, or domain rules
   onFailure: reject
 ```
 
-The class must:
+The registry has priority: if the `class` value matches a registered name, the registry is used; otherwise it falls back to reflection.
+
+The validator class must:
 
 1. Have a no-argument constructor
 2. Implement the `com.etl.framework.validation.Validator` trait

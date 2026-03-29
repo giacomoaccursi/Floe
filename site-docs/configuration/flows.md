@@ -189,7 +189,7 @@ The FK is identified by an auto-generated display name in the format `column -> 
 | `min` | string | — | — | Minimum value (for `range` type) |
 | `max` | string | — | — | Maximum value (for `range` type) |
 | `domainName` | string | — | — | Domain name from `domains.yaml` (for `domain` type) |
-| `class` | string | — | — | Fully qualified class name (for `custom` type) |
+| `class` | string | — | — | Validator name (registered via builder) or fully qualified class name (for `custom` type) |
 | `config` | map | — | — | Key-value config passed to custom validators |
 | `description` | string | — | — | Human-readable description |
 | `skipNull` | boolean | — | `true` | If true, NULL values pass without being checked |

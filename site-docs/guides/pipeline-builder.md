@@ -38,6 +38,7 @@ val result = pipeline.execute()
 | `withFlowTransformation(flow, pre, post)` | Registers pre and/or post-validation transformations for a flow |
 | `withPreValidationTransformation(flow, fn)` | Shorthand for pre-validation only |
 | `withPostValidationTransformation(flow, fn)` | Shorthand for post-validation only |
+| `withCustomValidator(name, factory)` | Registers a custom validator by name. Use the same name in the flow YAML `class` field. |
 | `withCatalogProvider(type, provider)` | Registers a custom Iceberg catalog provider |
 | `withVariables(variables)` | Sets variables for YAML substitution (priority over env vars). See [Configuration Overview](../configuration/overview.md#variable-substitution) |
 | `build()` | Builds the pipeline (returns `IngestionPipeline`) |

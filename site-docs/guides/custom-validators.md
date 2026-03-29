@@ -4,7 +4,27 @@ Guide to writing custom validation logic beyond the built-in regex, range, and d
 
 ## Overview
 
-When the built-in validators are not enough, you can provide a custom validator class. The framework loads it via reflection, optionally configures it, and calls it during the validation pipeline alongside the other rules.
+When the built-in validators are not enough, you can provide a custom validator class. There are two ways to wire it up:
+
+1. **Registry (recommended)** — register the validator by name on the pipeline builder with `withCustomValidator`, then reference that name in YAML:
+
+```scala
+IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .withCustomValidator("luhn", () => new LuhnCheckValidator())
+  .build()
+```
+
+```yaml
+- type: custom
+  class: luhn
+  column: credit_card_number
+  config:
+    strict: "true"
+  onFailure: reject
+```
+
+2. **Reflection** — use the fully qualified class name directly in YAML. The framework loads it via `Class.forName`:
 
 ```yaml
 - type: custom
@@ -14,6 +34,8 @@ When the built-in validators are not enough, you can provide a custom validator 
     strict: "true"
   onFailure: reject
 ```
+
+The registry has priority: if the `class` value matches a registered name, the registry is used; otherwise it falls back to reflection.
 
 ## The Validator trait
 
@@ -87,6 +109,53 @@ The `configure` method is called once after instantiation, before `validate`. Th
 
 All config values are strings — parse them in `configure` as needed.
 
+## Registering validators
+
+The recommended way to wire custom validators is through the pipeline builder registry. Register a factory function with a short name, then reference that name in YAML:
+
+```scala
+import com.etl.framework.pipeline.IngestionPipeline
+
+implicit val spark: SparkSession = SparkSession.builder()
+  .appName("My ETL")
+  .master("local[*]")
+  .config("spark.sql.extensions",
+    "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+  .getOrCreate()
+
+val pipeline = IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .withCustomValidator("luhn", () => new LuhnCheckValidator())
+  .withCustomValidator("email-domain", () => new EmailDomainValidator())
+  .build()
+
+val result = pipeline.execute()
+```
+
+Flow YAML:
+
+```yaml
+validation:
+  primaryKey: [order_id]
+  rules:
+    - type: custom
+      class: luhn
+      column: credit_card_number
+      config:
+        strict: "true"
+      onFailure: reject
+    - type: custom
+      class: email-domain
+      column: email
+      config:
+        domains: "example.com, mycompany.com"
+      onFailure: reject
+```
+
+The `class` field is matched against registered names first. If no match is found, the framework falls back to reflection loading (see below). This means you can mix both approaches in the same pipeline — some validators registered by name, others loaded by fully qualified class name.
+
+The factory function (`() => Validator`) is called each time the validator is needed, so each invocation gets a fresh instance. If your validator implements `ConfigurableValidator`, `configure` is called on the new instance as usual.
+
 ## Reflection loading
 
 The framework loads custom validators via `ValidatorFactory`:
@@ -159,7 +228,19 @@ class EmailDomainValidator extends Validator with ConfigurableValidator {
 }
 ```
 
-YAML configuration:
+YAML configuration (using a registered name):
+
+```yaml
+- type: custom
+  class: email-domain
+  column: email
+  config:
+    domains: "example.com, mycompany.com, partner.org"
+  onFailure: reject
+  description: "Email must belong to an approved domain"
+```
+
+Or using the fully qualified class name:
 
 ```yaml
 - type: custom
@@ -175,7 +256,7 @@ YAML configuration:
 
 Custom validators interact with the standard `skipNull` and `onFailure` settings:
 
-- **skipNull**: the built-in validators (regex, range, domain) extend `BaseValidator`, which handles `skipNull` automatically. Custom class validators implement `Validator` directly and receive the full DataFrame — your `validate` method must handle NULL values itself. Check `rule.skipNull` and filter NULLs in your implementation if needed.
+- **skipNull**: the framework handles `skipNull` for all rule types, including custom validators. When `skipNull` is `true` (the default), NULL values are filtered out before your `validate` method is called. You do not need to handle NULLs yourself.
 
 - **onFailure**: the framework applies the `onFailure` action (reject, warn, skip) based on the `ValidationStepResult` you return. If `onFailure: skip`, your validator is never called.
 

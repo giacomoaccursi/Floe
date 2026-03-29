@@ -160,7 +160,7 @@ The FK is identified by an auto-generated display name in the format `column -> 
 | `min` | range | — | Minimum value |
 | `max` | range | — | Maximum value |
 | `domainName` | domain | — | Domain from domains.yaml |
-| `class` | custom | — | Fully qualified class name |
+| `class` | custom | — | Validator name (registered via builder) or fully qualified class name |
 | `config` | no | — | Key-value config for custom validators |
 | `description` | no | — | Human-readable description |
 | `skipNull` | no | `true` | NULLs pass without checking |

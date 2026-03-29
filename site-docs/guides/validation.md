@@ -232,7 +232,7 @@ Referenced in the flow YAML:
 | `values` | — | List of allowed values |
 | `caseSensitive` | `true` | If false, comparison is case-insensitive |
 
-If the domain name is not found in `domains.yaml`, the error message lists all available domains. Rejection code: `DOMAIN_VALIDATION_FAILED`.
+If the domain name is not found in `domains.yaml`, the framework throws a `ValidationConfigException` at runtime. Rejection code: `DOMAIN_VALIDATION_FAILED`.
 
 For domain configuration details, see [Domains Configuration](../configuration/domains.md).
 

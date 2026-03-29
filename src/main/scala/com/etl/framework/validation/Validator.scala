@@ -74,13 +74,7 @@ object ValidatorFactory {
     // Try registry by name first, fall back to reflection
     customValidators.get(name) match {
       case Some(factory) =>
-        val validator = factory()
-        validator match {
-          case configurable: ConfigurableValidator =>
-            configurable.configure(rule.config.getOrElse(Map.empty))
-          case _ =>
-        }
-        validator
+        factory()
       case None =>
         createCustomValidator(rule, flowName)
     }
@@ -107,12 +101,6 @@ object ValidatorFactory {
       // Type-safe check
       instance match {
         case validator: Validator =>
-          // Configure the validator if it implements Configurable
-          validator match {
-            case configurable: ConfigurableValidator =>
-              configurable.configure(rule.config.getOrElse(Map.empty))
-            case _ => // No configuration needed
-          }
           validator
         case other =>
           throw ValidationConfigException(
@@ -133,10 +121,4 @@ object ValidatorFactory {
         )
     }
   }
-}
-
-/** Trait for validators that can be configured
-  */
-trait ConfigurableValidator {
-  def configure(config: Map[String, String]): Unit
 }

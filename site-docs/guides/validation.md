@@ -271,21 +271,17 @@ The validator class must:
 
 1. Have a no-argument constructor
 2. Implement the `com.etl.framework.validation.Validator` trait
-3. Optionally implement `ConfigurableValidator` to receive the `config` map
+
+Configuration from the YAML `config` map is available via `rule.config` inside the `validate` method:
 
 ```scala
-import com.etl.framework.validation.{Validator, ConfigurableValidator, ValidationStepResult}
+import com.etl.framework.validation.{Validator, ValidationStepResult}
 import com.etl.framework.config.ValidationRule
 import org.apache.spark.sql.DataFrame
 
-class LuhnCheckValidator extends Validator with ConfigurableValidator {
-  private var strict: Boolean = false
-
-  override def configure(config: Map[String, String]): Unit = {
-    strict = config.getOrElse("strict", "false").toBoolean
-  }
-
+class LuhnCheckValidator extends Validator {
   override def validate(df: DataFrame, rule: ValidationRule): ValidationStepResult = {
+    val strict = rule.config.flatMap(_.get("strict")).contains("true")
     // Custom validation logic here
     // Return ValidationStepResult(validDf, Some(rejectedDf)) or
     // ValidationStepResult(validDf, None) if all records pass

@@ -72,43 +72,6 @@ It returns a `ValidationStepResult`:
 - `validDf` — records that passed validation
 - `rejectedDf` — `Some(df)` with rejected records, or `None` if all passed
 
-## ConfigurableValidator
-
-If your validator needs configuration from the YAML `config` map, implement `ConfigurableValidator` in addition to `Validator`:
-
-```scala
-import com.etl.framework.validation.{Validator, ConfigurableValidator, ValidationStepResult}
-import com.etl.framework.config.ValidationRule
-import org.apache.spark.sql.DataFrame
-
-class LuhnCheckValidator extends Validator with ConfigurableValidator {
-  private var strict: Boolean = false
-
-  override def configure(config: Map[String, String]): Unit = {
-    strict = config.getOrElse("strict", "false").toBoolean
-  }
-
-  override def validate(df: DataFrame, rule: ValidationRule): ValidationStepResult = {
-    // Use this.strict and rule.column to implement validation
-    ???
-  }
-}
-```
-
-The `configure` method is called once after instantiation, before `validate`. The `config` map comes from the YAML rule definition:
-
-```yaml
-- type: custom
-  class: "com.mycompany.validators.LuhnCheckValidator"
-  column: credit_card_number
-  config:
-    strict: "true"
-    allowTestCards: "false"
-  onFailure: reject
-```
-
-All config values are strings — parse them in `configure` as needed.
-
 ## Registering validators
 
 The recommended way to wire custom validators is through the pipeline builder registry. Register a factory function with a short name, then reference that name in YAML:
@@ -154,7 +117,7 @@ validation:
 
 The `class` field is matched against registered names first. If no match is found, the framework falls back to reflection loading (see below). This means you can mix both approaches in the same pipeline — some validators registered by name, others loaded by fully qualified class name.
 
-The factory function (`() => Validator`) is called each time the validator is needed, so each invocation gets a fresh instance. If your validator implements `ConfigurableValidator`, `configure` is called on the new instance as usual.
+The factory function (`() => Validator`) is called each time the validator is needed, so each invocation gets a fresh instance.
 
 ## Reflection loading
 
@@ -164,7 +127,6 @@ The framework loads custom validators via `ValidatorFactory`:
 2. Loads the class via `Class.forName(className)`
 3. Instantiates it via the no-arg constructor: `clazz.getDeclaredConstructor().newInstance()`
 4. Verifies it implements `Validator`
-5. If it also implements `ConfigurableValidator`, calls `configure(rule.config)`
 
 If any step fails, the framework throws a descriptive exception:
 
@@ -182,27 +144,24 @@ A validator that checks email addresses belong to an allowed set of domains:
 ```scala
 package com.mycompany.validators
 
-import com.etl.framework.validation.{Validator, ConfigurableValidator, ValidationStepResult}
+import com.etl.framework.validation.{Validator, ValidationStepResult}
 import com.etl.framework.config.ValidationRule
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 
-class EmailDomainValidator extends Validator with ConfigurableValidator {
-  private var allowedDomains: Set[String] = Set.empty
-
-  override def configure(config: Map[String, String]): Unit = {
-    allowedDomains = config
-      .getOrElse("domains", "")
-      .split(",")
-      .map(_.trim.toLowerCase)
-      .filter(_.nonEmpty)
-      .toSet
-  }
-
+class EmailDomainValidator extends Validator {
   override def validate(df: DataFrame, rule: ValidationRule): ValidationStepResult = {
     val col_name = rule.column.getOrElse(
       throw new IllegalArgumentException("column is required for EmailDomainValidator")
     )
+
+    val allowedDomains = rule.config
+      .flatMap(_.get("domains"))
+      .getOrElse("")
+      .split(",")
+      .map(_.trim.toLowerCase)
+      .filter(_.nonEmpty)
+      .toSet
 
     if (allowedDomains.isEmpty) {
       return ValidationStepResult(df, None)

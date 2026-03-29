@@ -266,6 +266,8 @@ Each derived table function receives a `DerivedTableContext`:
 | `batchId` | `String` | Current batch identifier |
 | `catalogName` | `String` | Iceberg catalog name (from `global.yaml`) |
 
+Each derived table must have a unique name. Registering two derived tables with the same name throws `IllegalArgumentException` at build time.
+
 ### ctx.table(name)
 
 Reads a table from the Iceberg catalog. Returns the full table content (all historical data), not just the records from the current batch. This is the key difference from transformations, where `ctx.currentData` contains only the current batch's data.

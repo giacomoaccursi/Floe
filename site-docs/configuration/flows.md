@@ -2,6 +2,9 @@
 
 Complete reference for flow YAML files. Each file defines a single data ingestion pipeline and lives in the `flows/` subdirectory of the config directory.
 
+!!!warning "Unique flow names"
+    Each flow must have a unique `name`. If two YAML files in the `flows/` directory define the same name, the framework rejects the configuration at startup.
+
 ## Full example
 
 ```yaml

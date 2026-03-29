@@ -156,7 +156,7 @@ At the next run, the framework logs `Added column notes (STRING) to catalog.defa
 
 ### Table configuration updates
 
-Every run, `createOrUpdateTable` compares the current table state against the flow config and applies any differences:
+Every run, the framework compares the current table state against the flow config and applies any differences:
 
 - **Schema**: new columns are added via `ALTER TABLE ADD COLUMN` (see above).
 - **Table properties**: reads current properties via `SHOW TBLPROPERTIES` and applies only new or changed entries via `ALTER TABLE SET TBLPROPERTIES`. Existing properties not mentioned in the config are left untouched.

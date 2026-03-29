@@ -3,7 +3,6 @@ package com.etl.framework.validation
 import com.etl.framework.config.{DomainsConfig, FlowConfig, ValidationRule, ValidationRuleType}
 import com.etl.framework.validation.ValidationColumns._
 import com.etl.framework.validation.validators._
-import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /** Core validation engine that coordinates all validation steps Delegates actual validation logic to specialized

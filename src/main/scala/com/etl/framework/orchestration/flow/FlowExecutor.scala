@@ -4,7 +4,6 @@ import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
 import com.etl.framework.iceberg.{IcebergFlowMetadata, IcebergTableManager, IcebergTableWriter, WriteResult}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.util.TimingUtil
-import com.etl.framework.validation.ValidationColumns._
 import com.etl.framework.validation.{ValidationEngine, ValidationResult, Validator}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory

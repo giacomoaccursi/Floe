@@ -19,8 +19,6 @@ class SchemaValidatorTest extends AnyFlatSpec with Matchers {
     .config("spark.ui.enabled", "false")
     .getOrCreate()
 
-  import spark.implicits._
-
   // Helper to create basic FlowConfig with Schema
   def createConfig(
       columns: Seq[ColumnConfig],

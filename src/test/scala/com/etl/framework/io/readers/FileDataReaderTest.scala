@@ -1,7 +1,6 @@
 package com.etl.framework.io.readers
 
 import com.etl.framework.config.{ColumnConfig, SchemaConfig, SourceConfig, SourceType, FileFormat}
-import com.etl.framework.exceptions.UnsupportedOperationException
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.SparkSession

@@ -26,8 +26,8 @@ class IngestionPipeline private (
     flowTransformations: Map[String, FlowTransformations],
     domainsConfig: Option[DomainsConfig],
     extraCatalogProviders: Map[String, () => CatalogProvider],
-    customValidators: Map[String, () => Validator] = Map.empty,
-    derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq.empty
+    customValidators: Map[String, () => Validator],
+    derivedTables: Seq[(String, DerivedTableContext => DataFrame)]
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -435,8 +435,8 @@ object IngestionPipeline {
       flowTransformations: Map[String, FlowTransformations],
       domainsConfig: Option[DomainsConfig],
       extraCatalogProviders: Map[String, () => CatalogProvider],
-      customValidators: Map[String, () => Validator] = Map.empty,
-      derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq.empty
+      customValidators: Map[String, () => Validator],
+      derivedTables: Seq[(String, DerivedTableContext => DataFrame)]
   )(implicit spark: SparkSession): IngestionPipeline = {
     new IngestionPipeline(
       globalConfig,

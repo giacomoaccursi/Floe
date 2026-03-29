@@ -1,7 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.FlowConfig
-import com.etl.framework.validation.{ValidationUtils, Validator}
+import com.etl.framework.validation.Validator
 
 /** Base class for validators that need access to FlowConfig These validators validate structural aspects (schema, PK,
   * FK, not-null) rather than individual field values

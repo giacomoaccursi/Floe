@@ -1,11 +1,9 @@
 package com.etl.framework.config
 
-import com.etl.framework.exceptions.{ConfigFileException, ConfigurationException, YAMLSyntaxException}
+import com.etl.framework.exceptions.{ConfigFileException, ConfigurationException}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import pureconfig._
 import pureconfig.generic.auto._
-import pureconfig.module.yaml._
 import java.io.{File, PrintWriter}
 import scala.util.Using
 

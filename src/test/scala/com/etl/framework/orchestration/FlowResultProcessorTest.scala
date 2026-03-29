@@ -95,7 +95,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
       new MockFlowGroupExecutor(stopOnHighRejectionRate = false)
     val processor =
       new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.{Continue, StopExecution}
+    import processor.Continue
 
     val result =
       FlowResult.success("flow_a", "batch1", 100, 100, 95, 5, Map.empty)
@@ -119,7 +119,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     val groupExecutor = new MockFlowGroupExecutor()
     val processor =
       new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.{Continue, StopExecution}
+    import processor.StopExecution
 
     val result =
       FlowResult.failure("flow_a", "batch1", "Database connection failed")
@@ -152,7 +152,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     )
     val processor =
       new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.{Continue, StopExecution}
+    import processor.StopExecution
 
     // Rejection rate = 30/100 = 0.3 (30%), exceeds threshold of 10%
     val result =
@@ -187,7 +187,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
       new MockFlowGroupExecutor(stopOnHighRejectionRate = false)
     val processor =
       new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.{Continue, StopExecution}
+    import processor.Continue
 
     val results = Seq(
       FlowResult.success("flow_a", "batch1", 100, 100, 95, 5, Map.empty),
@@ -223,7 +223,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     val groupExecutor = new MockFlowGroupExecutor()
     val processor =
       new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.{Continue, StopExecution}
+    import processor.StopExecution
 
     val results = Seq(
       FlowResult.success("flow_a", "batch1", 100, 100, 95, 5, Map.empty),
@@ -255,7 +255,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     val groupExecutor = new MockFlowGroupExecutor()
     val processor =
       new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.{Continue, StopExecution}
+    import processor.Continue
 
     val accumulatedResults = mutable.ArrayBuffer[FlowResult]()
     val validatedFlows = mutable.Map[String, DataFrame]()
@@ -277,7 +277,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     val groupExecutor = new MockFlowGroupExecutor()
     val processor =
       new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.{Continue, StopExecution}
+    import processor.StopExecution
 
     val result = FlowResult.failure("flow_a", "batch123", "Error")
     val accumulatedResults = mutable.ArrayBuffer[FlowResult]()
@@ -308,7 +308,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     )
     val processor =
       new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.{Continue, StopExecution}
+    import processor.Continue
 
     // Rejection rate = 10/100 = 0.1 (10%), below threshold of 20%
     val result =
@@ -344,7 +344,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     val groupExecutor = new MockFlowGroupExecutor()
     val processor =
       new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.{Continue, StopExecution}
+    import processor.Continue
 
     val rejectionReasons = Map(
       "schema_validation" -> 3L,

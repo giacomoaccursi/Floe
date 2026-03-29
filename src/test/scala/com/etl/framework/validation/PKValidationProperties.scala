@@ -3,9 +3,8 @@ package com.etl.framework.validation
 import com.etl.framework.config._
 import com.etl.framework.TestConfig
 import com.etl.framework.validation.ValidationColumns._
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types._
 import org.scalacheck.{Gen, Properties}
 import org.scalacheck.Prop.forAll
 import org.scalacheck.Test.Parameters

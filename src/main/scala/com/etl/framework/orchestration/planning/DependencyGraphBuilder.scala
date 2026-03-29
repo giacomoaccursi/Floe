@@ -3,15 +3,12 @@ package com.etl.framework.orchestration.planning
 import com.etl.framework.config.FlowConfig
 import com.etl.framework.exceptions.CircularDependencyException
 import com.etl.framework.orchestration.ExecutionGroup
-import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
 
 /** Builds and analyzes dependency graphs from flow configurations
   */
 class DependencyGraphBuilder(flowConfigs: Seq[FlowConfig]) {
-
-  private val logger = LoggerFactory.getLogger(getClass)
 
   /** Builds dependency graph from Foreign Key relationships Returns a map: flow_name -> Set(dependent_flow_names)
     */

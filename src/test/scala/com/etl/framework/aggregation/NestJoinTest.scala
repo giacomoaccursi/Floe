@@ -2,7 +2,6 @@ package com.etl.framework.aggregation
 
 import com.etl.framework.config._
 import org.apache.spark.sql.{Row, SparkSession}
-import org.apache.spark.sql.types.ArrayType
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -53,7 +52,7 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
     result.columns should contain("children")
     result.schema.fields
       .find(_.name == "children")
-      .map(_.dataType) shouldBe a[Some[ArrayType]]
+      .map(_.dataType) shouldBe a[Some[_]]
   }
 
   it should "preserve all parent records with left outer join" in {

@@ -87,7 +87,7 @@ object PKValidationProperties extends Properties("PKValidation") {
       `type` = SourceType.File,
       path = "/test",
       format = FileFormat.CSV,
-      options = Map.empty,
+      options = Map.empty
     ),
     schema = SchemaConfig(
       enforceSchema = true,
@@ -211,7 +211,7 @@ object PKValidationProperties extends Properties("PKValidation") {
           `type` = SourceType.File,
           path = "/test",
           format = FileFormat.CSV,
-          options = Map.empty,
+          options = Map.empty
         ),
         schema = SchemaConfig(
           enforceSchema = true,
@@ -219,17 +219,17 @@ object PKValidationProperties extends Properties("PKValidation") {
           columns = Seq(
             ColumnConfig("id", "int", nullable = false, "ID column"),
             ColumnConfig(
-          "name",
-          "string",
-          nullable = false,
-          "Name column"
-        ),
+              "name",
+              "string",
+              nullable = false,
+              "Name column"
+            ),
             ColumnConfig(
-          "value",
-          "double",
-          nullable = true,
-          "Value column"
-        )
+              "value",
+              "double",
+              nullable = true,
+              "Value column"
+            )
           )
         ),
         loadMode = LoadModeConfig(
@@ -375,7 +375,7 @@ object PKValidationProperties extends Properties("PKValidation") {
           `type` = SourceType.File,
           path = "/test",
           format = FileFormat.CSV,
-          options = Map.empty,
+          options = Map.empty
         ),
         schema = SchemaConfig(
           enforceSchema = true,
@@ -383,17 +383,17 @@ object PKValidationProperties extends Properties("PKValidation") {
           columns = Seq(
             ColumnConfig("id", "int", nullable = false, "ID column"),
             ColumnConfig(
-          "name",
-          "string",
-          nullable = true,
-          "Name column"
-        ),
+              "name",
+              "string",
+              nullable = true,
+              "Name column"
+            ),
             ColumnConfig(
-          "value",
-          "double",
-          nullable = true,
-          "Value column"
-        )
+              "value",
+              "double",
+              nullable = true,
+              "Value column"
+            )
           )
         ),
         loadMode = LoadModeConfig(

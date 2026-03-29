@@ -49,7 +49,7 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
         `type` = SourceType.File,
         path = "/tmp/test",
         format = FileFormat.CSV,
-        options = Map.empty,
+        options = Map.empty
       ),
       schema = SchemaConfig(
         enforceSchema = true,

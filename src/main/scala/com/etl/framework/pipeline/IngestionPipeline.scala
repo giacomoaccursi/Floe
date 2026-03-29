@@ -263,12 +263,14 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     this
   }
 
-  /** Registers a custom validator by name.
-    * Use the same name in the flow YAML `class` field to reference it.
+  /** Registers a custom validator by name. Use the same name in the flow YAML `class` field to reference it.
     *
-    * @param name Short name for the validator (e.g. "luhn")
-    * @param factory Factory function that creates the validator instance
-    * @return This builder for chaining
+    * @param name
+    *   Short name for the validator (e.g. "luhn")
+    * @param factory
+    *   Factory function that creates the validator instance
+    * @return
+    *   This builder for chaining
     */
   def withCustomValidator(
       name: String,
@@ -278,13 +280,16 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     this
   }
 
-  /** Registers a derived table that will be computed after all flows are written to Iceberg.
-    * The function receives a DerivedTableContext with access to Iceberg tables (full history).
-    * The result is written to Iceberg as a full-load table.
+  /** Registers a derived table that will be computed after all flows are written to Iceberg. The function receives a
+    * DerivedTableContext with access to Iceberg tables (full history). The result is written to Iceberg as a full-load
+    * table.
     *
-    * @param tableName Name of the derived table (becomes the Iceberg table name)
-    * @param fn Function that produces the derived DataFrame
-    * @return This builder for chaining
+    * @param tableName
+    *   Name of the derived table (becomes the Iceberg table name)
+    * @param fn
+    *   Function that produces the derived DataFrame
+    * @return
+    *   This builder for chaining
     */
   def withDerivedTable(
       tableName: String,

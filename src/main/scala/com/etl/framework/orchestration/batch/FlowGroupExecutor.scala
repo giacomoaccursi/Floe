@@ -76,8 +76,7 @@ class FlowGroupExecutor(
     executor.execute(batchId)
   }
 
-  /** Determines if execution should stop based on result.
-    * Per-flow maxRejectionRate overrides the global setting.
+  /** Determines if execution should stop based on result. Per-flow maxRejectionRate overrides the global setting.
     */
   def shouldStopExecution(result: FlowResult, flowConfig: FlowConfig): Boolean = {
     if (!result.success) {

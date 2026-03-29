@@ -46,7 +46,8 @@ class FlowGroupExecutorTest extends AnyFlatSpec with Matchers {
 
   private def executor(maxRejectionRate: Option[Double]): FlowGroupExecutor = {
     implicit val spark: org.apache.spark.sql.SparkSession =
-      org.apache.spark.sql.SparkSession.builder()
+      org.apache.spark.sql.SparkSession
+        .builder()
         .appName("FlowGroupExecutorTest")
         .master("local[*]")
         .config("spark.ui.enabled", "false")

@@ -166,8 +166,7 @@ class OrphanDetector(
           s"Orphan detection: ${childFlow.name}.${fk.displayName} has $orphanCount " +
             s"orphaned records ($removedCount parent keys removed from ${fk.references.flow})"
         )
-        Some(OrphanReport(childFlow.name, fk.displayName, fk.references.flow,
-          orphanCount, removedCount, "warn"))
+        Some(OrphanReport(childFlow.name, fk.displayName, fk.references.flow, orphanCount, removedCount, "warn"))
 
       case OrphanAction.Delete =>
         logger.info(
@@ -197,8 +196,17 @@ class OrphanDetector(
 
         deletedChildKeys.foreach(dck => removedKeysByFlow(childFlow.name) = dck)
 
-        Some(OrphanReport(childFlow.name, fk.displayName, fk.references.flow,
-          orphanCount, removedCount, "delete", orphanCount))
+        Some(
+          OrphanReport(
+            childFlow.name,
+            fk.displayName,
+            fk.references.flow,
+            orphanCount,
+            removedCount,
+            "delete",
+            orphanCount
+          )
+        )
 
       case OrphanAction.Ignore => None
     }

@@ -6,8 +6,8 @@ import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-/** Validator for custom validation rules with reject/warn support. Orchestrates
-  * multiple validators and handles skipNull for all rule types.
+/** Validator for custom validation rules with reject/warn support. Orchestrates multiple validators and handles
+  * skipNull for all rule types.
   */
 class CustomRulesValidator(
     flowConfig: FlowConfig,

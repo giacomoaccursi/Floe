@@ -107,7 +107,7 @@ object FKValidationProperties extends Properties("FKValidation") {
       `type` = SourceType.File,
       path = "/test",
       format = FileFormat.CSV,
-      options = Map.empty,
+      options = Map.empty
     ),
     schema = SchemaConfig(
       enforceSchema = true,
@@ -313,30 +313,30 @@ object FKValidationProperties extends Properties("FKValidation") {
               `type` = SourceType.File,
               path = "/test",
               format = FileFormat.CSV,
-              options = Map.empty,
+              options = Map.empty
             ),
             schema = SchemaConfig(
               enforceSchema = true,
               allowExtraColumns = false,
               columns = Seq(
                 ColumnConfig(
-          "child_id",
-          "int",
-          nullable = false,
-          "Child ID"
-        ),
+                  "child_id",
+                  "int",
+                  nullable = false,
+                  "Child ID"
+                ),
                 ColumnConfig(
-          "parent1_id",
-          "int",
-          nullable = false,
-          "Parent 1 ID"
-        ),
+                  "parent1_id",
+                  "int",
+                  nullable = false,
+                  "Parent 1 ID"
+                ),
                 ColumnConfig(
-          "parent2_id",
-          "int",
-          nullable = false,
-          "Parent 2 ID"
-        ),
+                  "parent2_id",
+                  "int",
+                  nullable = false,
+                  "Parent 2 ID"
+                ),
                 ColumnConfig("name", "string", nullable = true, "Name")
               )
             ),
@@ -661,7 +661,7 @@ object FKValidationProperties extends Properties("FKValidation") {
           `type` = SourceType.File,
           path = "/test",
           format = FileFormat.CSV,
-          options = Map.empty,
+          options = Map.empty
         ),
         schema = SchemaConfig(
           enforceSchema = true,
@@ -669,23 +669,23 @@ object FKValidationProperties extends Properties("FKValidation") {
           columns = Seq(
             ColumnConfig("child_id", "int", nullable = false, "Child ID"),
             ColumnConfig(
-          "parent_id1",
-          "int",
-          nullable = false,
-          "Parent ID 1"
-        ),
+              "parent_id1",
+              "int",
+              nullable = false,
+              "Parent ID 1"
+            ),
             ColumnConfig(
-          "parent_id2",
-          "int",
-          nullable = false,
-          "Parent ID 2"
-        ),
+              "parent_id2",
+              "int",
+              nullable = false,
+              "Parent ID 2"
+            ),
             ColumnConfig(
-          "child_name",
-          "string",
-          nullable = true,
-          "Child name"
-        )
+              "child_name",
+              "string",
+              nullable = true,
+              "Child name"
+            )
           )
         ),
         loadMode = LoadModeConfig(

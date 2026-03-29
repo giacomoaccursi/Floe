@@ -60,7 +60,7 @@ class DataReaderTest extends AnyFlatSpec with Matchers {
         SourceType.File,
         tempPath,
         FileFormat.CSV,
-        Map("delimiter" -> ",", "header" -> "true", "inferSchema" -> "true"),
+        Map("delimiter" -> ",", "header" -> "true", "inferSchema" -> "true")
       )
       val reader = DataReaderFactory.create(config)
       val df = reader.read()
@@ -82,7 +82,7 @@ class DataReaderTest extends AnyFlatSpec with Matchers {
         SourceType.File,
         tempPath,
         FileFormat.CSV,
-        Map("delimiter" -> ";", "header" -> "true", "inferSchema" -> "true"),
+        Map("delimiter" -> ";", "header" -> "true", "inferSchema" -> "true")
       )
       val reader = DataReaderFactory.create(config)
       val df = reader.read()

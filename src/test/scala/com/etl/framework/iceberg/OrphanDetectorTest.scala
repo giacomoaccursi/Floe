@@ -465,7 +465,9 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     val parentResult1 = writer.writeFullLoad(parentData1, parentConfig)
 
     val childData = Seq(
-      (100, "US", 1), (101, "US", 2), (102, "EU", 1)
+      (100, "US", 1),
+      (101, "US", 2),
+      (102, "EU", 1)
     ).toDF("emp_id", "region", "dept_id")
     writer.writeFullLoad(childData, childConfig)
 
@@ -474,35 +476,55 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     val parentResult2 = writer.writeFullLoad(parentData2, parentConfig)
 
     val parentFlowResult = FlowResult(
-      flowName = "od_parent_comp", batchId = "b2", success = true,
-      inputRecords = 2, mergedRecords = 2, validRecords = 2, rejectedRecords = 0,
-      rejectionRate = 0.0, executionTimeMs = 100, rejectionReasons = Map.empty,
-      icebergMetadata = Some(IcebergFlowMetadata(
-        tableName = "orphan_catalog.default.od_parent_comp",
-        snapshotId = parentResult2.snapshotId.get,
-        snapshotTag = None,
-        parentSnapshotId = parentResult1.snapshotId,
-        snapshotTimestampMs = System.currentTimeMillis(),
-        recordsWritten = 2, manifestListLocation = "", summary = Map.empty
-      ))
+      flowName = "od_parent_comp",
+      batchId = "b2",
+      success = true,
+      inputRecords = 2,
+      mergedRecords = 2,
+      validRecords = 2,
+      rejectedRecords = 0,
+      rejectionRate = 0.0,
+      executionTimeMs = 100,
+      rejectionReasons = Map.empty,
+      icebergMetadata = Some(
+        IcebergFlowMetadata(
+          tableName = "orphan_catalog.default.od_parent_comp",
+          snapshotId = parentResult2.snapshotId.get,
+          snapshotTag = None,
+          parentSnapshotId = parentResult1.snapshotId,
+          snapshotTimestampMs = System.currentTimeMillis(),
+          recordsWritten = 2,
+          manifestListLocation = "",
+          summary = Map.empty
+        )
+      )
     )
     val childFlowResult = FlowResult(
-      flowName = "od_child_comp", batchId = "b2", success = true,
-      inputRecords = 3, mergedRecords = 3, validRecords = 3, rejectedRecords = 0,
-      rejectionRate = 0.0, executionTimeMs = 100, rejectionReasons = Map.empty
+      flowName = "od_child_comp",
+      batchId = "b2",
+      success = true,
+      inputRecords = 3,
+      mergedRecords = 3,
+      validRecords = 3,
+      rejectedRecords = 0,
+      rejectionRate = 0.0,
+      executionTimeMs = 100,
+      rejectionReasons = Map.empty
     )
 
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(parentConfig), parallel = false),
-      ExecutionGroup(Seq(childConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parentConfig), parallel = false),
+        ExecutionGroup(Seq(childConfig), parallel = false)
+      )
+    )
 
-    val detector = new OrphanDetector(spark, icebergConfig, Seq(parentConfig, childConfig),
-      Seq(parentFlowResult, childFlowResult))
+    val detector =
+      new OrphanDetector(spark, icebergConfig, Seq(parentConfig, childConfig), Seq(parentFlowResult, childFlowResult))
     val reports = detector.detectAndResolveOrphans(plan)
 
     reports should have size 1
-    reports.head.orphanCount shouldBe 1  // emp 101 with (US, 2)
+    reports.head.orphanCount shouldBe 1 // emp 101 with (US, 2)
     reports.head.actionTaken shouldBe "warn"
   }
 

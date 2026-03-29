@@ -20,9 +20,11 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
     .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog")
     .config("spark.sql.catalog.spark_catalog.type", "hadoop")
-    .config("spark.sql.catalog.spark_catalog.warehouse", {
-      Files.createTempDirectory("derived_table_test_warehouse").toString
-    })
+    .config(
+      "spark.sql.catalog.spark_catalog.warehouse", {
+        Files.createTempDirectory("derived_table_test_warehouse").toString
+      }
+    )
     .getOrCreate()
 
   import spark.implicits._
@@ -40,13 +42,15 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
   private def seedIcebergTable(tableName: String, df: DataFrame): Unit = {
     val fullName = s"spark_catalog.default.$tableName"
     val cols = df.schema.fields.map(f => s"${f.name} ${f.dataType.sql}").mkString(", ")
-    try { spark.sql(s"DROP TABLE IF EXISTS $fullName") } catch { case _: Exception => }
+    try { spark.sql(s"DROP TABLE IF EXISTS $fullName") }
+    catch { case _: Exception => }
     spark.sql(s"CREATE TABLE $fullName ($cols) USING iceberg")
     df.writeTo(fullName).append()
   }
 
   private def dropTable(name: String): Unit =
-    try { spark.sql(s"DROP TABLE IF EXISTS spark_catalog.default.$name") } catch { case _: Exception => }
+    try { spark.sql(s"DROP TABLE IF EXISTS spark_catalog.default.$name") }
+    catch { case _: Exception => }
 
   override def afterEach(): Unit = {
     Seq("orders", "order_summary", "orders_domestic", "orders_intl", "empty_derived", "failing_derived")
@@ -65,7 +69,8 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     val executor = new DerivedTableExecutor(icebergConfig)
     val derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq(
       "order_summary" -> { ctx: DerivedTableContext =>
-        ctx.table("orders")
+        ctx
+          .table("orders")
           .groupBy("category")
           .agg(sum("amount").as("total"))
       }
@@ -136,10 +141,12 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
   it should "handle empty source table" in {
     val emptyOrders = spark.createDataFrame(
       spark.sparkContext.emptyRDD[org.apache.spark.sql.Row],
-      org.apache.spark.sql.types.StructType(Seq(
-        org.apache.spark.sql.types.StructField("id", org.apache.spark.sql.types.IntegerType),
-        org.apache.spark.sql.types.StructField("category", org.apache.spark.sql.types.StringType)
-      ))
+      org.apache.spark.sql.types.StructType(
+        Seq(
+          org.apache.spark.sql.types.StructField("id", org.apache.spark.sql.types.IntegerType),
+          org.apache.spark.sql.types.StructField("category", org.apache.spark.sql.types.StringType)
+        )
+      )
     )
     seedIcebergTable("orders", emptyOrders)
 
@@ -212,10 +219,13 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     // Second execution: 3 columns (added count)
     val v2: Seq[(String, DerivedTableContext => DataFrame)] = Seq(
       "order_summary" -> { ctx: DerivedTableContext =>
-        ctx.table("orders").groupBy("category").agg(
-          sum("amount").as("total"),
-          count("*").as("cnt")
-        )
+        ctx
+          .table("orders")
+          .groupBy("category")
+          .agg(
+            sum("amount").as("total"),
+            count("*").as("cnt")
+          )
       }
     )
     val results = executor.execute(v2, "batch_v2")
@@ -264,7 +274,8 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
 
   "IngestionPipelineBuilder" should "reject duplicate derived table names" in {
     val fn: DerivedTableContext => DataFrame = _ => spark.emptyDataFrame
-    val builder = IngestionPipeline.builder()
+    val builder = IngestionPipeline
+      .builder()
       .withDerivedTable("my_table", fn)
 
     val ex = intercept[IllegalArgumentException] {

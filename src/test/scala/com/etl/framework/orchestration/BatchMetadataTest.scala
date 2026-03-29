@@ -52,7 +52,7 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
         `type` = SourceType.File,
         path = inputPath,
         format = FileFormat.CSV,
-        options = Map("header" -> "true"),
+        options = Map("header" -> "true")
       ),
       schema = SchemaConfig(
         enforceSchema = true,

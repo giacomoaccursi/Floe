@@ -9,8 +9,8 @@ import org.slf4j.LoggerFactory
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-/** Executes derived table functions and writes results to Iceberg as full-load tables.
-  * Each derived table gets snapshot tagging and post-write maintenance.
+/** Executes derived table functions and writes results to Iceberg as full-load tables. Each derived table gets snapshot
+  * tagging and post-write maintenance.
   */
 class DerivedTableExecutor(
     icebergConfig: IcebergConfig
@@ -81,7 +81,8 @@ class DerivedTableExecutor(
     try {
       val snapshotId = spark
         .sql(s"SELECT snapshot_id FROM $fullTableName.snapshots ORDER BY committed_at DESC LIMIT 1")
-        .first().getLong(0)
+        .first()
+        .getLong(0)
 
       val tagName = s"batch_$batchId"
       spark.sql(s"ALTER TABLE $fullTableName CREATE TAG `$tagName` AS OF VERSION $snapshotId")
@@ -133,12 +134,13 @@ class DerivedTableExecutor(
   }
 
   private def createOrUpdateTable(fullTableName: String, schema: StructType): Unit = {
-    val exists = try {
-      spark.sql(s"DESCRIBE TABLE $fullTableName")
-      true
-    } catch {
-      case _: org.apache.spark.sql.AnalysisException => false
-    }
+    val exists =
+      try {
+        spark.sql(s"DESCRIBE TABLE $fullTableName")
+        true
+      } catch {
+        case _: org.apache.spark.sql.AnalysisException => false
+      }
 
     if (!exists) {
       val columns = schema.fields.map(f => s"${f.name} ${f.dataType.sql}").mkString(", ")

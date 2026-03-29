@@ -4,6 +4,7 @@ import com.etl.framework.config._
 import com.etl.framework.orchestration.ExecutionPlan
 import com.etl.framework.orchestration.flow.FlowResult
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions.col
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
@@ -18,10 +19,6 @@ case class OrphanReport(
     deletedChildKeyCount: Long = 0
 )
 
-/** Detects and resolves orphaned records after batch execution. Uses Iceberg time travel to find PKs removed by parent
-  * flows, then checks child flows for orphaned FK references. Processes flows in topological order to support cascade
-  * propagation.
-  */
 class OrphanDetector(
     spark: SparkSession,
     icebergConfig: IcebergConfig,
@@ -34,27 +31,17 @@ class OrphanDetector(
   private val flowConfigMap = flowConfigs.map(fc => fc.name -> fc).toMap
   private val flowResultMap = flowResults.map(fr => fr.flowName -> fr).toMap
 
-  /** Detects and resolves orphans for all flows in topological order. Cascade: when onOrphan=Delete, deleted child PKs
-    * propagate to next level.
-    */
-  def detectAndResolveOrphans(
-      plan: ExecutionPlan
-  ): Seq[OrphanReport] = {
+  def detectAndResolveOrphans(plan: ExecutionPlan): Seq[OrphanReport] = {
     val removedKeysByFlow = mutable.Map[String, DataFrame]()
     val reports = mutable.ArrayBuffer[OrphanReport]()
 
-    // Process flows in topological order (groups are already ordered)
     plan.groups.flatMap(_.flows).foreach { flowConfig =>
       flowConfig.validation.foreignKeys.foreach { fk =>
         if (fk.onOrphan != OrphanAction.Ignore) {
-          processFK(flowConfig, fk, removedKeysByFlow) match {
-            case Some(report) => reports += report
-            case None         =>
-          }
+          processFK(flowConfig, fk, removedKeysByFlow).foreach(reports += _)
         }
       }
     }
-
     reports.toSeq
   }
 
@@ -68,18 +55,16 @@ class OrphanDetector(
 
     (parentFlowConfig, parentResult) match {
       case (Some(parentCfg), Some(parentRes)) =>
-        findRemovedParentKeys(parentCfg, parentRes, fk, removedKeysByFlow)
-          .flatMap { removed =>
-            val cached = removed.cache()
-            try {
-              val removedCount = cached.count()
-              if (removedCount == 0) None
-              else resolveOrphans(childFlow, fk, cached, removedCount, removedKeysByFlow)
-            } finally {
-              cached.unpersist()
-            }
+        findRemovedParentKeys(parentCfg, parentRes, fk, removedKeysByFlow).flatMap { removed =>
+          val cached = removed.cache()
+          try {
+            val removedCount = cached.count()
+            if (removedCount == 0) None
+            else resolveOrphans(childFlow, fk, cached, removedCount, removedKeysByFlow)
+          } finally {
+            cached.unpersist()
           }
-
+        }
       case _ =>
         logger.debug(
           s"Skipping orphan check for ${childFlow.name}.${fk.displayName}: " +
@@ -89,106 +74,68 @@ class OrphanDetector(
     }
   }
 
-  /** Finds PKs removed from the parent flow using Iceberg time travel or cascade propagation from a previously
-    * processed flow.
-    */
   private def findRemovedParentKeys(
       parentCfg: FlowConfig,
       parentResult: FlowResult,
       fk: ForeignKeyConfig,
       removedKeysByFlow: mutable.Map[String, DataFrame]
   ): Option[DataFrame] = {
-    // Check cascade first: if parent had deletes propagated from an earlier level
     removedKeysByFlow.get(parentCfg.name) match {
       case Some(cascadedKeys) =>
-        // Map cascaded PKs to the FK reference column
-        val parentPkCol = fk.references.columns.head
-        if (cascadedKeys.columns.contains(parentPkCol)) {
-          Some(cascadedKeys.select(parentPkCol))
-        } else {
-          None
-        }
-
+        val refCols = fk.references.columns
+        if (refCols.forall(cascadedKeys.columns.contains)) {
+          Some(cascadedKeys.select(refCols.map(col): _*))
+        } else None
       case None =>
-        // Use time travel to find removed PKs
         findRemovedKeysViaTimeTravel(parentCfg, parentResult, fk)
     }
   }
 
-  /** Uses Iceberg time travel to compare previous and current snapshot and find PKs that were removed.
-    */
   private def findRemovedKeysViaTimeTravel(
       parentCfg: FlowConfig,
       parentResult: FlowResult,
       fk: ForeignKeyConfig
   ): Option[DataFrame] = {
-    // Only check parents that can remove records:
-    // - Full load (replaces all data)
-    // - SCD2 with detectDeletes (soft-deletes missing records)
     val canRemoveRecords = parentCfg.loadMode.`type` match {
       case LoadMode.Full  => true
       case LoadMode.SCD2  => parentCfg.loadMode.detectDeletes
       case LoadMode.Delta => false
     }
-
     if (!canRemoveRecords) return None
 
-    // Need previous snapshot for time travel comparison
     val parentSnapshotId = parentResult.icebergMetadata.flatMap(_.parentSnapshotId)
     parentSnapshotId match {
       case None =>
-        // First execution, no previous snapshot to compare
-        logger.debug(
-          s"No previous snapshot for ${parentCfg.name}, skipping orphan check"
-        )
+        logger.debug(s"No previous snapshot for ${parentCfg.name}, skipping orphan check")
         None
-
       case Some(prevSnapshotId) =>
         val tableName = tableManager.resolveTableName(parentCfg)
-        val refCol = fk.references.columns.head
+        val refCols = fk.references.columns
+        val selectExpr = refCols.mkString(", ")
 
         try {
-          // Previous snapshot: all PKs that existed before this batch
           val previousPKs = spark
-            .sql(
-              s"SELECT $refCol FROM $tableName VERSION AS OF $prevSnapshotId"
-            )
-            .select(refCol)
+            .sql(s"SELECT $selectExpr FROM $tableName VERSION AS OF $prevSnapshotId")
             .distinct()
 
-          // Current state: active PKs
           val currentPKs = parentCfg.loadMode.`type` match {
             case LoadMode.SCD2 =>
-              val isCurrentCol =
-                parentCfg.loadMode.isCurrentColumn.getOrElse("is_current")
-              spark
-                .sql(
-                  s"SELECT $refCol FROM $tableName WHERE $isCurrentCol = true"
-                )
-                .select(refCol)
-                .distinct()
+              val isCurrentCol = parentCfg.loadMode.isCurrentColumn.getOrElse("is_current")
+              spark.sql(s"SELECT $selectExpr FROM $tableName WHERE $isCurrentCol = true").distinct()
             case _ =>
-              spark
-                .sql(s"SELECT $refCol FROM $tableName")
-                .select(refCol)
-                .distinct()
+              spark.sql(s"SELECT $selectExpr FROM $tableName").distinct()
           }
 
-          // PKs that were removed = in previous but not in current
-          val removed = previousPKs.join(currentPKs, Seq(refCol), "left_anti")
+          val removed = previousPKs.join(currentPKs, refCols, "left_anti")
           Some(removed)
         } catch {
           case e: Exception =>
-            logger.warn(
-              s"Failed to perform time travel on ${parentCfg.name}: ${e.getMessage}"
-            )
+            logger.warn(s"Failed to perform time travel on ${parentCfg.name}: ${e.getMessage}")
             None
         }
     }
   }
 
-  /** Resolves orphans based on the FK's onOrphan action.
-    */
   private def resolveOrphans(
       childFlow: FlowConfig,
       fk: ForeignKeyConfig,
@@ -197,16 +144,18 @@ class OrphanDetector(
       removedKeysByFlow: mutable.Map[String, DataFrame]
   ): Option[OrphanReport] = {
     val childTableName = tableManager.resolveTableName(childFlow)
-    val fkCol = fk.columns.head
-    val refCol = fk.references.columns.head
+    val fkCols = fk.columns
+    val refCols = fk.references.columns
+    val colPairs = fkCols.zip(refCols)
 
-    // Find orphaned child records
+    // Rename ref columns to match child FK columns for join
+    var renamedKeys = removedParentKeys
+    colPairs.foreach { case (fkCol, refCol) =>
+      if (fkCol != refCol) renamedKeys = renamedKeys.withColumnRenamed(refCol, fkCol)
+    }
+
     val childTable = spark.sql(s"SELECT * FROM $childTableName")
-    val orphans = childTable.join(
-      removedParentKeys.withColumnRenamed(refCol, fkCol),
-      Seq(fkCol),
-      "inner"
-    )
+    val orphans = childTable.join(renamedKeys, fkCols, "inner")
     val orphanCount = orphans.count()
 
     if (orphanCount == 0) return None
@@ -215,19 +164,10 @@ class OrphanDetector(
       case OrphanAction.Warn =>
         logger.warn(
           s"Orphan detection: ${childFlow.name}.${fk.displayName} has $orphanCount " +
-            s"orphaned records (${removedCount} parent keys removed from ${fk.references.flow})"
+            s"orphaned records ($removedCount parent keys removed from ${fk.references.flow})"
         )
-        // Warn does NOT propagate cascade
-        Some(
-          OrphanReport(
-            flowName = childFlow.name,
-            fkName = fk.displayName,
-            parentFlowName = fk.references.flow,
-            orphanCount = orphanCount,
-            removedParentKeyCount = removedCount,
-            actionTaken = "warn"
-          )
-        )
+        Some(OrphanReport(childFlow.name, fk.displayName, fk.references.flow,
+          orphanCount, removedCount, "warn"))
 
       case OrphanAction.Delete =>
         logger.info(
@@ -235,47 +175,32 @@ class OrphanDetector(
             s"from ${childFlow.name} (FK: ${fk.displayName})"
         )
 
-        // Collect orphaned child PKs for cascade before deleting
         val childPkCols = childFlow.validation.primaryKey
         val deletedChildKeys =
-          if (childPkCols.nonEmpty) {
-            Some(orphans.select(childPkCols.map(orphans(_)): _*).distinct())
-          } else None
+          if (childPkCols.nonEmpty) Some(orphans.select(childPkCols.map(col): _*).distinct())
+          else None
 
-        // Delete orphaned records from child table
-        val removedPksView = s"_orphan_removed_pks_${childFlow.name}_${fk.columns.head}"
-        removedParentKeys
-          .withColumnRenamed(refCol, fkCol)
-          .createOrReplaceTempView(removedPksView)
+        // Build multi-column DELETE condition
+        val viewName = s"_orphan_removed_pks_${childFlow.name}_${fkCols.mkString("_")}"
+        renamedKeys.createOrReplaceTempView(viewName)
 
         try {
+          val deleteCondition = fkCols
+            .map(c => s"$childTableName.$c = $viewName.$c")
+            .mkString(" AND ")
           spark.sql(
-            s"DELETE FROM $childTableName WHERE $fkCol IN (SELECT $fkCol FROM $removedPksView)"
+            s"DELETE FROM $childTableName WHERE EXISTS (SELECT 1 FROM $viewName WHERE $deleteCondition)"
           )
         } finally {
-          spark.catalog.dropTempView(removedPksView)
+          spark.catalog.dropTempView(viewName)
         }
 
-        // Propagate cascade: save deleted child PKs for next level
-        deletedChildKeys.foreach { dck =>
-          removedKeysByFlow(childFlow.name) = dck
-        }
+        deletedChildKeys.foreach(dck => removedKeysByFlow(childFlow.name) = dck)
 
-        Some(
-          OrphanReport(
-            flowName = childFlow.name,
-            fkName = fk.displayName,
-            parentFlowName = fk.references.flow,
-            orphanCount = orphanCount,
-            removedParentKeyCount = removedCount,
-            actionTaken = "delete",
-            deletedChildKeyCount = orphanCount
-          )
-        )
+        Some(OrphanReport(childFlow.name, fk.displayName, fk.references.flow,
+          orphanCount, removedCount, "delete", orphanCount))
 
-      case OrphanAction.Ignore =>
-        // Should not reach here (filtered earlier), but handle gracefully
-        None
+      case OrphanAction.Ignore => None
     }
   }
 }

@@ -86,7 +86,7 @@ Controls parallel execution of flows and DAG nodes.
 | `parallelFlows` | `false` | Execute independent flows (no FK dependency) in parallel |
 | `parallelNodes` | `false` | Execute independent DAG nodes in parallel |
 
-When `parallelFlows` is `true`, flows with no FK relationship between them are grouped and executed concurrently using a bounded thread pool. Flows connected by FK dependencies always execute in topological order regardless of this setting.
+When `parallelFlows` is `true`, flows with no dependency relationship (neither FK nor `dependsOn`) are grouped and executed concurrently using a bounded thread pool. Flows connected by FK dependencies or `dependsOn` always execute in topological order regardless of this setting.
 
 When `parallelNodes` is `true`, DAG nodes within the same execution group run in parallel. See [DAG Aggregation](../guides/dag-aggregation.md) for details.
 

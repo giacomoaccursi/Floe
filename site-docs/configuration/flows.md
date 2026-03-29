@@ -96,7 +96,16 @@ Defines where data is read from.
 | `format` | yes | — | File format: `csv`, `parquet`, `json` |
 | `options` | no | `{}` | Format-specific options passed to the Spark reader |
 
-Common CSV options: `header: "true"`, `delimiter: ";"`, `quote: "\""`, `escape: "\\"`, `nullValue: ""`.
+Common CSV options:
+
+```yaml
+options:
+  header: "true"       # first row is column names
+  delimiter: ";"       # field separator (default: comma)
+  nullValue: ""        # treat empty strings as NULL
+```
+
+These are standard [Spark CSV reader options](https://spark.apache.org/docs/latest/sql-data-sources-csv.html). For Parquet and JSON, options are rarely needed.
 
 For details on each file format and their options, see [Data Sources](../guides/data-sources.md).
 

@@ -22,6 +22,113 @@ Variables are resolved in YAML files via `${VAR_NAME}` or `$VAR_NAME` syntax. Ex
 
 For details on variable substitution, see [Configuration Overview](../configuration/overview.md#variable-substitution).
 
+## Multi-environment configuration
+
+The framework doesn't manage environments directly — it reads config from a local directory. You control which config is loaded by passing the right path. Two patterns work well:
+
+### Separate directories per environment
+
+Keep a full config set for each environment. One JAR, one parameter to select the environment:
+
+```
+config/
+├── dev/
+│   ├── global.yaml
+│   └── flows/
+│       ├── customers.yaml
+│       └── orders.yaml
+├── staging/
+│   ├── global.yaml
+│   └── flows/
+│       ├── customers.yaml
+│       └── orders.yaml
+└── prod/
+    ├── global.yaml
+    └── flows/
+        ├── customers.yaml
+        └── orders.yaml
+```
+
+```scala
+val env = args("--env")  // "dev", "staging", "prod"
+
+IngestionPipeline.builder()
+  .withConfigDirectory(s"config/$env")
+  .build()
+  .execute()
+```
+
+Each environment can have different paths, rejection thresholds, validation rules, or even different flows. The downside is duplication — if a flow YAML is identical across environments, you maintain three copies.
+
+### Shared config with variables
+
+Keep one set of YAML files and use variables for the parts that change between environments:
+
+```yaml
+# global.yaml
+paths:
+  outputPath: "${OUTPUT_PATH}/data"
+  rejectedPath: "${OUTPUT_PATH}/rejected"
+  metadataPath: "${OUTPUT_PATH}/metadata"
+
+processing:
+  maxRejectionRate: ${MAX_REJECTION_RATE}
+
+iceberg:
+  catalogType: "${CATALOG_TYPE}"
+  warehouse: "${WAREHOUSE_PATH}"
+```
+
+```yaml
+# flows/customers.yaml
+name: customers
+source:
+  type: file
+  path: "${DATA_PATH}/customers/"
+  format: parquet
+```
+
+Pass the variables at runtime:
+
+```scala
+val env = args("--env")
+
+val variables = env match {
+  case "dev" => Map(
+    "OUTPUT_PATH" -> "output",
+    "DATA_PATH" -> "data",
+    "WAREHOUSE_PATH" -> "output/warehouse",
+    "CATALOG_TYPE" -> "hadoop",
+    "MAX_REJECTION_RATE" -> "0.5"
+  )
+  case "prod" => Map(
+    "OUTPUT_PATH" -> "s3://prod-bucket/output",
+    "DATA_PATH" -> "s3://prod-bucket/raw",
+    "WAREHOUSE_PATH" -> "s3://prod-bucket/warehouse",
+    "CATALOG_TYPE" -> "glue",
+    "MAX_REJECTION_RATE" -> "0.01"
+  )
+}
+
+IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .withVariables(variables)
+  .build()
+  .execute()
+```
+
+This avoids duplication — one set of YAML files, different values per environment. Variables set via `withVariables` take priority over environment variables with the same name.
+
+### On managed platforms
+
+On AWS Glue, EMR, or Databricks, the config files must be accessible from the worker's local filesystem. Common approaches:
+
+- Package the config directory inside the JAR (as resources)
+- Copy config files from S3/DBFS to a local temp directory at job startup
+- Use the fully programmatic API (`withGlobalConfig` + `withFlowConfigs`) and load configs from any source
+
+The framework is agnostic about where configs come from — `withConfigDirectory` reads from local filesystem, but `withGlobalConfig`/`withFlowConfigs` accept objects from any source.
+
 ## AWS Glue
 
 ### SparkSession setup

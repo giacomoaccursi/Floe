@@ -129,7 +129,7 @@ Duplicate detection uses `groupBy` + `count > 1`. All rows sharing a duplicated 
 
 ## Foreign key integrity
 
-Foreign keys validate that values in a child flow's column exist in a parent flow's column. The parent flow must have been processed earlier in the same batch.
+Foreign keys validate that values in a child flow's columns exist in a parent flow's columns. The framework automatically executes parent flows before children based on FK dependencies, so the parent data is always available when the child is validated.
 
 ```yaml
 foreignKeys:

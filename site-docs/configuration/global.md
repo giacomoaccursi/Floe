@@ -101,7 +101,7 @@ For the complete Iceberg integration guide, see [Iceberg Integration](../guides/
 | `catalogType` | `hadoop` | Catalog implementation: `hadoop`, `glue` |
 | `catalogName` | `spark_catalog` | Catalog name used in SQL queries |
 | `warehouse` | — (required) | Path to the Iceberg warehouse directory |
-| `fileFormat` | `parquet` | Iceberg data file format: `parquet`, `orc`, `avro` |
+| `fileFormat` | `parquet` | Default data file format for Iceberg tables: `parquet`, `orc`, `avro`. Sets the `write.format.default` table property. If a flow specifies `write.format.default` in its `tableProperties`, that takes priority. |
 | `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel |
 | `catalogProperties` | `{}` | Additional key-value properties passed to the catalog provider |
 

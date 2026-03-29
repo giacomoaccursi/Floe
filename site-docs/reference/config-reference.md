@@ -79,10 +79,9 @@ Single-page reference with all YAML fields. For detailed explanations, follow th
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `type` | yes | — | Source type: `file` |
-| `path` | yes | — | Path to source data |
+| `path` | yes | — | Path to source data: single file, directory, or glob pattern |
 | `format` | yes | — | File format: `csv`, `parquet`, `json` |
 | `options` | no | `{}` | Format-specific Spark reader options |
-| `filePattern` | no | — | Glob pattern appended to path |
 
 ### schema
 

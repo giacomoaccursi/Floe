@@ -124,7 +124,6 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
         path = tempDir.toString,
         format = FileFormat.CSV,
         options = Map("header" -> "true"),
-        filePattern = Some("data_*.csv")
       )
       val reader = new FileDataReader(sourceConfig)
       val df = reader.read()

@@ -12,11 +12,10 @@ owner: data-team
 
 source:
   type: file
-  path: "data/orders.csv"
+  path: "data/orders_*.csv"
   format: csv
   options:
     header: "true"
-  filePattern: "orders_*.csv"
 
 schema:
   enforceSchema: true
@@ -77,10 +76,9 @@ Defines where data is read from.
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `type` | yes | — | Source type: `file` |
-| `path` | yes | — | Path to source data |
+| `path` | yes | — | Path to source data: a single file (`data/orders.csv`), a directory (`data/orders/`), or a glob pattern (`data/orders_*.csv`) |
 | `format` | yes | — | File format: `csv`, `parquet`, `json` |
 | `options` | no | `{}` | Format-specific options passed to the Spark reader |
-| `filePattern` | no | — | Glob pattern for file matching (appended to `path`) |
 
 Common CSV options: `header: "true"`, `delimiter: ";"`, `quote: "\""`, `escape: "\\"`, `nullValue: ""`.
 

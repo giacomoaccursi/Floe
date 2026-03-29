@@ -31,7 +31,7 @@ class SchemaValidatorTest extends AnyFlatSpec with Matchers {
       description = "desc",
       version = "1.0",
       owner = "me",
-      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
+      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty),
       schema = SchemaConfig(enforceSchema, false, columns),
       loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(Seq("id"), Seq.empty, Seq.empty),

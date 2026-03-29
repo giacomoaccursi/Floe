@@ -16,7 +16,7 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
       description = "Test flow",
       version = "1.0",
       owner = "test",
-      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty, None),
+      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty),
       schema = SchemaConfig(true, true, Seq.empty),
       loadMode = LoadModeConfig(LoadMode.Full),
       validation = ValidationConfig(Seq.empty, foreignKeys, Seq.empty),

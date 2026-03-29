@@ -24,8 +24,7 @@ case class SourceConfig(
     `type`: SourceType, // "file"
     path: String,
     format: FileFormat, // "csv" | "parquet" | "json"
-    options: Map[String, String],
-    filePattern: Option[String] = None
+    options: Map[String, String]
 )
 
 /** Schema configuration

@@ -60,7 +60,7 @@ class CustomValidatorSkipNullTest extends AnyFlatSpec with Matchers {
   "CustomRulesValidator" should "pass NULL rows through when skipNull is true for custom validators" in {
     val df = Seq(
       ("1", Some("a")),
-      ("2", None),
+      ("2", Option.empty[String]),
       ("3", Some("b"))
     ).toDF("id", "value")
       
@@ -77,7 +77,7 @@ class CustomValidatorSkipNullTest extends AnyFlatSpec with Matchers {
   it should "reject NULL rows when skipNull is false for custom validators" in {
     val df = Seq(
       ("1", Some("a")),
-      ("2", None),
+      ("2", Option.empty[String]),
       ("3", Some("b"))
     ).toDF("id", "value")
       

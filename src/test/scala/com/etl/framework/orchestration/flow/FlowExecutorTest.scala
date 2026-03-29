@@ -48,8 +48,7 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
         sourceType,
         "/tmp/test_source",
         FileFormat.CSV,
-        Map.empty,
-        None
+        Map.empty
       ),
       schema = SchemaConfig(
         enforceSchema = false,
@@ -110,7 +109,7 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
     val flowConfig = createFlowConfig("test_flow")
     val globalConfig = createGlobalConfig()
     val executor =
-      new TestableFlowExecutor(flowConfig, globalConfig, Map.empty, None)
+      new TestableFlowExecutor(flowConfig, globalConfig, Map.empty)
 
     executor should not be null
   }
@@ -124,7 +123,7 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
     )
 
     val executor =
-      new TestableFlowExecutor(flowConfig, globalConfig, validatedFlows, None)
+      new TestableFlowExecutor(flowConfig, globalConfig, validatedFlows)
 
     executor should not be null
   }

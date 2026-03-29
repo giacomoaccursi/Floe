@@ -40,8 +40,7 @@ class DependencyGraphTest extends AnyFlatSpec with Matchers {
       SourceType.File,
       s"/data/input/$name",
       FileFormat.CSV,
-      Map.empty,
-      None
+      Map.empty
     ),
     schema = SchemaConfig(
       true,

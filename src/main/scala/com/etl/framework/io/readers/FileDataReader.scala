@@ -38,14 +38,8 @@ class FileDataReader(
     // Apply options
     reader = reader.options(sourceConfig.options)
 
-    // Determine path with optional file pattern
-    val fullPath = sourceConfig.filePattern match {
-      case Some(pattern) => s"${sourceConfig.path}/$pattern"
-      case None          => sourceConfig.path
-    }
-
     // Load data
-    reader.load(fullPath)
+    reader.load(sourceConfig.path)
   }
 
   /** Converts SchemaConfig to Spark StructType

@@ -92,23 +92,24 @@ source:
 | `dateFormat` | `yyyy-MM-dd` | Date parsing format |
 | `timestampFormat` | `yyyy-MM-dd'T'HH:mm:ss` | Timestamp parsing format |
 
-## File patterns
+## Glob patterns
 
-Use `filePattern` to read multiple files matching a glob pattern:
+The `path` field accepts glob patterns to read multiple files in a single DataFrame:
 
 ```yaml
 source:
   type: file
-  path: "data/orders"
+  path: "data/orders/orders_*.csv"
   format: csv
   options:
     header: "true"
-  filePattern: "orders_*.csv"
 ```
 
-The pattern is appended to `path`, so the effective path becomes `data/orders/orders_*.csv`. This reads all files matching the glob in a single DataFrame.
+Spark handles glob expansion natively. The `path` can be:
 
-If `filePattern` is not set, the `path` is used directly — it can point to a single file or a directory (Spark reads all files in a directory by default).
+- A single file: `data/orders.csv`
+- A directory (reads all files): `data/orders/`
+- A glob pattern: `data/orders/orders_*.csv`
 
 ## Schema enforcement
 

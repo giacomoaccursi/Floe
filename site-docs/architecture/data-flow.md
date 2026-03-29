@@ -31,8 +31,7 @@ The `DataReaderFactory` creates a `FileDataReader` based on the flow's `source` 
 1. Validates the file format (csv, parquet, json)
 2. Optionally applies the schema from `schema.columns` if `enforceSchema: true`
 3. Applies format-specific options (header, delimiter, etc.)
-4. Resolves the file path, appending `filePattern` if configured
-5. Calls `spark.read.format(...).options(...).load(path)`
+4. Calls `spark.read.format(...).options(...).load(path)`
 
 The result is a raw DataFrame with the source data.
 

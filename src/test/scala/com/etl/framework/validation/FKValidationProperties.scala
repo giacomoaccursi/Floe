@@ -108,7 +108,6 @@ object FKValidationProperties extends Properties("FKValidation") {
       path = "/test",
       format = FileFormat.CSV,
       options = Map.empty,
-      filePattern = None
     ),
     schema = SchemaConfig(
       enforceSchema = true,
@@ -315,7 +314,6 @@ object FKValidationProperties extends Properties("FKValidation") {
               path = "/test",
               format = FileFormat.CSV,
               options = Map.empty,
-              filePattern = None
             ),
             schema = SchemaConfig(
               enforceSchema = true,
@@ -664,7 +662,6 @@ object FKValidationProperties extends Properties("FKValidation") {
           path = "/test",
           format = FileFormat.CSV,
           options = Map.empty,
-          filePattern = None
         ),
         schema = SchemaConfig(
           enforceSchema = true,

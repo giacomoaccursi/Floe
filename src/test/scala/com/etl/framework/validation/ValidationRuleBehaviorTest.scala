@@ -41,7 +41,7 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
       description = "Test flow",
       version = "1.0",
       owner = "test",
-      source = SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty, None),
+      source = SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty),
       schema = SchemaConfig(
         enforceSchema = true,
         allowExtraColumns = false,
@@ -225,7 +225,7 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
       description = "",
       version = "1.0",
       owner = "test",
-      source = SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty, None),
+      source = SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty),
       schema = SchemaConfig(
         enforceSchema = true,
         allowExtraColumns = false,
@@ -281,7 +281,7 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
       description = "Test flow",
       version = "1.0",
       owner = "test",
-      source = SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty, None),
+      source = SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty),
       schema = SchemaConfig(
         enforceSchema = true,
         allowExtraColumns = false,

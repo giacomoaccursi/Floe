@@ -52,7 +52,6 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
         path = "/tmp/test",
         format = FileFormat.CSV,
         options = Map.empty,
-        filePattern = None
       ),
       schema = SchemaConfig(
         enforceSchema = true,

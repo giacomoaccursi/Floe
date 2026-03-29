@@ -88,7 +88,6 @@ object PKValidationProperties extends Properties("PKValidation") {
       path = "/test",
       format = FileFormat.CSV,
       options = Map.empty,
-      filePattern = None
     ),
     schema = SchemaConfig(
       enforceSchema = true,
@@ -213,7 +212,6 @@ object PKValidationProperties extends Properties("PKValidation") {
           path = "/test",
           format = FileFormat.CSV,
           options = Map.empty,
-          filePattern = None
         ),
         schema = SchemaConfig(
           enforceSchema = true,
@@ -378,7 +376,6 @@ object PKValidationProperties extends Properties("PKValidation") {
           path = "/test",
           format = FileFormat.CSV,
           options = Map.empty,
-          filePattern = None
         ),
         schema = SchemaConfig(
           enforceSchema = true,

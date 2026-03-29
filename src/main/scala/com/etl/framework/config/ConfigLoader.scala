@@ -189,7 +189,7 @@ private[config] case class FlowConfigYaml(
     schema: SchemaConfig,
     loadMode: LoadModeConfig,
     validation: ValidationConfig,
-    output: OutputConfig,
+    output: OutputConfig = OutputConfig(),
     dependsOn: Seq[String] = Seq.empty,
     maxRejectionRate: Option[Double] = None
 ) {

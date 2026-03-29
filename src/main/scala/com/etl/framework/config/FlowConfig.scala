@@ -13,7 +13,7 @@ case class FlowConfig(
     schema: SchemaConfig,
     loadMode: LoadModeConfig,
     validation: ValidationConfig,
-    output: OutputConfig,
+    output: OutputConfig = OutputConfig(),
     dependsOn: Seq[String] = Seq.empty,
     maxRejectionRate: Option[Double] = None,
     preValidationTransformation: Option[FlowTransformation] = None,
@@ -62,8 +62,8 @@ case class LoadModeConfig(
   */
 case class ValidationConfig(
     primaryKey: Seq[String],
-    foreignKeys: Seq[ForeignKeyConfig],
-    rules: Seq[ValidationRule]
+    foreignKeys: Seq[ForeignKeyConfig] = Seq.empty,
+    rules: Seq[ValidationRule] = Seq.empty
 )
 
 /** Foreign key configuration

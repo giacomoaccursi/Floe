@@ -34,8 +34,6 @@ iceberg:
 ```yaml
 name: customers
 description: "Customer master data"
-version: "1.0"
-owner: data-team
 
 source:
   type: file
@@ -51,30 +49,23 @@ schema:
     - name: customer_id
       type: integer
       nullable: false
-      description: "Unique customer ID"
     - name: name
       type: string
       nullable: false
-      description: "Customer name"
     - name: email
       type: string
       nullable: true
-      description: "Email address"
 
 loadMode:
   type: full
 
 validation:
   primaryKey: [customer_id]
-  foreignKeys: []
   rules:
     - type: regex
       column: email
       pattern: "^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$"
-      skipNull: true
       onFailure: reject
-
-output: {}
 ```
 
 ## 4. Create sample data

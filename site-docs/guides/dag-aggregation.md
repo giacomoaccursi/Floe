@@ -257,7 +257,6 @@ Nodes within the same execution group can run in parallel if `performance.parall
 
 ```yaml
 performance:
-  parallelFlows: true
   parallelNodes: true
 ```
 

@@ -217,7 +217,7 @@ output:
 
 ## Write operations
 
-All writes select the appropriate strategy based on the flow's load mode.
+All writes select the appropriate strategy based on the flow's `loadMode.type`. For YAML configuration of load modes, see [Flow Configuration](../configuration/flows.md). This section covers the Iceberg-level behavior of each mode.
 
 ### Full load
 

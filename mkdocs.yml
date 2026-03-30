@@ -70,7 +70,6 @@ nav:
     - Execution Model: architecture/execution-model.md
     - Design Decisions: architecture/design-decisions.md
   - Reference:
-    - Config Reference: reference/config-reference.md
     - Exceptions: reference/exceptions.md
     - Changelog: reference/changelog.md
   - Contributing:

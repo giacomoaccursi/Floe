@@ -65,24 +65,7 @@ Every rule in the `rules` list has this structure:
 
 ## Batch-level rejection behavior
 
-One setting in `global.yaml` controls what happens when records are rejected:
-
-```yaml
-processing:
-  maxRejectionRate: 0.05
-```
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `maxRejectionRate` | — (disabled) | Rejection rate threshold (0.05 = 5%). If set, the batch stops when any flow exceeds this rate. If omitted, the batch never stops for rejected records. |
-
-| `maxRejectionRate` | Rejection rate vs threshold | Behavior |
-|-------------------|---------------------------|----------|
-| not set | any | Batch continues. Rejected records are written to `rejectedPath`, valid records proceed to Iceberg. |
-| set | `rate > maxRejectionRate` | Batch stops. Remaining flows in the group are not executed. |
-| set | `rate <= maxRejectionRate` | Batch continues. |
-
-The comparison uses strict `>` (not `>=`): a rejection rate exactly equal to the threshold does not trigger a stop.
+If `maxRejectionRate` is configured in `global.yaml` (or per-flow), the batch stops when any flow's rejection rate exceeds the threshold. See [Global Configuration — processing](../configuration/global.md#processing) for details.
 
 ## Schema validation
 
@@ -140,25 +123,9 @@ foreignKeys:
     onOrphan: warn
 ```
 
-### FK configuration reference
+### FK configuration
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `columns` | list | yes | — | Column(s) in the current flow. Use a list for composite FKs. |
-| `references.flow` | string | yes | — | Name of the parent flow |
-| `references.columns` | list | yes | — | Column(s) in the parent flow (same order as `columns`) |
-| `onOrphan` | string | — | `warn` | Post-batch orphan action: `warn`, `delete`, `ignore` |
-
-Composite FK example:
-
-```yaml
-foreignKeys:
-  - columns: [order_id, line_item_id]
-    references:
-      flow: order_items
-      columns: [order_id, line_item_id]
-    onOrphan: warn
-```
+For the full field reference, see [Flow Configuration — Foreign key fields](../configuration/flows.md#foreign-key-fields).
 
 ### Behavior
 

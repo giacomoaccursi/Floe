@@ -56,5 +56,5 @@ val result = IngestionPipeline.builder()
 
 - [Installation](getting-started/installation.md) — add the dependency
 - [Quickstart](getting-started/quickstart.md) — first pipeline in 5 minutes
-- [Configuration Reference](reference/config-reference.md) — all YAML fields
+- [Configuration](configuration/overview.md) — all YAML settings
 - [Architecture Overview](architecture/overview.md) — how it works

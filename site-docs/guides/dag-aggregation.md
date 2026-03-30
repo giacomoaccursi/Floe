@@ -10,13 +10,7 @@ The DAG is defined in a YAML configuration file. At execution time, the framewor
 
 The module is composed of five components:
 
-| Component | Responsibility |
-|-----------|---------------|
-| `DAGOrchestrator` | Entry point. Loads config, runs discovery, delegates to graph builder and executor. |
-| `DAGGraphBuilder` | Validates nodes, builds dependency graph, topological sort, groups nodes for parallel execution. |
-| `DAGExecutor` | Executes the plan group by group, sequential or parallel. |
-| `DAGNodeProcessor` | Executes a single node: loads source data, applies filters/select, joins with parent. |
-| `JoinStrategyExecutor` | Implements the three join strategies (Nest, Flatten, Aggregate). |
+The module validates the DAG configuration, resolves dependencies from join declarations, detects cycles, groups independent nodes for parallel execution, and produces a single output DataFrame from the root node. Three join strategies are supported: Nest, Flatten, and Aggregate.
 
 DAG nodes can reference any Iceberg table in the catalog, including [derived tables](pipeline-builder.md#derived-tables) produced by the pipeline.
 
@@ -71,7 +65,7 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `id` | string | yes | — | Unique node identifier |
-| `description` | string | yes | — | Human-readable description |
+| `description` | string | no | `""` | Human-readable description |
 | `sourceFlow` | string | — | — | Name of the source flow. Reads from `{catalogName}.default.{sourceFlow}`. Required if `sourceTable` is not set. |
 | `sourceTable` | string | — | — | Full Iceberg table name. Use instead of `sourceFlow` for external tables. |
 | `joins` | list | — | `[]` | List of join configurations. Dependencies are inferred automatically. |
@@ -88,9 +82,6 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 | `strategy` | string | yes | — | Join strategy: `nest`, `flatten`, `aggregate` |
 | `nestAs` | string | — | `nested_records` | Field name for nested array (Nest strategy only) |
 | `aggregations` | list | — | — | Aggregation specs (Aggregate strategy only) |
-
-!!!note "Join condition naming"
-    The naming can be counterintuitive. `left` refers to the parent DataFrame (the node referenced by `parent`), and `right` refers to the current node's source data. This matches the join order: `parent.join(child, parent(left) === child(right))`.
 
 ### Aggregation specification
 

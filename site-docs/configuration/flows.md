@@ -195,9 +195,9 @@ The entire `validation` section is optional. If omitted, no validation is perfor
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `columns` | string | yes | — | Column(s) in the current flow |
+| `columns` | list | yes | — | Column(s) in the current flow |
 | `references.flow` | string | yes | — | Name of the parent flow |
-| `references.columns` | string | yes | — | Column(s) in the parent flow (same order as `columns`) |
+| `references.columns` | list | yes | — | Column(s) in the parent flow (same order as `columns`) |
 | `onOrphan` | string | — | `warn` | Post-batch orphan action: `warn`, `delete`, `ignore`. See [Orphan Detection](../guides/orphan-detection.md). |
 
 The FK is identified by an auto-generated display name (e.g. `(customer_id) -> customers.(customer_id)`).

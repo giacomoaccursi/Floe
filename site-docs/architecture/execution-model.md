@@ -107,7 +107,7 @@ graph TD
         D1["Load DAG config"]
         D3["Build dependency graph<br/>→ topological sort → group nodes"]
         D4["Execute nodes group by group"]
-        D1 --> D2 --> D3 --> D4
+        D1 --> D3 --> D4
     end
 
     Phase1 --> Phase2 --> Phase3 --> Phase4
@@ -130,8 +130,8 @@ Example: `20260328_150000`. The batch ID is used for:
 
 ### Failure handling
 
-- **Flow failure**: if a flow fails, the batch continues with remaining flows (unless `failOnValidationError` stops it). The failed flow is reported in `IngestionResult`.
-- **Rejection threshold**: if `failOnValidationError: true` and any flow has rejected records, the batch stops. Remaining flows in the current group are not executed.
+- **Flow failure**: if a flow fails, the batch stops. The failed flow is reported in `IngestionResult`.
+- **Rejection threshold**: if `maxRejectionRate` is configured (globally or per-flow) and any flow's rejection rate exceeds the threshold, the batch stops. Remaining flows in the current group are not executed.
 - **Post-batch failure**: orphan detection and maintenance failures do not affect the batch result. The batch reports SUCCESS if all flow writes completed.
 - **Iceberg atomicity**: if a write fails mid-way, Iceberg rolls back automatically. The table remains in the previous state.
 

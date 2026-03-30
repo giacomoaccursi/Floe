@@ -51,11 +51,8 @@ iceberg:
   fileFormat: "parquet"
   enableSnapshotTagging: true
   maintenance:
-    enableSnapshotExpiration: true
     snapshotRetentionDays: 7
-    enableCompaction: true
     targetFileSizeMb: 128
-    enableOrphanCleanup: true
     orphanRetentionMinutes: 1440
     enableManifestRewrite: false
 ```
@@ -77,12 +74,9 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `enableSnapshotExpiration` | `true` | Expire snapshots older than the retention period |
-| `snapshotRetentionDays` | `7` | Days to retain snapshots before expiration |
-| `enableCompaction` | `true` | Compact small data files into larger ones |
-| `targetFileSizeMb` | `128` | Target file size after compaction |
-| `enableOrphanCleanup` | `true` | Remove orphaned files left by failed operations |
-| `orphanRetentionMinutes` | `1440` | Grace period before orphan files become eligible for cleanup |
+| `snapshotRetentionDays` | `7` | Days to retain snapshots. Remove to disable expiration. |
+| `targetFileSizeMb` | `128` | Target file size after compaction. Remove to disable. |
+| `orphanRetentionMinutes` | `1440` | Grace period before orphan files are removed (min 1440). Remove to disable. |
 | `enableManifestRewrite` | `false` | Rewrite manifest files for scan optimization |
 
 !!!warning "Orphan cleanup minimum retention"
@@ -92,7 +86,7 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 
 ### Catalog provider
 
-The catalog system is pluggable. `CatalogProvider` is a trait with methods: `catalogType`, `sparkSessionConfig`, `configureCatalog`, and `validateConfig`. The built-in `HadoopCatalogProvider` configures SparkSession with:
+The catalog system is pluggable. The `CatalogProvider` trait defines three methods: `catalogType`, `configureCatalog`, and `validateConfig`. The built-in hadoop provider configures SparkSession with:
 
 ```
 spark.sql.catalog.{name}          = org.apache.iceberg.spark.SparkCatalog
@@ -101,7 +95,7 @@ spark.sql.catalog.{name}.warehouse = {path}
 spark.sql.extensions               = org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
 ```
 
-`CatalogFactory` maps the `catalogType` string to the right provider. Adding a new catalog type (Hive, REST, Nessie, Glue) means implementing the trait and registering it in the factory. See [Pipeline Builder — Custom catalog providers](pipeline-builder.md#custom-catalog-providers) for details.
+The framework maps the `catalogType` string to the right provider. Adding a new catalog type (Hive, REST, Nessie) means implementing the `CatalogProvider` trait and registering it on the builder. See [Pipeline Builder — Custom catalog providers](pipeline-builder.md#custom-catalog-providers) for details.
 
 ### Table naming
 
@@ -223,7 +217,7 @@ output:
 
 ## Write operations
 
-All writes go through `IcebergTableWriter`, which selects the appropriate strategy based on the flow's load mode.
+All writes select the appropriate strategy based on the flow's load mode.
 
 ### Full load
 

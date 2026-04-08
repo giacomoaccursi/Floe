@@ -816,6 +816,72 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     spark.sql("SELECT * FROM orphan_catalog.default.od_nopk_child").count() shouldBe 1
   }
 
+  // ── Edge case: cascade column mismatch ────────────────────────────
+
+  it should "skip cascade when grandchild FK references columns not in cascade map" in {
+    // Parent → child (Delete, PK=id, FK=parent_id) → grandchild (FK references "code" from child)
+    // But child cascade map only has (parent_id, id) — "code" is not there
+    val parentConfig = makeFlowConfig("od_col_mis_parent")
+    val childConfig = makeFlowConfig(
+      "od_col_mis_child",
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("parent_id"),
+          references = ReferenceConfig(flow = "od_col_mis_parent", columns = Seq("id")),
+          onOrphan = OrphanAction.Delete
+        )
+      )
+    )
+    val grandchildConfig = makeFlowConfig(
+      "od_col_mis_gc",
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("child_code"),
+          references = ReferenceConfig(flow = "od_col_mis_child", columns = Seq("code")),
+          onOrphan = OrphanAction.Delete
+        )
+      )
+    )
+
+    val parentData1 = Seq((1, "A"), (2, "B")).toDF("id", "name")
+    val pr1 = writer.writeFullLoad(parentData1, parentConfig)
+
+    // child has "code" column but it's not PK or FK
+    val childData = Seq((10, 1, "X"), (20, 2, "Y")).toDF("id", "parent_id", "code")
+    writer.writeFullLoad(childData, childConfig)
+
+    val gcData = Seq((100, "X"), (200, "Y")).toDF("id", "child_code")
+    writer.writeFullLoad(gcData, grandchildConfig)
+
+    val parentData2 = Seq((1, "A")).toDF("id", "name")
+    val pr2 = writer.writeFullLoad(parentData2, parentConfig)
+
+    val flowConfigs = Seq(parentConfig, childConfig, grandchildConfig)
+    val flowResults = Seq(
+      makeFlowResult("od_col_mis_parent", pr2.snapshotId, pr1.snapshotId,
+        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult("od_col_mis_child", None, None),
+      makeFlowResult("od_col_mis_gc", None, None)
+    )
+    val plan = ExecutionPlan(Seq(
+      ExecutionGroup(Seq(parentConfig), parallel = false),
+      ExecutionGroup(Seq(childConfig), parallel = false),
+      ExecutionGroup(Seq(grandchildConfig), parallel = false)
+    ))
+
+    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
+    val reports = detector.detectAndResolveOrphans(plan)
+
+    // Child delete works, but grandchild cascade is skipped because "code" not in cascade map
+    reports should have size 1
+    reports.head.flowName shouldBe "od_col_mis_child"
+    reports.head.actionTaken shouldBe "delete"
+
+    // Child record 20 deleted, grandchild untouched (cascade column mismatch)
+    spark.sql("SELECT * FROM orphan_catalog.default.od_col_mis_child").count() shouldBe 1
+    spark.sql("SELECT * FROM orphan_catalog.default.od_col_mis_gc").count() shouldBe 2
+  }
+
   // ── SCD2 tests ──────────────────────────────────────────────────────
 
   it should "detect orphans when SCD2 parent with detectDeletes closes records" in {
@@ -921,6 +987,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     "od_multi_rem_cust", "od_multi_rem_orders",
     "od_casc_comp_parent", "od_casc_comp_child", "od_casc_comp_gc",
     "od_nopk_parent", "od_nopk_child",
+    "od_col_mis_parent", "od_col_mis_child", "od_col_mis_gc",
     "od_scd2_parent", "od_scd2_child",
     "od_scd2_nodelete_parent", "od_scd2_nodelete_child"
   )

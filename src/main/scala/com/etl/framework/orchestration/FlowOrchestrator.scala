@@ -154,8 +154,8 @@ class FlowOrchestrator(
     )
 
     // Write quality metrics to Iceberg (if configured)
-    val qualityWriter = new QualityMetricsWriter(globalConfig)
-    qualityWriter.write(batchId, flowResults, orphanResult.reports, executionTimeMs)
+    val qualityWriter = new QualityMetricsWriter(globalConfig, flowConfigs)
+    qualityWriter.write(batchId, flowResults, orphanResult.reports, executionTimeMs, batchSuccess = true)
 
     // Run Iceberg table maintenance post-batch
     runPostBatchMaintenance()

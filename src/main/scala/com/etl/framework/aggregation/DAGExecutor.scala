@@ -12,7 +12,6 @@ import scala.concurrent.duration._
 class DAGExecutor(nodeProcessor: DAGNodeProcessor, parallelEc: ExecutionContext) {
 
   private val logger = LoggerFactory.getLogger(getClass)
-  private val MaxParallelTimeout: FiniteDuration = 2.hours
 
   /** Executes DAG nodes according to the execution plan
     */
@@ -74,6 +73,6 @@ class DAGExecutor(nodeProcessor: DAGNodeProcessor, parallelEc: ExecutionContext)
     }
 
     val allResults = Future.sequence(futures)(implicitly, parallelEc)
-    Await.result(allResults, MaxParallelTimeout).toMap
+    Await.result(allResults, Duration.Inf).toMap
   }
 }

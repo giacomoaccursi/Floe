@@ -65,15 +65,16 @@ Each FK relationship in the child declares an `onOrphan` action that determines 
 
 #### 5. Cascade
 
-When a child flow undergoes a `Delete`, the deleted records have their own PKs. If a third flow (grandchild) has a FK towards the child, those records also become orphans.
+When a child flow undergoes a `Delete`, the deleted records have their own PKs and FK values. If a third flow (grandchild) has a FK towards the child, those records also become orphans.
 
 The cascade mechanism works as follows:
 
-1. After deleting orphaned records from the child, the PKs of deleted records are saved in a `removedKeysByFlow` map
-2. When processing the grandchild, before performing time travel, the detector checks if its parent (the child) has entries in the cascade map
-3. If so, those keys are used as "removed keys" instead of time travel
+1. After deleting orphaned records from the child, the PK and FK columns of deleted records are saved in a `removedKeysByFlow` map. Both column sets are preserved so that downstream flows can look up whichever columns they reference.
+2. When processing the grandchild, before performing time travel, the detector checks if its parent (the child) has entries in the cascade map.
+3. If the cascade map contains all the columns referenced by the grandchild's FK, those keys are used as "removed keys" instead of time travel. If the referenced columns are not present in the map (column mismatch), the cascade is skipped for that FK and the grandchild is not affected.
+4. When a child has multiple FKs and more than one triggers a `Delete`, the cascade map accumulates keys from each delete via union, so downstream flows see the combined set of removed keys.
 
-Cascade propagates only with `Delete`. With `Warn` the detector just signals the issue and the chain stops: there's no point propagating an alarm without having actually removed anything.
+Cascade propagates only with `Delete`. With `Warn` the detector signals the issue but does not modify data, so the chain stops: there's no point propagating an alarm without having actually removed anything.
 
 #### 6. Topological order
 
@@ -144,6 +145,7 @@ Each detection produces an `OrphanReport` included in the batch metadata:
 - **removedParentKeyCount**: number of keys removed by the parent
 - **actionTaken**: action taken (`warn` or `delete`)
 - **deletedChildKeyCount**: records actually deleted (only for `delete`)
+- **cascadeSource**: if the orphans were caused by a cascade delete (rather than time travel), this field contains the name of the flow whose delete triggered the cascade. `null` when the orphans were detected via time travel directly.
 
 ## Example
 
@@ -242,7 +244,7 @@ Orphaned data remains in the tables but the team receives notification in the ba
 
 - **First execution**: on the very first batch there is no previous snapshot. The check is skipped because there's no baseline to compare against.
 
-- **Performance**: time travel and left_anti join on PKs are lightweight operations as long as parent tables have a reasonable number of distinct keys. The main cost is in scanning the child table to find orphans.
+- **Performance**: time travel and left_anti join on PKs are lightweight operations as long as parent tables have a reasonable number of distinct keys. The detector projects only FK and PK columns from the child table (not `SELECT *`), keeping the scan narrow even on wide tables.
 
 - **Atomicity**: each DELETE on an Iceberg table is atomic. If the process fails mid-cascade, tables already cleaned stay clean and tables not yet processed remain untouched. On the next batch the detector retries.
 

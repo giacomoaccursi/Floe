@@ -2,7 +2,7 @@ package com.etl.framework.iceberg
 
 import com.etl.framework.config.{FlowConfig, IcebergConfig, MaintenanceConfig}
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types._
 import org.slf4j.LoggerFactory
 
 import java.time.ZoneOffset
@@ -55,6 +55,29 @@ class IcebergTableManager(
       }
     }
 
+    // Apply safe type widening on existing columns
+    val currentSchema = spark.table(tableName).schema
+    schema.fields.foreach { incomingField =>
+      currentSchema.fields.find(_.name == incomingField.name).foreach { existingField =>
+        if (existingField.dataType != incomingField.dataType) {
+          if (isSafeWidening(existingField.dataType, incomingField.dataType)) {
+            spark.sql(
+              s"ALTER TABLE $tableName ALTER COLUMN ${incomingField.name} TYPE ${incomingField.dataType.sql}"
+            )
+            logger.info(
+              s"Widened column ${incomingField.name} from ${existingField.dataType.sql} to ${incomingField.dataType.sql} on $tableName"
+            )
+          } else {
+            logger.warn(
+              s"Column ${incomingField.name} type mismatch on $tableName: " +
+                s"table has ${existingField.dataType.sql}, incoming has ${incomingField.dataType.sql}. " +
+                s"Not a safe widening — skipping. Resolve manually with ALTER TABLE."
+            )
+          }
+        }
+      }
+    }
+
     // Apply new or changed table properties
     if (flowConfig.output.tableProperties.nonEmpty) {
       val currentProps = spark
@@ -90,6 +113,13 @@ class IcebergTableManager(
         }
       }
     }
+  }
+
+  private[iceberg] def isSafeWidening(from: DataType, to: DataType): Boolean = (from, to) match {
+    case (IntegerType, LongType)                                    => true
+    case (FloatType, DoubleType)                                    => true
+    case (d1: DecimalType, d2: DecimalType) if d1.scale == d2.scale => d2.precision > d1.precision
+    case _                                                          => false
   }
 
   private def isPartitionAlreadyExistsError(e: Exception): Boolean = {

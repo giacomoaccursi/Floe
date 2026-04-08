@@ -115,6 +115,17 @@ Tables are created on first write with `CREATE TABLE IF NOT EXISTS`. The schema 
 
 Every run, the framework compares the incoming schema with the existing table schema and adds any new columns via `ALTER TABLE ADD COLUMN`. Columns present in the table but absent from the incoming schema are left untouched — the framework never drops columns.
 
+The framework also applies safe type widening automatically. If an existing column's type can be safely widened to match the incoming schema, the change is applied via `ALTER TABLE ALTER COLUMN TYPE`:
+
+| From | To | Safe? |
+|------|----|-------|
+| `int` | `long` | Yes |
+| `float` | `double` | Yes |
+| `decimal(p1, s)` | `decimal(p2, s)` where `p2 > p1` | Yes (same scale, wider precision) |
+| Any other combination | | No — logged as warning, skipped |
+
+Incompatible type changes (e.g. `string` → `int`, `long` → `int`) are not applied. The framework logs a warning and leaves the column unchanged. Resolve these manually with `ALTER TABLE`.
+
 This means adding a column to a flow's `schema.columns` section takes effect at the next run without manual intervention:
 
 1. The new column is added to the Iceberg table via ALTER TABLE

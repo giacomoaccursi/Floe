@@ -350,6 +350,97 @@ class IcebergTableManagerTest extends AnyFlatSpec with Matchers with BeforeAndAf
     tableManager.parsePartitionTransform("custom(x)") shouldBe "custom(x)"
   }
 
+  "IcebergTableManager type widening" should "widen int to long automatically" in {
+    val fc = testFlowConfig("type_widen_int_long")
+    val initialSchema = new StructType()
+      .add("id", IntegerType)
+      .add("name", StringType)
+    tableManager.createOrUpdateTable(fc, initialSchema)
+
+    // Write initial data
+    val data = spark.createDataFrame(
+      spark.sparkContext.parallelize(Seq(org.apache.spark.sql.Row(1, "Alice"))),
+      initialSchema
+    )
+    data.writeTo("test_catalog.default.type_widen_int_long").append()
+
+    // Update with widened schema
+    val widenedSchema = new StructType()
+      .add("id", LongType)
+      .add("name", StringType)
+    tableManager.createOrUpdateTable(fc, widenedSchema)
+
+    val tableSchema = spark.table("test_catalog.default.type_widen_int_long").schema
+    tableSchema("id").dataType shouldBe LongType
+  }
+
+  it should "widen float to double automatically" in {
+    val fc = testFlowConfig("type_widen_float_double")
+    val initialSchema = new StructType()
+      .add("id", IntegerType)
+      .add("score", FloatType)
+    tableManager.createOrUpdateTable(fc, initialSchema)
+
+    val widenedSchema = new StructType()
+      .add("id", IntegerType)
+      .add("score", DoubleType)
+    tableManager.createOrUpdateTable(fc, widenedSchema)
+
+    val tableSchema = spark.table("test_catalog.default.type_widen_float_double").schema
+    tableSchema("score").dataType shouldBe DoubleType
+  }
+
+  it should "widen decimal precision" in {
+    val fc = testFlowConfig("type_widen_decimal")
+    val initialSchema = new StructType()
+      .add("id", IntegerType)
+      .add("amount", DecimalType(10, 2))
+    tableManager.createOrUpdateTable(fc, initialSchema)
+
+    val widenedSchema = new StructType()
+      .add("id", IntegerType)
+      .add("amount", DecimalType(18, 2))
+    tableManager.createOrUpdateTable(fc, widenedSchema)
+
+    val tableSchema = spark.table("test_catalog.default.type_widen_decimal").schema
+    tableSchema("amount").dataType shouldBe DecimalType(18, 2)
+  }
+
+  it should "not widen incompatible types and log warning" in {
+    val fc = testFlowConfig("type_no_widen")
+    val initialSchema = new StructType()
+      .add("id", IntegerType)
+      .add("name", StringType)
+    tableManager.createOrUpdateTable(fc, initialSchema)
+
+    // Try to change string to int — not a safe widening
+    val incompatibleSchema = new StructType()
+      .add("id", IntegerType)
+      .add("name", IntegerType)
+    tableManager.createOrUpdateTable(fc, incompatibleSchema)
+
+    // Type should remain unchanged
+    val tableSchema = spark.table("test_catalog.default.type_no_widen").schema
+    tableSchema("name").dataType shouldBe StringType
+  }
+
+  "isSafeWidening" should "accept valid widenings" in {
+    import org.apache.spark.sql.types._
+    tableManager.isSafeWidening(IntegerType, LongType) shouldBe true
+    tableManager.isSafeWidening(FloatType, DoubleType) shouldBe true
+    tableManager.isSafeWidening(DecimalType(10, 2), DecimalType(18, 2)) shouldBe true
+  }
+
+  it should "reject invalid widenings" in {
+    import org.apache.spark.sql.types._
+    tableManager.isSafeWidening(LongType, IntegerType) shouldBe false
+    tableManager.isSafeWidening(DoubleType, FloatType) shouldBe false
+    tableManager.isSafeWidening(StringType, IntegerType) shouldBe false
+    tableManager.isSafeWidening(IntegerType, FloatType) shouldBe false
+    tableManager.isSafeWidening(DecimalType(18, 2), DecimalType(10, 2)) shouldBe false
+    tableManager.isSafeWidening(DecimalType(10, 2), DecimalType(10, 4)) shouldBe false
+  }
+
   override def afterAll(): Unit = {
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.create_test")
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.existing_table")
@@ -366,6 +457,10 @@ class IcebergTableManagerTest extends AnyFlatSpec with Matchers with BeforeAndAf
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.schema_evolution_idempotent_test")
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.maintenance_test")
     spark.sql("DROP TABLE IF EXISTS test_catalog.default.orphan_cleanup_test")
+    spark.sql("DROP TABLE IF EXISTS test_catalog.default.type_widen_int_long")
+    spark.sql("DROP TABLE IF EXISTS test_catalog.default.type_widen_float_double")
+    spark.sql("DROP TABLE IF EXISTS test_catalog.default.type_widen_decimal")
+    spark.sql("DROP TABLE IF EXISTS test_catalog.default.type_no_widen")
     super.afterAll()
   }
 }

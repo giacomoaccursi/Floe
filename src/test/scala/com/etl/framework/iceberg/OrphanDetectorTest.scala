@@ -816,6 +816,96 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     spark.sql("SELECT * FROM orphan_catalog.default.od_nopk_child").count() shouldBe 1
   }
 
+  // ── SCD2 tests ──────────────────────────────────────────────────────
+
+  it should "detect orphans when SCD2 parent with detectDeletes closes records" in {
+    val parentConfig = makeFlowConfig("od_scd2_parent", loadMode = LoadMode.SCD2,
+      primaryKey = Seq("id"), detectDeletes = true)
+    val childConfig = makeFlowConfig(
+      "od_scd2_child",
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("parent_id"),
+          references = ReferenceConfig(flow = "od_scd2_parent", columns = Seq("id")),
+          onOrphan = OrphanAction.Warn
+        )
+      )
+    )
+
+    // Batch 1: SCD2 initial load — 3 records, all current
+    val parentData1 = Seq((1, "Alice"), (2, "Bob"), (3, "Charlie")).toDF("id", "name")
+    val pr1 = writer.writeSCD2Load(parentData1, parentConfig)
+
+    val childData = Seq((100, 1), (101, 2), (102, 3)).toDF("id", "parent_id")
+    writer.writeFullLoad(childData, childConfig)
+
+    // Batch 2: SCD2 with detectDeletes — source only has 1,2 → record 3 gets closed
+    val parentData2 = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
+    val pr2 = writer.writeSCD2Load(parentData2, parentConfig)
+
+    val flowConfigs = Seq(parentConfig, childConfig)
+    val flowResults = Seq(
+      makeFlowResult("od_scd2_parent", pr2.snapshotId, pr1.snapshotId,
+        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult("od_scd2_child", None, None)
+    )
+    val plan = ExecutionPlan(Seq(
+      ExecutionGroup(Seq(parentConfig), parallel = false),
+      ExecutionGroup(Seq(childConfig), parallel = false)
+    ))
+
+    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
+    val reports = detector.detectAndResolveOrphans(plan)
+
+    // Record 3 was closed (is_current=false), so child record 102 is orphaned
+    reports should have size 1
+    reports.head.flowName shouldBe "od_scd2_child"
+    reports.head.orphanCount shouldBe 1
+    reports.head.actionTaken shouldBe "warn"
+  }
+
+  it should "skip orphan check for SCD2 parent without detectDeletes" in {
+    val parentConfig = makeFlowConfig("od_scd2_nodelete_parent", loadMode = LoadMode.SCD2,
+      primaryKey = Seq("id"), detectDeletes = false)
+    val childConfig = makeFlowConfig(
+      "od_scd2_nodelete_child",
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("parent_id"),
+          references = ReferenceConfig(flow = "od_scd2_nodelete_parent", columns = Seq("id")),
+          onOrphan = OrphanAction.Warn
+        )
+      )
+    )
+
+    val parentData1 = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
+    val pr1 = writer.writeSCD2Load(parentData1, parentConfig)
+
+    val childData = Seq((100, 1), (101, 2)).toDF("id", "parent_id")
+    writer.writeFullLoad(childData, childConfig)
+
+    // Batch 2: even though source only has 1, without detectDeletes record 2 stays current
+    val parentData2 = Seq((1, "Alice")).toDF("id", "name")
+    val pr2 = writer.writeSCD2Load(parentData2, parentConfig)
+
+    val flowConfigs = Seq(parentConfig, childConfig)
+    val flowResults = Seq(
+      makeFlowResult("od_scd2_nodelete_parent", pr2.snapshotId, pr1.snapshotId,
+        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult("od_scd2_nodelete_child", None, None)
+    )
+    val plan = ExecutionPlan(Seq(
+      ExecutionGroup(Seq(parentConfig), parallel = false),
+      ExecutionGroup(Seq(childConfig), parallel = false)
+    ))
+
+    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
+    val reports = detector.detectAndResolveOrphans(plan)
+
+    // SCD2 without detectDeletes cannot remove records → no orphan check
+    reports shouldBe empty
+  }
+
   private val allTables = Seq(
     "od_customers", "od_orders",
     "od_cust_del", "od_orders_del",
@@ -830,7 +920,9 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     "od_missing_parent_orders",
     "od_multi_rem_cust", "od_multi_rem_orders",
     "od_casc_comp_parent", "od_casc_comp_child", "od_casc_comp_gc",
-    "od_nopk_parent", "od_nopk_child"
+    "od_nopk_parent", "od_nopk_child",
+    "od_scd2_parent", "od_scd2_child",
+    "od_scd2_nodelete_parent", "od_scd2_nodelete_child"
   )
 
   override def afterAll(): Unit = {

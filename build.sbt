@@ -25,6 +25,7 @@ libraryDependencies ++= Seq(
   // Spark dependencies
   "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-avro" % sparkVersion % "provided",
 
   // Iceberg table format
   "org.apache.iceberg" % "iceberg-spark-runtime-3.5_2.12" % icebergVersion,

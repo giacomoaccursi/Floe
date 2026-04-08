@@ -101,7 +101,7 @@ class FileDataReader(
     *   if format is not supported
     */
   private def validateFormat(format: String): Unit = {
-    val supportedFormats = Set("csv", "parquet", "json")
+    val supportedFormats = Set("csv", "parquet", "json", "avro", "orc")
     if (!supportedFormats.contains(format.toLowerCase)) {
       throw UnsupportedOperationException(
         operation = s"file format '$format'",

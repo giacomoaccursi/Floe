@@ -120,7 +120,13 @@ object FileFormat {
   case object JSON extends FileFormat {
     val name = "json"; val sparkFormat = "json"
   }
-  val values: Seq[FileFormat] = Seq(CSV, Parquet, JSON)
+  case object Avro extends FileFormat {
+    val name = "avro"; val sparkFormat = "avro"
+  }
+  case object ORC extends FileFormat {
+    val name = "orc"; val sparkFormat = "orc"
+  }
+  val values: Seq[FileFormat] = Seq(CSV, Parquet, JSON, Avro, ORC)
 
   def fromString(s: String): Either[String, FileFormat] =
     values

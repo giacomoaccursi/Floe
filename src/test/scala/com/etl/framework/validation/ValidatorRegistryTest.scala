@@ -1,5 +1,6 @@
 package com.etl.framework.validation
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.validation.validators.CustomRulesValidator
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -31,24 +32,17 @@ class ValidatorRegistryTest extends AnyFlatSpec with Matchers {
 
   import spark.implicits._
 
-  private def makeFlowConfig(className: String): FlowConfig = FlowConfig(
+  private def makeFlowConfig(className: String): FlowConfig = TestFixtures.flowConfig(
     name = "test",
-    source = SourceConfig(SourceType.File, "data/test.csv", FileFormat.CSV, Map.empty),
-    schema = SchemaConfig(enforceSchema = false, allowExtraColumns = true, Seq.empty),
-    loadMode = LoadModeConfig(LoadMode.Full),
-    validation = ValidationConfig(
-      primaryKey = Seq("id"),
-      foreignKeys = Seq.empty,
-      rules = Seq(
-        ValidationRule(
-          `type` = ValidationRuleType.Custom,
-          column = Some("value"),
-          `class` = Some(className),
-          onFailure = OnFailureAction.Reject
-        )
+    sourcePath = "data/test.csv",
+    rules = Seq(
+      ValidationRule(
+        `type` = ValidationRuleType.Custom,
+        column = Some("value"),
+        `class` = Some(className),
+        onFailure = OnFailureAction.Reject
       )
-    ),
-    output = OutputConfig()
+    )
   )
 
   "ValidatorFactory" should "resolve a validator from the registry by name" in {

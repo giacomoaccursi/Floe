@@ -1,5 +1,6 @@
 package com.etl.framework.validation.validators
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.config.ValidationRuleType
 import com.etl.framework.config.ValidationRuleType.Schema
@@ -24,19 +25,13 @@ class SchemaValidatorTest extends AnyFlatSpec with Matchers {
   def createConfig(
       columns: Seq[ColumnConfig],
       enforceSchema: Boolean = true
-  ): FlowConfig = {
-    FlowConfig(
+  ): FlowConfig =
+    TestFixtures.flowConfig(
       name = "test_flow",
-      description = "desc",
-      version = "1.0",
-      owner = "me",
-      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty),
-      schema = SchemaConfig(enforceSchema, false, columns),
-      loadMode = LoadModeConfig(LoadMode.Full),
-      validation = ValidationConfig(Seq("id"), Seq.empty, Seq.empty),
-      output = OutputConfig()
+      enforceSchema = enforceSchema,
+      allowExtraColumns = false,
+      columns = columns
     )
-  }
 
   "SchemaValidator" should "validate correct schema" in {
     val schema = StructType(

@@ -1,5 +1,6 @@
 package com.etl.framework.validation
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.SparkSession
@@ -36,41 +37,28 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
 
   private val allRecords = validRecords ++ invalidRecords
 
-  def flowConfigWithRegexRule(onFailure: OnFailureAction): FlowConfig = {
-    FlowConfig(
+  def flowConfigWithRegexRule(onFailure: OnFailureAction): FlowConfig =
+    TestFixtures.flowConfig(
       name = "test_flow",
-      description = "Test flow",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty),
-      schema = SchemaConfig(
-        enforceSchema = true,
-        allowExtraColumns = false,
-        columns = Seq(
-          ColumnConfig("id", "int", nullable = false, ""),
-          ColumnConfig("email", "string", nullable = false, ""),
-          ColumnConfig("age", "int", nullable = false, ""),
-          ColumnConfig("status", "string", nullable = false, "")
-        )
+      enforceSchema = true,
+      allowExtraColumns = false,
+      columns = Seq(
+        ColumnConfig("id", "int", nullable = false, ""),
+        ColumnConfig("email", "string", nullable = false, ""),
+        ColumnConfig("age", "int", nullable = false, ""),
+        ColumnConfig("status", "string", nullable = false, "")
       ),
-      loadMode = LoadModeConfig(LoadMode.Full),
-      validation = ValidationConfig(
-        primaryKey = Seq("id"),
-        foreignKeys = Seq.empty,
-        rules = Seq(
-          ValidationRule(
-            `type` = ValidationRuleType.Regex,
-            column = Some("email"),
-            pattern = Some(emailPattern),
-            description = Some("Email must be valid format"),
-            skipNull = Some(false),
-            onFailure = onFailure
-          )
+      rules = Seq(
+        ValidationRule(
+          `type` = ValidationRuleType.Regex,
+          column = Some("email"),
+          pattern = Some(emailPattern),
+          description = Some("Email must be valid format"),
+          skipNull = Some(false),
+          onFailure = onFailure
         )
-      ),
-      output = OutputConfig()
+      )
     )
-  }
 
   "Reject behavior" should "move failed records to rejected" in {
     val df = allRecords.toDF()
@@ -221,37 +209,25 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
     )
     val df = records.toDF("id", "score")
 
-    val flowConfig = FlowConfig(
+    val flowConfig = TestFixtures.flowConfig(
       name = "test_range",
-      description = "",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty),
-      schema = SchemaConfig(
-        enforceSchema = true,
-        allowExtraColumns = false,
-        columns = Seq(
-          ColumnConfig("id", "string", nullable = false, ""),
-          ColumnConfig("score", "string", nullable = false, "")
-        )
+      enforceSchema = true,
+      allowExtraColumns = false,
+      columns = Seq(
+        ColumnConfig("id", "string", nullable = false, ""),
+        ColumnConfig("score", "string", nullable = false, "")
       ),
-      loadMode = LoadModeConfig(LoadMode.Full),
-      validation = ValidationConfig(
-        primaryKey = Seq("id"),
-        foreignKeys = Seq.empty,
-        rules = Seq(
-          ValidationRule(
-            `type` = ValidationRuleType.Range,
-            column = Some("score"),
-            min = Some("10"),
-            max = Some("100"),
-            description = Some("Score must be between 10 and 100"),
-            skipNull = Some(false),
-            onFailure = OnFailureAction.Reject
-          )
+      rules = Seq(
+        ValidationRule(
+          `type` = ValidationRuleType.Range,
+          column = Some("score"),
+          min = Some("10"),
+          max = Some("100"),
+          description = Some("Score must be between 10 and 100"),
+          skipNull = Some(false),
+          onFailure = OnFailureAction.Reject
         )
-      ),
-      output = OutputConfig()
+      )
     )
 
     val engine = new ValidationEngine()
@@ -277,47 +253,35 @@ class ValidationRuleBehaviorTest extends AnyFlatSpec with Matchers {
     )
     val df = records.toDF()
 
-    val flowConfig = FlowConfig(
+    val flowConfig = TestFixtures.flowConfig(
       name = "test_flow",
-      description = "Test flow",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(SourceType.File, "/test", FileFormat.CSV, Map.empty),
-      schema = SchemaConfig(
-        enforceSchema = true,
-        allowExtraColumns = false,
-        columns = Seq(
-          ColumnConfig("id", "int", nullable = false, ""),
-          ColumnConfig("email", "string", nullable = false, ""),
-          ColumnConfig("age", "int", nullable = false, ""),
-          ColumnConfig("status", "string", nullable = false, "")
-        )
+      enforceSchema = true,
+      allowExtraColumns = false,
+      columns = Seq(
+        ColumnConfig("id", "int", nullable = false, ""),
+        ColumnConfig("email", "string", nullable = false, ""),
+        ColumnConfig("age", "int", nullable = false, ""),
+        ColumnConfig("status", "string", nullable = false, "")
       ),
-      loadMode = LoadModeConfig(LoadMode.Full),
-      validation = ValidationConfig(
-        primaryKey = Seq("id"),
-        foreignKeys = Seq.empty,
-        rules = Seq(
-          ValidationRule(
-            `type` = ValidationRuleType.Regex,
-            column = Some("email"),
-            pattern = Some(emailPattern),
-            description = Some("Email must be valid format"),
-            skipNull = Some(false),
-            onFailure = OnFailureAction.Warn
-          ),
-          ValidationRule(
-            `type` = ValidationRuleType.Range,
-            column = Some("age"),
-            min = Some("18"),
-            max = Some("120"),
-            description = Some("Age must be between 18 and 120"),
-            skipNull = Some(false),
-            onFailure = OnFailureAction.Reject
-          )
+      rules = Seq(
+        ValidationRule(
+          `type` = ValidationRuleType.Regex,
+          column = Some("email"),
+          pattern = Some(emailPattern),
+          description = Some("Email must be valid format"),
+          skipNull = Some(false),
+          onFailure = OnFailureAction.Warn
+        ),
+        ValidationRule(
+          `type` = ValidationRuleType.Range,
+          column = Some("age"),
+          min = Some("18"),
+          max = Some("120"),
+          description = Some("Age must be between 18 and 120"),
+          skipNull = Some(false),
+          onFailure = OnFailureAction.Reject
         )
-      ),
-      output = OutputConfig()
+      )
     )
 
     val engine = new ValidationEngine()

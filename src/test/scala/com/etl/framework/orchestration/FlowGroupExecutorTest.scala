@@ -1,5 +1,6 @@
 package com.etl.framework.orchestration
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.orchestration.batch.FlowGroupExecutor
 import com.etl.framework.orchestration.flow.FlowResult
@@ -8,20 +9,18 @@ import org.scalatest.matchers.should.Matchers
 
 class FlowGroupExecutorTest extends AnyFlatSpec with Matchers {
 
-  private def makeConfig(maxRejectionRate: Option[Double]): GlobalConfig = GlobalConfig(
-    paths = PathsConfig("/out", "/rej", "/meta"),
-    processing = ProcessingConfig(maxRejectionRate = maxRejectionRate),
-    performance = PerformanceConfig(parallelFlows = false),
-    iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
-  )
+  private def makeConfig(maxRejectionRate: Option[Double]): GlobalConfig =
+    TestFixtures.globalConfig(
+      outputPath = "/out",
+      rejectedPath = "/rej",
+      metadataPath = "/meta",
+      maxRejectionRate = maxRejectionRate,
+      iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
+    )
 
-  private val defaultFlowConfig = FlowConfig(
+  private val defaultFlowConfig = TestFixtures.flowConfig(
     name = "test_flow",
-    source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty),
-    schema = SchemaConfig(enforceSchema = false, allowExtraColumns = true, Seq.empty),
-    loadMode = LoadModeConfig(LoadMode.Full),
-    validation = ValidationConfig(Seq.empty, Seq.empty, Seq.empty),
-    output = OutputConfig()
+    primaryKey = Seq.empty
   )
 
   private def makeResult(

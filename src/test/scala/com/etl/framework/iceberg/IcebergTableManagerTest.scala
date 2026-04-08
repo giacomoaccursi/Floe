@@ -1,5 +1,6 @@
 package com.etl.framework.iceberg
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
@@ -58,36 +59,15 @@ class IcebergTableManagerTest extends AnyFlatSpec with Matchers with BeforeAndAf
       sortOrder: Seq[String] = Seq.empty,
       icebergPartitions: Seq[String] = Seq.empty,
       tableProperties: Map[String, String] = Map.empty
-  ): FlowConfig = {
-    FlowConfig(
-      name = name,
-      description = "test",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(
-        `type` = SourceType.File,
-        path = "/tmp/test",
-        format = FileFormat.CSV,
-        options = Map.empty
-      ),
-      schema = SchemaConfig(
-        enforceSchema = false,
-        allowExtraColumns = true,
-        columns = Seq.empty
-      ),
-      loadMode = LoadModeConfig(`type` = LoadMode.Full),
-      validation = ValidationConfig(
-        primaryKey = primaryKey,
-        foreignKeys = Seq.empty,
-        rules = Seq.empty
-      ),
-      output = OutputConfig(
-        sortOrder = sortOrder,
-        icebergPartitions = icebergPartitions,
-        tableProperties = tableProperties
-      )
+  ): FlowConfig = TestFixtures.flowConfig(
+    name = name,
+    primaryKey = primaryKey,
+    output = OutputConfig(
+      sortOrder = sortOrder,
+      icebergPartitions = icebergPartitions,
+      tableProperties = tableProperties
     )
-  }
+  )
 
   private val testSchema = StructType(
     Seq(

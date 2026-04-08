@@ -1,23 +1,16 @@
 package com.etl.framework.orchestration
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 class CustomOutputPathTest extends AnyFlatSpec with Matchers {
 
-  private val globalConfig = GlobalConfig(
-    paths = PathsConfig(
-      outputPath = "/tmp/output",
-      rejectedPath = "/tmp/rejected",
-      metadataPath = "/tmp/metadata"
-    ),
-    processing = ProcessingConfig(
-      batchIdFormat = "yyyyMMdd_HHmmss"
-    ),
-    performance = PerformanceConfig(
-      parallelFlows = false
-    ),
+  private val globalConfig = TestFixtures.globalConfig(
+    outputPath = "/tmp/output",
+    rejectedPath = "/tmp/rejected",
+    metadataPath = "/tmp/metadata",
     iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )
 
@@ -39,29 +32,11 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
   }
 
   it should "use default path when no custom path specified" in {
-    val flowConfig = FlowConfig(
+    val flowConfig = TestFixtures.flowConfig(
       name = "test_flow",
-      description = "Test flow",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(
-        `type` = SourceType.File,
-        path = "/tmp/test",
-        format = FileFormat.CSV,
-        options = Map.empty
-      ),
-      schema = SchemaConfig(
-        enforceSchema = true,
-        allowExtraColumns = false,
-        columns = Seq(ColumnConfig("id", "string", nullable = false, "ID"))
-      ),
-      loadMode = LoadModeConfig(`type` = LoadMode.Full),
-      validation = ValidationConfig(
-        primaryKey = Seq("id"),
-        foreignKeys = Seq.empty,
-        rules = Seq.empty
-      ),
-      output = OutputConfig()
+      enforceSchema = true,
+      allowExtraColumns = false,
+      columns = Seq(ColumnConfig("id", "string", nullable = false, "ID"))
     )
 
     flowConfig.output.rejectedPath shouldBe empty

@@ -1,5 +1,6 @@
 package com.etl.framework.orchestration.planning
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.exceptions.CircularDependencyException
 import org.scalatest.flatspec.AnyFlatSpec
@@ -10,19 +11,13 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
   def createFlowConfig(
       name: String,
       foreignKeys: Seq[ForeignKeyConfig] = Seq.empty
-  ): FlowConfig = {
-    FlowConfig(
+  ): FlowConfig =
+    TestFixtures.flowConfig(
       name = name,
-      description = "Test flow",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty),
-      schema = SchemaConfig(true, true, Seq.empty),
-      loadMode = LoadModeConfig(LoadMode.Full),
-      validation = ValidationConfig(Seq.empty, foreignKeys, Seq.empty),
-      output = OutputConfig()
+      primaryKey = Seq.empty,
+      foreignKeys = foreignKeys,
+      enforceSchema = true
     )
-  }
 
   def createForeignKey(
       column: String,

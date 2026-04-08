@@ -1,5 +1,6 @@
 package com.etl.framework.orchestration.flow
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.iceberg.{IcebergTableManager, IcebergTableWriter}
 import org.apache.spark.sql.SparkSession
@@ -36,29 +37,20 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
   }
 
   private def createGlobalConfig(): GlobalConfig =
-    GlobalConfig(
-      paths = PathsConfig(
-        outputPath = tempDir.resolve("output").toString,
-        rejectedPath = tempDir.resolve("rejected").toString,
-        metadataPath = tempDir.resolve("metadata").toString
-      ),
-      processing = ProcessingConfig(
-        batchIdFormat = "yyyyMMdd"
-      ),
-      performance = PerformanceConfig(parallelFlows = false),
+    TestFixtures.globalConfig(
+      outputPath = tempDir.resolve("output").toString,
+      rejectedPath = tempDir.resolve("rejected").toString,
+      metadataPath = tempDir.resolve("metadata").toString,
+      batchIdFormat = "yyyyMMdd",
       iceberg = IcebergConfig(warehouse = tempDir.resolve("warehouse").toString)
     )
 
   private def createFlowConfig(name: String, rejectedPath: Option[String] = None): FlowConfig =
-    FlowConfig(
+    TestFixtures.flowConfig(
       name = name,
-      description = "Test flow",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(SourceType.File, "/tmp/test_source", FileFormat.Parquet, Map.empty),
-      schema = SchemaConfig(enforceSchema = false, allowExtraColumns = true, Seq.empty),
-      loadMode = LoadModeConfig(LoadMode.Full),
-      validation = ValidationConfig(Seq.empty, Seq.empty, Seq.empty),
+      primaryKey = Seq.empty,
+      sourcePath = "/tmp/test_source",
+      format = FileFormat.Parquet,
       output = OutputConfig(rejectedPath = rejectedPath)
     )
 

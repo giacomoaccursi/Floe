@@ -1,5 +1,6 @@
 package com.etl.framework.validation
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.validation.ValidationColumns._
 import org.scalatest.flatspec.AnyFlatSpec
@@ -26,19 +27,15 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
       primaryKey: Seq[String] = Seq("id"),
       foreignKeys: Seq[ForeignKeyConfig] = Seq.empty,
       rules: Seq[ValidationRule] = Seq.empty
-  ): FlowConfig = {
-    FlowConfig(
+  ): FlowConfig =
+    TestFixtures.flowConfig(
       name = name,
-      description = "Test flow",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty),
-      schema = SchemaConfig(true, true, schemaFields),
-      loadMode = LoadModeConfig(LoadMode.Full),
-      validation = ValidationConfig(primaryKey, foreignKeys, rules),
-      output = OutputConfig()
+      primaryKey = primaryKey,
+      foreignKeys = foreignKeys,
+      columns = schemaFields,
+      enforceSchema = true,
+      rules = rules
     )
-  }
 
   "ValidationEngine" should "not add internal columns to the valid DataFrame" in {
     val schema = StructType(Seq(StructField("id", StringType, false)))

@@ -1,5 +1,6 @@
 package com.etl.framework.validation.validators
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.config.ValidationRuleType
 import org.scalatest.flatspec.AnyFlatSpec
@@ -27,19 +28,14 @@ class NotNullValidatorTest extends AnyFlatSpec with Matchers {
     )
   }
 
-  def createDummyConfig(columns: Seq[ColumnConfig] = Seq.empty): FlowConfig = {
-    FlowConfig(
+  def createDummyConfig(columns: Seq[ColumnConfig] = Seq.empty): FlowConfig =
+    TestFixtures.flowConfig(
       name = "test_flow",
-      description = "desc",
-      version = "1.0",
-      owner = "me",
-      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty),
-      schema = SchemaConfig(true, false, columns),
-      loadMode = LoadModeConfig(LoadMode.Full),
-      validation = ValidationConfig(Seq.empty, Seq.empty, Seq.empty),
-      output = OutputConfig()
+      primaryKey = Seq.empty,
+      enforceSchema = true,
+      allowExtraColumns = false,
+      columns = columns
     )
-  }
 
   "NotNullValidator" should "validate non-null values" in {
     val schema = StructType(Seq(StructField("id", StringType, true)))

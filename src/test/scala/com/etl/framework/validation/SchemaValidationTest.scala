@@ -1,5 +1,6 @@
 package com.etl.framework.validation
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.{Row, SparkSession}
@@ -23,19 +24,13 @@ class SchemaValidationTest extends AnyFlatSpec with Matchers {
       schemaFields: Seq[ColumnConfig] = Seq.empty,
       enforceSchema: Boolean = true,
       allowExtraColumns: Boolean = false
-  ): FlowConfig = {
-    FlowConfig(
+  ): FlowConfig =
+    TestFixtures.flowConfig(
       name = "test_flow",
-      description = "Test flow",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty),
-      schema = SchemaConfig(enforceSchema, allowExtraColumns, schemaFields),
-      loadMode = LoadModeConfig(LoadMode.Full),
-      validation = ValidationConfig(Seq("id"), Seq.empty, Seq.empty),
-      output = OutputConfig()
+      enforceSchema = enforceSchema,
+      allowExtraColumns = allowExtraColumns,
+      columns = schemaFields
     )
-  }
 
   val standardColumns: Seq[ColumnConfig] = Seq(
     ColumnConfig("id", "string", nullable = true, description = ""),

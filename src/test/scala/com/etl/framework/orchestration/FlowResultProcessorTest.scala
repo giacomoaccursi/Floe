@@ -1,5 +1,6 @@
 package com.etl.framework.orchestration
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.orchestration.batch.FlowGroupExecutor
 import com.etl.framework.orchestration.flow.FlowResult
@@ -61,33 +62,25 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
 
   def createGlobalConfig(
       rejectionThreshold: Double = 0.1
-  ): GlobalConfig = {
-    GlobalConfig(
-      paths = PathsConfig("/tmp/output", "/tmp/rejected", "/tmp/metadata"),
-      processing = ProcessingConfig(
-        maxRejectionRate = Some(rejectionThreshold)
-      ),
-      performance = PerformanceConfig(parallelFlows = true),
+  ): GlobalConfig =
+    TestFixtures.globalConfig(
+      outputPath = "/tmp/output",
+      rejectedPath = "/tmp/rejected",
+      metadataPath = "/tmp/metadata",
+      parallelFlows = true,
+      maxRejectionRate = Some(rejectionThreshold),
       iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
     )
-  }
 
   def createFlowConfig(
       name: String,
       outputPath: Option[String] = None
-  ): FlowConfig = {
-    FlowConfig(
+  ): FlowConfig =
+    TestFixtures.flowConfig(
       name = name,
-      description = "Test flow",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty),
-      schema = SchemaConfig(true, true, Seq.empty),
-      loadMode = LoadModeConfig(LoadMode.Full),
-      validation = ValidationConfig(Seq.empty, Seq.empty, Seq.empty),
-      output = OutputConfig()
+      primaryKey = Seq.empty,
+      enforceSchema = true
     )
-  }
 
   "FlowResultProcessor" should "continue processing for successful flow result" in {
     val globalConfig = createGlobalConfig()

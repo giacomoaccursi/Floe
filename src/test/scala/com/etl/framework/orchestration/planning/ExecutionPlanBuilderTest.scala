@@ -1,5 +1,6 @@
 package com.etl.framework.orchestration.planning
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.exceptions.CircularDependencyException
 import org.scalatest.flatspec.AnyFlatSpec
@@ -7,33 +8,26 @@ import org.scalatest.matchers.should.Matchers
 
 class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
 
-  def createGlobalConfig(parallelFlows: Boolean = true): GlobalConfig = {
-    GlobalConfig(
-      paths = PathsConfig("/output", "/rejected", "/metadata"),
-      processing = ProcessingConfig(
-        "yyyyMMdd"
-      ),
-      performance = PerformanceConfig(parallelFlows),
+  def createGlobalConfig(parallelFlows: Boolean = true): GlobalConfig =
+    TestFixtures.globalConfig(
+      outputPath = "/output",
+      rejectedPath = "/rejected",
+      metadataPath = "/metadata",
+      batchIdFormat = "yyyyMMdd",
+      parallelFlows = parallelFlows,
       iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
     )
-  }
 
   def createFlowConfig(
       name: String,
       foreignKeys: Seq[ForeignKeyConfig] = Seq.empty
-  ): FlowConfig = {
-    FlowConfig(
+  ): FlowConfig =
+    TestFixtures.flowConfig(
       name = name,
-      description = "Test flow",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(SourceType.File, "/path", FileFormat.CSV, Map.empty),
-      schema = SchemaConfig(true, true, Seq.empty),
-      loadMode = LoadModeConfig(LoadMode.Full),
-      validation = ValidationConfig(Seq.empty, foreignKeys, Seq.empty),
-      output = OutputConfig()
+      primaryKey = Seq.empty,
+      foreignKeys = foreignKeys,
+      enforceSchema = true
     )
-  }
 
   def createForeignKey(
       column: String,

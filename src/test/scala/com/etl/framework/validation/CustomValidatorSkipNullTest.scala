@@ -1,5 +1,6 @@
 package com.etl.framework.validation
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.validation.validators.CustomRulesValidator
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -34,28 +35,18 @@ class CustomValidatorSkipNullTest extends AnyFlatSpec with Matchers {
 
   import spark.implicits._
 
-  private def makeFlowConfig(skipNull: Boolean): FlowConfig = FlowConfig(
+  private def makeFlowConfig(skipNull: Boolean): FlowConfig = TestFixtures.flowConfig(
     name = "test",
-    description = "test",
-    version = "1.0",
-    owner = "test",
-    source = SourceConfig(SourceType.File, "data/test.csv", FileFormat.CSV, Map.empty),
-    schema = SchemaConfig(enforceSchema = false, allowExtraColumns = true, Seq.empty),
-    loadMode = LoadModeConfig(LoadMode.Full),
-    validation = ValidationConfig(
-      primaryKey = Seq("id"),
-      foreignKeys = Seq.empty,
-      rules = Seq(
-        ValidationRule(
-          `type` = ValidationRuleType.Custom,
-          column = Some("value"),
-          `class` = Some("com.etl.framework.validation.RejectAllValidator"),
-          skipNull = Some(skipNull),
-          onFailure = OnFailureAction.Reject
-        )
+    sourcePath = "data/test.csv",
+    rules = Seq(
+      ValidationRule(
+        `type` = ValidationRuleType.Custom,
+        column = Some("value"),
+        `class` = Some("com.etl.framework.validation.RejectAllValidator"),
+        skipNull = Some(skipNull),
+        onFailure = OnFailureAction.Reject
       )
-    ),
-    output = OutputConfig()
+    )
   )
 
   "CustomRulesValidator" should "pass NULL rows through when skipNull is true for custom validators" in {

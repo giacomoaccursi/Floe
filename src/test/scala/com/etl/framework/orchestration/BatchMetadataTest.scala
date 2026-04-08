@@ -1,5 +1,6 @@
 package com.etl.framework.orchestration
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import org.apache.spark.sql.SparkSession
 import org.scalatest.flatspec.AnyFlatSpec
@@ -44,56 +45,32 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
       .option("header", "true")
       .save(inputPath)
 
-    FlowConfig(
+    TestFixtures.flowConfig(
       name = flowName,
-      description = s"Test flow $flowName",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(
-        `type` = SourceType.File,
-        path = inputPath,
-        format = FileFormat.CSV,
-        options = Map("header" -> "true")
-      ),
-      schema = SchemaConfig(
-        enforceSchema = true,
-        allowExtraColumns = false,
-        columns = Seq(
-          ColumnConfig("id", "string", nullable = false, "Primary key"),
-          ColumnConfig("value", "string", nullable = true, "Value")
-        )
-      ),
-      loadMode = LoadModeConfig(`type` = LoadMode.Full),
-      validation = ValidationConfig(
-        primaryKey = Seq("id"),
-        foreignKeys = Seq.empty,
-        rules = Seq.empty
+      enforceSchema = true,
+      allowExtraColumns = false,
+      sourcePath = inputPath,
+      columns = Seq(
+        ColumnConfig("id", "string", nullable = false, "Primary key"),
+        ColumnConfig("value", "string", nullable = true, "Value")
       ),
       output = OutputConfig(
         rejectedPath = Some(s"$tempDir/rejected/$flowName")
       )
-    )
+    ).copy(source = SourceConfig(path = inputPath, format = FileFormat.CSV, options = Map("header" -> "true")))
   }
 
   private def createGlobalConfig(
       tempDir: String,
       batchIdFormat: String = "yyyyMMdd_HHmmss"
-  ): GlobalConfig = {
-    GlobalConfig(
-      paths = PathsConfig(
-        outputPath = s"$tempDir/output",
-        rejectedPath = s"$tempDir/rejected",
-        metadataPath = s"$tempDir/metadata"
-      ),
-      processing = ProcessingConfig(
-        batchIdFormat = batchIdFormat
-      ),
-      performance = PerformanceConfig(
-        parallelFlows = false
-      ),
+  ): GlobalConfig =
+    TestFixtures.globalConfig(
+      outputPath = s"$tempDir/output",
+      rejectedPath = s"$tempDir/rejected",
+      metadataPath = s"$tempDir/metadata",
+      batchIdFormat = batchIdFormat,
       iceberg = IcebergConfig(warehouse = warehousePath)
     )
-  }
 
   private def cleanupTempDir(tempDir: String): Unit = {
     Try {

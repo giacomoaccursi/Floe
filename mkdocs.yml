@@ -61,6 +61,7 @@ nav:
     - DAG Aggregation: guides/dag-aggregation.md
     - Pipeline Builder: guides/pipeline-builder.md
     - Orphan Detection: guides/orphan-detection.md
+    - Batch Listeners: guides/batch-listeners.md
     - Custom Validators: guides/custom-validators.md
     - Cloud Deployment: guides/cloud-deployment.md
   - Architecture:

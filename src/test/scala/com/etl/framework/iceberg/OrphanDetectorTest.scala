@@ -1033,6 +1033,106 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     reports shouldBe empty
   }
 
+  // ── OrphanDetectionResult type tests ────────────────────────────────
+
+  it should "return Skipped when no FK has actionable onOrphan" in {
+    // All FKs are Ignore — the detector itself doesn't check this (the orchestrator does),
+    // but if all FKs are Ignore, no processFK calls happen → Completed with empty reports
+    val parentConfig = makeFlowConfig("od_skip_parent")
+    val childConfig = makeFlowConfig(
+      "od_skip_child",
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("parent_id"),
+          references = ReferenceConfig(flow = "od_skip_parent", columns = Seq("id")),
+          onOrphan = OrphanAction.Ignore
+        )
+      )
+    )
+
+    val parentData = Seq((1, "A")).toDF("id", "name")
+    val pr = writer.writeFullLoad(parentData, parentConfig)
+
+    val childData = Seq((100, 1)).toDF("id", "parent_id")
+    writer.writeFullLoad(childData, childConfig)
+
+    val flowConfigs = Seq(parentConfig, childConfig)
+    val flowResults = Seq(
+      makeFlowResult("od_skip_parent", pr.snapshotId, None,
+        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult("od_skip_child", None, None)
+    )
+    val plan = ExecutionPlan(Seq(
+      ExecutionGroup(Seq(parentConfig), parallel = false),
+      ExecutionGroup(Seq(childConfig), parallel = false)
+    ))
+
+    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
+    val result = detector.detectAndResolveOrphans(plan)
+
+    result shouldBe a[OrphanDetectionResult.Completed]
+    result.reports shouldBe empty
+  }
+
+  it should "return Failed with partial reports when detection crashes mid-cascade" in {
+    // We simulate a failure by referencing a non-existent table in the second child's FK
+    val parentConfig = makeFlowConfig("od_fail_parent")
+    val child1Config = makeFlowConfig(
+      "od_fail_child1",
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("parent_id"),
+          references = ReferenceConfig(flow = "od_fail_parent", columns = Seq("id")),
+          onOrphan = OrphanAction.Warn
+        )
+      )
+    )
+    // child2 references a flow that exists in config but whose table doesn't exist in Iceberg
+    val child2Config = makeFlowConfig(
+      "od_fail_child2",
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("parent_id"),
+          references = ReferenceConfig(flow = "od_fail_parent", columns = Seq("id")),
+          onOrphan = OrphanAction.Delete
+        )
+      )
+    )
+
+    val parentData1 = Seq((1, "A"), (2, "B")).toDF("id", "name")
+    val pr1 = writer.writeFullLoad(parentData1, parentConfig)
+
+    val child1Data = Seq((100, 1), (101, 2)).toDF("id", "parent_id")
+    writer.writeFullLoad(child1Data, child1Config)
+    // Intentionally do NOT create od_fail_child2 table
+
+    val parentData2 = Seq((1, "A")).toDF("id", "name")
+    val pr2 = writer.writeFullLoad(parentData2, parentConfig)
+
+    val flowConfigs = Seq(parentConfig, child1Config, child2Config)
+    val flowResults = Seq(
+      makeFlowResult("od_fail_parent", pr2.snapshotId, pr1.snapshotId,
+        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult("od_fail_child1", None, None),
+      makeFlowResult("od_fail_child2", None, None)
+    )
+    val plan = ExecutionPlan(Seq(
+      ExecutionGroup(Seq(parentConfig), parallel = false),
+      ExecutionGroup(Seq(child1Config), parallel = false),
+      ExecutionGroup(Seq(child2Config), parallel = false)
+    ))
+
+    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
+    val result = detector.detectAndResolveOrphans(plan)
+
+    result shouldBe a[OrphanDetectionResult.Failed]
+    val failed = result.asInstanceOf[OrphanDetectionResult.Failed]
+    failed.error should not be empty
+    // child1 was processed successfully before child2 crashed
+    failed.reports should have size 1
+    failed.reports.head.flowName shouldBe "od_fail_child1"
+  }
+
   private val allTables = Seq(
     "od_customers",
     "od_orders",
@@ -1071,7 +1171,11 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     "od_scd2_parent",
     "od_scd2_child",
     "od_scd2_nodelete_parent",
-    "od_scd2_nodelete_child"
+    "od_scd2_nodelete_child",
+    "od_skip_parent",
+    "od_skip_child",
+    "od_fail_parent",
+    "od_fail_child1"
   )
 
   override def afterAll(): Unit = {

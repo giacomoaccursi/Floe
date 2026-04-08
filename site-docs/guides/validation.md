@@ -463,3 +463,5 @@ In this example:
 - [Custom Validators](custom-validators.md) — writing your own validators
 - [Orphan Detection](orphan-detection.md) — post-batch FK integrity
 - [Global Configuration](../configuration/global.md) — rejection behavior settings
+- [Custom Validators](custom-validators.md) — writing custom validation logic
+- [Quality Metrics](quality-metrics.md) — tracking rejection rates over time

@@ -142,3 +142,5 @@ Example: `20260328_150000`. The batch ID is used for:
 - [Global Configuration — performance](../configuration/global.md#performance) — parallelism settings
 - [DAG Aggregation](../guides/dag-aggregation.md) — DAG execution details
 - [Orphan Detection](../guides/orphan-detection.md) — post-batch FK integrity
+- [Batch Listeners](../guides/batch-listeners.md) — notifications on batch completion/failure
+- [Quality Metrics](../guides/quality-metrics.md) — per-flow metrics Iceberg table

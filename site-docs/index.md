@@ -45,6 +45,9 @@ val result = IngestionPipeline.builder()
 - **Combine tables** — join data from multiple flows into aggregated views using a DAG. Nest child records, flatten columns, or compute summaries.
 - **Transform in code** — hook into the pipeline with Scala functions to enrich, filter, or reshape data before or after validation.
 - **Detect broken references** — after a batch, the framework checks if parent records were removed and child records are now orphaned. It can warn or clean up automatically.
+- **Get notified** — register batch listeners to receive notifications on completion or failure. Send to Slack, SNS, or any custom endpoint.
+- **Track quality over time** — optionally write per-flow quality metrics to an Iceberg table for trend analysis and dashboards.
+- **Read from anywhere** — built-in support for CSV, Parquet, JSON, Avro, ORC files and JDBC databases. Register custom readers for any other source.
 - **Run anywhere** — works locally, on Spark clusters, and on managed platforms like AWS Glue, EMR, and Databricks. Pass environment-specific parameters without changing your YAML files.
 
 ## Stack

@@ -599,3 +599,4 @@ If a maintenance operation fails mid-way (e.g., compaction fails on one table), 
 - [Orphan Detection](orphan-detection.md) — post-batch FK integrity
 - [Architecture: Design Decisions](../architecture/design-decisions.md) — why Iceberg, why MERGE INTO
 - [Pipeline Builder](pipeline-builder.md) — custom catalog providers
+- [Quality Metrics](quality-metrics.md) — per-flow quality metrics table

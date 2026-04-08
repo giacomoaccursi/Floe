@@ -85,15 +85,15 @@ sealed trait SourceType extends Product with Serializable {
 object SourceType {
   case object File extends SourceType { val name = "file" }
   case object JDBC extends SourceType { val name = "jdbc" }
+  case class Custom(name: String) extends SourceType
 
-  val values: Seq[SourceType] = Seq(File, JDBC)
+  val builtinValues: Seq[SourceType] = Seq(File, JDBC)
 
   def fromString(s: String): Either[String, SourceType] =
-    values
+    builtinValues
       .find(_.name == s.toLowerCase)
-      .toRight(
-        s"Unknown source type: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
-      )
+      .map(Right(_))
+      .getOrElse(Right(Custom(s.toLowerCase)))
 
   implicit val reader: ConfigReader[SourceType] =
     ConfigReader.fromString[SourceType](s => fromString(s).left.map(msg => CannotConvert(s, "SourceType", msg)))

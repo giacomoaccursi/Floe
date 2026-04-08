@@ -1,6 +1,7 @@
 package com.etl.framework.orchestration.batch
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
+import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.flow.{FlowExecutor, FlowResult}
 import com.etl.framework.util.RetryExecutor
 import com.etl.framework.validation.Validator
@@ -18,7 +19,8 @@ class FlowGroupExecutor(
     globalConfig: GlobalConfig,
     domainsConfig: Option[DomainsConfig],
     parallelEc: ExecutionContext,
-    customValidators: Map[String, () => Validator] = Map.empty
+    customValidators: Map[String, () => Validator] = Map.empty,
+    customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -82,13 +84,15 @@ class FlowGroupExecutor(
         baseDelayMs = backoffMs,
         operationName = s"Flow ${flowConfig.name}"
       ) {
-        val executor = new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig, customValidators)
+        val executor =
+          new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig, customValidators, customReaders)
         val result = executor.execute(batchId)
         if (!result.success) throw new RuntimeException(result.error.getOrElse("Flow failed"))
         result
       }
     } else {
-      val executor = new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig, customValidators)
+      val executor =
+        new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig, customValidators, customReaders)
       executor.execute(batchId)
     }
   }

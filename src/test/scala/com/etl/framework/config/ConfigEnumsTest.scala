@@ -30,11 +30,12 @@ class ConfigEnumsTest extends AnyFlatSpec with Matchers {
   // ═══════════════════════════════════════════════════════════════════════════
   "SourceType.fromString" should "parse valid types" in {
     SourceType.fromString("file") shouldBe Right(SourceType.File)
+    SourceType.fromString("jdbc") shouldBe Right(SourceType.JDBC)
   }
 
-  it should "return Left for invalid values" in {
-    SourceType.fromString("jdbc").isLeft shouldBe true
-    SourceType.fromString("kafka").isLeft shouldBe true
+  it should "return Custom for unknown source types" in {
+    SourceType.fromString("kafka") shouldBe Right(SourceType.Custom("kafka"))
+    SourceType.fromString("s3select") shouldBe Right(SourceType.Custom("s3select"))
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

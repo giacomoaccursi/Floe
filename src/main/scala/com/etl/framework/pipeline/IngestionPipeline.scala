@@ -12,6 +12,7 @@ import com.etl.framework.config.{
 import com.etl.framework.core.FlowTransformation
 import com.etl.framework.exceptions.MissingConfigFieldException
 import com.etl.framework.iceberg.catalog.{CatalogFactory, CatalogProvider}
+import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.{FlowOrchestrator, IngestionResult, BatchListener}
 import com.etl.framework.validation.Validator
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -28,7 +29,8 @@ class IngestionPipeline private (
     extraCatalogProviders: Map[String, () => CatalogProvider],
     customValidators: Map[String, () => Validator],
     derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
-    batchListeners: Seq[BatchListener]
+    batchListeners: Seq[BatchListener],
+    customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -56,7 +58,14 @@ class IngestionPipeline private (
 
     // Create and execute orchestrator with DomainsConfig
     val orchestrator =
-      FlowOrchestrator(globalConfig, enrichedFlowConfigs, domainsConfig, customValidators.toMap, batchListeners)
+      FlowOrchestrator(
+        globalConfig,
+        enrichedFlowConfigs,
+        domainsConfig,
+        customValidators.toMap,
+        batchListeners,
+        customReaders.toMap
+      )
     val result = orchestrator.execute()
 
     // Execute derived tables after all flows have been written to Iceberg
@@ -120,6 +129,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private val customValidators = mutable.Map[String, () => Validator]()
   private val derivedTables = mutable.ListBuffer[(String, DerivedTableContext => DataFrame)]()
   private val batchListeners = mutable.ListBuffer[BatchListener]()
+  private val customReaders = mutable.Map[String, DataReaderFactory.ReaderFactory]()
   private var configVariables: scala.collection.immutable.Map[String, String] = scala.collection.immutable.Map.empty
 
   /** Sets the configuration directory path Loads global.yaml, domains.yaml, and flows/ *.yaml from this directory
@@ -310,6 +320,14 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     this
   }
 
+  def withDataReader(
+      typeName: String,
+      factory: DataReaderFactory.ReaderFactory
+  ): IngestionPipelineBuilder = {
+    customReaders(typeName) = factory
+    this
+  }
+
   /** Builds the IngestionPipeline
     *
     * @return
@@ -357,7 +375,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       extraCatalogProviders.toMap,
       customValidators.toMap,
       derivedTables.toSeq,
-      batchListeners.toSeq
+      batchListeners.toSeq,
+      customReaders.toMap
     )
   }
 
@@ -446,7 +465,8 @@ object IngestionPipeline {
       extraCatalogProviders: Map[String, () => CatalogProvider],
       customValidators: Map[String, () => Validator],
       derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
-      batchListeners: Seq[BatchListener] = Seq.empty
+      batchListeners: Seq[BatchListener] = Seq.empty,
+      customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty
   )(implicit spark: SparkSession): IngestionPipeline = {
     new IngestionPipeline(
       globalConfig,
@@ -456,7 +476,8 @@ object IngestionPipeline {
       extraCatalogProviders,
       customValidators,
       derivedTables,
-      batchListeners
+      batchListeners,
+      customReaders
     )
   }
 

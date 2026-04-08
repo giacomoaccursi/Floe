@@ -17,7 +17,8 @@ class FlowExecutor(
     globalConfig: GlobalConfig,
     validatedFlows: Map[String, DataFrame] = Map.empty,
     domainsConfig: Option[DomainsConfig] = None,
-    customValidators: Map[String, () => Validator] = Map.empty
+    customValidators: Map[String, () => Validator] = Map.empty,
+    customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -117,7 +118,7 @@ class FlowExecutor(
       s"Creating reader for source type: ${flowConfig.source.`type`.name}"
     )
     val reader =
-      DataReaderFactory.create(flowConfig.source, Some(flowConfig.schema))
+      DataReaderFactory.create(flowConfig.source, Some(flowConfig.schema), customReaders)
     reader.read()
   }
 

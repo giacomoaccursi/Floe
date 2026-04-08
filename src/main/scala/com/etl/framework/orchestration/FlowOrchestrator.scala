@@ -2,6 +2,7 @@ package com.etl.framework.orchestration
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig, OrphanAction}
 import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetectionResult, OrphanDetector, OrphanReport}
+import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.batch.{BatchMetadataWriter, FlowGroupExecutor, QualityMetricsWriter}
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.ExecutionPlanBuilder
@@ -51,7 +52,8 @@ class FlowOrchestrator(
     metadataWriter: BatchMetadataWriter,
     executionLogger: ExecutionLogger,
     threadPool: Option[java.util.concurrent.ExecutorService] = None,
-    batchListeners: Seq[BatchListener] = Seq.empty
+    batchListeners: Seq[BatchListener] = Seq.empty,
+    customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -243,11 +245,12 @@ object FlowOrchestrator {
       flowConfigs: Seq[FlowConfig],
       domainsConfig: Option[DomainsConfig] = None,
       customValidators: Map[String, () => Validator] = Map.empty,
-      batchListeners: Seq[BatchListener] = Seq.empty
+      batchListeners: Seq[BatchListener] = Seq.empty,
+      customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty
   )(implicit spark: SparkSession): FlowOrchestrator = {
     val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
     val ec = ExecutionContext.fromExecutorService(pool)
-    val groupExecutor = new FlowGroupExecutor(globalConfig, domainsConfig, ec, customValidators)
+    val groupExecutor = new FlowGroupExecutor(globalConfig, domainsConfig, ec, customValidators, customReaders)
     val metadataWriter = new BatchMetadataWriter(globalConfig, flowConfigs)
     val planBuilder = new ExecutionPlanBuilder(flowConfigs, globalConfig)
     val resultProcessor = new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
@@ -263,7 +266,8 @@ object FlowOrchestrator {
       metadataWriter = metadataWriter,
       executionLogger = executionLogger,
       threadPool = Some(pool),
-      batchListeners = batchListeners
+      batchListeners = batchListeners,
+      customReaders = customReaders
     )
   }
 }

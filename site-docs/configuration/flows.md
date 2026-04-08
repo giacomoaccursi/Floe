@@ -159,9 +159,9 @@ Defines the expected schema and controls enforcement during read.
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `enforceSchema` | yes | — | If true, validate column presence and apply Spark schema during read |
-| `allowExtraColumns` | yes | — | If false, reject data with columns not defined in `columns` |
-| `columns` | yes | — | List of column definitions |
+| `enforceSchema` | yes | — | If `true`, validate column presence and apply Spark schema during read |
+| `allowExtraColumns` | no | `true` | If `false`, reject data with columns not defined in `columns`. Only evaluated when `enforceSchema: true`. |
+| `columns` | no | `[]` | List of column definitions. Required when `enforceSchema: true`. |
 
 ### Column definition
 

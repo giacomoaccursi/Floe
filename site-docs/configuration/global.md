@@ -16,6 +16,7 @@ processing:
   maxRejectionRate: 0.1
   maxRetries: 3
   retryBackoffMs: 2000
+  qualityMetricsTable: "quality_metrics"
 
 performance:
   parallelFlows: true
@@ -65,6 +66,7 @@ Controls batch execution and validation behavior. This entire section is optiona
 | `maxRejectionRate` | — (disabled) | If set, the batch stops when any flow's rejection rate exceeds this threshold (0.1 = 10%). If omitted, the batch never stops for rejected records. |
 | `maxRetries` | `0` | Maximum number of retries per flow on failure. `0` means no retry. |
 | `retryBackoffMs` | `1000` | Base delay in milliseconds for exponential backoff between retries. Actual delay: `baseDelay * 2^attempt + random jitter`. |
+| `qualityMetricsTable` | — (disabled) | If set, the framework writes per-flow quality metrics to this Iceberg table after each batch. The table is created automatically on first use. |
 
 ### Rejection behavior
 

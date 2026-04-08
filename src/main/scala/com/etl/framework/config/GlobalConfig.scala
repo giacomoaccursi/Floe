@@ -18,7 +18,8 @@ case class ProcessingConfig(
     batchIdFormat: String = "yyyyMMdd_HHmmss",
     maxRejectionRate: Option[Double] = None,
     maxRetries: Int = 0,
-    retryBackoffMs: Long = 1000
+    retryBackoffMs: Long = 1000,
+    qualityMetricsTable: Option[String] = None
 )
 
 case class PerformanceConfig(

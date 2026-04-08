@@ -2,7 +2,7 @@ package com.etl.framework.orchestration
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig, OrphanAction}
 import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetectionResult, OrphanDetector, OrphanReport}
-import com.etl.framework.orchestration.batch.{BatchMetadataWriter, FlowGroupExecutor}
+import com.etl.framework.orchestration.batch.{BatchMetadataWriter, FlowGroupExecutor, QualityMetricsWriter}
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.ExecutionPlanBuilder
 import com.etl.framework.pipeline.DerivedTableResult
@@ -152,6 +152,10 @@ class FlowOrchestrator(
         case _                                    => None
       }
     )
+
+    // Write quality metrics to Iceberg (if configured)
+    val qualityWriter = new QualityMetricsWriter(globalConfig)
+    qualityWriter.write(batchId, flowResults, orphanResult.reports, executionTimeMs)
 
     // Run Iceberg table maintenance post-batch
     runPostBatchMaintenance()

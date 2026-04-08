@@ -29,7 +29,7 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       val sourceConfig = SourceConfig(
         `type` = SourceType.File,
         path = csvFile.toString,
-        format = FileFormat.CSV,
+        format = Some(FileFormat.CSV),
         options = Map("header" -> "true")
       )
       val reader = new FileDataReader(sourceConfig)
@@ -49,7 +49,7 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       val sourceConfig = SourceConfig(
         `type` = SourceType.File,
         path = csvFile.toString,
-        format = FileFormat.CSV,
+        format = Some(FileFormat.CSV),
         options = Map("header" -> "true")
       )
       val schemaConfig = SchemaConfig(
@@ -82,7 +82,7 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       val csvConfig = SourceConfig(
         SourceType.File,
         csvFile.toString,
-        FileFormat.CSV,
+        Some(FileFormat.CSV),
         Map("header" -> "true")
       )
       val csvReader = new FileDataReader(csvConfig)
@@ -99,7 +99,7 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       val sourceConfig = SourceConfig(
         `type` = SourceType.File,
         path = csvFile.toString,
-        format = FileFormat.CSV,
+        format = Some(FileFormat.CSV),
         options = Map("header" -> "true", "delimiter" -> ";")
       )
       val reader = new FileDataReader(sourceConfig)
@@ -122,7 +122,7 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       val sourceConfig = SourceConfig(
         `type` = SourceType.File,
         path = tempDir.toString,
-        format = FileFormat.CSV,
+        format = Some(FileFormat.CSV),
         options = Map("header" -> "true")
       )
       val reader = new FileDataReader(sourceConfig)
@@ -173,7 +173,7 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
         val sourceConfig = SourceConfig(
           SourceType.File,
           csvFile.toString,
-          FileFormat.CSV,
+          Some(FileFormat.CSV),
           Map("header" -> "true")
         )
         noException should be thrownBy new FileDataReader(
@@ -193,7 +193,7 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       val sourceConfig = SourceConfig(
         `type` = SourceType.File,
         path = csvFile.toString,
-        format = FileFormat.CSV,
+        format = Some(FileFormat.CSV),
         options = Map("header" -> "true")
       )
       val schemaConfig = SchemaConfig(

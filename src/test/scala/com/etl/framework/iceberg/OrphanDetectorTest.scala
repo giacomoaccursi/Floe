@@ -1058,14 +1058,15 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val flowConfigs = Seq(parentConfig, childConfig)
     val flowResults = Seq(
-      makeFlowResult("od_skip_parent", pr.snapshotId, None,
-        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult("od_skip_parent", pr.snapshotId, None, Some(tableManager.resolveTableName(parentConfig))),
       makeFlowResult("od_skip_child", None, None)
     )
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(parentConfig), parallel = false),
-      ExecutionGroup(Seq(childConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parentConfig), parallel = false),
+        ExecutionGroup(Seq(childConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val result = detector.detectAndResolveOrphans(plan)
@@ -1111,16 +1112,22 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val flowConfigs = Seq(parentConfig, child1Config, child2Config)
     val flowResults = Seq(
-      makeFlowResult("od_fail_parent", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult(
+        "od_fail_parent",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(parentConfig))
+      ),
       makeFlowResult("od_fail_child1", None, None),
       makeFlowResult("od_fail_child2", None, None)
     )
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(parentConfig), parallel = false),
-      ExecutionGroup(Seq(child1Config), parallel = false),
-      ExecutionGroup(Seq(child2Config), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parentConfig), parallel = false),
+        ExecutionGroup(Seq(child1Config), parallel = false),
+        ExecutionGroup(Seq(child2Config), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val result = detector.detectAndResolveOrphans(plan)

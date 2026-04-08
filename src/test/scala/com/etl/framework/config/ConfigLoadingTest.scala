@@ -92,7 +92,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
     source = SourceConfig(
       `type` = SourceType.File,
       path = "/data/input/customers",
-      format = FileFormat.CSV,
+      format = Some(FileFormat.CSV),
       options = Map("header" -> "true", "delimiter" -> ",")
     ),
     schema = SchemaConfig(

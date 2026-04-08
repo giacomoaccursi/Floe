@@ -84,8 +84,9 @@ sealed trait SourceType extends Product with Serializable {
 
 object SourceType {
   case object File extends SourceType { val name = "file" }
+  case object JDBC extends SourceType { val name = "jdbc" }
 
-  val values: Seq[SourceType] = Seq(File)
+  val values: Seq[SourceType] = Seq(File, JDBC)
 
   def fromString(s: String): Either[String, SourceType] =
     values

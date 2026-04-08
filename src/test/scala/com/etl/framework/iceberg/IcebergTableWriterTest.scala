@@ -68,7 +68,8 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
       name = name,
       loadMode = loadMode,
       primaryKey = primaryKey,
-      compareColumns = if (compareColumns.nonEmpty) compareColumns
+      compareColumns =
+        if (compareColumns.nonEmpty) compareColumns
         else if (loadMode == LoadMode.SCD2) Seq("name")
         else Seq.empty,
       detectDeletes = detectDeletes

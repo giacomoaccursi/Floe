@@ -107,7 +107,7 @@ object FKValidationProperties extends Properties("FKValidation") {
     source = SourceConfig(
       `type` = SourceType.File,
       path = "/test",
-      format = FileFormat.CSV,
+      format = Some(FileFormat.CSV),
       options = Map.empty
     ),
     schema = SchemaConfig(
@@ -313,7 +313,7 @@ object FKValidationProperties extends Properties("FKValidation") {
             source = SourceConfig(
               `type` = SourceType.File,
               path = "/test",
-              format = FileFormat.CSV,
+              format = Some(FileFormat.CSV),
               options = Map.empty
             ),
             schema = SchemaConfig(
@@ -661,7 +661,7 @@ object FKValidationProperties extends Properties("FKValidation") {
         source = SourceConfig(
           `type` = SourceType.File,
           path = "/test",
-          format = FileFormat.CSV,
+          format = Some(FileFormat.CSV),
           options = Map.empty
         ),
         schema = SchemaConfig(

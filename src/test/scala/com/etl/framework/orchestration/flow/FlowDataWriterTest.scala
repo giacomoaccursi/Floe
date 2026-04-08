@@ -50,7 +50,7 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       name = name,
       primaryKey = Seq.empty,
       sourcePath = "/tmp/test_source",
-      format = FileFormat.Parquet,
+      format = Some(FileFormat.Parquet),
       output = OutputConfig(rejectedPath = rejectedPath)
     )
 

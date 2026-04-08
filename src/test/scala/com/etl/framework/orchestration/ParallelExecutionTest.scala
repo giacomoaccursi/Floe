@@ -47,7 +47,7 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
       source = SourceConfig(
         `type` = SourceType.File,
         path = inputPath,
-        format = FileFormat.CSV,
+        format = Some(FileFormat.CSV),
         options = Map("header" -> "true")
       ),
       schema = SchemaConfig(
@@ -161,7 +161,7 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
         source = SourceConfig(
           `type` = SourceType.File,
           path = inputPathB,
-          format = FileFormat.CSV,
+          format = Some(FileFormat.CSV),
           options = Map("header" -> "true")
         ),
         schema = SchemaConfig(

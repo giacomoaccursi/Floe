@@ -25,7 +25,7 @@ case class FlowConfig(
 case class SourceConfig(
     `type`: SourceType = SourceType.File,
     path: String,
-    format: FileFormat,
+    format: Option[FileFormat] = None,
     options: Map[String, String] = Map.empty
 )
 

@@ -43,7 +43,8 @@ libraryDependencies ++= Seq(
   // Testing
   "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
   "org.scalacheck" %% "scalacheck" % scalaCheckVersion % Test,
-  "org.scalatestplus" %% "scalacheck-1-17" % "3.2.18.0" % Test
+  "org.scalatestplus" %% "scalacheck-1-17" % "3.2.18.0" % Test,
+  "com.h2database" % "h2" % "2.2.224" % Test
 )
 
 // Compiler options

@@ -45,19 +45,21 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
       .option("header", "true")
       .save(inputPath)
 
-    TestFixtures.flowConfig(
-      name = flowName,
-      enforceSchema = true,
-      allowExtraColumns = false,
-      sourcePath = inputPath,
-      columns = Seq(
-        ColumnConfig("id", "string", nullable = false, "Primary key"),
-        ColumnConfig("value", "string", nullable = true, "Value")
-      ),
-      output = OutputConfig(
-        rejectedPath = Some(s"$tempDir/rejected/$flowName")
+    TestFixtures
+      .flowConfig(
+        name = flowName,
+        enforceSchema = true,
+        allowExtraColumns = false,
+        sourcePath = inputPath,
+        columns = Seq(
+          ColumnConfig("id", "string", nullable = false, "Primary key"),
+          ColumnConfig("value", "string", nullable = true, "Value")
+        ),
+        output = OutputConfig(
+          rejectedPath = Some(s"$tempDir/rejected/$flowName")
+        )
       )
-    ).copy(source = SourceConfig(path = inputPath, format = FileFormat.CSV, options = Map("header" -> "true")))
+      .copy(source = SourceConfig(path = inputPath, format = Some(FileFormat.CSV), options = Map("header" -> "true")))
   }
 
   private def createGlobalConfig(

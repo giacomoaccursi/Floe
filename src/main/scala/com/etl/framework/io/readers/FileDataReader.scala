@@ -21,11 +21,16 @@ class FileDataReader(
     *   if file format is not supported
     */
   override def read(): DataFrame = {
-    // Validate format
-    validateFormat(sourceConfig.format.name) // Use .name
+    val format = sourceConfig.format.getOrElse(
+      throw UnsupportedOperationException(
+        operation = "file read without format",
+        details = "File source requires a format (csv, parquet, json)"
+      )
+    )
 
-    // Create reader with format
-    var reader = spark.read.format(sourceConfig.format.name) // Use .name
+    validateFormat(format.name)
+
+    var reader = spark.read.format(format.name)
 
     // Apply schema if provided and enforceSchema is true
     schemaConfig.foreach { schema =>

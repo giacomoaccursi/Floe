@@ -13,7 +13,7 @@ object TestFixtures {
       enforceSchema: Boolean = false,
       allowExtraColumns: Boolean = true,
       sourcePath: String = "/tmp/test",
-      format: FileFormat = FileFormat.CSV,
+      format: Option[FileFormat] = Some(FileFormat.CSV),
       rules: Seq[ValidationRule] = Seq.empty,
       output: OutputConfig = OutputConfig(),
       detectDeletes: Boolean = false,

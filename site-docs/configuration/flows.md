@@ -163,6 +163,13 @@ Defines the expected schema and controls enforcement during read.
 | `allowExtraColumns` | no | `true` | If `false`, reject data with columns not defined in `columns`. Only evaluated when `enforceSchema: true`. |
 | `columns` | no | `[]` | List of column definitions. Required when `enforceSchema: true`. |
 
+When schema enforcement is not needed, the minimal configuration is:
+
+```yaml
+schema:
+  enforceSchema: false
+```
+
 ### Column definition
 
 | Field | Required | Default | Description |

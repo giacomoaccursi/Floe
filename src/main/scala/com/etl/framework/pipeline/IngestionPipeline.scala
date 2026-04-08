@@ -12,7 +12,7 @@ import com.etl.framework.config.{
 import com.etl.framework.core.FlowTransformation
 import com.etl.framework.exceptions.MissingConfigFieldException
 import com.etl.framework.iceberg.catalog.{CatalogFactory, CatalogProvider}
-import com.etl.framework.orchestration.{FlowOrchestrator, IngestionResult}
+import com.etl.framework.orchestration.{FlowOrchestrator, IngestionResult, BatchListener}
 import com.etl.framework.validation.Validator
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
@@ -27,7 +27,8 @@ class IngestionPipeline private (
     domainsConfig: Option[DomainsConfig],
     extraCatalogProviders: Map[String, () => CatalogProvider],
     customValidators: Map[String, () => Validator],
-    derivedTables: Seq[(String, DerivedTableContext => DataFrame)]
+    derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
+    batchListeners: Seq[BatchListener]
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -54,7 +55,8 @@ class IngestionPipeline private (
     }
 
     // Create and execute orchestrator with DomainsConfig
-    val orchestrator = FlowOrchestrator(globalConfig, enrichedFlowConfigs, domainsConfig, customValidators.toMap)
+    val orchestrator =
+      FlowOrchestrator(globalConfig, enrichedFlowConfigs, domainsConfig, customValidators.toMap, batchListeners)
     val result = orchestrator.execute()
 
     // Execute derived tables after all flows have been written to Iceberg
@@ -117,6 +119,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private val extraCatalogProviders = mutable.Map[String, () => CatalogProvider]()
   private val customValidators = mutable.Map[String, () => Validator]()
   private val derivedTables = mutable.ListBuffer[(String, DerivedTableContext => DataFrame)]()
+  private val batchListeners = mutable.ListBuffer[BatchListener]()
   private var configVariables: scala.collection.immutable.Map[String, String] = scala.collection.immutable.Map.empty
 
   /** Sets the configuration directory path Loads global.yaml, domains.yaml, and flows/ *.yaml from this directory
@@ -302,6 +305,11 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     this
   }
 
+  def withBatchListener(listener: BatchListener): IngestionPipelineBuilder = {
+    batchListeners += listener
+    this
+  }
+
   /** Builds the IngestionPipeline
     *
     * @return
@@ -348,7 +356,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       domainsConfigOpt,
       extraCatalogProviders.toMap,
       customValidators.toMap,
-      derivedTables.toSeq
+      derivedTables.toSeq,
+      batchListeners.toSeq
     )
   }
 
@@ -436,7 +445,8 @@ object IngestionPipeline {
       domainsConfig: Option[DomainsConfig],
       extraCatalogProviders: Map[String, () => CatalogProvider],
       customValidators: Map[String, () => Validator],
-      derivedTables: Seq[(String, DerivedTableContext => DataFrame)]
+      derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
+      batchListeners: Seq[BatchListener] = Seq.empty
   )(implicit spark: SparkSession): IngestionPipeline = {
     new IngestionPipeline(
       globalConfig,
@@ -445,7 +455,8 @@ object IngestionPipeline {
       domainsConfig,
       extraCatalogProviders,
       customValidators,
-      derivedTables
+      derivedTables,
+      batchListeners
     )
   }
 

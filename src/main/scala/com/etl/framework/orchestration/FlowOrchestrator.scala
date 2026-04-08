@@ -50,7 +50,8 @@ class FlowOrchestrator(
     resultProcessor: FlowResultProcessor,
     metadataWriter: BatchMetadataWriter,
     executionLogger: ExecutionLogger,
-    threadPool: Option[java.util.concurrent.ExecutorService] = None
+    threadPool: Option[java.util.concurrent.ExecutorService] = None,
+    batchListeners: Seq[BatchListener] = Seq.empty
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -70,29 +71,46 @@ class FlowOrchestrator(
     val flowResults = mutable.ArrayBuffer[FlowResult]()
     val validatedFlows = mutable.Map[String, DataFrame]()
 
-    try {
-      val plan = buildExecutionPlan()
+    val result =
+      try {
+        val plan = buildExecutionPlan()
 
-      plan.groups.foreach { group =>
-        executionLogger.logGroupStart(group)
+        plan.groups.foreach { group =>
+          executionLogger.logGroupStart(group)
 
-        val groupResults = executeGroup(group, batchId, validatedFlows.toMap)
+          val groupResults = executeGroup(group, batchId, validatedFlows.toMap)
 
-        resultProcessor.processGroupResults(groupResults, flowResults, validatedFlows, batchId) match {
-          case resultProcessor.StopExecution(result) =>
-            return result
-          case resultProcessor.Continue =>
-          // Continue to next group
+          resultProcessor.processGroupResults(groupResults, flowResults, validatedFlows, batchId) match {
+            case resultProcessor.StopExecution(r) =>
+              notifyListeners(r)
+              return r
+            case resultProcessor.Continue =>
+            // Continue to next group
+          }
         }
+
+        createSuccessResult(batchId, flowResults.toSeq, startTime, plan)
+
+      } catch {
+        case e: Exception =>
+          handleExecutionFailure(batchId, flowResults.toSeq, startTime, e)
+      } finally {
+        threadPool.foreach(_.shutdown())
       }
 
-      createSuccessResult(batchId, flowResults.toSeq, startTime, plan)
+    notifyListeners(result)
+    result
+  }
 
-    } catch {
-      case e: Exception =>
-        handleExecutionFailure(batchId, flowResults.toSeq, startTime, e)
-    } finally {
-      threadPool.foreach(_.shutdown())
+  private def notifyListeners(result: IngestionResult): Unit = {
+    batchListeners.foreach { listener =>
+      try {
+        if (result.success) listener.onBatchCompleted(result)
+        else listener.onBatchFailed(result)
+      } catch {
+        case e: Exception =>
+          logger.warn(s"Batch listener ${listener.getClass.getSimpleName} failed: ${e.getMessage}")
+      }
     }
   }
 
@@ -220,7 +238,8 @@ object FlowOrchestrator {
       globalConfig: GlobalConfig,
       flowConfigs: Seq[FlowConfig],
       domainsConfig: Option[DomainsConfig] = None,
-      customValidators: Map[String, () => Validator] = Map.empty
+      customValidators: Map[String, () => Validator] = Map.empty,
+      batchListeners: Seq[BatchListener] = Seq.empty
   )(implicit spark: SparkSession): FlowOrchestrator = {
     val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
     val ec = ExecutionContext.fromExecutorService(pool)
@@ -239,7 +258,8 @@ object FlowOrchestrator {
       resultProcessor = resultProcessor,
       metadataWriter = metadataWriter,
       executionLogger = executionLogger,
-      threadPool = Some(pool)
+      threadPool = Some(pool),
+      batchListeners = batchListeners
     )
   }
 }

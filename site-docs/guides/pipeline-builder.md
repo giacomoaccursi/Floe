@@ -41,6 +41,7 @@ val result = pipeline.execute()
 | `withCustomValidator(name, factory)` | Registers a custom validator by name. Use the same name in the flow YAML `class` field. |
 | `withCatalogProvider(type, provider)` | Registers a custom Iceberg catalog provider |
 | `withDerivedTable(name, fn)` | Registers a derived table computed after all flows are written to Iceberg |
+| `withBatchListener(listener)` | Registers a listener notified on batch completion or failure. See [Batch Listeners](batch-listeners.md). |
 | `withVariables(variables)` | Sets variables for YAML substitution (priority over env vars). See [Configuration Overview](../configuration/overview.md#variable-substitution) |
 | `build()` | Builds the pipeline (returns `IngestionPipeline`) |
 

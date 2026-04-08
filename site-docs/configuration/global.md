@@ -63,6 +63,8 @@ Controls batch execution and validation behavior. This entire section is optiona
 | Field | Default | Description |
 |-------|---------|-------------|
 | `batchIdFormat` | `yyyyMMdd_HHmmss` | Java `DateTimeFormatter` pattern for batch ID generation. Use `timestamp` for epoch millis (e.g. `1711648200000`). |
+
+Low-granularity formats like `yyyyMMdd` produce the same batch ID if the pipeline runs more than once in the same day. This is safe for Full and Delta loads (idempotent), but SCD2 flows may create extra versions and snapshot tagging will fail on the duplicate tag. Use the default `yyyyMMdd_HHmmss` or `timestamp` to avoid collisions.
 | `maxRejectionRate` | — (disabled) | If set, the batch stops when any flow's rejection rate exceeds this threshold (0.1 = 10%). If omitted, the batch never stops for rejected records. |
 | `maxRetries` | `0` | Maximum number of retries per flow on failure. `0` means no retry. |
 | `retryBackoffMs` | `1000` | Base delay in milliseconds for exponential backoff between retries. Actual delay: `baseDelay * 2^attempt + random jitter`. |

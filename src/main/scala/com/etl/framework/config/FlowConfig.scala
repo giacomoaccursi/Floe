@@ -43,7 +43,8 @@ case class ColumnConfig(
     name: String,
     `type`: String,
     nullable: Boolean,
-    description: String = ""
+    description: String = "",
+    sourceColumn: Option[String] = None
 )
 
 /** Load mode configuration

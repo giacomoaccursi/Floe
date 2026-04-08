@@ -171,6 +171,7 @@ Defines the expected schema and controls enforcement during read.
 | `type` | yes | — | Data type (see table below) |
 | `nullable` | yes | — | Whether the column allows NULL values. `false` triggers not-null validation. |
 | `description` | no | `""` | Human-readable description |
+| `sourceColumn` | no | — | Original column name in the source data. When set, the framework renames this column to `name` before validation. |
 
 ### Column types
 

@@ -67,9 +67,12 @@ class FlowExecutor(
       readData()
     }
 
+    // 1b. Apply column renames from sourceColumn mappings
+    val renamedData = applyColumnRenames(rawData)
+
     // 2. Apply pre-validation transformations
     val preTransformedData =
-      transformer.applyPreValidationTransformation(rawData, batchId)
+      transformer.applyPreValidationTransformation(renamedData, batchId)
 
     val cachedInput = preTransformedData.cache()
     try {
@@ -116,6 +119,15 @@ class FlowExecutor(
     val reader =
       DataReaderFactory.create(flowConfig.source, Some(flowConfig.schema))
     reader.read()
+  }
+
+  private def applyColumnRenames(df: DataFrame): DataFrame = {
+    val renames = flowConfig.schema.columns.flatMap { col =>
+      col.sourceColumn.map(src => src -> col.name)
+    }
+    renames.foldLeft(df) { case (acc, (from, to)) =>
+      acc.withColumnRenamed(from, to)
+    }
   }
 
   protected def validateData(data: DataFrame): ValidationResult = {

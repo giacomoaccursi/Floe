@@ -13,6 +13,7 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
     .appName("FileDataReaderTest")
     .master("local[*]")
     .config("spark.ui.enabled", "false")
+      .config("spark.driver.bindAddress", "127.0.0.1")
     .getOrCreate()
 
   def createTempCsv(content: String): Path = {

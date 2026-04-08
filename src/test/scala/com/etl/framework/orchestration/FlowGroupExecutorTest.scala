@@ -51,6 +51,7 @@ class FlowGroupExecutorTest extends AnyFlatSpec with Matchers {
         .appName("FlowGroupExecutorTest")
         .master("local[*]")
         .config("spark.ui.enabled", "false")
+      .config("spark.driver.bindAddress", "127.0.0.1")
         .getOrCreate()
 
     new FlowGroupExecutor(makeConfig(maxRejectionRate), None, scala.concurrent.ExecutionContext.global)

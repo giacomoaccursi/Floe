@@ -27,6 +27,7 @@ object PKValidationProperties extends Properties("PKValidation") {
     .appName("PKValidationPropertiesTest")
     .master("local[2]")
     .config("spark.ui.enabled", "false")
+      .config("spark.driver.bindAddress", "127.0.0.1")
     .config("spark.sql.shuffle.partitions", "2")
     .getOrCreate()
 

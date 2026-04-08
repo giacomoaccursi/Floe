@@ -16,6 +16,7 @@ class SchemaValidationTest extends AnyFlatSpec with Matchers {
     .appName("SchemaValidationTest")
     .master("local[*]")
     .config("spark.ui.enabled", "false")
+      .config("spark.driver.bindAddress", "127.0.0.1")
     .getOrCreate()
 
   def createFlowConfig(

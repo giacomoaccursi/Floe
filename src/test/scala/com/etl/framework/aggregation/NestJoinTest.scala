@@ -12,6 +12,7 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
     .appName("NestJoinTest")
     .master("local[*]")
     .config("spark.ui.enabled", "false")
+      .config("spark.driver.bindAddress", "127.0.0.1")
     .config("spark.sql.shuffle.partitions", "2")
     .getOrCreate()
 

@@ -17,6 +17,7 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     .appName("BatchMetadataTest")
     .master("local[*]")
     .config("spark.ui.enabled", "false")
+      .config("spark.driver.bindAddress", "127.0.0.1")
     .config("spark.sql.shuffle.partitions", "2")
     .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
     .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog")

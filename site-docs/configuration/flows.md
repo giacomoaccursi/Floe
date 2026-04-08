@@ -151,6 +151,41 @@ options:
 
 The JDBC driver must be on the classpath. The framework does not bundle any database drivers.
 
+### Incremental reads
+
+For both JDBC and file sources, use variable substitution to read only new data:
+
+```yaml
+# JDBC: filter by timestamp
+source:
+  type: jdbc
+  path: "public.orders"
+  options:
+    url: "jdbc:postgresql://host:5432/mydb"
+    query: "SELECT * FROM orders WHERE updated_at > '${LAST_BATCH_DATE}'"
+
+# File: read only today's partition
+source:
+  type: file
+  path: "s3://bucket/data/orders/date=${BATCH_DATE}/"
+  format: parquet
+```
+
+Pass the variable values at runtime via the pipeline builder:
+
+```scala
+IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .withVariables(Map(
+    "LAST_BATCH_DATE" -> "2024-03-15",
+    "BATCH_DATE" -> "2024-03-16"
+  ))
+  .build()
+  .execute()
+```
+
+The framework substitutes `${VAR_NAME}` in the YAML before parsing. Variables passed via `withVariables()` take priority over environment variables.
+
 For details on file formats, see [Data Sources](../guides/data-sources.md).
 
 ## schema

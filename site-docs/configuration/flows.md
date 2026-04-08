@@ -93,7 +93,7 @@ Defines where data is read from.
 |-------|----------|---------|-------------|
 | `type` | no | `file` | Source type: `file` or `jdbc` |
 | `path` | yes | — | For `file`: path to data (file, directory, or glob). For `jdbc`: table name (e.g. `public.customers`) |
-| `format` | for `file` | — | File format: `csv`, `parquet`, `json`. Not used for `jdbc`. |
+| `format` | for `file` | — | File format: `csv`, `parquet`, `json`, `avro`, `orc`. Not used for `jdbc`. |
 | `options` | no | `{}` | Options passed to the Spark reader |
 
 ### File source

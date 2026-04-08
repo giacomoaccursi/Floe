@@ -4,13 +4,15 @@ The framework reads data through pluggable readers based on the `source.type` in
 
 ## File sources
 
-Supports CSV, Parquet, and JSON formats with optional schema enforcement.
+Supports CSV, Parquet, JSON, Avro, and ORC formats with optional schema enforcement.
 
 | Format | Description |
 |--------|-------------|
 | `csv` | Comma-separated values (or custom delimiter) |
 | `parquet` | Columnar binary format |
 | `json` | JSON lines (one JSON object per line) |
+| `avro` | Apache Avro binary format (requires `spark-avro` on classpath) |
+| `orc` | Optimized Row Columnar format (included in Spark) |
 
 Unsupported formats throw an `UnsupportedOperationException` listing the valid options.
 

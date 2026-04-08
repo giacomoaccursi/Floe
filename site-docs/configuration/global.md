@@ -14,6 +14,8 @@ paths:
 processing:
   batchIdFormat: "yyyyMMdd"
   maxRejectionRate: 0.1
+  maxRetries: 3
+  retryBackoffMs: 2000
 
 performance:
   parallelFlows: true
@@ -61,6 +63,8 @@ Controls batch execution and validation behavior. This entire section is optiona
 |-------|---------|-------------|
 | `batchIdFormat` | `yyyyMMdd_HHmmss` | Java `DateTimeFormatter` pattern for batch ID generation. Use `timestamp` for epoch millis (e.g. `1711648200000`). |
 | `maxRejectionRate` | — (disabled) | If set, the batch stops when any flow's rejection rate exceeds this threshold (0.1 = 10%). If omitted, the batch never stops for rejected records. |
+| `maxRetries` | `0` | Maximum number of retries per flow on failure. `0` means no retry. |
+| `retryBackoffMs` | `1000` | Base delay in milliseconds for exponential backoff between retries. Actual delay: `baseDelay * 2^attempt + random jitter`. |
 
 ### Rejection behavior
 
@@ -73,6 +77,20 @@ Controls batch execution and validation behavior. This entire section is optiona
 The comparison uses strict `>` (not `>=`): a rejection rate exactly equal to the threshold does not trigger a stop.
 
 Individual flows can override the global threshold with their own `maxRejectionRate` field. See [Flow Configuration](../configuration/flows.md).
+
+### Retry behavior
+
+When `maxRetries` is greater than 0, the framework retries failed flows using exponential backoff with jitter:
+
+| Attempt | Delay |
+|---------|-------|
+| 1st retry | `retryBackoffMs` + jitter |
+| 2nd retry | `retryBackoffMs × 2` + jitter |
+| 3rd retry | `retryBackoffMs × 4` + jitter |
+
+Jitter is a random value between 0 and `retryBackoffMs`, added to prevent thundering herd when multiple flows retry simultaneously.
+
+A flow is retried only when it throws an exception (e.g. network timeout, Iceberg commit conflict). Validation failures (rejected records) are not retried — they produce a `FlowResult` with `success = true` and the rejected records are written normally.
 
 For the full validation pipeline, see [Validation Engine](../guides/validation.md).
 

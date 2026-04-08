@@ -39,6 +39,8 @@ test-*.log
 !README.md
 !docs/
 !docs/**/*.md
+!site-docs/
+!site-docs/**/*.md
 docs/technical-review.md
 
 # Scripts

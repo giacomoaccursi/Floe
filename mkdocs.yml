@@ -62,6 +62,7 @@ nav:
     - Pipeline Builder: guides/pipeline-builder.md
     - Orphan Detection: guides/orphan-detection.md
     - Batch Listeners: guides/batch-listeners.md
+    - Quality Metrics: guides/quality-metrics.md
     - Custom Validators: guides/custom-validators.md
     - Cloud Deployment: guides/cloud-deployment.md
   - Architecture:

@@ -16,7 +16,8 @@ case class OrphanReport(
     orphanCount: Long,
     removedParentKeyCount: Long,
     actionTaken: String,
-    deletedChildKeyCount: Long = 0
+    deletedChildKeyCount: Long = 0,
+    cascadeSource: Option[String] = None
 )
 
 class OrphanDetector(
@@ -42,6 +43,12 @@ class OrphanDetector(
         }
       }
     }
+
+    // Unpersist any cached DataFrames that were stored via cache() (not localCheckpoint)
+    removedKeysByFlow.values.foreach { df =>
+      try { df.unpersist() } catch { case _: Exception => }
+    }
+
     reports.toSeq
   }
 
@@ -55,12 +62,16 @@ class OrphanDetector(
 
     (parentFlowConfig, parentResult) match {
       case (Some(parentCfg), Some(parentRes)) =>
+        val isCascade = removedKeysByFlow.contains(parentCfg.name)
         findRemovedParentKeys(parentCfg, parentRes, fk, removedKeysByFlow).flatMap { removed =>
           val cached = removed.cache()
           try {
             val removedCount = cached.count()
             if (removedCount == 0) None
-            else resolveOrphans(childFlow, fk, cached, removedCount, removedKeysByFlow)
+            else {
+              val cascadeSrc = if (isCascade) Some(parentCfg.name) else None
+              resolveOrphans(childFlow, fk, cached, removedCount, removedKeysByFlow, cascadeSrc)
+            }
           } finally {
             cached.unpersist()
           }
@@ -84,7 +95,7 @@ class OrphanDetector(
       case Some(cascadedKeys) =>
         val refCols = fk.references.columns
         if (refCols.forall(cascadedKeys.columns.contains)) {
-          Some(cascadedKeys.select(refCols.map(col): _*))
+          Some(cascadedKeys.select(refCols.map(col): _*).distinct())
         } else None
       case None =>
         findRemovedKeysViaTimeTravel(parentCfg, parentResult, fk)
@@ -111,7 +122,7 @@ class OrphanDetector(
       case Some(prevSnapshotId) =>
         val tableName = tableManager.resolveTableName(parentCfg)
         val refCols = fk.references.columns
-        val selectExpr = refCols.mkString(", ")
+        val selectExpr = refCols.map(c => s"`$c`").mkString(", ")
 
         try {
           val previousPKs = spark
@@ -121,7 +132,7 @@ class OrphanDetector(
           val currentPKs = parentCfg.loadMode.`type` match {
             case LoadMode.SCD2 =>
               val isCurrentCol = parentCfg.loadMode.isCurrentColumn.getOrElse("is_current")
-              spark.sql(s"SELECT $selectExpr FROM $tableName WHERE $isCurrentCol = true").distinct()
+              spark.sql(s"SELECT $selectExpr FROM $tableName WHERE `$isCurrentCol` = true").distinct()
             case _ =>
               spark.sql(s"SELECT $selectExpr FROM $tableName").distinct()
           }
@@ -141,7 +152,8 @@ class OrphanDetector(
       fk: ForeignKeyConfig,
       removedParentKeys: DataFrame,
       removedCount: Long,
-      removedKeysByFlow: mutable.Map[String, DataFrame]
+      removedKeysByFlow: mutable.Map[String, DataFrame],
+      cascadeSource: Option[String]
   ): Option[OrphanReport] = {
     val childTableName = tableManager.resolveTableName(childFlow)
     val fkCols = fk.columns
@@ -154,38 +166,50 @@ class OrphanDetector(
       if (fkCol != refCol) renamedKeys = renamedKeys.withColumnRenamed(refCol, fkCol)
     }
 
-    val childTable = spark.sql(s"SELECT * FROM $childTableName")
-    val orphans = childTable.join(renamedKeys, fkCols, "inner")
-    val orphanCount = orphans.count()
-
-    if (orphanCount == 0) return None
+    // Select only FK + PK columns from child table instead of SELECT *
+    val childPkCols = childFlow.validation.primaryKey
+    val childTableCols = spark.table(childTableName).columns.toSet
+    val columnsNeeded = (fkCols ++ childPkCols).distinct.filter(childTableCols.contains)
+    val selectCols = columnsNeeded.map(c => s"`$c`").mkString(", ")
+    val childProjection = spark.sql(s"SELECT $selectCols FROM $childTableName")
+    val orphans = childProjection.join(renamedKeys, fkCols, "inner")
 
     fk.onOrphan match {
       case OrphanAction.Warn =>
+        val orphanCount = orphans.count()
+        if (orphanCount == 0) return None
         logger.warn(
           s"Orphan detection: ${childFlow.name}.${fk.displayName} has $orphanCount " +
             s"orphaned records ($removedCount parent keys removed from ${fk.references.flow})"
         )
-        Some(OrphanReport(childFlow.name, fk.displayName, fk.references.flow, orphanCount, removedCount, "warn"))
+        Some(OrphanReport(
+          childFlow.name, fk.displayName, fk.references.flow,
+          orphanCount, removedCount, "warn", cascadeSource = cascadeSource
+        ))
 
       case OrphanAction.Delete =>
+        // Materialize cascade keys BEFORE delete (delete mutates the table, invalidating lazy lineage).
+        // Use localCheckpoint to break lineage dependency on the parent removed-keys DataFrame,
+        // which will be unpersisted by the caller after this method returns.
+        val cascadeCols = columnsNeeded
+        val cachedOrphans = orphans.select(cascadeCols.map(col): _*).distinct().localCheckpoint()
+        val orphanCount = cachedOrphans.count()
+        if (orphanCount == 0) {
+          cachedOrphans.unpersist()
+          return None
+        }
+
         logger.info(
           s"Orphan detection: deleting $orphanCount orphaned records " +
             s"from ${childFlow.name} (FK: ${fk.displayName})"
         )
 
-        val childPkCols = childFlow.validation.primaryKey
-        val deletedChildKeys =
-          if (childPkCols.nonEmpty) Some(orphans.select(childPkCols.map(col): _*).distinct())
-          else None
-
-        // Build multi-column DELETE condition
+        // Build DELETE condition using temp view
         val viewName = s"_orphan_removed_pks_${childFlow.name}_${fkCols.mkString("_")}"
         renamedKeys.createOrReplaceTempView(viewName)
-
         try {
           val deleteCondition = fkCols
-            .map(c => s"$childTableName.$c = $viewName.$c")
+            .map(c => s"$childTableName.`$c` = $viewName.`$c`")
             .mkString(" AND ")
           spark.sql(
             s"DELETE FROM $childTableName WHERE EXISTS (SELECT 1 FROM $viewName WHERE $deleteCondition)"
@@ -194,19 +218,29 @@ class OrphanDetector(
           spark.catalog.dropTempView(viewName)
         }
 
-        deletedChildKeys.foreach(dck => removedKeysByFlow(childFlow.name) = dck)
+        // Save cascade keys for downstream grandchild detection
+        if (columnsNeeded.nonEmpty) {
+          removedKeysByFlow.get(childFlow.name) match {
+            case Some(existing) =>
+              val merged = existing
+                .unionByName(cachedOrphans, allowMissingColumns = true)
+                .distinct()
+                .cache()
+              merged.count()
+              existing.unpersist()
+              cachedOrphans.unpersist()
+              removedKeysByFlow(childFlow.name) = merged
+            case None =>
+              removedKeysByFlow(childFlow.name) = cachedOrphans
+          }
+        } else {
+          cachedOrphans.unpersist()
+        }
 
-        Some(
-          OrphanReport(
-            childFlow.name,
-            fk.displayName,
-            fk.references.flow,
-            orphanCount,
-            removedCount,
-            "delete",
-            orphanCount
-          )
-        )
+        Some(OrphanReport(
+          childFlow.name, fk.displayName, fk.references.flow,
+          orphanCount, removedCount, "delete", orphanCount, cascadeSource
+        ))
 
       case OrphanAction.Ignore => None
     }

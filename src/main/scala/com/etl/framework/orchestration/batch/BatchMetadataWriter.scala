@@ -39,7 +39,7 @@ class BatchMetadataWriter(
     val overallRejectionRate = if (totalInput > 0) totalRejected.toDouble / totalInput else 0.0
 
     val orphanReportsData = orphanReports.map { report =>
-      Map[String, Any](
+      val base = Map[String, Any](
         "flow_name" -> report.flowName,
         "fk_name" -> report.fkName,
         "parent_flow_name" -> report.parentFlowName,
@@ -48,6 +48,10 @@ class BatchMetadataWriter(
         "action_taken" -> report.actionTaken,
         "deleted_child_key_count" -> report.deletedChildKeyCount
       )
+      report.cascadeSource match {
+        case Some(src) => base + ("cascade_source" -> src)
+        case None      => base
+      }
     }
 
     val metadata = Map(

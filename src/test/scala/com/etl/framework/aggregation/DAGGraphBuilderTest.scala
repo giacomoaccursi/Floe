@@ -22,12 +22,14 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
     DAGNode(
       id = id,
       sourceFlow = s"flow_$id",
-      joins = Seq(JoinConfig(
-        `type` = JoinType.LeftOuter,
-        `with` = withNode,
-        conditions = Seq(JoinCondition("id", "id")),
-        strategy = JoinStrategy.Nest
-      ))
+      joins = Seq(
+        JoinConfig(
+          `type` = JoinType.LeftOuter,
+          `with` = withNode,
+          conditions = Seq(JoinCondition("id", "id")),
+          strategy = JoinStrategy.Nest
+        )
+      )
     )
 
   "DAGGraphBuilder" should "build dependency graph with no joins" in {

@@ -15,7 +15,7 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
     .appName("DAGNodeProcessorTest")
     .master("local[*]")
     .config("spark.ui.enabled", "false")
-      .config("spark.driver.bindAddress", "127.0.0.1")
+    .config("spark.driver.bindAddress", "127.0.0.1")
     .config("spark.sql.shuffle.partitions", "1")
     .getOrCreate()
 

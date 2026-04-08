@@ -18,7 +18,7 @@ class DataReaderTest extends AnyFlatSpec with Matchers {
     .appName("DataReaderTest")
     .master("local[*]")
     .config("spark.ui.enabled", "false")
-      .config("spark.driver.bindAddress", "127.0.0.1")
+    .config("spark.driver.bindAddress", "127.0.0.1")
     .getOrCreate()
 
   import spark.implicits._

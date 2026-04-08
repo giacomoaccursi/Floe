@@ -46,7 +46,8 @@ class OrphanDetector(
 
     // Unpersist any cached DataFrames that were stored via cache() (not localCheckpoint)
     removedKeysByFlow.values.foreach { df =>
-      try { df.unpersist() } catch { case _: Exception => }
+      try { df.unpersist() }
+      catch { case _: Exception => }
     }
 
     reports.toSeq
@@ -182,10 +183,17 @@ class OrphanDetector(
           s"Orphan detection: ${childFlow.name}.${fk.displayName} has $orphanCount " +
             s"orphaned records ($removedCount parent keys removed from ${fk.references.flow})"
         )
-        Some(OrphanReport(
-          childFlow.name, fk.displayName, fk.references.flow,
-          orphanCount, removedCount, "warn", cascadeSource = cascadeSource
-        ))
+        Some(
+          OrphanReport(
+            childFlow.name,
+            fk.displayName,
+            fk.references.flow,
+            orphanCount,
+            removedCount,
+            "warn",
+            cascadeSource = cascadeSource
+          )
+        )
 
       case OrphanAction.Delete =>
         // Materialize cascade keys BEFORE delete (delete mutates the table, invalidating lazy lineage).
@@ -237,10 +245,18 @@ class OrphanDetector(
           cachedOrphans.unpersist()
         }
 
-        Some(OrphanReport(
-          childFlow.name, fk.displayName, fk.references.flow,
-          orphanCount, removedCount, "delete", orphanCount, cascadeSource
-        ))
+        Some(
+          OrphanReport(
+            childFlow.name,
+            fk.displayName,
+            fk.references.flow,
+            orphanCount,
+            removedCount,
+            "delete",
+            orphanCount,
+            cascadeSource
+          )
+        )
 
       case OrphanAction.Ignore => None
     }

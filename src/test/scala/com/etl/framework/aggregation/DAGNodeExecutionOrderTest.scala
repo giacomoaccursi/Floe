@@ -13,7 +13,7 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
     .appName("DAGNodeExecutionOrderTest")
     .master("local[*]")
     .config("spark.ui.enabled", "false")
-      .config("spark.driver.bindAddress", "127.0.0.1")
+    .config("spark.driver.bindAddress", "127.0.0.1")
     .config("spark.sql.shuffle.partitions", "2")
     .getOrCreate()
 
@@ -30,12 +30,14 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
     DAGNode(
       id = id,
       sourceFlow = s"flow_$id",
-      joins = Seq(JoinConfig(
-        `type` = JoinType.LeftOuter,
-        `with` = withNode,
-        conditions = Seq(JoinCondition("id", "id")),
-        strategy = JoinStrategy.Nest
-      ))
+      joins = Seq(
+        JoinConfig(
+          `type` = JoinType.LeftOuter,
+          `with` = withNode,
+          conditions = Seq(JoinCondition("id", "id")),
+          strategy = JoinStrategy.Nest
+        )
+      )
     )
 
   private def createDagConfig(nodes: Seq[DAGNode]): AggregationConfig =

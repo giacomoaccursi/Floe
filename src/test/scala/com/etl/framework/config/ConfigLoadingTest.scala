@@ -62,7 +62,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
       batchIdFormat = "yyyyMMdd_HHmmss"
     ),
     performance = PerformanceConfig(
-      parallelFlows = true,
+      parallelFlows = true
     ),
     iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )

@@ -141,15 +141,21 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     val pr2 = writer.writeFullLoad(customers2, customersConfig)
 
     val flowResults = Seq(
-      makeFlowResult("od_customers", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(customersConfig))),
+      makeFlowResult(
+        "od_customers",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(customersConfig))
+      ),
       makeFlowResult("od_orders", None, None)
     )
     val flowConfigs = Seq(customersConfig, ordersConfig)
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(customersConfig), parallel = false),
-      ExecutionGroup(Seq(ordersConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(customersConfig), parallel = false),
+        ExecutionGroup(Seq(ordersConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -188,15 +194,21 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     val pr2 = writer.writeFullLoad(customers2, customersConfig)
 
     val flowResults = Seq(
-      makeFlowResult("od_cust_del", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(customersConfig))),
+      makeFlowResult(
+        "od_cust_del",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(customersConfig))
+      ),
       makeFlowResult("od_orders_del", None, None)
     )
     val flowConfigs = Seq(customersConfig, ordersConfig)
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(customersConfig), parallel = false),
-      ExecutionGroup(Seq(ordersConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(customersConfig), parallel = false),
+        ExecutionGroup(Seq(ordersConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -231,15 +243,16 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     writer.writeFullLoad(orders, ordersConfig)
 
     val flowResults = Seq(
-      makeFlowResult("od_cust_first", pr.snapshotId, None,
-        Some(tableManager.resolveTableName(customersConfig))),
+      makeFlowResult("od_cust_first", pr.snapshotId, None, Some(tableManager.resolveTableName(customersConfig))),
       makeFlowResult("od_orders_first", None, None)
     )
     val flowConfigs = Seq(customersConfig, ordersConfig)
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(customersConfig), parallel = false),
-      ExecutionGroup(Seq(ordersConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(customersConfig), parallel = false),
+        ExecutionGroup(Seq(ordersConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -270,15 +283,21 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     val pr2 = writer.writeFullLoad(customers2, customersConfig)
 
     val flowResults = Seq(
-      makeFlowResult("od_cust_ign", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(customersConfig))),
+      makeFlowResult(
+        "od_cust_ign",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(customersConfig))
+      ),
       makeFlowResult("od_orders_ign", None, None)
     )
     val flowConfigs = Seq(customersConfig, ordersConfig)
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(customersConfig), parallel = false),
-      ExecutionGroup(Seq(ordersConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(customersConfig), parallel = false),
+        ExecutionGroup(Seq(ordersConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -306,15 +325,16 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     writer.writeFullLoad(childData, childConfig)
 
     val flowResults = Seq(
-      makeFlowResult("od_parent_delta", pr.snapshotId, Some(999L),
-        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult("od_parent_delta", pr.snapshotId, Some(999L), Some(tableManager.resolveTableName(parentConfig))),
       makeFlowResult("od_child_delta", None, None)
     )
     val flowConfigs = Seq(parentConfig, childConfig)
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(parentConfig), parallel = false),
-      ExecutionGroup(Seq(childConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parentConfig), parallel = false),
+        ExecutionGroup(Seq(childConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -346,14 +366,20 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     val pr2 = writer.writeFullLoad(parentData2, parentConfig)
 
     val flowResults = Seq(
-      makeFlowResult("od_parent_comp", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult(
+        "od_parent_comp",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(parentConfig))
+      ),
       makeFlowResult("od_child_comp", None, None)
     )
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(parentConfig), parallel = false),
-      ExecutionGroup(Seq(childConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parentConfig), parallel = false),
+        ExecutionGroup(Seq(childConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, Seq(parentConfig, childConfig), flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -405,16 +431,22 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val flowConfigs = Seq(customersConfig, ordersConfig, linesConfig)
     val flowResults = Seq(
-      makeFlowResult("od_casc_cust", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(customersConfig))),
+      makeFlowResult(
+        "od_casc_cust",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(customersConfig))
+      ),
       makeFlowResult("od_casc_orders", None, None),
       makeFlowResult("od_casc_lines", None, None)
     )
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(customersConfig), parallel = false),
-      ExecutionGroup(Seq(ordersConfig), parallel = false),
-      ExecutionGroup(Seq(linesConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(customersConfig), parallel = false),
+        ExecutionGroup(Seq(ordersConfig), parallel = false),
+        ExecutionGroup(Seq(linesConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -474,16 +506,22 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val flowConfigs = Seq(customersConfig, ordersConfig, linesConfig)
     val flowResults = Seq(
-      makeFlowResult("od_casc_warn_cust", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(customersConfig))),
+      makeFlowResult(
+        "od_casc_warn_cust",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(customersConfig))
+      ),
       makeFlowResult("od_casc_warn_orders", None, None),
       makeFlowResult("od_casc_warn_lines", None, None)
     )
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(customersConfig), parallel = false),
-      ExecutionGroup(Seq(ordersConfig), parallel = false),
-      ExecutionGroup(Seq(linesConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(customersConfig), parallel = false),
+        ExecutionGroup(Seq(ordersConfig), parallel = false),
+        ExecutionGroup(Seq(linesConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -545,17 +583,27 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val flowConfigs = Seq(parent1Config, parent2Config, childConfig)
     val flowResults = Seq(
-      makeFlowResult("od_multi_p1", p1r2.snapshotId, p1r1.snapshotId,
-        Some(tableManager.resolveTableName(parent1Config))),
-      makeFlowResult("od_multi_p2", p2r2.snapshotId, p2r1.snapshotId,
-        Some(tableManager.resolveTableName(parent2Config))),
+      makeFlowResult(
+        "od_multi_p1",
+        p1r2.snapshotId,
+        p1r1.snapshotId,
+        Some(tableManager.resolveTableName(parent1Config))
+      ),
+      makeFlowResult(
+        "od_multi_p2",
+        p2r2.snapshotId,
+        p2r1.snapshotId,
+        Some(tableManager.resolveTableName(parent2Config))
+      ),
       makeFlowResult("od_multi_child", None, None)
     )
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(parent1Config), parallel = false),
-      ExecutionGroup(Seq(parent2Config), parallel = false),
-      ExecutionGroup(Seq(childConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parent1Config), parallel = false),
+        ExecutionGroup(Seq(parent2Config), parallel = false),
+        ExecutionGroup(Seq(childConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -607,14 +655,20 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val flowConfigs = Seq(customersConfig, ordersConfig)
     val flowResults = Seq(
-      makeFlowResult("od_no_orphan_cust", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(customersConfig))),
+      makeFlowResult(
+        "od_no_orphan_cust",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(customersConfig))
+      ),
       makeFlowResult("od_no_orphan_orders", None, None)
     )
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(customersConfig), parallel = false),
-      ExecutionGroup(Seq(ordersConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(customersConfig), parallel = false),
+        ExecutionGroup(Seq(ordersConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -642,9 +696,11 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val flowConfigs = Seq(ordersConfig)
     val flowResults = Seq(makeFlowResult("od_missing_parent_orders", None, None))
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(ordersConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(ordersConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -680,14 +736,20 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val flowConfigs = Seq(customersConfig, ordersConfig)
     val flowResults = Seq(
-      makeFlowResult("od_multi_rem_cust", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(customersConfig))),
+      makeFlowResult(
+        "od_multi_rem_cust",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(customersConfig))
+      ),
       makeFlowResult("od_multi_rem_orders", None, None)
     )
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(customersConfig), parallel = false),
-      ExecutionGroup(Seq(ordersConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(customersConfig), parallel = false),
+        ExecutionGroup(Seq(ordersConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -742,16 +804,22 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val flowConfigs = Seq(parentConfig, childConfig, grandchildConfig)
     val flowResults = Seq(
-      makeFlowResult("od_casc_comp_parent", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult(
+        "od_casc_comp_parent",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(parentConfig))
+      ),
       makeFlowResult("od_casc_comp_child", None, None),
       makeFlowResult("od_casc_comp_gc", None, None)
     )
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(parentConfig), parallel = false),
-      ExecutionGroup(Seq(childConfig), parallel = false),
-      ExecutionGroup(Seq(grandchildConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parentConfig), parallel = false),
+        ExecutionGroup(Seq(childConfig), parallel = false),
+        ExecutionGroup(Seq(grandchildConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -797,14 +865,20 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val flowConfigs = Seq(parentConfig, childConfig)
     val flowResults = Seq(
-      makeFlowResult("od_nopk_parent", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult(
+        "od_nopk_parent",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(parentConfig))
+      ),
       makeFlowResult("od_nopk_child", None, None)
     )
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(parentConfig), parallel = false),
-      ExecutionGroup(Seq(childConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parentConfig), parallel = false),
+        ExecutionGroup(Seq(childConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -858,16 +932,22 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val flowConfigs = Seq(parentConfig, childConfig, grandchildConfig)
     val flowResults = Seq(
-      makeFlowResult("od_col_mis_parent", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult(
+        "od_col_mis_parent",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(parentConfig))
+      ),
       makeFlowResult("od_col_mis_child", None, None),
       makeFlowResult("od_col_mis_gc", None, None)
     )
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(parentConfig), parallel = false),
-      ExecutionGroup(Seq(childConfig), parallel = false),
-      ExecutionGroup(Seq(grandchildConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parentConfig), parallel = false),
+        ExecutionGroup(Seq(childConfig), parallel = false),
+        ExecutionGroup(Seq(grandchildConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -885,8 +965,8 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
   // ── SCD2 tests ──────────────────────────────────────────────────────
 
   it should "detect orphans when SCD2 parent with detectDeletes closes records" in {
-    val parentConfig = makeFlowConfig("od_scd2_parent", loadMode = LoadMode.SCD2,
-      primaryKey = Seq("id"), detectDeletes = true)
+    val parentConfig =
+      makeFlowConfig("od_scd2_parent", loadMode = LoadMode.SCD2, primaryKey = Seq("id"), detectDeletes = true)
     val childConfig = makeFlowConfig(
       "od_scd2_child",
       foreignKeys = Seq(
@@ -911,14 +991,20 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val flowConfigs = Seq(parentConfig, childConfig)
     val flowResults = Seq(
-      makeFlowResult("od_scd2_parent", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult(
+        "od_scd2_parent",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(parentConfig))
+      ),
       makeFlowResult("od_scd2_child", None, None)
     )
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(parentConfig), parallel = false),
-      ExecutionGroup(Seq(childConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parentConfig), parallel = false),
+        ExecutionGroup(Seq(childConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -931,8 +1017,8 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
   }
 
   it should "skip orphan check for SCD2 parent without detectDeletes" in {
-    val parentConfig = makeFlowConfig("od_scd2_nodelete_parent", loadMode = LoadMode.SCD2,
-      primaryKey = Seq("id"), detectDeletes = false)
+    val parentConfig =
+      makeFlowConfig("od_scd2_nodelete_parent", loadMode = LoadMode.SCD2, primaryKey = Seq("id"), detectDeletes = false)
     val childConfig = makeFlowConfig(
       "od_scd2_nodelete_child",
       foreignKeys = Seq(
@@ -956,14 +1042,20 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     val flowConfigs = Seq(parentConfig, childConfig)
     val flowResults = Seq(
-      makeFlowResult("od_scd2_nodelete_parent", pr2.snapshotId, pr1.snapshotId,
-        Some(tableManager.resolveTableName(parentConfig))),
+      makeFlowResult(
+        "od_scd2_nodelete_parent",
+        pr2.snapshotId,
+        pr1.snapshotId,
+        Some(tableManager.resolveTableName(parentConfig))
+      ),
       makeFlowResult("od_scd2_nodelete_child", None, None)
     )
-    val plan = ExecutionPlan(Seq(
-      ExecutionGroup(Seq(parentConfig), parallel = false),
-      ExecutionGroup(Seq(childConfig), parallel = false)
-    ))
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parentConfig), parallel = false),
+        ExecutionGroup(Seq(childConfig), parallel = false)
+      )
+    )
 
     val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
     val reports = detector.detectAndResolveOrphans(plan)
@@ -973,23 +1065,44 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
   }
 
   private val allTables = Seq(
-    "od_customers", "od_orders",
-    "od_cust_del", "od_orders_del",
-    "od_cust_first", "od_orders_first",
-    "od_cust_ign", "od_orders_ign",
-    "od_parent_delta", "od_child_delta",
-    "od_parent_comp", "od_child_comp",
-    "od_casc_cust", "od_casc_orders", "od_casc_lines",
-    "od_casc_warn_cust", "od_casc_warn_orders", "od_casc_warn_lines",
-    "od_multi_p1", "od_multi_p2", "od_multi_child",
-    "od_no_orphan_cust", "od_no_orphan_orders",
+    "od_customers",
+    "od_orders",
+    "od_cust_del",
+    "od_orders_del",
+    "od_cust_first",
+    "od_orders_first",
+    "od_cust_ign",
+    "od_orders_ign",
+    "od_parent_delta",
+    "od_child_delta",
+    "od_parent_comp",
+    "od_child_comp",
+    "od_casc_cust",
+    "od_casc_orders",
+    "od_casc_lines",
+    "od_casc_warn_cust",
+    "od_casc_warn_orders",
+    "od_casc_warn_lines",
+    "od_multi_p1",
+    "od_multi_p2",
+    "od_multi_child",
+    "od_no_orphan_cust",
+    "od_no_orphan_orders",
     "od_missing_parent_orders",
-    "od_multi_rem_cust", "od_multi_rem_orders",
-    "od_casc_comp_parent", "od_casc_comp_child", "od_casc_comp_gc",
-    "od_nopk_parent", "od_nopk_child",
-    "od_col_mis_parent", "od_col_mis_child", "od_col_mis_gc",
-    "od_scd2_parent", "od_scd2_child",
-    "od_scd2_nodelete_parent", "od_scd2_nodelete_child"
+    "od_multi_rem_cust",
+    "od_multi_rem_orders",
+    "od_casc_comp_parent",
+    "od_casc_comp_child",
+    "od_casc_comp_gc",
+    "od_nopk_parent",
+    "od_nopk_child",
+    "od_col_mis_parent",
+    "od_col_mis_child",
+    "od_col_mis_gc",
+    "od_scd2_parent",
+    "od_scd2_child",
+    "od_scd2_nodelete_parent",
+    "od_scd2_nodelete_child"
   )
 
   override def afterAll(): Unit = {

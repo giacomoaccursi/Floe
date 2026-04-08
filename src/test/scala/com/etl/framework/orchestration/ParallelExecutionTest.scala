@@ -15,7 +15,7 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
     .appName("ParallelExecutionTest")
     .master("local[*]")
     .config("spark.ui.enabled", "false")
-      .config("spark.driver.bindAddress", "127.0.0.1")
+    .config("spark.driver.bindAddress", "127.0.0.1")
     .config("spark.sql.shuffle.partitions", "2")
     .getOrCreate()
 
@@ -81,7 +81,7 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
     ),
     processing = ProcessingConfig("yyyyMMdd_HHmmss"),
     performance = PerformanceConfig(
-      parallelFlows = parallel,
+      parallelFlows = parallel
     ),
     iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )

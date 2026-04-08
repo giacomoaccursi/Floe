@@ -16,7 +16,7 @@ class CustomOutputPathTest extends AnyFlatSpec with Matchers {
       batchIdFormat = "yyyyMMdd_HHmmss"
     ),
     performance = PerformanceConfig(
-      parallelFlows = false,
+      parallelFlows = false
     ),
     iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
   )

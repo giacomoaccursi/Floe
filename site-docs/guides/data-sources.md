@@ -212,6 +212,45 @@ All options are passed through to the Spark JDBC datasource. The framework does 
 
 Credentials should not be hardcoded in YAML. Use variable substitution (`${DB_PASSWORD}`) and resolve them at runtime via `withVariables()` in the pipeline builder, sourcing values from your secret manager.
 
+## Custom readers
+
+You can register custom data readers for source types not built into the framework. This lets you read from any source without modifying the framework code.
+
+```scala
+import com.etl.framework.io.readers.{DataReader, DataReaderFactory}
+import com.etl.framework.config.{SourceConfig, SchemaConfig}
+import org.apache.spark.sql.{DataFrame, SparkSession}
+
+val s3SelectReader: DataReaderFactory.ReaderFactory = (config, schema, spark) => {
+  new DataReader {
+    override def read(): DataFrame = {
+      spark.read
+        .format("s3selectCSV")
+        .options(config.options)
+        .load(config.path)
+    }
+  }
+}
+
+IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .withDataReader("s3select", s3SelectReader)
+  .build()
+  .execute()
+```
+
+Then in the flow YAML:
+
+```yaml
+source:
+  type: s3select
+  path: "s3://bucket/data/large-file.csv"
+  options:
+    compression: "GZIP"
+```
+
+The factory receives the full `SourceConfig`, optional `SchemaConfig`, and the `SparkSession`. Custom readers override built-in readers if the same type name is used.
+
 ## Related
 
 - [Flow Configuration](../configuration/flows.md) — full flow YAML reference

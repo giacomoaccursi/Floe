@@ -55,6 +55,17 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
   private val tableManager = new IcebergTableManager(spark, icebergConfig)
   private val writer = new IcebergTableWriter(spark, icebergConfig, tableManager)
 
+  private def runDetection(
+      flowConfigs: Seq[FlowConfig],
+      flowResults: Seq[FlowResult],
+      plan: ExecutionPlan
+  ): Seq[OrphanReport] = {
+    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
+    val result = detector.detectAndResolveOrphans(plan)
+    result shouldBe a[OrphanDetectionResult.Completed]
+    result.reports
+  }
+
   private def makeFlowConfig(
       name: String,
       loadMode: LoadMode = LoadMode.Full,
@@ -132,8 +143,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     reports.size shouldBe 1
     reports.head.flowName shouldBe "od_orders"
@@ -185,8 +195,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     reports.size shouldBe 1
     reports.head.actionTaken shouldBe "delete"
@@ -229,8 +238,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     reports shouldBe empty
   }
@@ -274,8 +282,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     reports shouldBe empty
   }
@@ -311,8 +318,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     reports shouldBe empty
   }
@@ -356,8 +362,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, Seq(parentConfig, childConfig), flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(Seq(parentConfig, childConfig), flowResults, plan)
 
     reports should have size 1
     reports.head.orphanCount shouldBe 1
@@ -423,8 +428,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     // Should have 2 reports: orders and lines
     reports should have size 2
@@ -498,8 +502,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     // Only 1 report: orders (warn). Lines should NOT be affected because orders didn't delete.
     reports should have size 1
@@ -580,8 +583,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     // FK1 (p1_id→p1): orphans are records 101, 103 (p1_id=2)
     // After FK1 delete: remaining records are 100 (p1=1,p2=10) and 102 (p1=1,p2=20)
@@ -645,8 +647,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     reports shouldBe empty
     spark.sql("SELECT * FROM orphan_catalog.default.od_no_orphan_orders").count() shouldBe 2
@@ -677,8 +678,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     reports shouldBe empty
   }
@@ -726,8 +726,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     reports should have size 1
     reports.head.orphanCount shouldBe 2
@@ -796,8 +795,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     reports should have size 2
 
@@ -855,8 +853,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     reports should have size 1
     reports.head.actionTaken shouldBe "delete"
@@ -924,8 +921,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     // Child delete works, but grandchild cascade is skipped because "code" not in cascade map
     reports should have size 1
@@ -981,8 +977,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     // Record 3 was closed (is_current=false), so child record 102 is orphaned
     reports should have size 1
@@ -1032,8 +1027,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    val detector = new OrphanDetector(spark, icebergConfig, flowConfigs, flowResults)
-    val reports = detector.detectAndResolveOrphans(plan)
+    val reports = runDetection(flowConfigs, flowResults, plan)
 
     // SCD2 without detectDeletes cannot remove records → no orphan check
     reports shouldBe empty

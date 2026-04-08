@@ -20,6 +20,16 @@ case class OrphanReport(
     cascadeSource: Option[String] = None
 )
 
+sealed trait OrphanDetectionResult {
+  def reports: Seq[OrphanReport]
+}
+
+object OrphanDetectionResult {
+  case class Completed(reports: Seq[OrphanReport]) extends OrphanDetectionResult
+  case object Skipped extends OrphanDetectionResult { val reports: Seq[OrphanReport] = Seq.empty }
+  case class Failed(error: String, reports: Seq[OrphanReport]) extends OrphanDetectionResult
+}
+
 class OrphanDetector(
     spark: SparkSession,
     icebergConfig: IcebergConfig,
@@ -32,25 +42,30 @@ class OrphanDetector(
   private val flowConfigMap = flowConfigs.map(fc => fc.name -> fc).toMap
   private val flowResultMap = flowResults.map(fr => fr.flowName -> fr).toMap
 
-  def detectAndResolveOrphans(plan: ExecutionPlan): Seq[OrphanReport] = {
+  def detectAndResolveOrphans(plan: ExecutionPlan): OrphanDetectionResult = {
     val removedKeysByFlow = mutable.Map[String, DataFrame]()
     val reports = mutable.ArrayBuffer[OrphanReport]()
 
-    plan.groups.flatMap(_.flows).foreach { flowConfig =>
-      flowConfig.validation.foreignKeys.foreach { fk =>
-        if (fk.onOrphan != OrphanAction.Ignore) {
-          processFK(flowConfig, fk, removedKeysByFlow).foreach(reports += _)
+    try {
+      plan.groups.flatMap(_.flows).foreach { flowConfig =>
+        flowConfig.validation.foreignKeys.foreach { fk =>
+          if (fk.onOrphan != OrphanAction.Ignore) {
+            processFK(flowConfig, fk, removedKeysByFlow).foreach(reports += _)
+          }
         }
       }
-    }
 
-    // Unpersist any cached DataFrames that were stored via cache() (not localCheckpoint)
-    removedKeysByFlow.values.foreach { df =>
-      try { df.unpersist() }
-      catch { case _: Exception => }
+      OrphanDetectionResult.Completed(reports.toSeq)
+    } catch {
+      case e: Exception =>
+        logger.error(s"Orphan detection failed after ${reports.size} reports: ${e.getMessage}")
+        OrphanDetectionResult.Failed(e.getMessage, reports.toSeq)
+    } finally {
+      removedKeysByFlow.values.foreach { df =>
+        try { df.unpersist() }
+        catch { case _: Exception => }
+      }
     }
-
-    reports.toSeq
   }
 
   private def processFK(

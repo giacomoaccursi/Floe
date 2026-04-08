@@ -29,7 +29,8 @@ class BatchMetadataWriter(
       executionTimeMs: Long,
       success: Boolean,
       rolledBack: Boolean = false,
-      orphanReports: Seq[OrphanReport] = Seq.empty
+      orphanReports: Seq[OrphanReport] = Seq.empty,
+      orphanDetectionError: Option[String] = None
   ): Unit = {
     val metadataPath = s"${globalConfig.paths.metadataPath}/$batchId/summary.json"
 
@@ -66,6 +67,7 @@ class BatchMetadataWriter(
       "total_rejected_records" -> totalRejected,
       "overall_rejection_rate" -> overallRejectionRate,
       "orphan_reports" -> orphanReportsData,
+      "orphan_detection_error" -> orphanDetectionError.getOrElse(""),
       "flows" -> flowResults.map { result =>
         val baseFlowMetadata = Map[String, Any](
           "flow_name" -> result.flowName,

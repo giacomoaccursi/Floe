@@ -1,7 +1,7 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig, OrphanAction}
-import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetector, OrphanReport}
+import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetectionResult, OrphanDetector, OrphanReport}
 import com.etl.framework.orchestration.batch.{BatchMetadataWriter, FlowGroupExecutor}
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.ExecutionPlanBuilder
@@ -121,14 +121,18 @@ class FlowOrchestrator(
     val executionTimeMs = (System.nanoTime() - startTime) / 1000000
 
     // Run orphan detection BEFORE maintenance (maintenance may expire snapshots needed for time travel)
-    val orphanReports = runPostBatchOrphanDetection(flowResults, plan)
+    val orphanResult = runPostBatchOrphanDetection(flowResults, plan)
 
     metadataWriter.writeBatchMetadata(
       batchId,
       flowResults,
       executionTimeMs,
       success = true,
-      orphanReports = orphanReports
+      orphanReports = orphanResult.reports,
+      orphanDetectionError = orphanResult match {
+        case OrphanDetectionResult.Failed(err, _) => Some(err)
+        case _                                    => None
+      }
     )
 
     // Run Iceberg table maintenance post-batch
@@ -167,27 +171,23 @@ class FlowOrchestrator(
   private def runPostBatchOrphanDetection(
       flowResults: Seq[FlowResult],
       plan: ExecutionPlan
-  ): Seq[OrphanReport] = {
+  ): OrphanDetectionResult = {
     val hasOrphanChecks = flowConfigs.exists(
       _.validation.foreignKeys.exists(_.onOrphan != OrphanAction.Ignore)
     )
-    if (!hasOrphanChecks) return Seq.empty
+    if (!hasOrphanChecks) return OrphanDetectionResult.Skipped
 
-    try {
-      val detector =
-        new OrphanDetector(spark, globalConfig.iceberg, flowConfigs, flowResults)
-      val reports = detector.detectAndResolveOrphans(plan)
-      if (reports.nonEmpty) {
-        logger.info(
-          s"Orphan detection completed: ${reports.size} reports generated"
-        )
-      }
-      reports
-    } catch {
-      case e: Exception =>
-        logger.warn(s"Post-batch orphan detection failed: ${e.getMessage}")
-        Seq.empty
+    val detector =
+      new OrphanDetector(spark, globalConfig.iceberg, flowConfigs, flowResults)
+    val result = detector.detectAndResolveOrphans(plan)
+    result match {
+      case OrphanDetectionResult.Completed(reports) if reports.nonEmpty =>
+        logger.info(s"Orphan detection completed: ${reports.size} reports generated")
+      case OrphanDetectionResult.Failed(err, partial) =>
+        logger.warn(s"Orphan detection failed after ${partial.size} reports: $err")
+      case _ =>
     }
+    result
   }
 
   /** Runs Iceberg table maintenance on all flow tables after batch completion.

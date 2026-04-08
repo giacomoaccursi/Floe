@@ -6,8 +6,8 @@ Detailed walkthrough of the Read → PreTransform → Validate → PostTransform
 
 ```mermaid
 graph TD
-    Source["Source File(s)"]
-    Read["Read<br/>FileDataReader: load CSV/Parquet/JSON, apply schema"]
+    Source["Source<br/>File or Database"]
+    Read["Read<br/>DataReaderFactory: file (CSV/Parquet/JSON) or JDBC"]
     PreTransform["PreTransform<br/>User-defined: enrich, cleanse, filter"]
     Validate["Validate<br/>Schema → Not-null → PK → FK → Custom rules"]
     Rejected["Rejected DataFrame<br/>→ written to rejectedPath"]
@@ -26,11 +26,10 @@ graph TD
 
 ## Step 1: Read
 
-The `DataReaderFactory` creates a `FileDataReader` based on the flow's `source` config. The reader:
+The `DataReaderFactory` creates a reader based on the flow's `source.type` config:
 
-1. Validates the file format (csv, parquet, json)
-2. Optionally applies the schema from `schema.columns` if `enforceSchema: true`
-3. Applies format-specific options (header, delimiter, etc.)
+- **File** (`FileDataReader`): validates the format (csv, parquet, json), optionally applies the schema, and loads from the configured path.
+- **JDBC** (`JDBCDataReader`): connects to a database via JDBC URL, reads a table or custom query, and passes through all connection options.
 4. Calls `spark.read.format(...).options(...).load(path)`
 
 The result is a raw DataFrame with the source data.

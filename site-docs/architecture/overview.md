@@ -69,7 +69,7 @@ A batch execution follows this sequence:
 | `config` | YAML config loading, variable substitution, validation |
 | `validation` | Validation engine: schema, not-null, PK, FK, regex, range, domain, custom |
 | `iceberg` | Iceberg table writes (full/delta/SCD2), catalog management, maintenance |
-| `io` | Data readers: CSV, Parquet, JSON |
+| `io` | Data readers: CSV, Parquet, JSON, JDBC |
 | `aggregation` | DAG execution: join strategies, topological ordering, parallel groups |
 | `orchestration` | Flow and batch orchestration, metadata, logging |
 | `pipeline` | Public entry point: builder API, derived tables |

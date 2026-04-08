@@ -10,7 +10,7 @@ Detailed responsibilities of each module in the framework.
 | `validation` | Validation engine (schema, not-null, PK, FK, custom rules) |
 | `merge` | *(dead code)* Pre-Iceberg in-memory merge — no longer used |
 | `iceberg` | Iceberg table writes (full/delta/SCD2) |
-| `io` | Data readers: file (CSV, Parquet, JSON) |
+| `io` | Data readers: file (CSV, Parquet, JSON), JDBC |
 | `aggregation` | DAG execution for layered joins and aggregations |
 | `orchestration` | Flow and batch orchestration, metadata, logging |
 | `pipeline` | Ingestion pipeline entry point and fluent builder API |
@@ -63,13 +63,12 @@ See [Iceberg Integration](../guides/iceberg.md).
 
 ## io
 
-Data readers for various source types. Currently supports file-based sources:
+Data readers for various source types:
 
-- **CSV** — with configurable delimiter, header, quoting, encoding
-- **Parquet** — self-describing format, minimal options needed
-- **JSON** — JSON lines format
+- **File** — CSV (configurable delimiter, header, quoting, encoding), Parquet, JSON
+- **JDBC** — any database with a JDBC driver (PostgreSQL, MySQL, Oracle, etc.)
 
-Uses `DataReaderFactory` to create the appropriate reader based on `source.type`. Only `file` is supported. Supports optional schema enforcement during read (converts `SchemaConfig` to Spark `StructType`).
+Uses `DataReaderFactory` to create the appropriate reader based on `source.type`. Supports optional schema enforcement during read (converts `SchemaConfig` to Spark `StructType`).
 
 See [Data Sources](../guides/data-sources.md).
 

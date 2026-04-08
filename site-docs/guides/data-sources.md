@@ -1,8 +1,10 @@
 # Data Sources
 
-Guide to file-based data readers. The framework reads data through `FileDataReader`, which supports CSV, Parquet, and JSON formats with optional schema enforcement.
+The framework reads data through pluggable readers based on the `source.type` in the flow configuration. Two source types are supported: `file` and `jdbc`.
 
-## Supported formats
+## File sources
+
+Supports CSV, Parquet, and JSON formats with optional schema enforcement.
 
 | Format | Description |
 |--------|-------------|
@@ -161,7 +163,12 @@ Unrecognized type strings throw `UnsupportedOperationException` with the list of
 
 ## DataReader factory
 
-The framework uses `DataReaderFactory` to create the appropriate reader based on the source type. Currently only `file` is supported:
+The framework uses `DataReaderFactory` to create the appropriate reader based on the source type:
+
+| Source type | Reader | Description |
+|-------------|--------|-------------|
+| `file` | `FileDataReader` | CSV, Parquet, JSON from local or cloud storage |
+| `jdbc` | `JDBCDataReader` | Any database with a JDBC driver |
 
 ```scala
 val reader = DataReaderFactory.create(sourceConfig, Some(schemaConfig))
@@ -169,6 +176,39 @@ val df = reader.read()
 ```
 
 Unsupported source types throw `UnsupportedOperationException`.
+
+## JDBC sources
+
+The JDBC reader connects to any database that provides a JDBC driver (PostgreSQL, MySQL, Oracle, SQL Server, Redshift, Snowflake, etc.).
+
+```yaml
+source:
+  type: jdbc
+  path: "public.customers"
+  options:
+    url: "jdbc:postgresql://host:5432/mydb"
+    user: "${DB_USER}"
+    password: "${DB_PASSWORD}"
+    driver: "org.postgresql.Driver"
+```
+
+Key options:
+
+| Option | Description |
+|--------|-------------|
+| `url` | JDBC connection URL (required) |
+| `user` | Database username |
+| `password` | Database password |
+| `driver` | JDBC driver class name |
+| `query` | Custom SQL query (overrides `path` as table name) |
+| `fetchSize` | Number of rows fetched per round-trip |
+| `partitionColumn` | Column for parallel reads (must be numeric/date) |
+| `lowerBound` / `upperBound` | Range for partition column |
+| `numPartitions` | Number of parallel JDBC connections |
+
+All options are passed through to the Spark JDBC datasource. The framework does not bundle database drivers — add the appropriate driver JAR to your classpath.
+
+Credentials should not be hardcoded in YAML. Use variable substitution (`${DB_PASSWORD}`) and resolve them at runtime via `withVariables()` in the pipeline builder, sourcing values from your secret manager.
 
 ## Related
 

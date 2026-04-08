@@ -91,23 +91,67 @@ Defines where data is read from.
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `type` | no | `file` | Source type. Currently only `file` is supported. |
-| `path` | yes | — | Path to source data: a single file (`data/orders.csv`), a directory (`data/orders/`), or a glob pattern (`data/orders_*.csv`) |
-| `format` | yes | — | File format: `csv`, `parquet`, `json` |
-| `options` | no | `{}` | Format-specific options passed to the Spark reader |
+| `type` | no | `file` | Source type: `file` or `jdbc` |
+| `path` | yes | — | For `file`: path to data (file, directory, or glob). For `jdbc`: table name (e.g. `public.customers`) |
+| `format` | for `file` | — | File format: `csv`, `parquet`, `json`. Not used for `jdbc`. |
+| `options` | no | `{}` | Options passed to the Spark reader |
 
-Common CSV options:
+### File source
 
 ```yaml
-options:
-  header: "true"       # first row is column names
-  delimiter: ";"       # field separator (default: comma)
-  nullValue: ""        # treat empty strings as NULL
+source:
+  type: file
+  path: "data/orders/"
+  format: csv
+  options:
+    header: "true"
+    delimiter: ";"
 ```
 
 These are standard [Spark CSV reader options](https://spark.apache.org/docs/latest/sql-data-sources-csv.html). For Parquet and JSON, options are rarely needed.
 
-For details on each file format and their options, see [Data Sources](../guides/data-sources.md).
+### JDBC source
+
+```yaml
+source:
+  type: jdbc
+  path: "public.customers"
+  options:
+    url: "jdbc:postgresql://${DB_HOST}:5432/${DB_NAME}"
+    user: "${DB_USER}"
+    password: "${DB_PASSWORD}"
+    driver: "org.postgresql.Driver"
+    fetchSize: "10000"
+```
+
+To read a custom query instead of a full table:
+
+```yaml
+source:
+  type: jdbc
+  path: "public.customers"
+  options:
+    url: "jdbc:postgresql://host:5432/mydb"
+    user: "${DB_USER}"
+    password: "${DB_PASSWORD}"
+    query: "SELECT * FROM customers WHERE updated_at > '${LAST_BATCH_DATE}'"
+```
+
+When `query` is provided, `path` is ignored. The query is wrapped as a subquery for Spark.
+
+For parallel reads on large tables, add Spark JDBC partitioning options:
+
+```yaml
+options:
+  partitionColumn: "id"
+  lowerBound: "1"
+  upperBound: "1000000"
+  numPartitions: "10"
+```
+
+The JDBC driver must be on the classpath. The framework does not bundle any database drivers.
+
+For details on file formats, see [Data Sources](../guides/data-sources.md).
 
 ## schema
 

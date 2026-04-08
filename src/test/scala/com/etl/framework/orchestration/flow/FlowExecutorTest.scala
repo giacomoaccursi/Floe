@@ -1,6 +1,7 @@
 package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config._
+import com.etl.framework.TestFixtures
 import com.etl.framework.exceptions.InvariantViolationException
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -18,47 +19,15 @@ class FlowExecutorTest extends AnyFlatSpec with Matchers {
 
   import spark.implicits._
 
-  def createGlobalConfig(): GlobalConfig = {
-    GlobalConfig(
-      paths = PathsConfig(
-        "/tmp/flow_executor_test/output",
-        "/tmp/flow_executor_test/rejected",
-        "/tmp/flow_executor_test/metadata"
-      ),
-      processing = ProcessingConfig(
-        "yyyyMMdd"
-      ),
-      performance = PerformanceConfig(parallelFlows = false),
-      iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
-    )
-  }
+  def createGlobalConfig(): GlobalConfig =
+    TestFixtures.globalConfig(batchIdFormat = "yyyyMMdd")
 
   def createFlowConfig(
       name: String,
       sourceType: SourceType = SourceType.File,
       loadMode: LoadMode = LoadMode.Full
-  ): FlowConfig = {
-    FlowConfig(
-      name = name,
-      description = "Test flow",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(
-        sourceType,
-        "/tmp/test_source",
-        FileFormat.CSV,
-        Map.empty
-      ),
-      schema = SchemaConfig(
-        enforceSchema = false,
-        allowExtraColumns = true,
-        Seq.empty
-      ),
-      loadMode = LoadModeConfig(loadMode),
-      validation = ValidationConfig(Seq.empty, Seq.empty, Seq.empty),
-      output = OutputConfig()
-    )
-  }
+  ): FlowConfig =
+    TestFixtures.flowConfig(name = name, loadMode = loadMode, primaryKey = Seq.empty)
 
   // Test helper that overrides protected methods for unit testing
   class TestableFlowExecutor(

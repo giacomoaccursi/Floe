@@ -1,6 +1,7 @@
 package com.etl.framework.iceberg
 
 import com.etl.framework.config._
+import com.etl.framework.TestFixtures
 import com.etl.framework.orchestration.{ExecutionGroup, ExecutionPlan}
 import com.etl.framework.orchestration.flow.FlowResult
 import org.apache.spark.sql.SparkSession
@@ -60,40 +61,14 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       primaryKey: Seq[String] = Seq("id"),
       foreignKeys: Seq[ForeignKeyConfig] = Seq.empty,
       detectDeletes: Boolean = false
-  ): FlowConfig = {
-    FlowConfig(
+  ): FlowConfig =
+    TestFixtures.flowConfig(
       name = name,
-      description = "test",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(
-        `type` = SourceType.File,
-        path = "/tmp/test",
-        format = FileFormat.CSV,
-        options = Map.empty
-      ),
-      schema = SchemaConfig(
-        enforceSchema = false,
-        allowExtraColumns = true,
-        columns = Seq.empty
-      ),
-      loadMode = LoadModeConfig(
-        `type` = loadMode,
-        compareColumns = if (loadMode == LoadMode.SCD2) Seq("name") else Seq.empty,
-        validFromColumn = if (loadMode == LoadMode.SCD2) Some("valid_from") else None,
-        validToColumn = if (loadMode == LoadMode.SCD2) Some("valid_to") else None,
-        isCurrentColumn = if (loadMode == LoadMode.SCD2) Some("is_current") else None,
-        detectDeletes = detectDeletes,
-        isActiveColumn = if (detectDeletes) Some("is_active") else None
-      ),
-      validation = ValidationConfig(
-        primaryKey = primaryKey,
-        foreignKeys = foreignKeys,
-        rules = Seq.empty
-      ),
-      output = OutputConfig()
+      loadMode = loadMode,
+      primaryKey = primaryKey,
+      foreignKeys = foreignKeys,
+      detectDeletes = detectDeletes
     )
-  }
 
   private def makeFlowResult(
       flowName: String,

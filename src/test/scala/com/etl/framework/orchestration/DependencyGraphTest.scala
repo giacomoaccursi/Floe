@@ -1,6 +1,7 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.config._
+import com.etl.framework.TestFixtures
 import com.etl.framework.exceptions.CircularDependencyException
 import org.apache.spark.sql.SparkSession
 import org.scalatest.flatspec.AnyFlatSpec
@@ -17,44 +18,19 @@ class DependencyGraphTest extends AnyFlatSpec with Matchers {
     .config("spark.sql.shuffle.partitions", "2")
     .getOrCreate()
 
-  private val globalConfig = GlobalConfig(
-    paths = PathsConfig(
-      "/data/output",
-      "/data/rejected",
-      "/data/metadata"
-    ),
-    processing = ProcessingConfig("yyyyMMdd_HHmmss"),
-    performance = PerformanceConfig(false),
-    iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
-  )
+  private val globalConfig = TestFixtures.globalConfig()
 
   private def createFlow(
       name: String,
       foreignKeys: Seq[ForeignKeyConfig] = Seq.empty,
       fkColumns: Seq[ColumnConfig] = Seq.empty
-  ): FlowConfig = FlowConfig(
+  ): FlowConfig = TestFixtures.flowConfig(
     name = name,
-    description = s"Flow $name",
-    version = "1.0",
-    owner = "test",
-    source = SourceConfig(
-      SourceType.File,
-      s"/data/input/$name",
-      FileFormat.CSV,
-      Map.empty
-    ),
-    schema = SchemaConfig(
-      true,
-      false,
-      ColumnConfig("id", "string", false, "PK") +: fkColumns
-    ),
-    loadMode = LoadModeConfig(LoadMode.Full),
-    validation = ValidationConfig(
-      primaryKey = Seq("id"),
-      foreignKeys = foreignKeys,
-      rules = Seq.empty
-    ),
-    output = OutputConfig()
+    foreignKeys = foreignKeys,
+    columns = ColumnConfig("id", "string", nullable = false) +: fkColumns,
+    enforceSchema = true,
+    allowExtraColumns = false,
+    sourcePath = s"/data/input/$name"
   )
 
   "Dependency graph" should "contain all FK edges" in {

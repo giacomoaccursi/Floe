@@ -1,6 +1,7 @@
 package com.etl.framework.iceberg
 
 import com.etl.framework.config._
+import com.etl.framework.TestFixtures
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
@@ -62,40 +63,16 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
       isCurrentColumn: Option[String] = None,
       detectDeletes: Boolean = false,
       isActiveColumn: Option[String] = None
-  ): FlowConfig = {
-    FlowConfig(
+  ): FlowConfig =
+    TestFixtures.flowConfig(
       name = name,
-      description = "test",
-      version = "1.0",
-      owner = "test",
-      source = SourceConfig(
-        `type` = SourceType.File,
-        path = "/tmp/test",
-        format = FileFormat.CSV,
-        options = Map.empty
-      ),
-      schema = SchemaConfig(
-        enforceSchema = false,
-        allowExtraColumns = true,
-        columns = Seq.empty
-      ),
-      loadMode = LoadModeConfig(
-        `type` = loadMode,
-        compareColumns = compareColumns,
-        validFromColumn = validFromColumn,
-        validToColumn = validToColumn,
-        isCurrentColumn = isCurrentColumn,
-        detectDeletes = detectDeletes,
-        isActiveColumn = isActiveColumn
-      ),
-      validation = ValidationConfig(
-        primaryKey = primaryKey,
-        foreignKeys = Seq.empty,
-        rules = Seq.empty
-      ),
-      output = OutputConfig()
+      loadMode = loadMode,
+      primaryKey = primaryKey,
+      compareColumns = if (compareColumns.nonEmpty) compareColumns
+        else if (loadMode == LoadMode.SCD2) Seq("name")
+        else Seq.empty,
+      detectDeletes = detectDeletes
     )
-  }
 
   // --- Full Load Tests ---
 

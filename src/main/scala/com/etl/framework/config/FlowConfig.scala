@@ -33,8 +33,8 @@ case class SourceConfig(
   */
 case class SchemaConfig(
     enforceSchema: Boolean,
-    allowExtraColumns: Boolean,
-    columns: Seq[ColumnConfig]
+    allowExtraColumns: Boolean = true,
+    columns: Seq[ColumnConfig] = Seq.empty
 )
 
 /** Column configuration

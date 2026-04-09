@@ -5,8 +5,8 @@ Thanks for your interest in contributing to Floe.
 ## Quick start
 
 ```bash
-git clone https://github.com/giacomoaccursi/spark-etl-framework.git
-cd spark-etl-framework
+git clone https://github.com/giacomoaccursi/floe.git
+cd floe
 sbt compile
 sbt test
 ```
@@ -42,4 +42,4 @@ Types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `chore`. Max 72 charac
 
 ## Full guide
 
-See the [Development Guide](https://giacomoaccursi.github.io/spark-etl-framework/contributing/development/) and [Code Quality Rules](https://giacomoaccursi.github.io/spark-etl-framework/contributing/code-quality/) for details.
+See the [Development Guide](https://giacomoaccursi.github.io/floe/contributing/development/) and [Code Quality Rules](https://giacomoaccursi.github.io/floe/contributing/code-quality/) for details.

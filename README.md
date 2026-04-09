@@ -1,6 +1,6 @@
 # Floe
 
-[![CI](https://github.com/giacomoaccursi/spark-etl-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/giacomoaccursi/spark-etl-framework/actions/workflows/ci.yml)
+[![CI](https://github.com/giacomoaccursi/floe/actions/workflows/ci.yml/badge.svg)](https://github.com/giacomoaccursi/floe/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 Declarative ETL framework — powered by Spark and Iceberg.
@@ -115,17 +115,17 @@ Works locally, on Spark clusters, and on managed platforms:
 - **Amazon EMR** — standard spark-submit
 - **Databricks** — use dbutils widgets for parameters
 
-See the [Cloud Deployment Guide](https://giacomoaccursi.github.io/spark-etl-framework/guides/cloud-deployment/) for platform-specific examples.
+See the [Cloud Deployment Guide](https://giacomoaccursi.github.io/floe/guides/cloud-deployment/) for platform-specific examples.
 
 ## Documentation
 
-Full documentation at **[giacomoaccursi.github.io/spark-etl-framework](https://giacomoaccursi.github.io/spark-etl-framework/)**
+Full documentation at **[giacomoaccursi.github.io/floe](https://giacomoaccursi.github.io/floe/)**
 
-- [Quickstart](https://giacomoaccursi.github.io/spark-etl-framework/getting-started/quickstart/) — first pipeline in 5 minutes
-- [Configuration Reference](https://giacomoaccursi.github.io/spark-etl-framework/configuration/overview/) — all YAML settings
-- [Validation Engine](https://giacomoaccursi.github.io/spark-etl-framework/guides/validation/) — all rule types
-- [Iceberg Integration](https://giacomoaccursi.github.io/spark-etl-framework/guides/iceberg/) — write modes, snapshots, maintenance
-- [Pipeline Builder API](https://giacomoaccursi.github.io/spark-etl-framework/guides/pipeline-builder/) — programmatic configuration
+- [Quickstart](https://giacomoaccursi.github.io/floe/getting-started/quickstart/) — first pipeline in 5 minutes
+- [Configuration Reference](https://giacomoaccursi.github.io/floe/configuration/overview/) — all YAML settings
+- [Validation Engine](https://giacomoaccursi.github.io/floe/guides/validation/) — all rule types
+- [Iceberg Integration](https://giacomoaccursi.github.io/floe/guides/iceberg/) — write modes, snapshots, maintenance
+- [Pipeline Builder API](https://giacomoaccursi.github.io/floe/guides/pipeline-builder/) — programmatic configuration
 
 ## License
 

@@ -9,7 +9,7 @@ scalaVersion := "2.12.18"
 
 // Publish to GitHub Packages
 publishTo := Some(
-  "GitHub Packages" at s"https://maven.pkg.github.com/${sys.env.getOrElse("GITHUB_REPOSITORY", "giacomoaccursi/spark-etl-framework")}"
+  "GitHub Packages" at s"https://maven.pkg.github.com/${sys.env.getOrElse("GITHUB_REPOSITORY", "giacomoaccursi/floe")}"
 )
 credentials ++= sys.env.get("GITHUB_TOKEN").map { token =>
   Credentials("GitHub Package Registry", "maven.pkg.github.com", "_", token)

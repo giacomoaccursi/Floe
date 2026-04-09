@@ -1,6 +1,6 @@
 # Floe
 
-Declarative ETL framework for Spark and Iceberg.
+Declarative ETL framework — powered by Spark and Iceberg.
 
 ## What it does
 

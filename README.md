@@ -3,7 +3,7 @@
 [![CI](https://github.com/giacomoaccursi/spark-etl-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/giacomoaccursi/spark-etl-framework/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-Declarative ETL framework for Spark and Iceberg.
+Declarative ETL framework — powered by Spark and Iceberg.
 
 Define your data flows in YAML. The framework handles ingestion, validation, incremental loads, schema evolution, and table management — so you can focus on your data, not the plumbing.
 

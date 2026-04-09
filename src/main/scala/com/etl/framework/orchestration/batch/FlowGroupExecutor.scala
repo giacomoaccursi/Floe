@@ -24,10 +24,7 @@ class FlowGroupExecutor(
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
-  private val MaxParallelTimeout: FiniteDuration = 2.hours
 
-  /** Executes a group of flows sequentially
-    */
   def executeSequential(
       group: ExecutionGroup,
       batchId: String,
@@ -63,7 +60,7 @@ class FlowGroupExecutor(
     }
 
     val allResults = Future.sequence(futures)(implicitly, parallelEc)
-    Await.result(allResults, MaxParallelTimeout)
+    Await.result(allResults, Duration.Inf)
   }
 
   /** Executes a single flow

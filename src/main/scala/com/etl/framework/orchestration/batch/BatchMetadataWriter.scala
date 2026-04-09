@@ -3,23 +3,17 @@ package com.etl.framework.orchestration.batch
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
 import com.etl.framework.iceberg.OrphanReport
 import com.etl.framework.orchestration.flow.FlowResult
-import org.json4s._
-import org.json4s.jackson.Serialization
-import org.json4s.jackson.Serialization.write
+import com.etl.framework.util.{IcebergMetadataSerializer, JsonFileWriter}
 import org.slf4j.LoggerFactory
 
-import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.time.Instant
 
-/** Handles writing of batch execution metadata
-  */
 class BatchMetadataWriter(
     globalConfig: GlobalConfig,
     flowConfigs: Seq[FlowConfig]
 ) {
 
   private val logger = LoggerFactory.getLogger(getClass)
-  private implicit val formats: Formats = Serialization.formats(NoTypeHints)
 
   /** Writes batch metadata
     */
@@ -85,37 +79,17 @@ class BatchMetadataWriter(
 
         result.icebergMetadata match {
           case Some(iceberg) =>
-            baseFlowMetadata + ("iceberg_metadata" -> Map(
-              "table_name" -> iceberg.tableName,
-              "snapshot_id" -> iceberg.snapshotId,
-              "snapshot_tag" -> iceberg.snapshotTag.getOrElse(""),
-              "parent_snapshot_id" -> iceberg.parentSnapshotId.getOrElse(""),
-              "snapshot_timestamp_ms" -> iceberg.snapshotTimestampMs,
-              "records_written" -> iceberg.recordsWritten,
-              "manifest_list_location" -> iceberg.manifestListLocation,
-              "summary" -> iceberg.summary
-            ))
+            baseFlowMetadata + ("iceberg_metadata" -> IcebergMetadataSerializer.toMap(iceberg))
           case None => baseFlowMetadata
         }
       }
     )
 
-    writeJsonToFile(metadata, metadataPath)
+    JsonFileWriter.write(metadata, metadataPath)
 
     logger.debug(s"Batch metadata written - batchId: $batchId, path: $metadataPath")
   }
 
-  /** Writes a map as JSON to a file
-    */
-  private def writeJsonToFile(data: Map[String, Any], filePath: String): Unit = {
-    val jsonString = write(data)
-    val path = Paths.get(filePath)
-    Files.createDirectories(path.getParent)
-    Files.write(path, jsonString.getBytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
-  }
-
-  /** Generates a unique batch ID
-    */
   def generateBatchId(): String = {
     val format = globalConfig.processing.batchIdFormat
     val timestamp = Instant.now()

@@ -46,7 +46,7 @@ val result = IngestionPipeline.builder()
   .executeOrThrow()
 ```
 
-That's it. The framework reads the CSV, validates schema and rules, upserts into an Iceberg table, tags the snapshot, and writes metadata — all from those few lines.
+That's it. The framework reads the source data, validates schema and rules, upserts into an Iceberg table, tags the snapshot, and writes metadata — all from those few lines.
 
 ## Key features
 

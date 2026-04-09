@@ -1,7 +1,7 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig, OrphanAction}
-import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetectionResult, OrphanDetector, OrphanReport}
+import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetectionResult, OrphanDetector}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.batch.{
   BatchIdGenerator,

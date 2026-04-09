@@ -446,7 +446,7 @@ Custom providers override built-in ones if the same type key is used. The provid
 
 ```scala
 import com.etl.framework.pipeline.IngestionPipeline
-import com.etl.framework.core.TransformationContext
+import com.etl.framework.pipeline.TransformationContext
 import org.apache.spark.sql.{SparkSession, DataFrame}
 import org.apache.spark.sql.functions._
 

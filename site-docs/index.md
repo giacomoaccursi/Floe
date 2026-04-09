@@ -1,6 +1,6 @@
-# Spark ETL Framework
+# Floe
 
-A declarative Scala/Spark framework for building enterprise ETL pipelines with Apache Iceberg.
+Declarative ETL framework for Spark and Iceberg.
 
 ## What it does
 

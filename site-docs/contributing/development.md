@@ -11,7 +11,7 @@
 
 ```bash
 git clone <repository-url>
-cd spark-etl-framework
+cd floe
 sbt compile
 ```
 

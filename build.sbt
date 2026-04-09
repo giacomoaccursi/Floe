@@ -1,6 +1,6 @@
 organization := "io.github.giacomoaccursi"
 
-name := "spark-etl-framework"
+name := "floe"
 
 // Version is derived from git tags by sbt-dynver
 ThisBuild / dynverSeparator := "-"

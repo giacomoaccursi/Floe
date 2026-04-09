@@ -30,7 +30,7 @@ scalaVersion := "2.12.18"
 val sparkVersion = "3.5.8"
 
 libraryDependencies ++= Seq(
-  "io.github.giacomoaccursi" %% "spark-etl-framework" % "<version>",
+  "io.github.giacomoaccursi" %% "floe" % "<version>",
   "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided"
 )

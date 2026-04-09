@@ -1,5 +1,5 @@
-site_name: Spark ETL Framework
-site_description: Declarative Scala/Spark framework for enterprise ETL pipelines with Apache Iceberg
+site_name: Floe
+site_description: Declarative ETL framework for Spark and Iceberg
 repo_url: https://github.com/giacomoaccursi/spark-etl-framework
 repo_name: giacomoaccursi/spark-etl-framework
 

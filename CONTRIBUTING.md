@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in contributing to the Spark ETL Framework.
+Thanks for your interest in contributing to Floe.
 
 ## Quick start
 

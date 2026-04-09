@@ -1,9 +1,9 @@
-# Spark ETL Framework
+# Floe
 
 [![CI](https://github.com/giacomoaccursi/spark-etl-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/giacomoaccursi/spark-etl-framework/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-A declarative Scala/Spark framework for building production-grade ETL pipelines with Apache Iceberg.
+Declarative ETL framework for Spark and Iceberg.
 
 Define your data flows in YAML. The framework handles ingestion, validation, incremental loads, schema evolution, and table management — so you can focus on your data, not the plumbing.
 
@@ -78,7 +78,7 @@ That's it. The framework reads the source data, validates schema and rules, upse
 ### 1. Add the dependency
 
 ```scala
-libraryDependencies += "io.github.giacomoaccursi" %% "spark-etl-framework" % "<version>"
+libraryDependencies += "io.github.giacomoaccursi" %% "floe" % "<version>"
 ```
 
 ### 2. Create your config

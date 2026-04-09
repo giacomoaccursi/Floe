@@ -12,7 +12,7 @@
 Add to your `build.sbt`:
 
 ```scala
-libraryDependencies += "io.github.giacomoaccursi" %% "spark-etl-framework" % "<version>"
+libraryDependencies += "io.github.giacomoaccursi" %% "floe" % "<version>"
 ```
 
 Spark is a `provided` dependency — the framework expects it on the classpath at runtime (cluster, spark-submit, or local dev with Spark installed).

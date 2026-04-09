@@ -89,29 +89,4 @@ class BatchMetadataWriter(
 
     logger.debug(s"Batch metadata written - batchId: $batchId, path: $metadataPath")
   }
-
-  def generateBatchId(): String = {
-    val format = globalConfig.processing.batchIdFormat
-    val timestamp = Instant.now()
-
-    import java.time.format.DateTimeFormatter
-
-    format match {
-      case "timestamp" =>
-        timestamp.toEpochMilli.toString
-
-      case "datetime" =>
-        DateTimeFormatter
-          .ofPattern("yyyyMMdd_HHmmss")
-          .withZone(java.time.ZoneId.systemDefault())
-          .format(timestamp)
-
-      case _ =>
-        // Default to datetime format
-        DateTimeFormatter
-          .ofPattern("yyyyMMdd_HHmmss")
-          .withZone(java.time.ZoneId.systemDefault())
-          .format(timestamp)
-    }
-  }
 }

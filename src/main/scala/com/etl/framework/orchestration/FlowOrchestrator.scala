@@ -3,7 +3,12 @@ package com.etl.framework.orchestration
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig, OrphanAction}
 import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetectionResult, OrphanDetector, OrphanReport}
 import com.etl.framework.io.readers.DataReaderFactory
-import com.etl.framework.orchestration.batch.{BatchMetadataWriter, FlowGroupExecutor, QualityMetricsWriter}
+import com.etl.framework.orchestration.batch.{
+  BatchIdGenerator,
+  BatchMetadataWriter,
+  FlowGroupExecutor,
+  QualityMetricsWriter
+}
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.ExecutionPlanBuilder
 import com.etl.framework.pipeline.DerivedTableResult
@@ -64,7 +69,7 @@ class FlowOrchestrator(
   /** Executes all flows in correct order.
     */
   def execute(): IngestionResult = {
-    val batchId = metadataWriter.generateBatchId()
+    val batchId = BatchIdGenerator.generate(globalConfig.processing.batchIdFormat)
     val startTime = System.nanoTime()
 
     executionLogger.logBatchStart(batchId, flowConfigs.size)

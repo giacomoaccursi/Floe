@@ -2,19 +2,20 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    tags:
+      - "v*"
 
 permissions:
-  contents: write
+  contents: read
   packages: write
 
 env:
   SPARK_LOCAL_IP: "127.0.0.1"
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  JAVA_OPTS: "-Xmx2G"
 
 jobs:
   release:
-    name: Release
+    name: Publish to GitHub Packages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,45 +30,14 @@ jobs:
 
       - uses: sbt/setup-sbt@v1
 
-      - name: Determine next version
-        id: version
-        uses: ietf-tools/semver-action@v1
-        with:
-          token: ${{ github.token }}
-          branch: main
+      - name: Compile
+        run: sbt -J-Xss4m compile
 
-      - name: Create git tag
-        if: steps.version.outputs.next != ''
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${{ steps.version.outputs.next }}" -m "Release v${{ steps.version.outputs.next }}"
-          git push origin "v${{ steps.version.outputs.next }}"
+      - name: Test
+        run: sbt -J-Xss4m test
 
-      - name: Publish to GitHub Packages
-        if: steps.version.outputs.next != ''
+      - name: Publish
         run: sbt -J-Xss4m publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build fat JAR
-        if: steps.version.outputs.next != ''
-        run: sbt -J-Xss4m assembly
-
-      - name: Generate changelog
-        id: changelog
-        if: steps.version.outputs.next != ''
-        uses: requarks/changelog-action@v1
-        with:
-          token: ${{ github.token }}
-          tag: "v${{ steps.version.outputs.next }}"
-          excludeTypes: chore,docs,test
-
-      - name: Create GitHub Release
-        if: steps.version.outputs.next != ''
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ steps.version.outputs.next }}"
-          name: "v${{ steps.version.outputs.next }}"
-          body: ${{ steps.changelog.outputs.changes }}
-          files: target/scala-2.12/spark-etl-framework-assembly-*.jar
+          GITHUB_REPOSITORY: ${{ github.repository }}

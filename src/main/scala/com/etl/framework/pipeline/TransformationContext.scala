@@ -1,4 +1,4 @@
-package com.etl.framework.core
+package com.etl.framework.pipeline
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
 

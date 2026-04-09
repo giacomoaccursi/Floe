@@ -1,8 +1,5 @@
 package com.etl.framework
 
-package object core {
-
-  /** Function type for flow transformations
-    */
+package object pipeline {
   type FlowTransformation = TransformationContext => TransformationContext
 }

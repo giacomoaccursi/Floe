@@ -11,7 +11,6 @@ import com.etl.framework.validation.Validator
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
-import scala.collection.mutable
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 
@@ -70,8 +69,7 @@ class FlowOrchestrator(
 
     executionLogger.logBatchStart(batchId, flowConfigs.size)
 
-    val flowResults = mutable.ArrayBuffer[FlowResult]()
-    val validatedFlows = mutable.Map[String, DataFrame]()
+    var state = BatchState(Seq.empty, Map.empty)
 
     val result =
       try {
@@ -80,22 +78,22 @@ class FlowOrchestrator(
         plan.groups.foreach { group =>
           executionLogger.logGroupStart(group)
 
-          val groupResults = executeGroup(group, batchId, validatedFlows.toMap)
+          val groupResults = executeGroup(group, batchId, state.validatedFlows)
 
-          resultProcessor.processGroupResults(groupResults, flowResults, validatedFlows, batchId) match {
+          resultProcessor.processGroupResults(groupResults, state, batchId) match {
             case resultProcessor.StopExecution(r) =>
               notifyListeners(r)
               return r
-            case resultProcessor.Continue =>
-            // Continue to next group
+            case resultProcessor.ContinueWith(newState) =>
+              state = newState
           }
         }
 
-        createSuccessResult(batchId, flowResults.toSeq, startTime, plan)
+        createSuccessResult(batchId, state.flowResults, startTime, plan)
 
       } catch {
         case e: Exception =>
-          handleExecutionFailure(batchId, flowResults.toSeq, startTime, e)
+          handleExecutionFailure(batchId, state.flowResults, startTime, e)
       } finally {
         threadPool.foreach(_.shutdown())
       }

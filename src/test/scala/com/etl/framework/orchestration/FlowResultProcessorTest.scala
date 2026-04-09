@@ -6,8 +6,7 @@ import com.etl.framework.orchestration.batch.FlowGroupExecutor
 import com.etl.framework.orchestration.flow.FlowResult
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.apache.spark.sql.{SparkSession, DataFrame}
-import scala.collection.mutable
+import org.apache.spark.sql.SparkSession
 
 class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
 
@@ -18,8 +17,6 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     .config("spark.ui.enabled", "false")
     .config("spark.driver.bindAddress", "127.0.0.1")
     .getOrCreate()
-
-  import spark.implicits._
 
   // Mock FlowGroupExecutor for testing
   class MockFlowGroupExecutor(
@@ -42,21 +39,6 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
       if (stopOnHighRejectionRate && result.rejectionRate > rejectionThreshold)
         return true
       false
-    }
-  }
-
-  // Mock FlowResultProcessor that doesn't load data from disk
-  class MockFlowResultProcessor(
-      globalConfig: GlobalConfig,
-      flowConfigs: Seq[FlowConfig],
-      groupExecutor: FlowGroupExecutor
-  ) extends FlowResultProcessor(globalConfig, flowConfigs, groupExecutor) {
-    override def loadValidatedData(
-        result: FlowResult,
-        validatedFlows: scala.collection.mutable.Map[String, DataFrame]
-    ): Unit = {
-      // Mock: don't actually load from disk, just create a dummy DataFrame
-      validatedFlows(result.flowName) = Seq((1, "dummy")).toDF("id", "value")
     }
   }
 
@@ -88,23 +70,24 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     val groupExecutor =
       new MockFlowGroupExecutor(stopOnHighRejectionRate = false)
     val processor =
-      new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.Continue
+      new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
+    import processor.ContinueWith
 
     val result =
       FlowResult.success("flow_a", "batch1", 100, 100, 95, 5, Map.empty)
-    val accumulatedResults = mutable.ArrayBuffer[FlowResult]()
-    val validatedFlows = mutable.Map[String, DataFrame]()
+    val state = BatchState(Seq.empty, Map.empty)
 
     val processingResult = processor.processGroupResults(
       Seq(result),
-      accumulatedResults,
-      validatedFlows,
+      state,
       "batch1"
     )
 
-    processingResult shouldBe Continue
-    accumulatedResults should have size 1
+    processingResult match {
+      case ContinueWith(newState) =>
+        newState.flowResults should have size 1
+      case _ => fail("Expected ContinueWith")
+    }
   }
 
   it should "stop execution for failed flow result" in {
@@ -112,18 +95,16 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     val flowConfigs = Seq(createFlowConfig("flow_a"))
     val groupExecutor = new MockFlowGroupExecutor()
     val processor =
-      new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
+      new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
     import processor.StopExecution
 
     val result =
       FlowResult.failure("flow_a", "batch1", "Database connection failed")
-    val accumulatedResults = mutable.ArrayBuffer[FlowResult]()
-    val validatedFlows = mutable.Map[String, DataFrame]()
+    val state = BatchState(Seq.empty, Map.empty)
 
     val processingResult = processor.processGroupResults(
       Seq(result),
-      accumulatedResults,
-      validatedFlows,
+      state,
       "batch1"
     )
 
@@ -145,19 +126,17 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
       rejectionThreshold = 0.1
     )
     val processor =
-      new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
+      new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
     import processor.StopExecution
 
     // Rejection rate = 30/100 = 0.3 (30%), exceeds threshold of 10%
     val result =
       FlowResult.success("flow_a", "batch1", 100, 100, 70, 30, Map.empty)
-    val accumulatedResults = mutable.ArrayBuffer[FlowResult]()
-    val validatedFlows = mutable.Map[String, DataFrame]()
+    val state = BatchState(Seq.empty, Map.empty)
 
     val processingResult = processor.processGroupResults(
       Seq(result),
-      accumulatedResults,
-      validatedFlows,
+      state,
       "batch1"
     )
 
@@ -180,31 +159,32 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     val groupExecutor =
       new MockFlowGroupExecutor(stopOnHighRejectionRate = false)
     val processor =
-      new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.Continue
+      new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
+    import processor.ContinueWith
 
     val results = Seq(
       FlowResult.success("flow_a", "batch1", 100, 100, 95, 5, Map.empty),
       FlowResult.success("flow_b", "batch1", 200, 200, 190, 10, Map.empty),
       FlowResult.success("flow_c", "batch1", 150, 150, 145, 5, Map.empty)
     )
-    val accumulatedResults = mutable.ArrayBuffer[FlowResult]()
-    val validatedFlows = mutable.Map[String, DataFrame]()
+    val state = BatchState(Seq.empty, Map.empty)
 
     val processingResult = processor.processGroupResults(
       results,
-      accumulatedResults,
-      validatedFlows,
+      state,
       "batch1"
     )
 
-    processingResult shouldBe Continue
-    accumulatedResults should have size 3
-    accumulatedResults.map(_.flowName) should contain allOf (
-      "flow_a",
-      "flow_b",
-      "flow_c"
-    )
+    processingResult match {
+      case ContinueWith(newState) =>
+        newState.flowResults should have size 3
+        newState.flowResults.map(_.flowName) should contain allOf (
+          "flow_a",
+          "flow_b",
+          "flow_c"
+        )
+      case _ => fail("Expected ContinueWith")
+    }
   }
 
   it should "stop at first failure in mixed results" in {
@@ -216,7 +196,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     )
     val groupExecutor = new MockFlowGroupExecutor()
     val processor =
-      new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
+      new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
     import processor.StopExecution
 
     val results = Seq(
@@ -224,13 +204,11 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
       FlowResult.failure("flow_b", "batch1", "Processing error"),
       FlowResult.success("flow_c", "batch1", 150, 150, 145, 5, Map.empty)
     )
-    val accumulatedResults = mutable.ArrayBuffer[FlowResult]()
-    val validatedFlows = mutable.Map[String, DataFrame]()
+    val state = BatchState(Seq.empty, Map.empty)
 
     val processingResult = processor.processGroupResults(
       results,
-      accumulatedResults,
-      validatedFlows,
+      state,
       "batch1"
     )
 
@@ -248,21 +226,22 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     val flowConfigs = Seq.empty
     val groupExecutor = new MockFlowGroupExecutor()
     val processor =
-      new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.Continue
+      new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
+    import processor.ContinueWith
 
-    val accumulatedResults = mutable.ArrayBuffer[FlowResult]()
-    val validatedFlows = mutable.Map[String, DataFrame]()
+    val state = BatchState(Seq.empty, Map.empty)
 
     val processingResult = processor.processGroupResults(
       Seq.empty,
-      accumulatedResults,
-      validatedFlows,
+      state,
       "batch1"
     )
 
-    processingResult shouldBe Continue
-    accumulatedResults shouldBe empty
+    processingResult match {
+      case ContinueWith(newState) =>
+        newState.flowResults shouldBe empty
+      case _ => fail("Expected ContinueWith")
+    }
   }
 
   it should "create IngestionResult with correct batch ID and flow results" in {
@@ -270,17 +249,15 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     val flowConfigs = Seq(createFlowConfig("flow_a"))
     val groupExecutor = new MockFlowGroupExecutor()
     val processor =
-      new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
+      new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
     import processor.StopExecution
 
     val result = FlowResult.failure("flow_a", "batch123", "Error")
-    val accumulatedResults = mutable.ArrayBuffer[FlowResult]()
-    val validatedFlows = mutable.Map[String, DataFrame]()
+    val state = BatchState(Seq.empty, Map.empty)
 
     val processingResult = processor.processGroupResults(
       Seq(result),
-      accumulatedResults,
-      validatedFlows,
+      state,
       "batch123"
     )
 
@@ -301,24 +278,25 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
       rejectionThreshold = 0.2
     )
     val processor =
-      new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.Continue
+      new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
+    import processor.ContinueWith
 
     // Rejection rate = 10/100 = 0.1 (10%), below threshold of 20%
     val result =
       FlowResult.success("flow_a", "batch1", 100, 100, 90, 10, Map.empty)
-    val accumulatedResults = mutable.ArrayBuffer[FlowResult]()
-    val validatedFlows = mutable.Map[String, DataFrame]()
+    val state = BatchState(Seq.empty, Map.empty)
 
     val processingResult = processor.processGroupResults(
       Seq(result),
-      accumulatedResults,
-      validatedFlows,
+      state,
       "batch1"
     )
 
-    processingResult shouldBe Continue
-    accumulatedResults should have size 1
+    processingResult match {
+      case ContinueWith(newState) =>
+        newState.flowResults should have size 1
+      case _ => fail("Expected ContinueWith")
+    }
   }
 
   it should "use factory method from companion object" in {
@@ -337,8 +315,8 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     val flowConfigs = Seq(createFlowConfig("flow_a"))
     val groupExecutor = new MockFlowGroupExecutor()
     val processor =
-      new MockFlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
-    import processor.Continue
+      new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
+    import processor.ContinueWith
 
     val rejectionReasons = Map(
       "schema_validation" -> 3L,
@@ -346,17 +324,18 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     )
     val result =
       FlowResult.success("flow_a", "batch1", 100, 100, 95, 5, rejectionReasons)
-    val accumulatedResults = mutable.ArrayBuffer[FlowResult]()
-    val validatedFlows = mutable.Map[String, DataFrame]()
+    val state = BatchState(Seq.empty, Map.empty)
 
     val processingResult = processor.processGroupResults(
       Seq(result),
-      accumulatedResults,
-      validatedFlows,
+      state,
       "batch1"
     )
 
-    processingResult shouldBe Continue
-    accumulatedResults.head.rejectionReasons shouldBe rejectionReasons
+    processingResult match {
+      case ContinueWith(newState) =>
+        newState.flowResults.head.rejectionReasons shouldBe rejectionReasons
+      case _ => fail("Expected ContinueWith")
+    }
   }
 }

@@ -23,7 +23,7 @@ class FlowExecutor(
 
   private val logger = LoggerFactory.getLogger(getClass)
 
-  private val icebergTableWriter: IcebergTableWriter = {
+  private lazy val icebergTableWriter: IcebergTableWriter = {
     val tableManager = new IcebergTableManager(spark, globalConfig.iceberg)
     new IcebergTableWriter(spark, globalConfig.iceberg, tableManager)
   }

@@ -7,36 +7,27 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 
-/** Coordinates DAG-based aggregation
-  */
 class DAGOrchestrator(
     dagConfig: AggregationConfig,
     globalConfig: GlobalConfig
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
-
   private val graphBuilder = new DAGGraphBuilder(dagConfig.parallelNodes)
-  private val joinExecutor = new JoinStrategyExecutor()
-  private val nodeProcessor =
-    new DAGNodeProcessor(joinExecutor, globalConfig.iceberg.catalogName, globalConfig.iceberg.namespace)
-  private val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
-  private val dagExecutor = new DAGExecutor(nodeProcessor, ExecutionContext.fromExecutorService(pool))
 
-  /** Builds execution plan from DAG configuration
-    */
   def buildExecutionPlan(): DAGExecutionPlan = {
     logger.info("Building DAG execution plan")
-    val nodes = dagConfig.nodes
-    logger.info(s"Total DAG nodes: ${nodes.size}")
-    graphBuilder.buildExecutionPlan(nodes)
+    graphBuilder.buildExecutionPlan(dagConfig.nodes)
   }
 
-  /** Executes the DAG
-    */
   def execute(): DataFrame = {
     logger.info("Starting DAG execution")
+    val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
     try {
+      val joinExecutor = new JoinStrategyExecutor()
+      val nodeProcessor =
+        new DAGNodeProcessor(joinExecutor, globalConfig.iceberg.catalogName, globalConfig.iceberg.namespace)
+      val dagExecutor = new DAGExecutor(nodeProcessor, ExecutionContext.fromExecutorService(pool))
       val plan = buildExecutionPlan()
       dagExecutor.execute(plan)
     } finally {

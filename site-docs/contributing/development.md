@@ -71,7 +71,6 @@ The `build.sbt` includes the required `--add-opens` flags for Java 17+ compatibi
 src/main/scala/com/etl/framework/
 ├── config/          # YAML config loading & validation
 ├── validation/      # Validation engine
-├── merge/           # (dead code) Pre-Iceberg merge
 ├── iceberg/         # Iceberg table writes
 ├── io/              # Data readers
 ├── aggregation/     # DAG execution

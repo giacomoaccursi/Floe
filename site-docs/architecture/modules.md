@@ -8,7 +8,6 @@ Detailed responsibilities of each module in the framework.
 |--------|---------------|
 | `config` | YAML config loading & validation |
 | `validation` | Validation engine (schema, not-null, PK, FK, custom rules) |
-| `merge` | *(dead code)* Pre-Iceberg in-memory merge — no longer used |
 | `iceberg` | Iceberg table writes (full/delta/SCD2) |
 | `io` | Data readers: file (CSV, Parquet, JSON), JDBC |
 | `aggregation` | DAG execution for layered joins and aggregations |
@@ -43,10 +42,6 @@ Each step separates valid from rejected records. Rejected records carry metadata
 Includes a plugin system for custom validators loaded via reflection.
 
 See [Validation Engine](../guides/validation.md).
-
-## merge
-
-**Dead code.** This module contained a pre-Iceberg in-memory merge implementation. It is no longer used — all merge operations now go through Iceberg's MERGE INTO. The module remains in the codebase but is not referenced by any active code path.
 
 ## iceberg
 

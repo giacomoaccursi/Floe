@@ -2,18 +2,11 @@ package com.etl.framework.aggregation
 
 import com.etl.framework.config._
 import com.etl.framework.exceptions.CircularDependencyException
+import com.etl.framework.util.TopologicalSorter
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
-
-  def createGlobalConfig(parallelFlows: Boolean = true): GlobalConfig = {
-    GlobalConfig(
-      paths = PathsConfig("/output", "/rejected", "/metadata"),
-      performance = PerformanceConfig(parallelFlows = parallelFlows),
-      iceberg = IcebergConfig(warehouse = "/tmp/test-warehouse")
-    )
-  }
 
   def leaf(id: String): DAGNode =
     DAGNode(id = id, sourceFlow = s"flow_$id")
@@ -33,38 +26,41 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
     )
 
   "DAGGraphBuilder" should "build dependency graph with no joins" in {
-    val builder = new DAGGraphBuilder(parallelNodes = false)
-    val graph = builder.buildDependencyGraph(Seq(leaf("A"), leaf("B"), leaf("C")))
-
+    val graph = TopologicalSorter.buildGraph[DAGNode](
+      Seq(leaf("A"), leaf("B"), leaf("C")),
+      _.id,
+      _.joins.map(_.`with`).toSet
+    )
     graph.size shouldBe 3
     graph("A") shouldBe empty
     graph("B") shouldBe empty
     graph("C") shouldBe empty
   }
 
-  it should "infer dependency from join parent" in {
-    val builder = new DAGGraphBuilder(parallelNodes = false)
-    val graph = builder.buildDependencyGraph(Seq(leaf("A"), child("B", "A")))
-
+  it should "infer dependency from join" in {
+    val graph = TopologicalSorter.buildGraph[DAGNode](
+      Seq(leaf("A"), child("B", "A")),
+      _.id,
+      _.joins.map(_.`with`).toSet
+    )
     graph("A") shouldBe empty
     graph("B") shouldBe Set("A")
   }
 
   it should "build linear chain from joins" in {
-    val builder = new DAGGraphBuilder(parallelNodes = false)
-    val graph = builder.buildDependencyGraph(Seq(leaf("A"), child("B", "A"), child("C", "B")))
-
+    val graph = TopologicalSorter.buildGraph[DAGNode](
+      Seq(leaf("A"), child("B", "A"), child("C", "B")),
+      _.id,
+      _.joins.map(_.`with`).toSet
+    )
     graph("A") shouldBe empty
     graph("B") shouldBe Set("A")
     graph("C") shouldBe Set("B")
   }
 
-  it should "build diamond execution plan" in {
+  it should "build execution plan in correct order" in {
     val builder = new DAGGraphBuilder(parallelNodes = false)
-    // A <- B <- C (linear chain)
-    val nodes = Seq(leaf("A"), child("B", "A"), child("C", "B"))
-
-    val plan = builder.buildExecutionPlan(nodes)
+    val plan = builder.buildExecutionPlan(Seq(leaf("A"), child("B", "A"), child("C", "B")))
 
     val allIds = plan.groups.flatMap(_.nodes.map(_.id))
     allIds.indexOf("A") should be < allIds.indexOf("B")
@@ -72,13 +68,13 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
     plan.rootNode shouldBe "C"
   }
 
-  it should "identify root node (node with no dependents)" in {
+  it should "identify root node" in {
     val builder = new DAGGraphBuilder(parallelNodes = false)
     val plan = builder.buildExecutionPlan(Seq(leaf("A"), child("B", "A"), child("C", "B")))
     plan.rootNode shouldBe "C"
   }
 
-  it should "detect circular dependency via join parents" in {
+  it should "detect circular dependency" in {
     val builder = new DAGGraphBuilder(parallelNodes = false)
     intercept[CircularDependencyException] {
       builder.buildExecutionPlan(Seq(child("A", "B"), child("B", "A")))
@@ -104,14 +100,12 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
   it should "disable parallel when parallelNodes is false" in {
     val builder = new DAGGraphBuilder(parallelNodes = false)
     val plan = builder.buildExecutionPlan(Seq(leaf("A"), leaf("B")))
-
     plan.groups.head.parallel shouldBe false
   }
 
   it should "handle single node DAG" in {
     val builder = new DAGGraphBuilder(parallelNodes = false)
     val plan = builder.buildExecutionPlan(Seq(leaf("A")))
-
     plan.groups.size shouldBe 1
     plan.rootNode shouldBe "A"
   }

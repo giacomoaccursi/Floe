@@ -25,7 +25,7 @@ class QualityMetricsWriter(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConf
       case None =>
       case Some(tableName) =>
         try {
-          val fullTableName = s"${globalConfig.iceberg.catalogName}.default.$tableName"
+          val fullTableName = globalConfig.iceberg.fullTableName(tableName)
           ensureTable(fullTableName)
           val df = buildMetricsDataFrame(batchId, flowResults, orphanReports, executionTimeMs, batchSuccess)
           df.writeTo(fullTableName).append()

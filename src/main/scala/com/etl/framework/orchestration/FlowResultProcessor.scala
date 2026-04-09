@@ -77,7 +77,7 @@ class FlowResultProcessor(
   }
 
   private def loadValidatedData(result: FlowResult): Option[DataFrame] = {
-    val tableName = s"${globalConfig.iceberg.catalogName}.default.${result.flowName}"
+    val tableName = globalConfig.iceberg.fullTableName(result.flowName)
     scala.util.Try(spark.table(tableName)).toOption match {
       case some @ Some(_) => some
       case None =>

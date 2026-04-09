@@ -7,7 +7,9 @@ import org.slf4j.LoggerFactory
 
 /** Processes individual DAG nodes
   */
-class DAGNodeProcessor(joinExecutor: JoinStrategyExecutor, catalogName: String)(implicit spark: SparkSession) {
+class DAGNodeProcessor(joinExecutor: JoinStrategyExecutor, catalogName: String, namespace: String = "default")(implicit
+    spark: SparkSession
+) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -16,7 +18,7 @@ class DAGNodeProcessor(joinExecutor: JoinStrategyExecutor, catalogName: String)(
   def executeNode(node: DAGNode, nodeResults: Map[String, DataFrame]): DataFrame = {
     logger.info(s"Executing DAG node: ${node.id}")
 
-    val tableName = node.sourceTable.getOrElse(s"$catalogName.default.${node.sourceFlow}")
+    val tableName = node.sourceTable.getOrElse(s"$catalogName.$namespace.${node.sourceFlow}")
     val sourceData = spark.table(tableName)
     logger.debug(s"Source data loaded from table: $tableName")
 

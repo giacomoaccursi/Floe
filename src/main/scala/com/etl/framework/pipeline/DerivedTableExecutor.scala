@@ -26,7 +26,7 @@ class DerivedTableExecutor(
       derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
       batchId: String
   ): Seq[DerivedTableResult] = {
-    val ctx = DerivedTableContext(spark, batchId, icebergConfig.catalogName)
+    val ctx = DerivedTableContext(spark, batchId, icebergConfig.catalogName, icebergConfig.namespace)
 
     val results = derivedTables.map { case (tableName, fn) =>
       executeSingle(tableName, fn, ctx, batchId)
@@ -62,7 +62,7 @@ class DerivedTableExecutor(
   }
 
   private def resolveTableName(tableName: String): String =
-    s"${icebergConfig.catalogName}.default.$tableName"
+    icebergConfig.fullTableName(tableName)
 
   private def writeToIceberg(fullTableName: String, df: DataFrame): Long = {
     createOrUpdateTable(fullTableName, df.schema)

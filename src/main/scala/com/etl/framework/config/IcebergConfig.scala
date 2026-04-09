@@ -3,6 +3,7 @@ package com.etl.framework.config
 case class IcebergConfig(
     catalogType: String = "hadoop",
     catalogName: String = "spark_catalog",
+    namespace: String = "default",
     warehouse: String,
     catalogProperties: Map[String, String] = Map.empty,
     fileFormat: String = "parquet",
@@ -10,6 +11,9 @@ case class IcebergConfig(
     maintenance: MaintenanceConfig = MaintenanceConfig()
 ) {
   val formatVersion: Int = 2
+
+  def fullTableName(table: String): String =
+    s"$catalogName.$namespace.$table"
 }
 
 case class MaintenanceConfig(

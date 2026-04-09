@@ -8,11 +8,10 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 final case class DerivedTableContext(
     spark: SparkSession,
     batchId: String,
-    catalogName: String
+    catalogName: String,
+    namespace: String = "default"
 ) {
 
-  /** Reads a table from the Iceberg catalog (full history, not just the current batch delta).
-    */
   def table(name: String): DataFrame =
-    spark.table(s"$catalogName.default.$name")
+    spark.table(s"$catalogName.$namespace.$name")
 }

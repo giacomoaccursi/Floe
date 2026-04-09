@@ -19,9 +19,8 @@ class IcebergTableManager(
     .ofPattern("yyyy-MM-dd HH:mm:ss")
     .withZone(ZoneOffset.UTC)
 
-  def resolveTableName(flowConfig: FlowConfig): String = {
-    s"${icebergConfig.catalogName}.default.${flowConfig.name}"
-  }
+  def resolveTableName(flowConfig: FlowConfig): String =
+    icebergConfig.fullTableName(flowConfig.name)
 
   def createOrUpdateTable(
       flowConfig: FlowConfig,

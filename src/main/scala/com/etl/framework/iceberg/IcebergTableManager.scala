@@ -37,7 +37,13 @@ class IcebergTableManager(
   }
 
   private def updateTableConfig(tableName: String, schema: StructType, flowConfig: FlowConfig): Unit = {
-    // Add new columns that exist in the incoming schema but not in the table
+    addNewColumns(tableName, schema, flowConfig)
+    widenColumnTypes(tableName, schema)
+    updateTableProperties(tableName, flowConfig)
+    addPartitionFields(tableName, flowConfig)
+  }
+
+  private def addNewColumns(tableName: String, schema: StructType, flowConfig: FlowConfig): Unit = {
     val currentColumns = spark.table(tableName).schema.fieldNames.toSet
     val newColumns = schema.fields.filterNot(f => currentColumns.contains(f.name))
     val isActiveCol = flowConfig.loadMode.isActiveColumn
@@ -53,16 +59,15 @@ class IcebergTableManager(
         )
       }
     }
+  }
 
-    // Apply safe type widening on existing columns
+  private def widenColumnTypes(tableName: String, schema: StructType): Unit = {
     val currentSchema = spark.table(tableName).schema
     schema.fields.foreach { incomingField =>
       currentSchema.fields.find(_.name == incomingField.name).foreach { existingField =>
         if (existingField.dataType != incomingField.dataType) {
           if (isSafeWidening(existingField.dataType, incomingField.dataType)) {
-            spark.sql(
-              s"ALTER TABLE $tableName ALTER COLUMN ${incomingField.name} TYPE ${incomingField.dataType.sql}"
-            )
+            spark.sql(s"ALTER TABLE $tableName ALTER COLUMN ${incomingField.name} TYPE ${incomingField.dataType.sql}")
             logger.info(
               s"Widened column ${incomingField.name} from ${existingField.dataType.sql} to ${incomingField.dataType.sql} on $tableName"
             )
@@ -76,8 +81,9 @@ class IcebergTableManager(
         }
       }
     }
+  }
 
-    // Apply new or changed table properties
+  private def updateTableProperties(tableName: String, flowConfig: FlowConfig): Unit = {
     if (flowConfig.output.tableProperties.nonEmpty) {
       val currentProps = spark
         .sql(s"SHOW TBLPROPERTIES $tableName")
@@ -93,8 +99,9 @@ class IcebergTableManager(
         logger.info(s"Applied ${toApply.size} property updates to $tableName: ${toApply.keys.mkString(", ")}")
       }
     }
+  }
 
-    // Add missing partition fields — idempotent: Iceberg throws if field already exists
+  private def addPartitionFields(tableName: String, flowConfig: FlowConfig): Unit = {
     if (flowConfig.output.icebergPartitions.nonEmpty) {
       flowConfig.output.icebergPartitions.foreach { partition =>
         val partitionExpr = parsePartitionTransform(partition)

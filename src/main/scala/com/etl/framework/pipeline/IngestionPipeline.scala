@@ -343,34 +343,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     */
   def build(): IngestionPipeline = {
     logger.info("Building IngestionPipeline")
-
-    // Load configurations if directory was specified
-    val (globalConfig, flowConfigs) = (globalConfigOpt, flowConfigsOpt) match {
-      case (Some(gc), Some(fc)) =>
-        // Both provided directly
-        (gc, fc)
-
-      case (None, None) if configDirectory.isDefined =>
-        // Load from directory
-        loadConfigurationsFromDirectory(configDirectory.get)
-
-      case (Some(gc), None) if configDirectory.isDefined =>
-        // Global config provided, load flows from directory
-        val flows = loadFlowConfigsFromDirectory(configDirectory.get)
-        (gc, flows)
-
-      case (None, Some(fc)) if configDirectory.isDefined =>
-        // Flow configs provided, load global from directory
-        val global = loadGlobalConfigFromDirectory(configDirectory.get)
-        (global, fc)
-
-      case _ =>
-        throw MissingConfigFieldException(
-          file = "pipeline-builder",
-          field = "configDirectory or (globalConfig + flowConfigs)",
-          section = "pipeline configuration"
-        )
-    }
+    val (globalConfig, flowConfigs) = loadConfigs()
 
     logger.info(s"IngestionPipeline built with ${flowConfigs.size} flows")
     IngestionPipeline.create(
@@ -384,6 +357,73 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       batchListeners.toSeq,
       customReaders.toMap
     )
+  }
+
+  def validate(): Seq[String] = {
+    val errors = scala.collection.mutable.ArrayBuffer[String]()
+
+    val configs = scala.util.Try(loadConfigs())
+    configs match {
+      case scala.util.Failure(e) =>
+        errors += s"Configuration loading failed: ${e.getMessage}"
+        return errors.toSeq
+      case _ =>
+    }
+
+    val (_, flowConfigs) = configs.get
+    val flowNames = flowConfigs.map(_.name).toSet
+
+    // Check FK references point to existing flows
+    flowConfigs.foreach { fc =>
+      fc.validation.foreignKeys.foreach { fk =>
+        if (!flowNames.contains(fk.references.flow))
+          errors += s"Flow '${fc.name}': FK references unknown flow '${fk.references.flow}'"
+      }
+      fc.dependsOn.foreach { dep =>
+        if (!flowNames.contains(dep))
+          errors += s"Flow '${fc.name}': dependsOn references unknown flow '$dep'"
+      }
+    }
+
+    // Check for dependency cycles
+    scala.util.Try {
+      val graph = com.etl.framework.util.TopologicalSorter.buildGraph[FlowConfig](
+        flowConfigs,
+        _.name,
+        fc => fc.validation.foreignKeys.map(_.references.flow).toSet ++ fc.dependsOn.toSet
+      )
+      com.etl.framework.util.TopologicalSorter.sort(graph, "flow dependency graph")
+    } match {
+      case scala.util.Failure(e) => errors += e.getMessage
+      case _                     =>
+    }
+
+    errors.toSeq
+  }
+
+  private def loadConfigs(): (GlobalConfig, Seq[FlowConfig]) = {
+    (globalConfigOpt, flowConfigsOpt) match {
+      case (Some(gc), Some(fc)) =>
+        (gc, fc)
+
+      case (None, None) if configDirectory.isDefined =>
+        loadConfigurationsFromDirectory(configDirectory.get)
+
+      case (Some(gc), None) if configDirectory.isDefined =>
+        val flows = loadFlowConfigsFromDirectory(configDirectory.get)
+        (gc, flows)
+
+      case (None, Some(fc)) if configDirectory.isDefined =>
+        val global = loadGlobalConfigFromDirectory(configDirectory.get)
+        (global, fc)
+
+      case _ =>
+        throw MissingConfigFieldException(
+          file = "pipeline-builder",
+          field = "configDirectory or (globalConfig + flowConfigs)",
+          section = "pipeline configuration"
+        )
+    }
   }
 
   /** Loads all configurations from directory

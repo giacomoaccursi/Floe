@@ -45,6 +45,7 @@ val result = pipeline.execute()
 | `withBatchListener(listener)` | Registers a listener notified on batch completion or failure. See [Batch Listeners](batch-listeners.md). |
 | `withVariables(variables)` | Sets variables for YAML substitution (priority over env vars). See [Configuration Overview](../configuration/overview.md#variable-substitution) |
 | `build()` | Builds the pipeline (returns `IngestionPipeline`) |
+| `validate()` | Validates configuration without executing. Returns `Seq[String]` of issues (empty = valid). |
 
 The builder does not have an `execute()` method — call `build()` first, then `execute()` or `executeOrThrow()` on the returned pipeline.
 
@@ -76,6 +77,29 @@ if (!result.success) {
   // handle failure
 }
 ```
+
+### Configuration validation
+
+`validate()` checks your YAML configuration without starting Spark or reading data:
+
+```scala
+val issues = IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .validate()
+
+if (issues.nonEmpty) {
+  issues.foreach(println)
+  sys.exit(1)
+}
+```
+
+It verifies:
+- YAML files are parseable and contain required fields
+- FK references point to existing flows
+- `dependsOn` references point to existing flows
+- No circular dependencies between flows
+
+Use it in CI pipelines to catch config errors before deployment.
 
 ### Configuration loading
 

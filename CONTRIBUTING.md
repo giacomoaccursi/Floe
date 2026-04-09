@@ -1,0 +1,45 @@
+# Contributing
+
+Thanks for your interest in contributing to the Spark ETL Framework.
+
+## Quick start
+
+```bash
+git clone https://github.com/giacomoaccursi/spark-etl-framework.git
+cd spark-etl-framework
+sbt compile
+sbt test
+```
+
+Requires Java 17+ and SBT 1.9+.
+
+## Workflow
+
+1. Create a branch from `develop` (`feat/my-feature`, `fix/my-fix`)
+2. Make changes, commit with [Conventional Commits](https://www.conventionalcommits.org/) format
+3. Open a PR targeting `develop`
+4. Pass CI (compile, test, scalafmt)
+
+## Commit format
+
+```
+<type>(<scope>): <description>
+```
+
+Types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `chore`. Max 72 characters, no body.
+
+## Bug fixes
+
+1. Write a test that reproduces the problem (must fail)
+2. Fix the bug
+3. Show the test passing
+
+## Code style
+
+- Prefer immutability, `Option` over `null`, pattern matching
+- Cache with `try-finally`, minimize Spark actions
+- Run `sbt scalafmtAll` before committing
+
+## Full guide
+
+See the [Development Guide](https://giacomoaccursi.github.io/spark-etl-framework/contributing/development/) and [Code Quality Rules](https://giacomoaccursi.github.io/spark-etl-framework/contributing/code-quality/) for details.

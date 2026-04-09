@@ -37,6 +37,7 @@ test-*.log
 # Documentation files (external to project)
 *.md
 !README.md
+!CONTRIBUTING.md
 !docs/
 !docs/**/*.md
 !site-docs/

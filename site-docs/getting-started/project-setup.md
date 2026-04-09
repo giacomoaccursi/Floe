@@ -75,6 +75,15 @@ object MyPipeline extends App {
 }
 ```
 
+On managed platforms (Glue, EMR, Databricks), use `executeOrThrow()` instead — the platform detects failure automatically via the uncaught exception:
+
+```scala
+IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .build()
+  .executeOrThrow()
+```
+
 ## Running locally
 
 ```bash
@@ -84,7 +93,7 @@ sbt run
 ## Adding transformations
 
 ```scala
-import com.etl.framework.core.TransformationContext
+import com.etl.framework.pipeline.TransformationContext
 import org.apache.spark.sql.functions._
 
 val normalizeEmails: TransformationContext => TransformationContext = { ctx =>

@@ -9,7 +9,7 @@ import com.etl.framework.config.{
   GlobalConfigLoader,
   IcebergConfig
 }
-import com.etl.framework.exceptions.MissingConfigFieldException
+import com.etl.framework.exceptions.{BatchFailedException, MissingConfigFieldException}
 import com.etl.framework.iceberg.catalog.{CatalogFactory, CatalogProvider}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.{FlowOrchestrator, IngestionResult, BatchListener}
@@ -80,6 +80,13 @@ class IngestionPipeline private (
     } else {
       result
     }
+  }
+
+  def executeOrThrow(): IngestionResult = {
+    val result = execute()
+    if (!result.success)
+      throw BatchFailedException(result.batchId, result.error.getOrElse("unknown error"))
+    result
   }
 
   private def configureSparkForIceberg(

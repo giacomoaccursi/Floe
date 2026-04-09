@@ -15,7 +15,7 @@ IngestionPipeline.builder()
     "WAREHOUSE_PATH" -> args("warehouse_path")
   ))
   .build()
-  .execute()
+  .executeOrThrow()  // throws on failure — Glue/EMR/Databricks detect it automatically
 ```
 
 Variables are resolved in YAML files via `${VAR_NAME}` or `$VAR_NAME` syntax. Explicit variables take priority over environment variables with the same name.

@@ -46,7 +46,36 @@ val result = pipeline.execute()
 | `withVariables(variables)` | Sets variables for YAML substitution (priority over env vars). See [Configuration Overview](../configuration/overview.md#variable-substitution) |
 | `build()` | Builds the pipeline (returns `IngestionPipeline`) |
 
-The builder does not have an `execute()` method — call `build()` first, then `execute()` on the returned pipeline.
+The builder does not have an `execute()` method — call `build()` first, then `execute()` or `executeOrThrow()` on the returned pipeline.
+
+### execute() vs executeOrThrow()
+
+| Method | On success | On failure |
+|--------|-----------|-----------|
+| `execute()` | Returns `IngestionResult` with `success = true` | Returns `IngestionResult` with `success = false` |
+| `executeOrThrow()` | Returns `IngestionResult` with `success = true` | Throws `BatchFailedException` |
+
+Use `execute()` when you want to inspect the result programmatically. Use `executeOrThrow()` on managed platforms (AWS Glue, EMR, Databricks) where the runtime detects failure via uncaught exceptions:
+
+```scala
+// AWS Glue — job fails automatically if batch fails
+IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .build()
+  .executeOrThrow()
+```
+
+```scala
+// Custom orchestration — inspect result
+val result = IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .build()
+  .execute()
+
+if (!result.success) {
+  // handle failure
+}
+```
 
 ### Configuration loading
 

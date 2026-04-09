@@ -496,3 +496,19 @@ case class UnsupportedOperationException(
     "details" -> details
   )
 }
+
+/** Batch execution failed. Thrown by `executeOrThrow()` when the batch completes with `success = false`. Contains the
+  * full `IngestionResult` for inspection.
+  */
+case class BatchFailedException(
+    batchId: String,
+    details: String
+) extends FrameworkException(
+      s"Batch '$batchId' failed: $details"
+    ) {
+  override def errorCode: String = "BATCH_FAILED"
+  override def context: Map[String, Any] = Map(
+    "batchId" -> batchId,
+    DETAILS -> details
+  )
+}

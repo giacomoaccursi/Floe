@@ -274,6 +274,40 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     completed.head.batchId shouldBe result.batchId
   }
 
+  it should "throw BatchFailedException from executeOrThrow on failure" in {
+    val configDir = tempDir.resolve("e2e_throw").resolve("config")
+
+    setupConfig(configDir)
+
+    // Flow pointing to non-existent source → will fail
+    writeFile(
+      configDir.resolve("flows").resolve("bad_flow.yaml"),
+      s"""
+         |name: bad_flow
+         |source:
+         |  path: "/nonexistent/path/that/does/not/exist"
+         |  format: csv
+         |schema:
+         |  enforceSchema: false
+         |loadMode:
+         |  type: full
+         |validation:
+         |  primaryKey: [id]
+         |""".stripMargin
+    )
+
+    val ex = intercept[com.etl.framework.exceptions.BatchFailedException] {
+      IngestionPipeline
+        .builder()
+        .withConfigDirectory(configDir.toString)
+        .build()
+        .executeOrThrow()
+    }
+
+    ex.batchId should not be empty
+    ex.getMessage should include("bad_flow")
+  }
+
   it should "rename columns using sourceColumn mapping" in {
     val configDir = tempDir.resolve("e2e_rename").resolve("config")
     val dataDir = tempDir.resolve("e2e_rename").resolve("data")

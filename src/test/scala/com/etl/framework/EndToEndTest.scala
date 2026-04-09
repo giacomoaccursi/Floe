@@ -274,8 +274,68 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     completed.head.batchId shouldBe result.batchId
   }
 
+  it should "rename columns using sourceColumn mapping" in {
+    val configDir = tempDir.resolve("e2e_rename").resolve("config")
+    val dataDir = tempDir.resolve("e2e_rename").resolve("data")
+
+    setupConfig(configDir)
+
+    // Flow with sourceColumn rename: CustID → customer_id
+    writeFile(
+      configDir.resolve("flows").resolve("renamed_customers.yaml"),
+      s"""
+         |name: renamed_customers
+         |source:
+         |  path: "${dataDir.resolve("renamed_customers")}"
+         |  format: csv
+         |  options:
+         |    header: "true"
+         |schema:
+         |  enforceSchema: false
+         |  columns:
+         |    - name: customer_id
+         |      type: string
+         |      nullable: false
+         |      sourceColumn: CustID
+         |    - name: full_name
+         |      type: string
+         |      nullable: true
+         |      sourceColumn: nm
+         |loadMode:
+         |  type: full
+         |validation:
+         |  primaryKey: [customer_id]
+         |""".stripMargin
+    )
+
+    // Write CSV with source column names
+    import spark.implicits._
+    Seq(("1", "Alice"), ("2", "Bob"))
+      .toDF("CustID", "nm")
+      .write
+      .mode("overwrite")
+      .format("csv")
+      .option("header", "true")
+      .save(dataDir.resolve("renamed_customers").toString)
+
+    val result = IngestionPipeline
+      .builder()
+      .withConfigDirectory(configDir.toString)
+      .build()
+      .execute()
+
+    result.success shouldBe true
+
+    // Verify columns were renamed in Iceberg
+    val df = spark.sql("SELECT * FROM spark_catalog.default.renamed_customers")
+    df.columns should contain allOf ("customer_id", "full_name")
+    df.columns should not contain "CustID"
+    df.columns should not contain "nm"
+    df.count() shouldBe 2
+  }
+
   override def afterAll(): Unit = {
-    Seq("customers", "orders").foreach { t =>
+    Seq("customers", "orders", "renamed_customers").foreach { t =>
       spark.sql(s"DROP TABLE IF EXISTS spark_catalog.default.$t")
     }
     super.afterAll()

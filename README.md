@@ -2,6 +2,10 @@
 
 [![CI](https://github.com/giacomoaccursi/floe/actions/workflows/ci.yml/badge.svg)](https://github.com/giacomoaccursi/floe/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Scala](https://img.shields.io/badge/Scala-2.12-red.svg)](https://www.scala-lang.org/)
+[![Spark](https://img.shields.io/badge/Spark-3.5-orange.svg)](https://spark.apache.org/)
+[![Iceberg](https://img.shields.io/badge/Iceberg-1.10-blue.svg)](https://iceberg.apache.org/)
+[![Docs](https://img.shields.io/badge/docs-online-green.svg)](https://giacomoaccursi.github.io/floe/)
 
 Declarative ETL framework — built on Spark and Iceberg.
 
@@ -67,11 +71,6 @@ That's it. Floe reads the source data, validates schema and rules, upserts into 
 | **DAG aggregation** | Join, nest, flatten, and aggregate data across flows using a declarative DAG |
 | **Derived tables** | Compute post-batch tables from Iceberg data with full history access |
 | **Config validation** | Lint your YAML configs without starting Spark |
-
-## Stack
-
-- Scala 2.12 · Apache Spark 3.5 · Apache Iceberg 1.10
-- SBT · PureConfig · ScalaTest + ScalaCheck
 
 ## Getting started
 

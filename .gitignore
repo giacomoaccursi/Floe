@@ -38,6 +38,7 @@ test-*.log
 *.md
 !README.md
 !CONTRIBUTING.md
+!.github/**/*.md
 !docs/
 !docs/**/*.md
 !site-docs/

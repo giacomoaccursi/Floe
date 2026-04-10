@@ -126,12 +126,12 @@ class IcebergTableWriter(
     val scd2Schema = buildSCD2Schema(df, cfg)
     tableManager.createOrUpdateTable(flowConfig, scd2Schema)
 
-    val existingCount = spark.sql(s"SELECT COUNT(*) FROM $tableName").first().getLong(0)
+    val isInitialLoad = tableManager.getCurrentSnapshotId(flowConfig).isEmpty
     val sn = sanitizeViewName(flowConfig.name)
 
     val cachedDf = df.cache()
     try {
-      if (existingCount == 0)
+      if (isInitialLoad)
         executeSCD2InitialLoad(cachedDf, tableName, sn, cfg)
       else
         executeSCD2MergeLoad(cachedDf, tableName, sn, cfg)

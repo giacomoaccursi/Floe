@@ -64,15 +64,16 @@ class FlattenJoinTest extends AnyFlatSpec with Matchers {
     val childJoinKeys = Set("parent_id")
     val childDataColumns = childDF.columns.toSet -- childJoinKeys
     val resultColumns = result.columns.toSet
+    val prefix = "parent_node_"
 
     childDataColumns.foreach { childCol =>
       (resultColumns.contains(childCol) || resultColumns.contains(
-        s"child_$childCol"
+        s"$prefix$childCol"
       )) shouldBe true
     }
   }
 
-  it should "handle column name conflicts with prefix" in {
+  it should "handle column name conflicts with node name prefix" in {
     val parentDF = parentRecords.toDF("id", "parent_name", "parent_value")
     val conflictChildDF =
       Seq(("p1", "conflict_value", 42), ("p2", "conflict_value2", 43))
@@ -84,7 +85,7 @@ class FlattenJoinTest extends AnyFlatSpec with Matchers {
 
     val resultColumns = result.columns.toSet
     resultColumns should contain("parent_name")
-    resultColumns should contain("child_parent_name")
+    resultColumns should contain("parent_node_parent_name")
   }
 
   it should "produce only matching records with inner join" in {

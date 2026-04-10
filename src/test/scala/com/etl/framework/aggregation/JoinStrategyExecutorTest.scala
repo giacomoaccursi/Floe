@@ -106,7 +106,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     result.count() shouldBe 2
   }
 
-  it should "rename conflicting columns with child_ prefix" in {
+  it should "rename conflicting columns with node name prefix" in {
     val parent = Seq((1, "Alice")).toDF("id", "name")
     val child = Seq((1, "AliceChild")).toDF("parent_id", "name")
 
@@ -121,7 +121,7 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
 
     val result = executor.applyJoin(parent, child, joinConfig)
 
-    result.columns should contain("child_name")
+    result.columns should contain("parent_name")
   }
 
   it should "exclude child join keys from flattened result" in {

@@ -87,9 +87,10 @@ class JoinStrategyExecutor {
     val rightJoinKeys = joinConfig.conditions.map(_.right).toSet
     val rightDataColumns = rightColumns -- rightJoinKeys
 
+    val prefix = s"${joinConfig.`with`}_"
     val renamedRight = rightDataColumns.foldLeft(right) { (df, rightCol) =>
       if (leftColumns.contains(rightCol)) {
-        df.withColumnRenamed(rightCol, s"child_$rightCol")
+        df.withColumnRenamed(rightCol, s"$prefix$rightCol")
       } else {
         df
       }
@@ -108,7 +109,7 @@ class JoinStrategyExecutor {
     }
 
     val finalRightColumns = rightDataColumns.map { rightCol =>
-      if (leftColumns.contains(rightCol)) s"child_$rightCol" else rightCol
+      if (leftColumns.contains(rightCol)) s"$prefix$rightCol" else rightCol
     }
 
     val allColumns = leftColumns ++ finalRightColumns

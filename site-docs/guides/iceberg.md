@@ -406,6 +406,18 @@ For each flow's table, the framework runs the enabled maintenance operations:
 !!!note "Maintenance is best-effort"
     A maintenance failure causes the individual operation to fail but does not abort the batch. The batch result still reports SUCCESS if all flow writes completed. However, subsequent maintenance operations in the same batch may be skipped if the failure propagates.
 
+!!!tip "Metadata file cleanup"
+    Every commit creates a new metadata JSON file in the table's `metadata/` directory (e.g. `v1.metadata.json`, `v2.metadata.json`). These files are small (KB) but accumulate over time. To enable automatic cleanup, add these table properties:
+
+    ```yaml
+    output:
+      tableProperties:
+        write.metadata.delete-after-commit.enabled: "true"
+        write.metadata.previous-versions-max: "100"
+    ```
+
+    With these settings, Iceberg deletes old metadata files after each commit, keeping only the last 100 versions. Recommended for production environments with frequent batch runs.
+
 #### File accumulation in the warehouse
 
 Without maintenance enabled, Iceberg data files accumulate across runs. Each delta or full load write creates new data files but does not delete old ones — they remain on disk referenced by previous snapshots (or as orphans after snapshot expiration).

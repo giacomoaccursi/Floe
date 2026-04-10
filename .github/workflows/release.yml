@@ -2,11 +2,10 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 env:
@@ -15,12 +14,13 @@ env:
 
 jobs:
   release:
-    name: Publish to GitHub Packages
+    name: Semantic Release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-java@v4
         with:
@@ -30,13 +30,26 @@ jobs:
 
       - uses: sbt/setup-sbt@v1
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install semantic-release
+        run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git
+
       - name: Compile
         run: sbt -J-Xss4m compile
 
       - name: Test
         run: sbt -J-Xss4m test
 
-      - name: Publish
+      - name: Release
+        run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to GitHub Packages
+        if: success()
         run: sbt -J-Xss4m publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

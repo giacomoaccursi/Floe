@@ -4,7 +4,7 @@ import com.etl.framework.config.{FlowConfig, ForeignKeyConfig, ValidationRule}
 import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.{broadcast, col, lit}
+import org.apache.spark.sql.functions.{col, lit}
 
 /** Validator for Foreign Key integrity. Supports composite (multi-column) foreign keys.
   */
@@ -18,21 +18,22 @@ class ForeignKeyValidator(
     if (flowConfig.validation.foreignKeys.isEmpty) {
       ValidationUtils.validResult(df)
     } else {
-      // Pre-compute broadcast refs deduplicated by (flow, columns)
-      val broadcastedRefs: Map[(String, Seq[String]), DataFrame] =
+      // Pre-compute refs deduplicated by (flow, columns).
+      // No explicit broadcast — AQE decides the optimal join strategy at runtime.
+      val refs: Map[(String, Seq[String]), DataFrame] =
         flowConfig.validation.foreignKeys
           .map(fk => (fk.references.flow, fk.references.columns))
           .distinct
           .flatMap { case (refFlow, refCols) =>
             validatedFlows.get(refFlow).map { refDf =>
-              (refFlow, refCols) -> broadcast(refDf.select(refCols.map(col): _*))
+              (refFlow, refCols) -> refDf.select(refCols.map(col): _*)
             }
           }
           .toMap
 
       flowConfig.validation.foreignKeys.foldLeft(ValidationStepResult(df, None)) {
         case (ValidationStepResult(currentDf, rejectedAcc, _), fk) =>
-          broadcastedRefs.get((fk.references.flow, fk.references.columns)) match {
+          refs.get((fk.references.flow, fk.references.columns)) match {
             case None =>
               throw ValidationConfigException(
                 s"Referenced flow '${fk.references.flow}' not found in flow $flowName"

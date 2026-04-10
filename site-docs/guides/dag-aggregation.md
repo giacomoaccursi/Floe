@@ -199,6 +199,9 @@ At least one aggregation is required — an empty `aggregations` list throws `Va
 
 The child is grouped by the join key columns, aggregated, then joined to the parent. Only the parent columns and the aggregation aliases appear in the output.
 
+!!!note "Data skew on aggregate and nest joins"
+    Aggregate and Nest strategies use `groupBy` on the join key columns. If a key value is heavily skewed (e.g. one customer has 90% of all orders), the executor handling that key becomes a bottleneck. Spark's Adaptive Query Execution (AQE) handles skew automatically for regular joins (Flatten strategy) but not for `groupBy` aggregations.
+
 ## Filters and select
 
 Filters and select are applied to the node's source data **before** any join with the parent.

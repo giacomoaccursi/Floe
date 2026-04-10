@@ -4,6 +4,9 @@ import com.etl.framework.config.FlowConfig
 import com.etl.framework.orchestration.ExecutionGroup
 import com.etl.framework.util.TopologicalSorter
 
+/** Builds a dependency graph from flow FK references and dependsOn declarations. Delegates to TopologicalSorter for
+  * sorting and grouping.
+  */
 class DependencyGraphBuilder(flowConfigs: Seq[FlowConfig]) {
 
   private val flowConfigMap = flowConfigs.map(fc => fc.name -> fc).toMap

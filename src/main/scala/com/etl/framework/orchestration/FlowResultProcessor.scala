@@ -11,6 +11,9 @@ case class BatchState(
     validatedFlows: Map[String, DataFrame]
 )
 
+/** Processes flow group results: tracks batch state (flow results + validated DataFrames), stops execution on failure
+  * or rejection threshold breach, loads Iceberg tables for FK validation.
+  */
 class FlowResultProcessor(
     globalConfig: GlobalConfig,
     flowConfigs: Seq[FlowConfig],

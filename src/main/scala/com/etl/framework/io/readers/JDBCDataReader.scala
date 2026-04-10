@@ -5,6 +5,9 @@ import com.etl.framework.exceptions.DataSourceException
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
+/** Reads data from JDBC sources (databases). Connects using the provided URL, credentials, and optional query or table
+  * name. Supports any JDBC-compatible database.
+  */
 class JDBCDataReader(
     sourceConfig: SourceConfig,
     schemaConfig: Option[SchemaConfig] = None

@@ -7,6 +7,9 @@ import org.slf4j.LoggerFactory
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
+/** Runs post-batch Iceberg maintenance: expire snapshots, compact data files, remove orphan files, and rewrite
+  * manifests. Operations run in a specific order to ensure correctness (see comments in run()).
+  */
 class IcebergMaintenanceRunner(spark: SparkSession, icebergConfig: IcebergConfig) {
 
   private val logger = LoggerFactory.getLogger(getClass)

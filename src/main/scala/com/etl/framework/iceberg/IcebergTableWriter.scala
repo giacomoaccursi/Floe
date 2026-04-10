@@ -12,6 +12,9 @@ case class WriteResult(
     icebergMetadata: Option[IcebergFlowMetadata] = None
 )
 
+/** Writes DataFrames to Iceberg tables using the appropriate strategy (full, delta, SCD2). Handles MERGE INTO for
+  * upserts, SCD2 versioning with change detection, and snapshot tagging.
+  */
 class IcebergTableWriter(
     spark: SparkSession,
     icebergConfig: IcebergConfig,

@@ -7,6 +7,9 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 
+/** Entry point for DAG execution. Creates the execution plan and coordinates node processing with a bounded thread pool
+  * for parallel execution.
+  */
 class DAGOrchestrator(
     dagConfig: AggregationConfig,
     globalConfig: GlobalConfig

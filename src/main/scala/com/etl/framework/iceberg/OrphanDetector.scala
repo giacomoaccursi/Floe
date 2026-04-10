@@ -30,6 +30,9 @@ object OrphanDetectionResult {
   case class Failed(error: String, reports: Seq[OrphanReport]) extends OrphanDetectionResult
 }
 
+/** Detects orphaned child records after a batch by comparing pre-batch and post-batch parent keys via Iceberg time
+  * travel. Supports cascade detection across multiple FK levels.
+  */
 class OrphanDetector(
     spark: SparkSession,
     icebergConfig: IcebergConfig,

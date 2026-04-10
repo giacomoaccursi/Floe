@@ -2,6 +2,7 @@ package com.etl.framework.util
 
 import com.etl.framework.iceberg.IcebergFlowMetadata
 
+/** Serializes IcebergFlowMetadata to a JSON-compatible map for batch metadata files. */
 object IcebergMetadataSerializer {
 
   def toMap(meta: IcebergFlowMetadata): Map[String, Any] = Map(

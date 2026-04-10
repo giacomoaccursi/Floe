@@ -7,6 +7,9 @@ import org.slf4j.LoggerFactory
 
 /** Processes individual DAG nodes
   */
+/** Processes a single DAG node: loads source data from Iceberg, applies filters and column selection, then executes
+  * joins with dependent nodes using the configured strategy.
+  */
 class DAGNodeProcessor(joinExecutor: JoinStrategyExecutor, catalogName: String, namespace: String = "default")(implicit
     spark: SparkSession
 ) {

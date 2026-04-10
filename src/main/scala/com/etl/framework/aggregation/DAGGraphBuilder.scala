@@ -4,6 +4,9 @@ import com.etl.framework.config.DAGNode
 import com.etl.framework.util.TopologicalSorter
 import org.slf4j.LoggerFactory
 
+/** Builds the DAG execution plan: validates nodes, resolves dependencies via topological sort, groups independent nodes
+  * for parallel execution, and identifies the root node.
+  */
 class DAGGraphBuilder(parallelNodes: Boolean) {
 
   private val logger = LoggerFactory.getLogger(getClass)

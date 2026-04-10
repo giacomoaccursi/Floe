@@ -4,6 +4,7 @@ import org.slf4j.Logger
 
 /** Simple utility for timing operations
   */
+/** Utility for measuring and logging execution time of code blocks. */
 object TimingUtil {
 
   /** Execute operation with automatic timing and logging

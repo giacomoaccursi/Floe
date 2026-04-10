@@ -4,6 +4,9 @@ import com.etl.framework.exceptions.CircularDependencyException
 
 import scala.collection.mutable
 
+/** Generic topological sorter for directed acyclic graphs. Used by both the flow dependency resolver and the DAG
+  * aggregation module. Detects cycles and groups independent nodes for parallel execution.
+  */
 object TopologicalSorter {
 
   case class SortedGroups(groups: Seq[Seq[String]])

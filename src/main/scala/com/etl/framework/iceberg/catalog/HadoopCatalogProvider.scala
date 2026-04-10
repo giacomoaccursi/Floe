@@ -3,6 +3,7 @@ package com.etl.framework.iceberg.catalog
 import com.etl.framework.config.IcebergConfig
 import org.apache.spark.sql.SparkSession
 
+/** Configures the Spark catalog for Hadoop-based Iceberg (local filesystem or HDFS). */
 class HadoopCatalogProvider extends CatalogProvider {
 
   private val icebergExtensions =

@@ -2,6 +2,7 @@ package com.etl.framework.exceptions
 
 /** Standard keys used in exception context maps
   */
+/** Standard context keys used in FrameworkException for structured error reporting. */
 object ContextKeys {
   // File and location information
   val FILE = "file"

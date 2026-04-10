@@ -6,6 +6,7 @@ import org.json4s.jackson.Serialization.{write => jsonWrite}
 
 import java.nio.file.{Files, Paths, StandardOpenOption}
 
+/** Writes a Scala map as a formatted JSON file to the local filesystem. */
 object JsonFileWriter {
 
   private implicit val formats: Formats = Serialization.formats(NoTypeHints)

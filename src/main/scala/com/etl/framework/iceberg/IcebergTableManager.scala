@@ -8,6 +8,9 @@ import org.slf4j.LoggerFactory
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
+/** Manages Iceberg table lifecycle: creation, schema evolution (add columns, widen types), partition evolution, table
+  * properties, snapshot tagging, and maintenance delegation.
+  */
 class IcebergTableManager(
     spark: SparkSession,
     icebergConfig: IcebergConfig

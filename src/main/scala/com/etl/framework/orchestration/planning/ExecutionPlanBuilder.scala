@@ -7,6 +7,9 @@ import org.slf4j.LoggerFactory
 /** Builds execution plans based on flow dependencies. Extracted from FlowOrchestrator to follow Single Responsibility
   * Principle.
   */
+/** Builds execution plans from flow dependencies. Validates FK references, resolves dependency order, and groups flows
+  * for sequential/parallel execution.
+  */
 class ExecutionPlanBuilder(
     flowConfigs: Seq[FlowConfig],
     globalConfig: GlobalConfig

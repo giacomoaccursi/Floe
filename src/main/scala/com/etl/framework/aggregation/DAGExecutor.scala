@@ -9,6 +9,9 @@ import scala.concurrent.duration._
 
 /** Executes DAG execution plans
   */
+/** Executes DAG nodes according to the execution plan, processing groups sequentially and nodes within a group either
+  * sequentially or in parallel.
+  */
 class DAGExecutor(nodeProcessor: DAGNodeProcessor, parallelEc: ExecutionContext) {
 
   private val logger = LoggerFactory.getLogger(getClass)

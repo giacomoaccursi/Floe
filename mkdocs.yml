@@ -1,5 +1,5 @@
 site_name: Floe
-site_description: Declarative ETL framework — powered by Spark and Iceberg
+site_description: Declarative ETL framework — built on Spark and Iceberg
 repo_url: https://github.com/giacomoaccursi/floe
 repo_name: giacomoaccursi/floe
 

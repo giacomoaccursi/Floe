@@ -1,15 +1,15 @@
-# Floe
+# 🧊 Floe
 
 [![CI](https://github.com/giacomoaccursi/floe/actions/workflows/ci.yml/badge.svg)](https://github.com/giacomoaccursi/floe/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-Declarative ETL framework — powered by Spark and Iceberg.
+Declarative ETL framework — built on Spark and Iceberg.
 
 Define your data flows in YAML. The framework handles ingestion, validation, incremental loads, schema evolution, and table management — so you can focus on your data, not the plumbing.
 
 ## Why this framework
 
-Most ETL tools force you to choose between flexibility and structure. You either write everything in code (flexible but fragile) or use a rigid GUI tool (structured but limited). This framework gives you both: declarative YAML for the pipeline structure, Scala code only where you need custom logic.
+Most ETL tools force you to choose between flexibility and structure. You either write everything in code (flexible but fragile) or use a rigid GUI tool (structured but limited). Floe gives you both: declarative YAML for the pipeline structure, Scala code only where you need custom logic.
 
 Every write is atomic through Iceberg. Every batch is tagged for time travel. Every rejected record is saved with a reason. Every FK relationship is checked — even after the batch, when parent records disappear.
 
@@ -49,7 +49,7 @@ val result = IngestionPipeline.builder()
   .executeOrThrow()
 ```
 
-That's it. The framework reads the source data, validates schema and rules, upserts into an Iceberg table, tags the snapshot, and writes metadata — all from those few lines.
+That's it. Floe reads the source data, validates schema and rules, upserts into an Iceberg table, tags the snapshot, and writes metadata — all from those few lines.
 
 ## Key features
 
@@ -130,3 +130,7 @@ Full documentation at **[giacomoaccursi.github.io/floe](https://giacomoaccursi.g
 ## License
 
 [Apache License 2.0](LICENSE)
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.

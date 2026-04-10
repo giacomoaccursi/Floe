@@ -25,6 +25,7 @@ class FlowGroupExecutor(
 
   private val logger = LoggerFactory.getLogger(getClass)
 
+  /** Executes a group of flows sequentially. Stops on first failure or rejection threshold breach. */
   def executeSequential(
       group: ExecutionGroup,
       batchId: String,

@@ -11,6 +11,7 @@ class FlowMetadataWriter(
 
   private val logger = LoggerFactory.getLogger(getClass)
 
+  /** Writes flow result metadata (record counts, Iceberg snapshot info) to a JSON file. */
   def writeFlowMetadata(result: FlowResult, batchId: String): Unit = {
     val metadataPath = s"${globalConfig.paths.metadataPath}/$batchId/flows/${flowConfig.name}.json"
 

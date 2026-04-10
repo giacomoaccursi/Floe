@@ -9,6 +9,9 @@ object RetryExecutor {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
+  /** Executes a function with exponential backoff retry on failure. Jitter is added to prevent thundering herd on
+    * concurrent retries.
+    */
   def withRetry[T](
       maxRetries: Int,
       baseDelayMs: Long,
@@ -38,6 +41,7 @@ object RetryExecutor {
     attempt(maxRetries)
   }
 
+  /** Computes delay with exponential backoff (2^attempt * base) plus random jitter. */
   private[util] def computeDelay(attempt: Int, baseDelayMs: Long): Long = {
     val exponential = baseDelayMs * (1L << attempt)
     val jitter = (Math.random() * baseDelayMs).toLong

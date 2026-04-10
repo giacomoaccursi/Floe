@@ -247,6 +247,7 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
     } yield flowConfig
   }
 
+  /** Validates SCD2-specific constraints: compareColumns required, PK required and non-nullable. */
   private def validateFlowConfig(
       config: FlowConfig,
       path: String
@@ -277,6 +278,7 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
     }
   }
 
+  /** Parses YAML to the intermediate FlowConfigYaml (excludes non-serializable FlowTransformation fields). */
   private def parseYamlToFlowConfigYaml(
       yaml: String,
       path: String
@@ -351,6 +353,7 @@ class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
     } yield config
   }
 
+  /** Validates DAG config: no empty nodes, no duplicate IDs, all join targets exist, all joins have conditions. */
   private def validateAggregationConfig(
       config: AggregationConfig,
       path: String

@@ -7,6 +7,7 @@ object CatalogFactory {
     "glue" -> (() => new GlueCatalogProvider())
   )
 
+  /** Resolves the catalog provider for the given type and returns it, or an error message. */
   def createCatalogProvider(
       catalogType: String,
       extraProviders: Map[String, () => CatalogProvider] = Map.empty

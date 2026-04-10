@@ -224,6 +224,16 @@ output:
 
 Supported partition transforms: `year()`, `month()`, `day()`, `hour()`, `bucket(n, col)`, `truncate(len, col)`, and identity (bare column name). Transforms are case-insensitive (`MONTH(ts)` and `month(ts)` are equivalent).
 
+| Transform | Example | When to use |
+|-----------|---------|-------------|
+| `year(col)` | `year(created_at)` | Low-volume tables with multi-year history |
+| `month(col)` | `month(order_date)` | Most common choice for date-based tables |
+| `day(col)` | `day(event_time)` | High-volume tables with daily queries |
+| `hour(col)` | `hour(event_time)` | Very high-volume tables (millions of rows/day) |
+| `bucket(n, col)` | `bucket(16, customer_id)` | Distribute rows evenly across N buckets for non-temporal columns |
+| `truncate(len, col)` | `truncate(2, country_code)` | Group string values by prefix length |
+| identity | `region` | Column with very few distinct values (use sparingly) |
+
 Sort order is applied with `WRITE ORDERED BY`, which controls data layout within files for better scan performance without affecting query semantics.
 
 !!!warning "Partitioning guidelines"

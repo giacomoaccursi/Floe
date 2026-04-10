@@ -23,6 +23,9 @@ class FlowResultProcessor(
   case class ContinueWith(state: BatchState) extends ProcessingResult
   case class StopExecution(result: IngestionResult) extends ProcessingResult
 
+  /** Processes results from a group of flows. Returns StopExecution if any flow failed or exceeded rejection threshold,
+    * ContinueWith if all flows succeeded.
+    */
   def processGroupResults(
       groupResults: Seq[FlowResult],
       currentState: BatchState,
@@ -76,6 +79,7 @@ class FlowResultProcessor(
     }
   }
 
+  /** Loads the Iceberg table for a completed flow so downstream flows can use it for FK validation. */
   private def loadValidatedData(result: FlowResult): Option[DataFrame] = {
     val tableName = globalConfig.iceberg.fullTableName(result.flowName)
     scala.util.Try(spark.table(tableName)).toOption match {

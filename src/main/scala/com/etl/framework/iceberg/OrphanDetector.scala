@@ -42,6 +42,9 @@ class OrphanDetector(
   private val flowConfigMap = flowConfigs.map(fc => fc.name -> fc).toMap
   private val flowResultMap = flowResults.map(fr => fr.flowName -> fr).toMap
 
+  /** Detects orphaned child records caused by parent key removal during this batch. Uses Iceberg time travel to compare
+    * pre-batch and post-batch parent keys. Resolves orphans according to each FK's onOrphan action (warn or delete).
+    */
   def detectAndResolveOrphans(plan: ExecutionPlan): OrphanDetectionResult = {
     val removedKeysByFlow = mutable.Map[String, DataFrame]()
     val reports = mutable.ArrayBuffer[OrphanReport]()
@@ -68,6 +71,7 @@ class OrphanDetector(
     }
   }
 
+  /** Processes a single FK relationship: finds removed parent keys and resolves orphans. */
   private def processFK(
       childFlow: FlowConfig,
       fk: ForeignKeyConfig,
@@ -101,6 +105,7 @@ class OrphanDetector(
     }
   }
 
+  /** Finds parent keys that were removed during this batch, either via time travel or cascade map. */
   private def findRemovedParentKeys(
       parentCfg: FlowConfig,
       parentResult: FlowResult,
@@ -118,6 +123,7 @@ class OrphanDetector(
     }
   }
 
+  /** Compares pre-batch and post-batch parent table via Iceberg time travel to find removed keys. */
   private def findRemovedKeysViaTimeTravel(
       parentCfg: FlowConfig,
       parentResult: FlowResult,
@@ -163,6 +169,9 @@ class OrphanDetector(
     }
   }
 
+  /** Resolves orphaned records: warns or deletes depending on FK config. For delete, saves removed keys in cascade map
+    * for downstream grandchild detection.
+    */
   private def resolveOrphans(
       childFlow: FlowConfig,
       fk: ForeignKeyConfig,

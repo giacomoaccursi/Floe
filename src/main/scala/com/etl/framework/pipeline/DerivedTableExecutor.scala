@@ -22,6 +22,7 @@ class DerivedTableExecutor(
     .ofPattern("yyyy-MM-dd HH:mm:ss")
     .withZone(ZoneOffset.UTC)
 
+  /** Executes all derived table functions and writes results to Iceberg. Runs maintenance on successful tables. */
   def execute(
       derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
       batchId: String
@@ -40,6 +41,7 @@ class DerivedTableExecutor(
     results
   }
 
+  /** Executes a single derived table: computes the DataFrame, writes to Iceberg, tags the snapshot. */
   private def executeSingle(
       tableName: String,
       fn: DerivedTableContext => DataFrame,
@@ -133,6 +135,7 @@ class DerivedTableExecutor(
     }
   }
 
+  /** Creates the Iceberg table if it doesn't exist, or adds missing columns if it does. */
   private def createOrUpdateTable(fullTableName: String, schema: StructType): Unit = {
     val exists =
       try {

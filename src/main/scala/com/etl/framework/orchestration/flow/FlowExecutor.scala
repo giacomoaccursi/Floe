@@ -122,6 +122,7 @@ class FlowExecutor(
     reader.read()
   }
 
+  /** Applies sourceColumn renames defined in schema config (e.g. sourceColumn: "old_name" → name: "new_name"). */
   private def applyColumnRenames(df: DataFrame): DataFrame = {
     val renames = flowConfig.schema.columns.flatMap { col =>
       col.sourceColumn.map(src => src -> col.name)
@@ -152,6 +153,7 @@ class FlowExecutor(
     }
   }
 
+  /** Writes validated data to Iceberg, rejected records to Parquet, and warnings if present. */
   private def writeAllData(
       validatedData: DataFrame,
       validationResult: ValidationResult,

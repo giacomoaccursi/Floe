@@ -23,6 +23,7 @@ class IcebergTableWriter(
   private def sanitizeViewName(flowName: String): String =
     flowName.replaceAll("[^a-zA-Z0-9_]", "_")
 
+  /** Writes all source data to the Iceberg table, replacing existing content. */
   def writeFullLoad(
       df: DataFrame,
       flowConfig: FlowConfig
@@ -50,6 +51,7 @@ class IcebergTableWriter(
     }
   }
 
+  /** Upserts source data into the Iceberg table using MERGE INTO on primary key. */
   def writeDeltaLoad(
       df: DataFrame,
       flowConfig: FlowConfig
@@ -116,6 +118,9 @@ class IcebergTableWriter(
     }
   }
 
+  /** Writes SCD2 versioned history. Initial load inserts all records as current. Subsequent loads detect changes, close
+    * old versions, and insert new ones.
+    */
   def writeSCD2Load(
       df: DataFrame,
       flowConfig: FlowConfig
@@ -310,6 +315,7 @@ class IcebergTableWriter(
       )
       .mkString(" OR ")
 
+  /** Tags the batch snapshot and collects Iceberg metadata for the batch metadata JSON. */
   def tagBatchSnapshot(
       flowConfig: FlowConfig,
       writeResult: WriteResult,

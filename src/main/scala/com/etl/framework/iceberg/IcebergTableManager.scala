@@ -19,9 +19,11 @@ class IcebergTableManager(
     .ofPattern("yyyy-MM-dd HH:mm:ss")
     .withZone(ZoneOffset.UTC)
 
+  /** Returns the fully qualified Iceberg table name for a flow (catalogName.namespace.flowName). */
   def resolveTableName(flowConfig: FlowConfig): String =
     icebergConfig.fullTableName(flowConfig.name)
 
+  /** Creates the Iceberg table if it doesn't exist, or updates schema/properties/partitions if it does. */
   def createOrUpdateTable(
       flowConfig: FlowConfig,
       schema: StructType
@@ -36,6 +38,7 @@ class IcebergTableManager(
     }
   }
 
+  /** Applies all config updates to an existing table: new columns, type widening, properties, partitions. */
   private def updateTableConfig(tableName: String, schema: StructType, flowConfig: FlowConfig): Unit = {
     addNewColumns(tableName, schema, flowConfig)
     widenColumnTypes(tableName, schema)
@@ -43,6 +46,7 @@ class IcebergTableManager(
     addPartitionFields(tableName, flowConfig)
   }
 
+  /** Adds columns present in the incoming schema but missing from the table. */
   private def addNewColumns(tableName: String, schema: StructType, flowConfig: FlowConfig): Unit = {
     val currentColumns = spark.table(tableName).schema.fieldNames.toSet
     val newColumns = schema.fields.filterNot(f => currentColumns.contains(f.name))
@@ -61,6 +65,7 @@ class IcebergTableManager(
     }
   }
 
+  /** Widens column types where safe (int→long, float→double, decimal precision up). */
   private def widenColumnTypes(tableName: String, schema: StructType): Unit = {
     val currentSchema = spark.table(tableName).schema
     schema.fields.foreach { incomingField =>
@@ -83,6 +88,7 @@ class IcebergTableManager(
     }
   }
 
+  /** Applies table properties from flow config, skipping properties that already have the target value. */
   private def updateTableProperties(tableName: String, flowConfig: FlowConfig): Unit = {
     if (flowConfig.output.tableProperties.nonEmpty) {
       val currentProps = spark
@@ -101,6 +107,7 @@ class IcebergTableManager(
     }
   }
 
+  /** Adds partition fields from flow config. Silently skips fields that already exist (partition evolution). */
   private def addPartitionFields(tableName: String, flowConfig: FlowConfig): Unit = {
     if (flowConfig.output.icebergPartitions.nonEmpty) {
       flowConfig.output.icebergPartitions.foreach { partition =>
@@ -121,6 +128,7 @@ class IcebergTableManager(
     }
   }
 
+  /** Checks if a type change is safe (no data loss). Only int→long, float→double, decimal precision up. */
   private[iceberg] def isSafeWidening(from: DataType, to: DataType): Boolean = (from, to) match {
     case (IntegerType, LongType)                                    => true
     case (FloatType, DoubleType)                                    => true
@@ -230,6 +238,7 @@ class IcebergTableManager(
     logger.info(s"Sort order applied to $tableName: $sortExpr")
   }
 
+  /** Returns the latest snapshot ID for a flow's table, or None if the table has no snapshots. */
   def getCurrentSnapshotId(flowConfig: FlowConfig): Option[Long] = {
     val tableName = resolveTableName(flowConfig)
     try {
@@ -243,6 +252,7 @@ class IcebergTableManager(
     }
   }
 
+  /** Tags a snapshot with the batch ID for time travel (e.g. batch_20260115_100000). */
   def tagSnapshot(
       flowConfig: FlowConfig,
       snapshotId: Long,
@@ -267,6 +277,7 @@ class IcebergTableManager(
     }
   }
 
+  /** Collects snapshot metadata (parent ID, timestamp, manifest list, summary) for batch metadata JSON. */
   def getSnapshotMetadata(
       flowConfig: FlowConfig,
       snapshotId: Long,
@@ -314,6 +325,7 @@ class IcebergTableManager(
     }
   }
 
+  /** Runs post-batch maintenance operations on a flow's table. */
   def runMaintenance(
       flowConfig: FlowConfig,
       config: MaintenanceConfig

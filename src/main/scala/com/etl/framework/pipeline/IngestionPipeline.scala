@@ -82,6 +82,9 @@ class IngestionPipeline private (
     }
   }
 
+  /** Executes the pipeline and throws BatchFailedException if any flow fails. Use this on managed platforms (Glue, EMR)
+    * where a failed pipeline should stop the job.
+    */
   def executeOrThrow(): IngestionResult = {
     val result = execute()
     if (!result.success)
@@ -89,6 +92,9 @@ class IngestionPipeline private (
     result
   }
 
+  /** Configures the SparkSession with Iceberg catalog settings. Resolves the catalog provider (hadoop, glue, or custom)
+    * and applies catalog properties.
+    */
   private def configureSparkForIceberg(
       config: IcebergConfig,
       extraProviders: Map[String, () => CatalogProvider]
@@ -321,11 +327,15 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     this
   }
 
+  /** Registers a BatchListener that receives notifications on batch completion or failure. */
   def withBatchListener(listener: BatchListener): IngestionPipelineBuilder = {
     batchListeners += listener
     this
   }
 
+  /** Registers a custom DataReader factory for a given source type name. Use this to read from sources not supported by
+    * the built-in readers (file, jdbc).
+    */
   def withDataReader(
       typeName: String,
       factory: DataReaderFactory.ReaderFactory
@@ -359,6 +369,9 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     )
   }
 
+  /** Validates the pipeline configuration without starting Spark. Checks FK references, dependency cycles, and config
+    * loading. Returns a list of error messages (empty if valid).
+    */
   def validate(): Seq[String] = {
     val errors = scala.collection.mutable.ArrayBuffer[String]()
 

@@ -45,14 +45,14 @@ try {
 }
 ```
 
-### Joins and broadcasts
+### Joins
 
-- **Explicit broadcast**: apply `broadcast()` to small lookup tables; pre-compute broadcast hints outside loops
 - **Join awareness**: avoid repeated joins on the same datasets; derive projections from existing join results instead of re-joining
+- **Let AQE decide**: Spark's Adaptive Query Execution automatically chooses the optimal join strategy (broadcast vs shuffle) at runtime based on actual data sizes. Do not force `broadcast()` explicitly — AQE handles it better in most cases.
 
 ```scala
-// Good: broadcast small lookup table
-val enriched = orders.join(broadcast(customers), Seq("customer_id"), "left")
+// Good: let AQE decide the join strategy
+val enriched = orders.join(customers, Seq("customer_id"), "left")
 
 // Bad: re-joining the same tables multiple times
 val step1 = orders.join(customers, Seq("customer_id"))
@@ -84,8 +84,8 @@ When reviewing Spark code, check for:
 - [ ] No `.collect()` on unbounded DataFrames
 - [ ] No redundant `count()` calls
 - [ ] Every `cache()` has a matching `unpersist()` in a `try-finally`
-- [ ] Small tables are `broadcast()`-ed in joins
 - [ ] No repeated joins on the same datasets
+- [ ] No forced `broadcast()` — let AQE decide join strategy
 - [ ] Partitioning uses low-cardinality columns
 - [ ] Thread pools are explicitly sized (no global execution context)
 - [ ] Minimal number of Spark actions

@@ -10,7 +10,7 @@
 ## Clone and build
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/giacomoaccursi/floe.git
 cd floe
 sbt compile
 ```
@@ -71,11 +71,12 @@ The `build.sbt` includes the required `--add-opens` flags for Java 17+ compatibi
 src/main/scala/com/etl/framework/
 ├── config/          # YAML config loading & validation
 ├── validation/      # Validation engine
-├── iceberg/         # Iceberg table writes
-├── io/              # Data readers
-├── aggregation/     # DAG execution
-├── orchestration/   # Flow and batch orchestration
-├── pipeline/        # Entry point and builder API
+├── iceberg/         # Iceberg table writes, maintenance, orphan detection
+├── io/              # Data readers (file, JDBC, custom)
+├── aggregation/     # DAG execution for layered joins
+├── orchestration/   # Flow and batch orchestration, metadata
+├── pipeline/        # Entry point, builder API, derived tables
+├── util/            # Shared utilities (retry, topological sort, JSON writer)
 └── exceptions/      # Exception hierarchy
 ```
 

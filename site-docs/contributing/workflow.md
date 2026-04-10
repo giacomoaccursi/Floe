@@ -20,8 +20,6 @@ All commits follow the Conventional Commits format, header only:
 
 Rules:
 
-- Total length: **max 72 characters**
-- No body, no footer
 - Scope is optional but recommended (e.g., `fix(validation): handle NULL in range comparisons`)
 
 ### Examples

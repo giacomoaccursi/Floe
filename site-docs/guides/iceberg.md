@@ -23,6 +23,9 @@ implicit val spark: SparkSession = SparkSession.builder()
 
 All other Iceberg catalog settings (warehouse path, catalog type, catalog class) are applied automatically by the framework at pipeline startup.
 
+!!!tip "Keep Adaptive Query Execution enabled"
+    Spark 3.5 enables AQE by default (`spark.sql.adaptive.enabled = true`). AQE optimizes MERGE INTO and DAG joins at runtime by coalescing small partitions, converting to broadcast joins, and handling data skew automatically. Do not disable it — the framework relies on these optimizations for efficient execution.
+
 ### Java 18+ compatibility
 
 On Java 18 or newer, Hadoop's `UserGroupInformation` requires the security manager to be explicitly allowed. Add this JVM option:

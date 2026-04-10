@@ -26,7 +26,7 @@ Requires Java 17+ and SBT 1.9+.
 <type>(<scope>): <description>
 ```
 
-Types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `chore`. Max 72 characters, no body.
+Types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `chore`.
 
 ## Bug fixes
 

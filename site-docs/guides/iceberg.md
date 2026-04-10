@@ -194,6 +194,20 @@ CALL catalog.system.rewrite_data_files(
 )
 ```
 
+The `sort` strategy rewrites all data files, reorganizing rows according to the new partition layout. This is different from the default `binpack` strategy used by the framework's automatic compaction, which only merges small files into larger ones without reordering data. After running the sort compaction once, switch back to the normal batch flow — subsequent runs will write correctly partitioned files and `binpack` compaction is sufficient from that point on.
+
+For tables with frequent queries on multiple columns, Iceberg also supports a `zorder` strategy that optimizes file layout for multi-column pruning:
+
+```sql
+CALL catalog.system.rewrite_data_files(
+  table => 'catalog.default.orders',
+  strategy => 'zorder',
+  sort_order => 'order_date, customer_id'
+)
+```
+
+Both `sort` and `zorder` are one-time operations — run them manually when needed, not as part of the regular batch cycle.
+
 ### Partitioning and sort order
 
 Partitions are configured per-flow in the output section:

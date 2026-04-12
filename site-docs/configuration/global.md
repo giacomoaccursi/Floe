@@ -73,13 +73,9 @@ Controls batch execution and validation behavior. This entire section is optiona
 
 ### Rejection behavior
 
-| `maxRejectionRate` | Rejection rate vs threshold | Behavior |
-|-------------------|---------------------------|----------|
-| not set | any | Batch continues. Rejected records are written to `rejectedPath`, valid records proceed to Iceberg. |
-| set | `rate > maxRejectionRate` | Batch stops. Remaining flows in the group are not executed. |
-| set | `rate <= maxRejectionRate` | Batch continues. |
+When `maxRejectionRate` is not set, the batch always continues — rejected records are written to `rejectedPath` and valid records proceed to Iceberg.
 
-The comparison uses strict `>` (not `>=`): a rejection rate exactly equal to the threshold does not trigger a stop.
+When `maxRejectionRate` is set (e.g. `0.1` = 10%), the batch stops if any flow's rejection rate exceeds the threshold. The comparison is strict `>`: a rate exactly equal to the threshold does not trigger a stop.
 
 Individual flows can override the global threshold with their own `maxRejectionRate` field. See [Flow Configuration](../configuration/flows.md).
 

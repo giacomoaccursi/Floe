@@ -7,7 +7,8 @@ Detailed walkthrough of the Read → PreTransform → Validate → PostTransform
 ```mermaid
 graph TD
     Source["Source<br/>File or Database"]
-    Read["Read<br/>DataReaderFactory: file (CSV/Parquet/JSON) or JDBC"]
+    Read["Read<br/>DataReaderFactory: file (CSV/Parquet/JSON/Avro/ORC) or JDBC"]
+    Rename["Rename<br/>sourceColumn mappings"]
     PreTransform["PreTransform<br/>User-defined: enrich, cleanse, filter"]
     Validate["Validate<br/>Schema → Not-null → PK → FK → Custom rules"]
     Rejected["Rejected DataFrame<br/>→ written to rejectedPath"]
@@ -16,7 +17,8 @@ graph TD
     IcebergTable["Iceberg Table (snapshot tagged)"]
 
     Source -->|"Raw DataFrame"| Read
-    Read -->|"Raw DataFrame"| PreTransform
+    Read -->|"Raw DataFrame"| Rename
+    Rename -->|"Renamed DataFrame"| PreTransform
     PreTransform -->|"Enriched DataFrame"| Validate
     Validate -->|"Valid DataFrame"| PostTransform
     Validate -->|"Rejected DataFrame"| Rejected
@@ -33,6 +35,10 @@ The `DataReaderFactory` creates a reader based on the flow's `source.type` confi
 4. Calls `spark.read.format(...).options(...).load(path)`
 
 The result is a raw DataFrame with the source data.
+
+### Column renames
+
+If any column in the schema config has a `sourceColumn` field, the framework renames those columns before validation. This allows the source to use different column names than the target schema.
 
 See [Data Sources](../guides/data-sources.md).
 
@@ -71,7 +77,7 @@ Groups by PK columns, finds duplicates. All rows sharing a duplicated key are re
 
 ### 3d. Foreign key integrity
 
-For each FK, checks that values exist in the referenced parent flow's DataFrame (broadcast join). NULL FK values pass. → `FK_VIOLATION`.
+For each FK, checks that values exist in the referenced parent flow's DataFrame. NULL FK values pass. → `FK_VIOLATION`.
 
 ### 3e. Custom rules
 

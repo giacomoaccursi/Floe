@@ -279,7 +279,7 @@ validation:
       onFailure: reject
 ```
 
-The entire `validation` section is optional. If omitted, no validation is performed. `primaryKey` must be non-empty for SCD2 and delta modes (the framework validates this at startup).
+The entire `validation` section is optional. If omitted, no validation is performed. `primaryKey` is required — if empty, the framework throws a `ValidationConfigException` at runtime. For SCD2, all PK columns must also be non-nullable.
 
 ### Foreign key fields
 

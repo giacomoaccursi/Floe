@@ -218,7 +218,7 @@ val computeDerivedFields: FlowTransformation = { ctx =>
 
   ctx.withData(
     ctx.currentData
-      .join(broadcast(customers.select("customer_id", "segment")),
+      .join(customers.select("customer_id", "segment"),
         Seq("customer_id"), "left")
       .withColumn("priority",
         when(col("segment") === "premium", lit("high"))
@@ -278,7 +278,7 @@ val postTransform: FlowTransformation = { ctx =>
     case Some(customers) =>
       ctx.withData(
         ctx.currentData.join(
-          broadcast(customers.select("customer_id", "tier")),
+          customers.select("customer_id", "tier"),
           Seq("customer_id"), "left"))
     case None =>
       ctx
@@ -320,6 +320,7 @@ Each derived table function receives a `DerivedTableContext`:
 | `spark` | `SparkSession` | The active SparkSession |
 | `batchId` | `String` | Current batch identifier |
 | `catalogName` | `String` | Iceberg catalog name (from `global.yaml`) |
+| `namespace` | `String` | Iceberg namespace (from `global.yaml`, defaults to `default`) |
 
 Each derived table must have a unique name. Registering two derived tables with the same name throws `IllegalArgumentException` at build time.
 
@@ -472,7 +473,7 @@ object MyPipeline extends App {
       case Some(customers) =>
         ctx.withData(
           ctx.currentData.join(
-            broadcast(customers.select("customer_id", "segment")),
+            customers.select("customer_id", "segment"),
             Seq("customer_id"), "left")
             .withColumn("priority",
               when(col("segment") === "premium", lit("high"))

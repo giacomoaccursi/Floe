@@ -117,6 +117,7 @@ For the complete Iceberg integration guide, see [Iceberg Integration](../guides/
 |-------|---------|-------------|
 | `catalogType` | `hadoop` | Catalog implementation: `hadoop`, `glue`, or a custom type registered via the [Pipeline Builder](../guides/pipeline-builder.md#custom-catalog-providers) |
 | `catalogName` | `spark_catalog` | Catalog name used in SQL queries |
+| `namespace` | `default` | Iceberg namespace (database) for tables. Tables are named `{catalogName}.{namespace}.{flowName}`. |
 | `warehouse` | — (required) | Path to the Iceberg warehouse directory |
 | `fileFormat` | `parquet` | Default data file format for Iceberg tables: `parquet`, `orc`, `avro`. Sets the `write.format.default` table property. If a flow specifies `write.format.default` in its `tableProperties`, that takes priority. |
 | `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel |

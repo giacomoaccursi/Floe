@@ -108,7 +108,7 @@ validation:
 Duplicate detection uses `groupBy` + `count > 1`. All rows sharing a duplicated key combination are rejected — not just the second occurrence, but every row with that key value. Rejection code: `PK_DUPLICATE`.
 
 !!!note
-    A primary key is required for `delta` and `scd2` load modes. For `full` load mode, if `primaryKey` is empty, PK uniqueness validation is skipped.
+    A primary key is required for all load modes. If `primaryKey` is empty, PK uniqueness validation throws a `ValidationConfigException` at runtime.
 
 ## Foreign key integrity
 
@@ -130,7 +130,7 @@ For the full field reference, see [Flow Configuration — Foreign key fields](..
 ### Behavior
 
 - NULL FK values are not considered violations. A NULL means "no reference" (standard SQL semantics) and passes FK validation.
-- The referenced parent DataFrame is broadcast-joined for performance. Multiple FK constraints referencing the same parent flow/columns share a single broadcast.
+- The referenced parent DataFrame is joined for FK lookup. Multiple FK constraints referencing the same parent flow/columns share a single deduplicated reference.
 - If the referenced flow name does not exist in the batch configuration, a `ValidationConfigException` is thrown at startup.
 - Rejection code: `FK_VIOLATION`.
 

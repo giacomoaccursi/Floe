@@ -54,7 +54,7 @@ When `parallelNodes` is `true` in the DAG YAML, independent DAG nodes within the
 parallelNodes: true
 ```
 
-The thread pool is sized at `availableProcessors * 2`. The timeout for parallel groups is 2 hours.
+The thread pool is sized at `availableProcessors * 2`.
 
 If `parallelNodes` is `false` (default), all DAG nodes execute sequentially regardless of independence.
 
@@ -62,7 +62,7 @@ If `parallelNodes` is `false` (default), all DAG nodes execute sequentially rega
 
 Both flow and DAG parallelism use bounded, explicitly sized thread pools:
 
-- Flow parallelism: pool sized based on the number of independent flows in the largest group
+- Flow parallelism: pool sized at `Runtime.getRuntime.availableProcessors * 2`
 - DAG parallelism: pool sized at `Runtime.getRuntime.availableProcessors * 2`
 
 This follows the Spark best practice of never using the global execution context for parallel Spark operations. Each thread submits Spark jobs independently, and Spark's internal scheduler handles resource allocation.

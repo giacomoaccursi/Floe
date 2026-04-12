@@ -8,8 +8,6 @@ The DAG is defined in a YAML configuration file. At execution time, the framewor
 
 ## Architecture
 
-The module is composed of five components:
-
 The module validates the DAG configuration, resolves dependencies from join declarations, detects cycles, groups independent nodes for parallel execution, and produces a single output DataFrame from the root node. Three join strategies are supported: Nest, Flatten, and Aggregate.
 
 DAG nodes can reference any Iceberg table in the catalog, including [derived tables](pipeline-builder.md#derived-tables) produced by the pipeline.
@@ -241,7 +239,7 @@ Nodes within the same execution group can run in parallel if `parallelNodes` is 
 parallelNodes: true
 ```
 
-Parallel execution uses a bounded thread pool sized at `availableProcessors * 2` to avoid saturating the driver. The timeout for parallel groups is 2 hours.
+Parallel execution uses a bounded thread pool sized at `availableProcessors * 2` to avoid saturating the driver.
 
 If `parallelNodes` is `false`, all groups execute sequentially regardless of independence.
 

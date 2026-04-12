@@ -34,7 +34,8 @@ FrameworkException (abstract)
 │   ├── CustomValidatorLoadException     PLUGIN_VALIDATOR_LOAD
 │   └── CustomValidatorExecutionException PLUGIN_VALIDATOR_EXECUTION
 ├── OrchestrationException (abstract)
-│   └── FlowExecutionException           ORCHESTRATION_FLOW_EXECUTION
+│   ├── FlowExecutionException           ORCHESTRATION_FLOW_EXECUTION
+│   └── BatchFailedException             BATCH_FAILED
 └── UnsupportedOperationException        UNSUPPORTED_OPERATION
 ```
 
@@ -94,6 +95,7 @@ FrameworkException (abstract)
 | Exception | Error Code | Context Keys | When |
 |-----------|-----------|--------------|------|
 | `FlowExecutionException` | `ORCHESTRATION_FLOW_EXECUTION` | flowName, details | Flow execution failed |
+| `BatchFailedException` | `BATCH_FAILED` | batchId, details | Thrown by `executeOrThrow()` when any flow fails |
 
 ## Other exceptions
 

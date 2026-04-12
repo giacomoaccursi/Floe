@@ -97,9 +97,9 @@ object QuickstartApp extends App {
     .build()
     .execute()
 
-  logger.info(s"Batch: ${result.batchId}, Success: ${result.success}")
+  println(s"Batch: ${result.batchId}, Success: ${result.success}")
   result.flowResults.foreach { fr =>
-    logger.info(f"  ${fr.flowName}: ${fr.validRecords} valid, ${fr.rejectedRecords} rejected")
+    println(s"  ${fr.flowName}: ${fr.validRecords} valid, ${fr.rejectedRecords} rejected")
   }
 
   spark.stop()

@@ -67,7 +67,8 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 | Field | Default | Description |
 |-------|---------|-------------|
 | `catalogType` | `hadoop` | Iceberg catalog implementation: `hadoop`, `glue`, or a custom type registered via the [Pipeline Builder](pipeline-builder.md#custom-catalog-providers) |
-| `catalogName` | `spark_catalog` | Name used in SQL queries (`catalog.default.table`) |
+| `catalogName` | `spark_catalog` | Name used in SQL queries (`catalog.namespace.table`) |
+| `namespace` | `default` | Iceberg namespace for tables |
 | `warehouse` | *required* | Path to the Iceberg warehouse directory |
 | `fileFormat` | `parquet` | Default data file format |
 | `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel by batch ID |
@@ -105,10 +106,10 @@ The framework maps the `catalogType` string to the right provider. Adding a new 
 Every flow maps to a single Iceberg table with the convention:
 
 ```
-{catalogName}.default.{flowName}
+{catalogName}.{namespace}.{flowName}
 ```
 
-For example, a flow named `customers` with catalog `spark_catalog` becomes `spark_catalog.default.customers`.
+For example, a flow named `customers` with catalog `spark_catalog` and namespace `default` becomes `spark_catalog.default.customers`. The namespace is configurable via `iceberg.namespace` in `global.yaml` (defaults to `default`).
 
 ### Table creation and schema
 

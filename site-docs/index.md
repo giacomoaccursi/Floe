@@ -50,14 +50,9 @@ val result = IngestionPipeline.builder()
 - **Read from anywhere** — built-in support for CSV, Parquet, JSON, Avro, ORC files and JDBC databases. Register custom readers for any other source.
 - **Run anywhere** — works locally, on Spark clusters, and on managed platforms like AWS Glue, EMR, and Databricks. Pass environment-specific parameters without changing your YAML files.
 
-## Stack
-
-- Scala 2.12 · Apache Spark 3.5 · Apache Iceberg 1.10
-- SBT · ScalaTest + ScalaCheck · PureConfig
-
 ## Quick links
 
 - [Installation](getting-started/installation.md) — add the dependency
-- [Quickstart](getting-started/quickstart.md) — first pipeline in 5 minutes
+- [Quickstart](getting-started/quickstart.md) — first pipeline
 - [Configuration](configuration/overview.md) — all YAML settings
 - [Architecture Overview](architecture/overview.md) — how it works

@@ -92,7 +92,7 @@ Defines where data is read from.
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `type` | no | `file` | Source type: `file` or `jdbc` |
-| `path` | yes | — | For `file`: path to data (file, directory, or glob). For `jdbc`: table name (e.g. `public.customers`) |
+| `path` | yes | — | For `file`: path to data (file, directory, or glob). For `jdbc`: table name (e.g. `public.customers`), ignored when `query` is provided in options. |
 | `format` | for `file` | — | File format: `csv`, `parquet`, `json`, `avro`, `orc`. Not used for `jdbc`. |
 | `options` | no | `{}` | Options passed to the Spark reader |
 
@@ -109,6 +109,9 @@ source:
 ```
 
 These are standard [Spark CSV reader options](https://spark.apache.org/docs/latest/sql-data-sources-csv.html). For Parquet and JSON, options are rarely needed.
+
+!!!note "Quote boolean values in options"
+    YAML interprets `true` and `false` without quotes as booleans. Spark reader options are strings, so always quote them: `header: "true"`, not `header: true`.
 
 ### JDBC source
 
@@ -213,7 +216,7 @@ schema:
 | `type` | yes | — | Data type (see table below) |
 | `nullable` | yes | — | Whether the column allows NULL values. `false` triggers not-null validation. |
 | `description` | no | `""` | Human-readable description |
-| `sourceColumn` | no | — | Original column name in the source data. When set, the framework renames this column to `name` before validation. |
+| `sourceColumn` | no | — | Original column name in the source data. When set, the framework renames this column to `name` before validation. When omitted, the source column must already match `name`. |
 
 ### Column types
 
@@ -359,3 +362,6 @@ output:
     write.format.default: "parquet"
     commit.retry.num-retries: "4"
 ```
+
+!!!note "commit.retry vs framework retry"
+    `commit.retry.num-retries` is an Iceberg property that retries the atomic commit if another writer modified the table concurrently (optimistic concurrency conflict). This is different from the framework's `maxRetries` in `processing`, which retries the entire flow on any failure. They operate at different levels and do not conflict.

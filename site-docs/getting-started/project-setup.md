@@ -12,15 +12,12 @@ my-etl-project/
 │       ├── customers.yaml
 │       ├── orders.yaml
 │       └── order_items.yaml
-├── data/                     # Source data files
-│   ├── customers.csv
-│   └── orders.csv
 └── src/main/scala/
     └── com/mycompany/
         └── MyPipeline.scala  # Entry point
 ```
 
-The `output/` directory (data, rejected, metadata, warehouse) is created automatically at runtime based on the paths in `global.yaml`.
+Source data can be local files, S3 paths, or JDBC databases — configured per-flow in the YAML. The `output/` directory (data, rejected, metadata, warehouse) is created automatically at runtime based on the paths in `global.yaml`.
 
 ## build.sbt
 
@@ -35,7 +32,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided"
 )
 
-run / fork := true
+run / fork := true    // Run in a separate JVM (required for Java 17+ --add-opens flags)
 run / javaOptions += "-Xmx2G"
 // Add --add-opens flags required by Spark on Java 17+
 // See: https://spark.apache.org/docs/latest/
@@ -61,13 +58,12 @@ object MyPipeline extends App {
     .execute()
 
   if (result.success) {
-    println(s"Batch ${result.batchId} completed successfully")
     result.flowResults.foreach { fr =>
-      println(f"  ${fr.flowName}: ${fr.validRecords} valid, " +
-        f"${fr.rejectedRecords} rejected (${fr.rejectionRate * 100}%.1f%%)")
+      spark.log.info(f"${fr.flowName}: ${fr.validRecords} valid, " +
+        f"${fr.rejectedRecords} rejected")
     }
   } else {
-    System.err.println(s"Batch failed: ${result.error.getOrElse("unknown")}")
+    spark.log.error(s"Batch failed: ${result.error.getOrElse("unknown")}")
     sys.exit(1)
   }
 

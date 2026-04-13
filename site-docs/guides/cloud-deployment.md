@@ -121,13 +121,20 @@ This avoids duplication — one set of YAML files, different values per environm
 
 ### On managed platforms
 
-On AWS Glue, EMR, or Databricks, the config files must be accessible from the worker's local filesystem. Common approaches:
+On AWS Glue, EMR, or Databricks, the config files can be stored on any Hadoop-compatible filesystem. The framework reads them natively:
 
-- Package the config directory inside the JAR (as resources)
-- Copy config files from S3/DBFS to a local temp directory at job startup
+```scala
+// Read config directly from S3
+IngestionPipeline.builder()
+  .withConfigDirectory("s3://my-bucket/config")
+  .build()
+  .executeOrThrow()
+```
+
+Alternatively:
+
+- Package the config directory inside the JAR (as resources) and use a local path
 - Use the fully programmatic API (`withGlobalConfig` + `withFlowConfigs`) and load configs from any source
-
-The framework is agnostic about where configs come from — `withConfigDirectory` reads from local filesystem, but `withGlobalConfig`/`withFlowConfigs` accept objects from any source.
 
 ## AWS Glue
 

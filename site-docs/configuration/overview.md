@@ -18,8 +18,17 @@ Pass the directory to the pipeline builder:
 
 ```scala
 IngestionPipeline.builder()
-  .withConfigDirectory("config")
+  .withConfigDirectory("config")    // local path
   .build()
+```
+
+The directory can be a local path, or any Hadoop-compatible filesystem path:
+
+```scala
+.withConfigDirectory("s3://my-bucket/config")     // AWS S3
+.withConfigDirectory("hdfs://namenode/config")     // HDFS
+.withConfigDirectory("gs://my-bucket/config")      // Google Cloud Storage
+.withConfigDirectory("abfss://container@account/config")  // Azure
 ```
 
 `global.yaml` and `flows/` are required. `domains.yaml` is optional — if absent, the framework uses empty domains (domain validation rules will fail if they reference a domain).

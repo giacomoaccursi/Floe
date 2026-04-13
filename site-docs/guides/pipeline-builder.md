@@ -31,7 +31,7 @@ val result = pipeline.execute()
 
 | Method | Description |
 |--------|-------------|
-| `withConfigDirectory(path)` | Loads `global.yaml`, `flows/*.yaml`, and optionally `domains.yaml` from the directory |
+| `withConfigDirectory(path)` | Loads `global.yaml`, `flows/*.yaml`, and optionally `domains.yaml` from the directory. Supports local paths and remote filesystems (S3, HDFS, GCS, Azure). |
 | `withGlobalConfig(config)` | Sets `GlobalConfig` programmatically (alternative to directory) |
 | `withFlowConfigs(configs)` | Sets flow configs programmatically |
 | `withDomainsConfig(config)` | Sets `DomainsConfig` programmatically |

@@ -146,17 +146,22 @@ class FlowOrchestrator(
     // Run orphan detection BEFORE maintenance (maintenance may expire snapshots needed for time travel)
     val orphanResult = runPostBatchOrphanDetection(flowResults, plan)
 
-    metadataWriter.writeBatchMetadata(
-      batchId,
-      flowResults,
-      executionTimeMs,
-      success = true,
-      orphanReports = orphanResult.reports,
-      orphanDetectionError = orphanResult match {
-        case OrphanDetectionResult.Failed(err, _) => Some(err)
-        case _                                    => None
-      }
-    )
+    try {
+      metadataWriter.writeBatchMetadata(
+        batchId,
+        flowResults,
+        executionTimeMs,
+        success = true,
+        orphanReports = orphanResult.reports,
+        orphanDetectionError = orphanResult match {
+          case OrphanDetectionResult.Failed(err, _) => Some(err)
+          case _                                    => None
+        }
+      )
+    } catch {
+      case e: Exception =>
+        logger.warn(s"Failed to write batch metadata for batch $batchId: ${e.getMessage}")
+    }
 
     // Write quality metrics to Iceberg (if configured)
     val qualityWriter = new QualityMetricsWriter(globalConfig, flowConfigs)

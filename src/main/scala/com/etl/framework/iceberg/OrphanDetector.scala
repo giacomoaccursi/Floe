@@ -189,9 +189,8 @@ class OrphanDetector(
     val colPairs = fkCols.zip(refCols)
 
     // Rename ref columns to match child FK columns for join
-    var renamedKeys = removedParentKeys
-    colPairs.foreach { case (fkCol, refCol) =>
-      if (fkCol != refCol) renamedKeys = renamedKeys.withColumnRenamed(refCol, fkCol)
+    val renamedKeys = colPairs.foldLeft(removedParentKeys) { case (df, (fkCol, refCol)) =>
+      if (fkCol != refCol) df.withColumnRenamed(refCol, fkCol) else df
     }
 
     // Select only FK + PK columns from child table instead of SELECT *

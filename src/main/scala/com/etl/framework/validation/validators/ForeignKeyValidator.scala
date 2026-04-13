@@ -58,11 +58,11 @@ class ForeignKeyValidator(
 
     // Rename ref columns to avoid ambiguity, add marker
     val renamedPairs = fk.columns.zip(fk.references.columns)
-    var markedRef = refKeys
-    renamedPairs.foreach { case (_, refCol) =>
-      markedRef = markedRef.withColumnRenamed(refCol, s"_fk_ref_$refCol")
-    }
-    markedRef = markedRef.withColumn("_fk_ref_exists", lit(true))
+    val markedRef = renamedPairs
+      .foldLeft(refKeys) { case (df, (_, refCol)) =>
+        df.withColumnRenamed(refCol, s"_fk_ref_$refCol")
+      }
+      .withColumn("_fk_ref_exists", lit(true))
 
     val joinCondition = renamedPairs
       .map { case (localCol, refCol) => nonNullCurrentDf(localCol) === col(s"_fk_ref_$refCol") }

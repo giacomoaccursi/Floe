@@ -1,6 +1,8 @@
 # Floe
 
-Declarative ETL framework — powered by Spark and Iceberg.
+Declarative ETL framework — built on Spark and Iceberg.
+
+Floe lets you define data ingestion pipelines in YAML. You describe your sources, schemas, validation rules, and load modes — the framework handles reading, validating, writing to Iceberg, schema evolution, snapshot tagging, and post-batch maintenance. Code is only needed where you want custom transformation logic.
 
 ## What it does
 

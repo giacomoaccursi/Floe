@@ -68,7 +68,6 @@ val step2 = orders.join(customers, Seq("customer_id"))  // redundant join
 ### Parallelism
 
 - **Bounded parallelism**: do not use `ExecutionContext.Implicits.global` for parallel Spark operations; use an explicitly sized thread pool
-- Size thread pools based on the workload, not the number of available processors
 
 ### Action awareness
 

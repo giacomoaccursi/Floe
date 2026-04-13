@@ -25,7 +25,11 @@ Tests are configured with:
 
 - **Forked JVM** with 2 GB heap (`-Xmx2g`)
 - **Sequential execution** (`parallelExecution := false`) to avoid conflicts on the shared SparkSession
-- **Local SparkSession** with `master("local[*]")` and `spark.sql.shuffle.partitions = 1`
+- **Local SparkSession** with `master("local[*]")`, `spark.sql.shuffle.partitions = 1`, and `spark.driver.bindAddress = 127.0.0.1`
+
+### Test fixtures
+
+Use `TestFixtures.flowConfig()` and `TestFixtures.globalConfig()` to build test configurations. Override only what the test needs via named parameters. Do not construct `FlowConfig` or `GlobalConfig` manually.
 
 ### Java 17+ JVM options
 

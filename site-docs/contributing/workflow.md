@@ -74,9 +74,10 @@ Fixing a bug without a covering test is not acceptable.
 The CI pipeline runs on every push and PR:
 
 ```
-1. Compile          sbt compile
-2. Test             sbt test
-3. Coverage         sbt coverage test coverageReport
+1. Scalafmt check    sbt scalafmtCheckAll
+2. Compile           sbt compile
+3. Test + coverage   sbt coverage test coverageReport
+4. Publish results   JUnit report + coverage artifact
 ```
 
 ### Test configuration
@@ -85,14 +86,18 @@ The CI pipeline runs on every push and PR:
 - Property-based testing: **ScalaCheck** for edge cases and invariants
 - JVM: forked with 2 GB heap (`-Xmx2g`)
 - Execution: sequential (`parallelExecution := false`) to avoid SparkSession conflicts
-- Spark: local mode with `master("local[*]")` and `spark.sql.shuffle.partitions = 1`
+- Spark: local mode with `master("local[*]")`, `spark.sql.shuffle.partitions = 1`, and `spark.driver.bindAddress = 127.0.0.1`
 
 ### Release process
 
+Releases are automated via [semantic-release](https://semantic-release.gitbook.io/):
+
 1. Merge `develop` into `main`
-2. Tag the release with semantic versioning (`v1.2.3`)
-3. CI generates the changelog from conventional commits
-4. Publish the artifact
+2. Semantic-release analyzes commit messages and determines the next version (`feat` → minor, `fix` → patch)
+3. Creates a git tag, generates the CHANGELOG, and publishes a GitHub Release
+4. CI publishes the artifact to GitHub Packages
+
+No manual tagging is needed.
 
 ## PR process
 

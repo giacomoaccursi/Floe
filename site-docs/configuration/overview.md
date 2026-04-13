@@ -82,14 +82,14 @@ Explicit variables take priority over environment variables with the same name.
 
 ### Escaping dollar signs
 
-The framework only substitutes patterns matching `${VAR_NAME}` or `$VAR_NAME` (where the name starts with a letter or underscore). A `$` followed by a space, punctuation, or end of string is left as-is:
+Use `$$` to produce a literal `$` in YAML values:
 
 ```yaml
-description: "Amount in $USD"   # $USD is a valid variable name — will be substituted
-pattern: "price > 100"          # no $ sign, no substitution
+description: "Amount in $$USD"     # resolves to: Amount in $USD
+pattern: "^$$[A-Z]{3}$$"           # resolves to: ^$[A-Z]{3}$
 ```
 
-If you need a literal `$` followed by a valid variable name pattern, set the variable to the value you want or restructure the string to avoid the pattern.
+The framework replaces `$$` with `$` before variable substitution, so `$$VAR` becomes `$VAR` in the output without being treated as a variable reference.
 
 ## Error handling
 

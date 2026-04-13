@@ -2,7 +2,7 @@
 
 ## Overview
 
-The framework uses Apache Iceberg as its storage layer. All write operations are atomic MERGE INTO statements, every batch produces a tagged snapshot for time travel, and post-batch maintenance runs automatically.
+The framework uses Apache Iceberg as its storage layer. Write operations use atomic Iceberg operations — `MERGE INTO` for delta and SCD2, `overwrite` for full loads. Every batch produces a tagged snapshot for time travel, and post-batch maintenance runs automatically.
 
 The `iceberg` section is required in `global.yaml`. At startup, the pipeline validates the config and configures the SparkSession with the Iceberg catalog. If the section is missing or invalid, execution stops immediately (fail-fast).
 
@@ -50,6 +50,7 @@ The `iceberg` block in `global.yaml` is required:
 iceberg:
   catalogType: "hadoop"
   catalogName: "spark_catalog"
+  namespace: "default"
   warehouse: "output/warehouse"
   fileFormat: "parquet"
   enableSnapshotTagging: true
@@ -72,6 +73,7 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 | `warehouse` | *required* | Path to the Iceberg warehouse directory |
 | `fileFormat` | `parquet` | Default data file format |
 | `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel by batch ID |
+| `catalogProperties` | `{}` | Additional key-value properties passed to the catalog provider |
 | `maintenance.*` | see below | Post-batch maintenance settings |
 
 ### Maintenance settings
@@ -90,14 +92,15 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 
 ### Catalog provider
 
-The catalog system is pluggable. The `CatalogProvider` trait defines three methods: `catalogType`, `configureCatalog`, and `validateConfig`. The built-in hadoop provider configures SparkSession with:
+The catalog system is pluggable. The `CatalogProvider` trait defines three methods: `catalogType`, `configureCatalog`, and `validateConfig`. The built-in hadoop provider verifies that Iceberg extensions are registered on the SparkSession and configures the catalog with:
 
 ```
 spark.sql.catalog.{name}          = org.apache.iceberg.spark.SparkCatalog
 spark.sql.catalog.{name}.type     = hadoop
 spark.sql.catalog.{name}.warehouse = {path}
-spark.sql.extensions               = org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
 ```
+
+The extensions (`spark.sql.extensions`) must be set by the user before creating the SparkSession — the provider validates their presence and throws an error if missing.
 
 The framework maps the `catalogType` string to the right provider. Adding a new catalog type (Hive, REST, Nessie) means implementing the `CatalogProvider` trait and registering it on the builder. See [Pipeline Builder — Custom catalog providers](pipeline-builder.md#custom-catalog-providers) for details.
 
@@ -292,7 +295,7 @@ WHEN NOT MATCHED THEN INSERT (order_id, status, total, order_date)
   VALUES (source.order_id, source.status, source.total, source.order_date)
 ```
 
-The `WHEN MATCHED AND (...)` condition uses Iceberg's null-safe equality operator `<=>`, which correctly handles NULL comparisons:
+The `WHEN MATCHED AND (...)` condition uses Spark SQL's null-safe equality operator `<=>`, which correctly handles NULL comparisons:
 
 - `NULL <=> NULL` → `true` (equal, no update)
 - `NULL <=> 'value'` → `false` (different, update)
@@ -364,7 +367,7 @@ For complete documentation including configuration, behavior per scenario, edge 
 After every write, if `enableSnapshotTagging` is true, the framework tags the new snapshot:
 
 ```sql
-ALTER TABLE catalog.default.customers SET TAG `batch_20260218_150000`
+ALTER TABLE catalog.default.customers CREATE TAG `batch_20260218_150000` AS OF VERSION 4857209365014528
 ```
 
 This allows querying any historical batch by name:
@@ -474,7 +477,7 @@ In production with daily runs and `snapshotRetentionDays: 7`, at most ~7 version
 Every flow follows the same pipeline:
 
 ```
-Read -> PreTransform -> Validate (new data only) -> PostTransform -> Write (MERGE INTO / Iceberg)
+Read -> Rename columns -> PreTransform -> Validate (new data only) -> PostTransform -> Write (Iceberg)
 ```
 
 - Validation runs only on incoming data, not on data already in the table

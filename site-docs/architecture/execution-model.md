@@ -87,13 +87,14 @@ graph TD
         E3["For each group (sequential)"]
         E4["For each flow in group<br/>(parallel if enabled)"]
         E5["Read source data"]
-        E6["Run pre-validation transformation"]
-        E7["Run validation pipeline"]
-        E8["Check rejection rate<br/>against threshold"]
-        E9["Run post-validation transformation"]
-        E10["Write to Iceberg<br/>(MERGE INTO / overwrite / SCD2)"]
+        E6["Apply column renames"]
+        E7["Run pre-validation transformation"]
+        E8["Run validation pipeline"]
+        E9["Check rejection rate<br/>against threshold"]
+        E10["Run post-validation transformation"]
+        E11["Write to Iceberg<br/>(MERGE INTO / overwrite / SCD2)"]
         E1 --> E2 --> E3 --> E4
-        E4 --> E5 --> E6 --> E7 --> E8 --> E9 --> E10
+        E4 --> E5 --> E6 --> E7 --> E8 --> E9 --> E10 --> E11
     end
 
     subgraph Phase3["3. Post-batch phase"]

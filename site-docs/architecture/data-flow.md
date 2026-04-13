@@ -32,7 +32,6 @@ The `DataReaderFactory` creates a reader based on the flow's `source.type` confi
 
 - **File** (`FileDataReader`): validates the format (csv, parquet, json), optionally applies the schema, and loads from the configured path.
 - **JDBC** (`JDBCDataReader`): connects to a database via JDBC URL, reads a table or custom query, and passes through all connection options.
-4. Calls `spark.read.format(...).options(...).load(path)`
 
 The result is a raw DataFrame with the source data.
 
@@ -46,7 +45,7 @@ See [Data Sources](../guides/data-sources.md).
 
 If a pre-validation transformation is registered for this flow, it runs now. The transformation receives a `TransformationContext` with:
 
-- `currentData` — the raw DataFrame from step 1
+- `currentData` — the DataFrame after column renames from step 1
 - `validatedFlows` — empty map (no flows validated yet at this stage)
 - `batchId`, `currentFlow`, `spark` — metadata
 

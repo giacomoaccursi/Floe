@@ -89,8 +89,6 @@ Coordinates batch and flow execution:
 - **ExecutionPlanBuilder** — analyzes FK dependencies, topological sort, groups independent flows
 - **BatchMetadataWriter** — writes batch and flow metadata JSON files
 - **ExecutionLogger** — structured logging for batch and flow execution
-- **Flow ordering** — analyzes FK dependencies, topological sort, groups independent flows
-- **Parallel execution** — bounded thread pool for concurrent flow/node execution
 - **Batch listeners** — pluggable notification hooks for batch completion or failure
 - **Quality metrics** — writes per-flow quality metrics to an Iceberg table
 - **Retry with exponential backoff** — configurable per-flow retry with jitter to handle transient failures

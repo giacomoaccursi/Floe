@@ -1,6 +1,6 @@
 # Architecture Overview
 
-High-level architecture of the Spark ETL Framework: how the pipeline works, the end-to-end data flow, and the design principles behind the system.
+High-level architecture of Floe: how the pipeline works, the end-to-end data flow, and the design principles behind the system.
 
 ## Pipeline flow
 
@@ -10,7 +10,7 @@ graph TD
     BUILD["Pipeline Build<br/>Load config · Configure Iceberg catalog"]
     ORDER["Flow Ordering<br/>Resolve FK + dependsOn → topological sort"]
     EXEC["Flow Execution (per flow)"]
-    READ["Read source data<br/>CSV · Parquet · JSON"]
+    READ["Read source data<br/>CSV · Parquet · JSON · Avro · ORC · JDBC"]
     PRE["Pre-validation transform"]
     VAL["Validate<br/>Schema · Not-null · PK · FK · Custom rules"]
     POST["Post-validation transform"]

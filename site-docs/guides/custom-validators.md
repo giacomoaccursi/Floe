@@ -215,7 +215,7 @@ Or using the fully qualified class name:
 
 Custom validators interact with the standard `skipNull` and `onFailure` settings:
 
-- **skipNull**: the framework handles `skipNull` for all rule types, including custom validators. When `skipNull` is `true` (the default), NULL values are filtered out before your `validate` method is called. You do not need to handle NULLs yourself.
+- **skipNull**: the framework handles `skipNull` for all rule types, including custom validators. When `skipNull` is `true` (the default) and the rule has a `column` field, NULL values in that column are filtered out before your `validate` method is called. You do not need to handle NULLs yourself. If the rule has no `column` field (cross-column validation), `skipNull` has no effect — your validator receives all rows including NULLs.
 
 - **onFailure**: the framework applies the `onFailure` action (reject, warn, skip) based on the `ValidationStepResult` you return. If `onFailure: skip`, your validator is never called.
 

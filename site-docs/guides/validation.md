@@ -460,8 +460,7 @@ In this example:
 
 - [Flow Configuration](../configuration/flows.md) — flow YAML reference
 - [Domains Configuration](../configuration/domains.md) — domain definitions
-- [Custom Validators](custom-validators.md) — writing your own validators
+- [Custom Validators](custom-validators.md) — writing custom validation logic
 - [Orphan Detection](orphan-detection.md) — post-batch FK integrity
 - [Global Configuration](../configuration/global.md) — rejection behavior settings
-- [Custom Validators](custom-validators.md) — writing custom validation logic
 - [Quality Metrics](quality-metrics.md) — tracking rejection rates over time

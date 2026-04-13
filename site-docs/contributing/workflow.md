@@ -2,7 +2,7 @@
 
 ## Conventional Commits
 
-All commits follow the Conventional Commits format, header only:
+All commits follow the Conventional Commits format:
 
 ```
 <type>(<scope>): <description>

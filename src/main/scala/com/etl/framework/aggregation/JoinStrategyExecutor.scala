@@ -108,12 +108,13 @@ class JoinStrategyExecutor {
       df.drop(renamedRight(cond.right))
     }
 
-    val finalRightColumns = rightDataColumns.map { rightCol =>
+    val finalRightColumns = rightDataColumns.toSeq.map { rightCol =>
       if (leftColumns.contains(rightCol)) s"$prefix$rightCol" else rightCol
     }
 
-    val allColumns = leftColumns ++ finalRightColumns
-    withoutRightJoinKeys.select(allColumns.toSeq.map(col): _*)
+    // Preserve parent column order, append child columns after
+    val allColumns = left.columns.toSeq ++ finalRightColumns
+    withoutRightJoinKeys.select(allColumns.map(col): _*)
   }
 
   /** Applies aggregate join strategy - aggregates child records with functions

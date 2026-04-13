@@ -34,8 +34,8 @@ FrameworkException (abstract)
 │   ├── CustomValidatorLoadException     PLUGIN_VALIDATOR_LOAD
 │   └── CustomValidatorExecutionException PLUGIN_VALIDATOR_EXECUTION
 ├── OrchestrationException (abstract)
-│   ├── FlowExecutionException           ORCHESTRATION_FLOW_EXECUTION
-│   └── BatchFailedException             BATCH_FAILED
+│   └── FlowExecutionException           ORCHESTRATION_FLOW_EXECUTION
+├── BatchFailedException                  BATCH_FAILED
 └── UnsupportedOperationException        UNSUPPORTED_OPERATION
 ```
 
@@ -95,6 +95,11 @@ FrameworkException (abstract)
 | Exception | Error Code | Context Keys | When |
 |-----------|-----------|--------------|------|
 | `FlowExecutionException` | `ORCHESTRATION_FLOW_EXECUTION` | flowName, details | Flow execution failed |
+
+## Batch exceptions
+
+| Exception | Error Code | Context Keys | When |
+|-----------|-----------|--------------|------|
 | `BatchFailedException` | `BATCH_FAILED` | batchId, details | Thrown by `executeOrThrow()` when any flow fails |
 
 ## Other exceptions
@@ -125,6 +130,7 @@ All context keys are defined in `ContextKeys` object:
 | `outputType`, `outputPath` | `DataWriteException` |
 | `mergeStrategy` | `MergeException` |
 | `parentNode`, `childNode`, `joinStrategy` | `JoinException` |
+| `batchId` | `BatchFailedException` |
 | `details`, `message` | Various exceptions |
 
 ## Related

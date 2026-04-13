@@ -289,9 +289,12 @@ Common `--conf` properties for all platforms:
 |----------|-------|----------|
 | `spark.sql.extensions` | `org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions` | Yes |
 | `spark.sql.catalog.{name}` | `org.apache.iceberg.spark.SparkCatalog` | Yes |
-| `spark.sql.catalog.{name}.type` | `hadoop` / `hive` / `rest` | Yes |
+| `spark.sql.catalog.{name}.type` | `hadoop` / `hive` / `rest` | Yes (for hadoop catalog) |
 | `spark.sql.catalog.{name}.warehouse` | Warehouse path | Yes |
-| `spark.sql.catalog.{name}.catalog-impl` | Catalog implementation class | For Glue/Nessie |
+| `spark.sql.catalog.{name}.catalog-impl` | Catalog implementation class | For Glue/Nessie (instead of `.type`) |
+
+!!!note
+    The spark-submit `--conf` properties configure the Spark catalog directly. When using the framework's `global.yaml` with `catalogType: hadoop` or `catalogType: glue`, these properties are set automatically — you only need the `spark.sql.extensions` line. The other properties are needed only when configuring the catalog via spark-submit instead of YAML.
 
 !!!note
     The `spark.sql.extensions` property **must** be set before the SparkSession is created. On managed platforms, set it in the cluster/job configuration rather than in code.

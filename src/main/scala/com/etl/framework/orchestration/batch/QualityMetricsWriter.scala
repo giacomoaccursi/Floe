@@ -72,7 +72,7 @@ class QualityMetricsWriter(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConf
   ): DataFrame = {
     import spark.implicits._
 
-    val orphansByFlow = orphanReports.groupBy(_.flowName).mapValues(_.map(_.orphanCount).sum)
+    val orphansByFlow = orphanReports.groupBy(_.flowName).mapValues(_.map(_.orphanCount).sum).toMap
 
     val columns = Seq(
       "batch_id",

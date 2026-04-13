@@ -1,6 +1,6 @@
 # Cloud Deployment
 
-Guide to deploying the Spark ETL Framework on managed cloud platforms: AWS Glue, Amazon EMR, and Databricks.
+Guide to deploying Floe on managed cloud platforms: AWS Glue, Amazon EMR, and Databricks.
 
 ## withVariables for parameter injection
 

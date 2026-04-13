@@ -177,8 +177,8 @@ class EmailDomainValidator extends Validator {
       col(col_name).isNotNull && !domainExpr.isin(domainList: _*)
     )
 
-    val rejectedCount = rejected.isEmpty
-    if (rejectedCount) {
+    val noRejections = rejected.isEmpty
+    if (noRejections) {
       ValidationStepResult(df, None)
     } else {
       ValidationStepResult(valid, Some(rejected))

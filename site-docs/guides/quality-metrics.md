@@ -11,7 +11,7 @@ processing:
   qualityMetricsTable: "quality_metrics"
 ```
 
-The table is created automatically on first use in the configured Iceberg catalog under the `default` namespace.
+The table is created automatically on first use in the configured Iceberg catalog and namespace.
 
 ## Table schema
 

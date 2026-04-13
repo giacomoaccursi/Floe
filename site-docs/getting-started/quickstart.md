@@ -1,6 +1,6 @@
 # Quickstart
 
-A minimal pipeline that reads a CSV, validates it, and writes to Iceberg — in 5 minutes.
+A minimal pipeline that reads a CSV, validates it, and writes to Iceberg.
 
 ## 1. Create the config directory
 

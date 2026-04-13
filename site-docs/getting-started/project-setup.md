@@ -59,11 +59,11 @@ object MyPipeline extends App {
 
   if (result.success) {
     result.flowResults.foreach { fr =>
-      spark.log.info(f"${fr.flowName}: ${fr.validRecords} valid, " +
+      println(f"  ${fr.flowName}: ${fr.validRecords} valid, " +
         f"${fr.rejectedRecords} rejected")
     }
   } else {
-    spark.log.error(s"Batch failed: ${result.error.getOrElse("unknown")}")
+    System.err.println(s"Batch failed: ${result.error.getOrElse("unknown")}")
     sys.exit(1)
   }
 

@@ -66,7 +66,7 @@ class BatchMetadataWriter(
         val baseFlowMetadata = Map[String, Any](
           "flow_name" -> result.flowName,
           "success" -> result.success,
-          "load_mode" -> flowConfigs.find(_.name == result.flowName).map(_.loadMode.`type`).getOrElse("unknown"),
+          "load_mode" -> flowConfigs.find(_.name == result.flowName).map(_.loadMode.`type`.name).getOrElse("unknown"),
           "input_records" -> result.inputRecords,
           "merged_records" -> result.mergedRecords,
           "valid_records" -> result.validRecords,

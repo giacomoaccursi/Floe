@@ -206,6 +206,27 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     }
   }
 
+  it should "serialize load_mode as string in per-flow metadata" in {
+    val tempDir = Files.createTempDirectory("load-mode-metadata-test").toString
+    try {
+      val flow = createFlow("test_flow", tempDir)
+      val globalConfig = createGlobalConfig(tempDir)
+
+      val orchestrator = FlowOrchestrator(globalConfig, Seq(flow))
+      val result = orchestrator.execute()
+
+      val flowMetadataPath = Paths.get(
+        s"$tempDir/metadata/${result.batchId}/flows/${flow.name}.json"
+      )
+      val metadataContent = new String(Files.readAllBytes(flowMetadataPath))
+
+      // load_mode should be the string "full", not an object like {} or {"name":"full"}
+      metadataContent should include(""""load_mode":"full"""")
+    } finally {
+      cleanupTempDir(tempDir)
+    }
+  }
+
   it should "produce valid metadata for empty flow list" in {
     val tempDir =
       Files.createTempDirectory("empty-metadata-test").toString

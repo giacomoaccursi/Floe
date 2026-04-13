@@ -19,7 +19,7 @@ class FlowMetadataWriter(
       "flow_name" -> result.flowName,
       "batch_id" -> result.batchId,
       "success" -> result.success,
-      "load_mode" -> flowConfig.loadMode.`type`,
+      "load_mode" -> flowConfig.loadMode.`type`.name,
       "input_records" -> result.inputRecords,
       "merged_records" -> result.mergedRecords,
       "valid_records" -> result.validRecords,

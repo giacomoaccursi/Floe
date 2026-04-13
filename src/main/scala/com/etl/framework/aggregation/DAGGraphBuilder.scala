@@ -56,8 +56,11 @@ class DAGGraphBuilder(parallelNodes: Boolean) {
       case Seq()       => throw new IllegalStateException("No root node found in DAG")
       case Seq(single) => single
       case multiple =>
-        logger.warn(s"Multiple root nodes found: ${multiple.mkString(", ")}. Using first: ${multiple.head}")
-        multiple.head
+        throw new IllegalStateException(
+          s"Multiple root nodes found in DAG: ${multiple.mkString(", ")}. " +
+            s"A DAG must have exactly one root node. Restructure the DAG so that a single node " +
+            s"joins all independent branches, or split into separate DAGs."
+        )
     }
   }
 }

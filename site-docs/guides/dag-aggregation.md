@@ -245,7 +245,7 @@ If `parallelNodes` is `false`, all groups execute sequentially regardless of ind
 
 ### Root node
 
-The root node is the node that no other node depends on — it produces the final output DataFrame. If multiple root nodes exist, the first one is used (with a warning). If no root node exists (all nodes are dependencies of others), an error is thrown.
+The root node is the node that no other node depends on — it produces the final output DataFrame. A DAG must have exactly one root node. If multiple root nodes are found, the framework throws an error. If no root node exists (all nodes are dependencies of others), an error is thrown.
 
 ## Complete DAG example
 

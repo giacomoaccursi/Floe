@@ -74,6 +74,16 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
     plan.rootNode shouldBe "C"
   }
 
+  it should "reject multiple root nodes" in {
+    val builder = new DAGGraphBuilder(parallelNodes = false)
+    // A and B are both roots (no one depends on them via joins)
+    // C depends on A, D depends on B — but A and B are independent roots
+    val ex = intercept[IllegalStateException] {
+      builder.buildExecutionPlan(Seq(leaf("A"), leaf("B"), child("C", "A"), child("D", "B")))
+    }
+    ex.getMessage should include("Multiple root nodes")
+  }
+
   it should "detect circular dependency" in {
     val builder = new DAGGraphBuilder(parallelNodes = false)
     intercept[CircularDependencyException] {
@@ -90,17 +100,37 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
 
   it should "group independent nodes for parallel execution" in {
     val builder = new DAGGraphBuilder(parallelNodes = true)
-    val plan = builder.buildExecutionPlan(Seq(leaf("A"), leaf("B"), leaf("C")))
+    // A, B are independent leaves; C joins both → single root C, group 1 has A,B in parallel
+    val nodeC = DAGNode(
+      id = "C",
+      sourceFlow = "flow_C",
+      joins = Seq(
+        JoinConfig(
+          `type` = JoinType.LeftOuter,
+          `with` = "A",
+          conditions = Seq(JoinCondition("id", "id")),
+          strategy = JoinStrategy.Nest
+        ),
+        JoinConfig(
+          `type` = JoinType.LeftOuter,
+          `with` = "B",
+          conditions = Seq(JoinCondition("id", "id")),
+          strategy = JoinStrategy.Flatten
+        )
+      )
+    )
+    val plan = builder.buildExecutionPlan(Seq(leaf("A"), leaf("B"), nodeC))
 
-    plan.groups.size shouldBe 1
-    plan.groups.head.nodes.size shouldBe 3
     plan.groups.head.parallel shouldBe true
+    plan.groups.head.nodes.map(_.id).toSet shouldBe Set("A", "B")
+    plan.rootNode shouldBe "C"
   }
 
   it should "disable parallel when parallelNodes is false" in {
     val builder = new DAGGraphBuilder(parallelNodes = false)
-    val plan = builder.buildExecutionPlan(Seq(leaf("A"), leaf("B")))
+    val plan = builder.buildExecutionPlan(Seq(leaf("A"), child("B", "A")))
     plan.groups.head.parallel shouldBe false
+    plan.rootNode shouldBe "B"
   }
 
   it should "handle single node DAG" in {

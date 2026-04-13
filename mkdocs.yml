@@ -74,7 +74,3 @@ nav:
   - Reference:
     - Exceptions: reference/exceptions.md
     - Changelog: reference/changelog.md
-  - Contributing:
-    - Development: contributing/development.md
-    - Workflow: contributing/workflow.md
-    - Code Quality: contributing/code-quality.md

@@ -24,6 +24,7 @@ performance:
 iceberg:
   catalogType: "hadoop"
   catalogName: "spark_catalog"
+  namespace: "default"
   warehouse: "output/warehouse"
   fileFormat: "parquet"
   enableSnapshotTagging: true

@@ -64,7 +64,7 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 |-------|------|----------|---------|-------------|
 | `id` | string | yes | — | Unique node identifier |
 | `description` | string | no | `""` | Human-readable description |
-| `sourceFlow` | string | — | — | Name of the source flow. Reads from `{catalogName}.default.{sourceFlow}`. Required if `sourceTable` is not set. |
+| `sourceFlow` | string | — | — | Name of the source flow. Reads from `{catalogName}.{namespace}.{sourceFlow}`. Required if `sourceTable` is not set. |
 | `sourceTable` | string | — | — | Full Iceberg table name. Use instead of `sourceFlow` for external tables. |
 | `joins` | list | — | `[]` | List of join configurations. Dependencies are inferred automatically. |
 | `select` | list | — | all columns | Columns to select from source data |
@@ -93,7 +93,7 @@ Supported aggregation functions: `sum`, `count`, `avg` (alias: `average`), `min`
 
 ## sourceTable — reading from external Iceberg tables
 
-By default, a node reads from `{catalogName}.default.{sourceFlow}`. If you need to read from a table outside the framework's naming convention (e.g. a table created by another system, or in a different catalog/namespace), use `sourceTable` instead of `sourceFlow`:
+By default, a node reads from `{catalogName}.{namespace}.{sourceFlow}`. If you need to read from a table outside the framework's naming convention (e.g. a table created by another system, or in a different catalog/namespace), use `sourceTable` instead of `sourceFlow`:
 
 ```yaml
 - id: external_customers_node

@@ -173,7 +173,8 @@ The framework uses `DataReaderFactory` to create the appropriate reader based on
 | `jdbc` | `JDBCDataReader` | Any database with a JDBC driver |
 
 ```scala
-val reader = DataReaderFactory.create(sourceConfig, Some(schemaConfig))
+// Internal usage — requires implicit SparkSession
+val reader = DataReaderFactory.create(sourceConfig, Some(schemaConfig))(spark)
 val df = reader.read()
 ```
 

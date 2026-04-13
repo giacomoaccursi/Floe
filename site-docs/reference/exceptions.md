@@ -125,7 +125,7 @@ All context keys are defined in `ContextKeys` object:
 | `duplicateCount`, `keyColumns` | `PrimaryKeyViolationException` |
 | `orphanCount`, `foreignKeyName`, `referencedFlow` | `ForeignKeyViolationException` |
 | `actualRate`, `maxRate`, `rejectedCount`, `totalCount` | `MaxRejectionRateExceededException` |
-| `inputCount`, `validCount`, `difference` | `InvariantViolationException` |
+| `inputCount`, `validCount`, `rejectedCount`, `difference` | `InvariantViolationException` |
 | `sourceType`, `sourcePath` | `DataSourceException` |
 | `outputType`, `outputPath` | `DataWriteException` |
 | `mergeStrategy` | `MergeException` |

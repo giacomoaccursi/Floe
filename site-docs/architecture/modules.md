@@ -109,17 +109,28 @@ See [Pipeline Builder](../guides/pipeline-builder.md).
 
 Domain-specific exception hierarchy rooted at `FrameworkException`:
 
-- `ConfigurationException` — YAML syntax, missing fields, invalid types, circular dependencies
+- `ConfigurationException` — YAML syntax, missing fields, invalid types, circular dependencies, file I/O errors, invalid references
 - `ValidationException` — schema, PK, FK, rejection rate violations
 - `DataProcessingException` — source errors, write errors, merge errors
 - `TransformationException` — pre/post-validation transformation failures
 - `AggregationException` — DAG node execution, join failures
 - `PluginException` — custom validator loading/execution failures
 - `OrchestrationException` — flow execution failures
+- `BatchFailedException` — thrown by `executeOrThrow()` on batch failure
 
 Every exception carries an error code and a context map for debugging.
 
 See [Reference: Exceptions](../reference/exceptions.md).
+
+## util
+
+Shared utilities used across modules:
+
+- **TopologicalSorter** — generic graph sorting with cycle detection, used by both flow dependency resolution and DAG node ordering
+- **RetryExecutor** — exponential backoff with jitter for retrying failed operations
+- **JsonFileWriter** — writes Scala maps as formatted JSON files
+- **IcebergMetadataSerializer** — converts `IcebergFlowMetadata` to JSON-compatible maps
+- **TimingUtil** — measures and logs execution time of code blocks
 
 ## Related
 

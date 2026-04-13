@@ -163,7 +163,7 @@ class FlowExecutor(
     val writeResult = dataWriter.writeValidated(validatedData, batchId)
 
     if (rejectedCount > 0) {
-      dataWriter.writeRejected(validationResult.rejected.get, batchId)
+      validationResult.rejected.foreach(rejDf => dataWriter.writeRejected(rejDf, batchId))
     }
 
     validationResult.warned.foreach { warnedDf =>

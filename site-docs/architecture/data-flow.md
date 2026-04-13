@@ -72,7 +72,7 @@ For each column with `nullable: false`, rejects rows where the column is NULL �
 
 ### 3c. Primary key uniqueness
 
-Groups by PK columns, finds duplicates. All rows sharing a duplicated key are rejected → `PK_DUPLICATE`.
+Groups by PK columns, finds duplicates. All rows sharing a duplicated key are rejected → `PK_DUPLICATE`. Skipped if `primaryKey` is empty (e.g. full load without a natural key).
 
 ### 3d. Foreign key integrity
 

@@ -11,6 +11,7 @@ graph TD
     ORDER["Flow Ordering<br/>Resolve FK + dependsOn → topological sort"]
     EXEC["Flow Execution (per flow)"]
     READ["Read source data<br/>CSV · Parquet · JSON · Avro · ORC · JDBC"]
+    RENAME["Column renames<br/>sourceColumn mappings"]
     PRE["Pre-validation transform"]
     VAL["Validate<br/>Schema · Not-null · PK · FK · Custom rules"]
     POST["Post-validation transform"]
@@ -21,8 +22,7 @@ graph TD
     DAG["DAG Aggregation<br/>Join · Nest · Flatten · Aggregate"]
 
     YAML --> BUILD --> ORDER --> EXEC
-    EXEC --> READ --> PRE --> VAL --> POST --> WRITE
-    WRITE --> DERIVED --> ORPHAN --> MAINT
+    EXEC --> READ --> RENAME --> PRE --> VAL --> POST --> WRITE    WRITE --> DERIVED --> ORPHAN --> MAINT
     MAINT -.-> DAG
 ```
 
@@ -41,7 +41,7 @@ A batch execution follows this sequence:
    Analyze FK and dependsOn → Topological sort → Group independent flows
 
 4. Flow execution (per flow, in dependency order)
-   Read → Pre-transform → Validate → Post-transform → Write to Iceberg
+   Read → Rename columns → Pre-transform → Validate → Post-transform → Write to Iceberg
 
 5. Derived tables (if registered)
    Read from Iceberg (full history) → Compute → Write to Iceberg

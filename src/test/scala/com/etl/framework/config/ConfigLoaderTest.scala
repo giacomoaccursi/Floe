@@ -235,4 +235,20 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
       ConfigWithDefaults("only_required", "default_value", List.empty)
     )
   }
+
+  "loadYamlFile" should "load from file:// protocol path" in {
+    val content =
+      """
+        |name: "protocol_test"
+        |value: 99
+        |items:
+        |  - "from_protocol"
+        |""".stripMargin
+
+    withTempFile(content) { file =>
+      val fileUri = s"file://${file.getAbsolutePath}"
+      val result = loader.load(fileUri)
+      result shouldBe Right(TestConfig("protocol_test", 99, List("from_protocol")))
+    }
+  }
 }

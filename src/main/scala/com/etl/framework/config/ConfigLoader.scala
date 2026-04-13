@@ -1,6 +1,8 @@
 package com.etl.framework.config
 
 import com.etl.framework.exceptions.{ConfigFileException, ConfigurationException, YAMLSyntaxException}
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path => HadoopPath}
 import pureconfig._
 import pureconfig.error.{ConfigReaderFailures, ConvertFailure, KeyNotFound, ThrowableFailure}
 import pureconfig.generic.auto._
@@ -43,19 +45,42 @@ trait ConfigLoader[T] {
     } yield config
   }
 
-  /** Read raw YAML content from file
+  /** Read raw YAML content from file. Supports local paths, S3, HDFS, GCS, and any Hadoop-compatible filesystem via the
+    * path protocol (file://, s3://, hdfs://, gs://, abfss://). Relative paths without a protocol are read from the
+    * local filesystem.
     */
   protected def loadYamlFile(
       path: String
   ): Either[ConfigurationException, String] = {
+    val hasProtocol = path.contains("://")
+    if (hasProtocol) {
+      loadFromHadoopFs(path)
+    } else {
+      loadFromLocalFs(path)
+    }
+  }
+
+  private def loadFromHadoopFs(path: String): Either[ConfigurationException, String] = {
+    try {
+      val hadoopPath = new HadoopPath(path)
+      val fs = FileSystem.get(hadoopPath.toUri, new Configuration())
+      val stream = fs.open(hadoopPath)
+      try {
+        Right(Source.fromInputStream(stream).mkString)
+      } finally {
+        stream.close()
+      }
+    } catch {
+      case ex: Exception =>
+        Left(ConfigFileException(file = path, message = "Failed to read configuration file", cause = ex))
+    }
+  }
+
+  private def loadFromLocalFs(path: String): Either[ConfigurationException, String] = {
     Using(Source.fromFile(path)) { source =>
       source.mkString
     }.toEither.left.map { ex =>
-      ConfigFileException(
-        file = path,
-        message = "Failed to read configuration file",
-        cause = ex
-      )
+      ConfigFileException(file = path, message = "Failed to read configuration file", cause = ex)
     }
   }
 
@@ -299,16 +324,13 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
       directory: String,
       variables: Map[String, String]
   ): Either[ConfigurationException, Seq[FlowConfig]] = {
-    val dir = new File(directory)
-    if (!dir.exists() || !dir.isDirectory)
-      Left(ConfigFileException(file = directory, message = "Directory does not exist or is not a directory"))
-    else {
-      val results = Option(dir.listFiles())
-        .getOrElse(Array.empty)
-        .filter(f => f.isFile && (f.getName.endsWith(".yaml") || f.getName.endsWith(".yml")))
-        .toSeq
-        .map(f => load(f.getAbsolutePath, variables))
+    val hasProtocol = directory.contains("://")
+    val yamlFiles: Either[ConfigurationException, Seq[String]] =
+      if (hasProtocol) listYamlFilesFromHadoop(directory)
+      else listYamlFilesFromLocal(directory)
 
+    yamlFiles.flatMap { files =>
+      val results = files.map(f => load(f, variables))
       val errors = results.collect { case Left(err) => err }
       val configs = results.collect { case Right(cfg) => cfg }
 
@@ -331,6 +353,39 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
           )
         else Right(configs)
       }
+    }
+  }
+
+  private def listYamlFilesFromLocal(directory: String): Either[ConfigurationException, Seq[String]] = {
+    val dir = new File(directory)
+    if (!dir.exists() || !dir.isDirectory)
+      Left(ConfigFileException(file = directory, message = "Directory does not exist or is not a directory"))
+    else
+      Right(
+        Option(dir.listFiles())
+          .getOrElse(Array.empty)
+          .filter(f => f.isFile && (f.getName.endsWith(".yaml") || f.getName.endsWith(".yml")))
+          .toSeq
+          .map(_.getAbsolutePath)
+      )
+  }
+
+  private def listYamlFilesFromHadoop(directory: String): Either[ConfigurationException, Seq[String]] = {
+    try {
+      val hadoopPath = new HadoopPath(directory)
+      val fs = FileSystem.get(hadoopPath.toUri, new Configuration())
+      if (!fs.exists(hadoopPath) || !fs.isDirectory(hadoopPath))
+        Left(ConfigFileException(file = directory, message = "Directory does not exist or is not a directory"))
+      else
+        Right(
+          fs.listStatus(hadoopPath)
+            .filter(s => s.isFile && (s.getPath.getName.endsWith(".yaml") || s.getPath.getName.endsWith(".yml")))
+            .toSeq
+            .map(_.getPath.toString)
+        )
+    } catch {
+      case ex: Exception =>
+        Left(ConfigFileException(file = directory, message = "Failed to list directory", cause = ex))
     }
   }
 }

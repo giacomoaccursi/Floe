@@ -185,6 +185,18 @@ class FlowOrchestrator(
     val executionTimeMs = (System.nanoTime() - startTime) / 1000000
     executionLogger.logExecutionFailure(batchId, executionTimeMs, error)
 
+    try {
+      metadataWriter.writeBatchMetadata(
+        batchId,
+        flowResults,
+        executionTimeMs,
+        success = false
+      )
+    } catch {
+      case e: Exception =>
+        logger.warn(s"Failed to write batch metadata for failed batch $batchId: ${e.getMessage}")
+    }
+
     IngestionResult(
       batchId = batchId,
       flowResults = flowResults,

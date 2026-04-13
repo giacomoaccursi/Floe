@@ -425,6 +425,22 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     spark.sql("SELECT * FROM writer_catalog.default.full_empty").count() shouldBe 0L
   }
 
+  "IcebergTableWriter.writeDeltaLoad" should "handle PK-only DataFrame without crashing" in {
+    val fc = flowConfig("delta_pk_only", loadMode = LoadMode.Delta, primaryKey = Seq("id"))
+    val batch1 = Seq(1, 2, 3).toDF("id")
+    writer.writeDeltaLoad(batch1, fc)
+
+    val batch2 = Seq(2, 3, 4).toDF("id")
+    val result = writer.writeDeltaLoad(batch2, fc)
+
+    // id=4 is new, id=2 and id=3 already exist (no columns to update), id=1 stays
+    val rows = spark
+      .sql("SELECT id FROM writer_catalog.default.delta_pk_only ORDER BY id")
+      .collect()
+      .map(_.getInt(0))
+    rows shouldBe Array(1, 2, 3, 4)
+  }
+
   private val allTables = Seq(
     "full_test",
     "full_overwrite",
@@ -440,7 +456,8 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     "scd2_null_change",
     "scd2_to_null",
     "scd2_empty_first",
-    "full_empty"
+    "full_empty",
+    "delta_pk_only"
   )
 
   override def afterAll(): Unit = {

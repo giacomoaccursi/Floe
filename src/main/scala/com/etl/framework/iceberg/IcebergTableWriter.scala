@@ -78,25 +78,26 @@ class IcebergTableWriter(
         val updateCols = cachedDf.columns
           .filterNot(pkColumns.contains)
 
-        val changeCondition = updateCols
-          .map(c => s"NOT (source.$c <=> target.$c)")
-          .mkString(" OR ")
-        val updateSetClause =
+        val matchedClause = if (updateCols.nonEmpty) {
+          val changeCondition = updateCols
+            .map(c => s"NOT (source.$c <=> target.$c)")
+            .mkString(" OR ")
           s"WHEN MATCHED AND ($changeCondition) THEN UPDATE SET " +
             updateCols.map(c => s"target.$c = source.$c").mkString(", ")
+        } else ""
 
         val insertCols = cachedDf.columns.mkString(", ")
         val insertVals = cachedDf.columns.map(c => s"source.$c").mkString(", ")
         val insertClause =
           s"WHEN NOT MATCHED THEN INSERT ($insertCols) VALUES ($insertVals)"
 
+        val allClauses = Seq(matchedClause, insertClause).filter(_.nonEmpty).mkString("\n")
         val mergeView = s"_iceberg_merge_${sanitizeViewName(flowConfig.name)}_source"
         val mergeSql =
           s"""MERGE INTO $tableName AS target
              |USING $mergeView AS source
              |ON $mergeCondition
-             |$updateSetClause
-             |$insertClause""".stripMargin
+             |$allClauses""".stripMargin
 
         logger.info(s"Executing MERGE INTO on $tableName")
         logger.debug(s"Merge SQL: $mergeSql")

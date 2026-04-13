@@ -145,7 +145,7 @@ Each detection produces an `OrphanReport` included in the batch metadata:
 - **removedParentKeyCount**: number of keys removed by the parent
 - **actionTaken**: action taken (`warn` or `delete`)
 - **deletedChildKeyCount**: records actually deleted (only for `delete`)
-- **cascadeSource**: if the orphans were caused by a cascade delete (rather than time travel), this field contains the name of the flow whose delete triggered the cascade. `null` when the orphans were detected via time travel directly.
+- **cascadeSource**: if the orphans were caused by a cascade delete (rather than time travel), this field contains the name of the flow whose delete triggered the cascade. Absent when the orphans were detected via time travel directly.
 
 ## Example
 

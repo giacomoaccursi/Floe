@@ -6,7 +6,7 @@ How flows are ordered, executed in parallel, and how the batch lifecycle works.
 
 Flows are not executed in the order they appear in YAML files. The framework builds an execution plan based on foreign key dependencies:
 
-1. **Dependency analysis** — FK references between flows are extracted. If `orders` has a FK referencing `customers.customer_id`, then `customers` is a dependency of `orders`.
+1. **Dependency analysis** — FK references and explicit `dependsOn` declarations between flows are extracted. If `orders` has a FK referencing `customers.customer_id` (or declares `dependsOn: [customers]`), then `customers` is a dependency of `orders`.
 
 2. **Topological sort** — flows are sorted so that every parent executes before its children. If a circular dependency is detected, a `CircularDependencyException` is thrown with the full cycle path.
 
@@ -104,14 +104,15 @@ graph TD
         P1 --> P2 --> P3
     end
 
-    subgraph Phase4["4. DAG phase (if configured)"]
+    subgraph Phase4["4. DAG phase (separate execution)"]
         D1["Load DAG config"]
         D3["Build dependency graph<br/>→ topological sort → group nodes"]
         D4["Execute nodes group by group"]
         D1 --> D3 --> D4
     end
 
-    Phase1 --> Phase2 --> Phase3 --> Phase4
+    Phase1 --> Phase2 --> Phase3
+    Phase3 -.->|"if configured,<br/>invoked separately"| Phase4
 ```
 
 ### Batch ID
@@ -132,7 +133,7 @@ Example: `20260328_150000`. The batch ID is used for:
 ### Failure handling
 
 - **Flow failure**: if a flow fails, the batch stops. The failed flow is reported in `IngestionResult`.
-- **Rejection threshold**: if `maxRejectionRate` is configured (globally or per-flow) and any flow's rejection rate exceeds the threshold, the batch stops. Remaining flows in the current group are not executed.
+- **Rejection threshold**: if `maxRejectionRate` is configured (globally or per-flow) and any flow's rejection rate exceeds the threshold, the batch stops. In sequential execution, remaining flows in the current group are not executed. In parallel execution, flows already running complete but subsequent groups are not started.
 - **Post-batch failure**: orphan detection and maintenance failures do not affect the batch result. The batch reports SUCCESS if all flow writes completed.
 - **Iceberg atomicity**: if a write fails mid-way, Iceberg rolls back automatically. The table remains in the previous state.
 

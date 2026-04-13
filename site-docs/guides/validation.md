@@ -108,7 +108,7 @@ validation:
 Duplicate detection uses `groupBy` + `count > 1`. All rows sharing a duplicated key combination are rejected — not just the second occurrence, but every row with that key value. Rejection code: `PK_DUPLICATE`.
 
 !!!note
-    A primary key is required for all load modes. If `primaryKey` is empty, PK uniqueness validation throws a `ValidationConfigException` at runtime.
+    A primary key is required for `delta` and `scd2` load modes (used for MERGE INTO matching). For `full` load mode, if `primaryKey` is empty, PK uniqueness validation is skipped.
 
 ## Foreign key integrity
 

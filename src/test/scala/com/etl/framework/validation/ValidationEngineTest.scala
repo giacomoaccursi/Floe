@@ -318,4 +318,23 @@ class ValidationEngineTest extends AnyFlatSpec with Matchers {
     result.rejectionReasons should contain key "pk_validation"
     result.rejectionReasons("pk_validation") shouldBe 2
   }
+
+  it should "skip PK validation when primaryKey is empty" in {
+    val df = Seq((1, "Alice"), (1, "Bob"), (2, "Charlie")).toDF("id", "name")
+
+    val flowConfig = createFlowConfig(
+      schemaFields = Seq(
+        ColumnConfig("id", "integer", nullable = true, description = ""),
+        ColumnConfig("name", "string", nullable = true, description = "")
+      ),
+      primaryKey = Seq.empty
+    )
+    val engine = new ValidationEngine()
+
+    val result = engine.validate(df, flowConfig)
+
+    // All 3 records should be valid — no PK check, duplicates are fine
+    result.valid.count() shouldBe 3
+    result.rejected shouldBe None
+  }
 }

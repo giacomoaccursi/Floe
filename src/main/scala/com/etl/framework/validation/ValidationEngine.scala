@@ -44,7 +44,7 @@ class ValidationEngine(
         ValidationRule(ValidationRuleType.NotNull)
       ),
       ValidationStep(
-        shouldExecute = true,
+        flowConfig.validation.primaryKey.nonEmpty,
         new PrimaryKeyValidator(flowConfig, flowName),
         ValidationRule(ValidationRuleType.PKUniqueness)
       ),

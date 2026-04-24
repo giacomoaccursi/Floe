@@ -47,5 +47,11 @@ class GlueCatalogProvider extends CatalogProvider {
 
   override def validateConfig(
       config: IcebergConfig
-  ): Either[String, Unit] = Right(())
+  ): Either[String, Unit] = {
+    if (config.catalogName.isEmpty) {
+      Left("catalogName is required for glue catalog")
+    } else {
+      Right(())
+    }
+  }
 }

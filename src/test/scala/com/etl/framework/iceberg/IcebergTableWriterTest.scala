@@ -82,7 +82,7 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     val data = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
 
     val result = writer.writeFullLoad(data, fc)
-    result.recordsWritten shouldBe 2
+    result.recordsProcessed shouldBe 2
     result.snapshotId shouldBe defined
 
     val readBack = spark.sql("SELECT * FROM writer_catalog.default.full_test")
@@ -97,7 +97,7 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     val data2 = Seq((3, "Charlie"), (4, "Dave"), (5, "Eve")).toDF("id", "name")
     val result = writer.writeFullLoad(data2, fc)
 
-    result.recordsWritten shouldBe 3
+    result.recordsProcessed shouldBe 3
     val readBack =
       spark.sql("SELECT * FROM writer_catalog.default.full_overwrite")
     readBack.count() shouldBe 3
@@ -110,7 +110,7 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     val data = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
 
     val result = writer.writeDeltaLoad(data, fc)
-    result.recordsWritten shouldBe 2
+    result.recordsProcessed shouldBe 2
 
     val readBack =
       spark.sql("SELECT * FROM writer_catalog.default.delta_first ORDER BY id")
@@ -166,7 +166,7 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     val data = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
 
     val result = writer.writeSCD2Load(data, fc)
-    result.recordsWritten shouldBe 2
+    result.recordsProcessed shouldBe 2
 
     val readBack =
       spark.sql("SELECT * FROM writer_catalog.default.scd2_first")
@@ -421,7 +421,7 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
       initial.schema
     )
     val result = writer.writeFullLoad(emptyDf, fc)
-    result.recordsWritten shouldBe 0L
+    result.recordsProcessed shouldBe 0L
     spark.sql("SELECT * FROM writer_catalog.default.full_empty").count() shouldBe 0L
   }
 
@@ -441,6 +441,58 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     rows shouldBe Array(1, 2, 3, 4)
   }
 
+  // --- Schema evolution + SCD2 ---
+
+  "IcebergTableWriter.writeSCD2Load" should "handle schema evolution with new column on existing SCD2 table" in {
+    val fc = flowConfig(
+      "scd2_schema_evo",
+      loadMode = LoadMode.SCD2,
+      compareColumns = Seq("name"),
+      validFromColumn = Some("valid_from"),
+      validToColumn = Some("valid_to"),
+      isCurrentColumn = Some("is_current")
+    )
+
+    // Batch 1: initial load with (id, name)
+    val batch1 = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
+    writer.writeSCD2Load(batch1, fc)
+
+    spark
+      .sql("SELECT * FROM writer_catalog.default.scd2_schema_evo")
+      .filter("is_current = true")
+      .count() shouldBe 2L
+
+    // Batch 2: source now has a new column (score). Schema evolution should add it.
+    val fcWithScore = flowConfig(
+      "scd2_schema_evo",
+      loadMode = LoadMode.SCD2,
+      compareColumns = Seq("name", "score"),
+      validFromColumn = Some("valid_from"),
+      validToColumn = Some("valid_to"),
+      isCurrentColumn = Some("is_current")
+    )
+    val batch2 = Seq((1, "Alice", 100), (2, "Bob_v2", 200)).toDF("id", "name", "score")
+    writer.writeSCD2Load(batch2, fcWithScore)
+
+    val table = spark.sql("SELECT * FROM writer_catalog.default.scd2_schema_evo")
+
+    // Alice: name unchanged but score is new (NULL→100) → new version. Bob: name changed → new version.
+    // Total: Alice(old) + Alice(new) + Bob(old) + Bob(new) = 4
+    table.count() shouldBe 4L
+    table.filter("is_current = true").count() shouldBe 2L
+
+    // New column should exist
+    table.columns should contain("score")
+
+    // Current versions should have the new score values
+    val aliceCurrent = table.filter("id = 1 AND is_current = true").collect().head
+    aliceCurrent.getAs[Int]("score") shouldBe 100
+
+    // Old versions should have score = NULL (written before schema evolution)
+    val aliceOld = table.filter("id = 1 AND is_current = false").collect().head
+    aliceOld.isNullAt(aliceOld.fieldIndex("score")) shouldBe true
+  }
+
   private val allTables = Seq(
     "full_test",
     "full_overwrite",
@@ -457,7 +509,8 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     "scd2_to_null",
     "scd2_empty_first",
     "full_empty",
-    "delta_pk_only"
+    "delta_pk_only",
+    "scd2_schema_evo"
   )
 
   override def afterAll(): Unit = {

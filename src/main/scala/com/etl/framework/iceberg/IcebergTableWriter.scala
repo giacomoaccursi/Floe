@@ -6,8 +6,10 @@ import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types.StructType
 import org.slf4j.LoggerFactory
 
+import java.util.UUID
+
 case class WriteResult(
-    recordsWritten: Long,
+    recordsProcessed: Long,
     snapshotId: Option[Long],
     icebergMetadata: Option[IcebergFlowMetadata] = None
 )
@@ -25,6 +27,9 @@ class IcebergTableWriter(
 
   private def sanitizeViewName(flowName: String): String =
     flowName.replaceAll("[^a-zA-Z0-9_]", "_")
+
+  private def uniqueViewName(prefix: String, flowName: String): String =
+    s"${prefix}_${sanitizeViewName(flowName)}_${UUID.randomUUID().toString.replace("-", "").take(8)}"
 
   /** Writes all source data to the Iceberg table, replacing existing content. */
   def writeFullLoad(
@@ -92,7 +97,7 @@ class IcebergTableWriter(
           s"WHEN NOT MATCHED THEN INSERT ($insertCols) VALUES ($insertVals)"
 
         val allClauses = Seq(matchedClause, insertClause).filter(_.nonEmpty).mkString("\n")
-        val mergeView = s"_iceberg_merge_${sanitizeViewName(flowConfig.name)}_source"
+        val mergeView = uniqueViewName("_iceberg_merge", flowConfig.name)
         val mergeSql =
           s"""MERGE INTO $tableName AS target
              |USING $mergeView AS source
@@ -136,14 +141,13 @@ class IcebergTableWriter(
     tableManager.createOrUpdateTable(flowConfig, scd2Schema)
 
     val isInitialLoad = tableManager.getCurrentSnapshotId(flowConfig).isEmpty
-    val sn = sanitizeViewName(flowConfig.name)
 
     val cachedDf = df.cache()
     try {
       if (isInitialLoad)
-        executeSCD2InitialLoad(cachedDf, tableName, sn, cfg)
+        executeSCD2InitialLoad(cachedDf, tableName, flowConfig.name, cfg)
       else
-        executeSCD2MergeLoad(cachedDf, tableName, sn, cfg)
+        executeSCD2MergeLoad(cachedDf, tableName, flowConfig.name, cfg)
 
       val recordCount = cachedDf.count()
       val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
@@ -192,11 +196,11 @@ class IcebergTableWriter(
   private def executeSCD2InitialLoad(
       df: DataFrame,
       tableName: String,
-      sn: String,
+      flowName: String,
       cfg: SCD2Config
   ): Unit = {
     logger.info(s"SCD2 initial load to $tableName")
-    val sourceView = s"_iceberg_scd2_${sn}_source"
+    val sourceView = uniqueViewName("_iceberg_scd2_src", flowName)
     df.createOrReplaceTempView(sourceView)
     try {
       val columns = df.columns.mkString(", ")
@@ -216,12 +220,12 @@ class IcebergTableWriter(
   private def executeSCD2MergeLoad(
       df: DataFrame,
       tableName: String,
-      sn: String,
+      flowName: String,
       cfg: SCD2Config
   ): Unit = {
     logger.info(s"SCD2 change detection on $tableName")
-    val sourceView = s"_iceberg_scd2_${sn}_source"
-    val stagedView = s"_iceberg_scd2_${sn}_staged"
+    val sourceView = uniqueViewName("_iceberg_scd2_src", flowName)
+    val stagedView = uniqueViewName("_iceberg_scd2_stg", flowName)
 
     df.createOrReplaceTempView(sourceView)
     try {
@@ -314,9 +318,7 @@ class IcebergTableWriter(
 
   private def buildChangeCondition(columns: Seq[String], leftAlias: String, rightAlias: String): String =
     columns
-      .map(c =>
-        s"$leftAlias.$c != $rightAlias.$c OR ($leftAlias.$c IS NULL AND $rightAlias.$c IS NOT NULL) OR ($leftAlias.$c IS NOT NULL AND $rightAlias.$c IS NULL)"
-      )
+      .map(c => s"NOT ($leftAlias.$c <=> $rightAlias.$c)")
       .mkString(" OR ")
 
   /** Tags the batch snapshot and collects Iceberg metadata for the batch metadata JSON. */
@@ -331,7 +333,7 @@ class IcebergTableWriter(
         val metadata = tableManager.getSnapshotMetadata(
           flowConfig,
           sid,
-          writeResult.recordsWritten,
+          writeResult.recordsProcessed,
           batchId,
           tagCreated = tagged
         )

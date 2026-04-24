@@ -57,4 +57,18 @@ class CatalogFactoryTest extends AnyFlatSpec with Matchers {
     val result2 = CatalogFactory.createCatalogProvider("hadoop")
     result1.toOption.get should not be theSameInstanceAs(result2.toOption.get)
   }
+
+  "GlueCatalogProvider.validateConfig" should "accept config with non-empty catalogName" in {
+    val provider = new GlueCatalogProvider()
+    val config = IcebergConfig(catalogName = "glue_catalog", warehouse = "s3://bucket/warehouse")
+    provider.validateConfig(config) shouldBe Right(())
+  }
+
+  it should "reject config with empty catalogName" in {
+    val provider = new GlueCatalogProvider()
+    val config = IcebergConfig(catalogName = "", warehouse = "s3://bucket/warehouse")
+    val result = provider.validateConfig(config)
+    result shouldBe a[Left[_, _]]
+    result.left.toOption.get should include("catalogName")
+  }
 }

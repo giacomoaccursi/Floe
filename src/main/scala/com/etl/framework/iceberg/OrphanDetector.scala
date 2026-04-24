@@ -7,6 +7,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.col
 import org.slf4j.LoggerFactory
 
+import java.util.UUID
 import scala.collection.mutable
 
 case class OrphanReport(
@@ -174,6 +175,11 @@ class OrphanDetector(
 
   /** Resolves orphaned records: warns or deletes depending on FK config. For delete, saves removed keys in cascade map
     * for downstream grandchild detection.
+    *
+    * IMPORTANT: This method assumes single-writer semantics. The child table is read, orphans are computed, and then a
+    * DELETE is issued. If another process writes to the child table between the read and the delete, the delete may
+    * miss newly inserted orphans or remove records that were updated concurrently. In a multi-writer environment,
+    * external serialization (e.g., table-level locking) is required.
     */
   private def resolveOrphans(
       childFlow: FlowConfig,
@@ -239,7 +245,8 @@ class OrphanDetector(
         )
 
         // Build DELETE condition using temp view
-        val viewName = s"_orphan_removed_pks_${childFlow.name}_${fkCols.mkString("_")}"
+        val viewName =
+          s"_orphan_removed_pks_${childFlow.name}_${fkCols.mkString("_")}_${UUID.randomUUID().toString.replace("-", "").take(8)}"
         renamedKeys.createOrReplaceTempView(viewName)
         try {
           val deleteCondition = fkCols

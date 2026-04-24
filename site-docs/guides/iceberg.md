@@ -281,12 +281,12 @@ Executes a single `MERGE INTO` statement with value-based change detection:
 
 ```sql
 MERGE INTO catalog.default.orders AS target
-USING _iceberg_merge_orders_source AS source
+USING _iceberg_merge_orders_<uuid> AS source
 ON target.order_id = source.order_id
 WHEN MATCHED AND (
-  source.status     != target.status     OR (source.status     IS NULL AND target.status     IS NOT NULL) OR (source.status     IS NOT NULL AND target.status     IS NULL) OR
-  source.total      != target.total      OR (source.total      IS NULL AND target.total      IS NOT NULL) OR (source.total      IS NOT NULL AND target.total      IS NULL) OR
-  source.order_date != target.order_date OR (source.order_date IS NULL AND target.order_date IS NOT NULL) OR (source.order_date IS NOT NULL AND target.order_date IS NULL)
+  NOT (source.status    <=> target.status)    OR
+  NOT (source.total     <=> target.total)     OR
+  NOT (source.order_date <=> target.order_date)
 ) THEN UPDATE SET
   target.status     = source.status,
   target.total      = source.total,
@@ -295,7 +295,7 @@ WHEN NOT MATCHED THEN INSERT (order_id, status, total, order_date)
   VALUES (source.order_id, source.status, source.total, source.order_date)
 ```
 
-The `WHEN MATCHED AND (...)` condition uses an expanded null-safe comparison for each column. This is semantically equivalent to Spark SQL's `NOT (a <=> b)` operator and correctly handles NULL comparisons:
+The `WHEN MATCHED AND (...)` condition uses Spark SQL's null-safe equality operator `<=>` to correctly handle NULL comparisons:
 
 - `NULL` vs `NULL` → **equal** (no update)
 - `NULL` vs `'value'` → **different** (update)
@@ -387,7 +387,7 @@ Each write produces an `IcebergFlowMetadata` object containing:
 - `snapshotTag`: batch tag string, or absent if tagging is disabled or the tag operation failed. When absent, use `snapshotId` for time travel instead.
 - `parentSnapshotId`: the snapshot that existed before this write (used for time travel in [orphan detection](orphan-detection.md))
 - `snapshotTimestampMs`: creation timestamp
-- `recordsWritten`: number of records in the source DataFrame submitted to the write operation. For delta and SCD2 modes, this is the number of records processed (not the number of rows actually inserted or updated — use the snapshot `summary` fields for that).
+- `recordsWritten`: number of records in the source DataFrame submitted to the write operation. For full loads, this equals the table's final row count. For delta and SCD2 modes, this is the number of source records processed, not the number of rows actually inserted or updated. Use the snapshot `summary` fields (`added-records`, `deleted-records`) for file-level write statistics.
 - `manifestListLocation`: path to the manifest list file
 - `summary`: Iceberg summary map (added/deleted records, file counts, etc.)
 

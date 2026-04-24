@@ -146,6 +146,8 @@ class IcebergTableManager(
 
   private def tableExists(tableName: String): Boolean = {
     try {
+      // spark.catalog.tableExists does not support fully-qualified Iceberg names (catalog.namespace.table),
+      // so we use DESCRIBE TABLE which works with any catalog.
       spark.sql(s"DESCRIBE TABLE $tableName")
       true
     } catch {

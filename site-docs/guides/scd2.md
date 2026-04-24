@@ -430,13 +430,13 @@ The staging view is constructed as:
 ```sql
 -- Part 1: all source records (merge key = real PK)
 SELECT src.*, src.customer_id AS _mk_customer_id
-FROM source src
+FROM _iceberg_scd2_customers_scd2_source src
 
 UNION ALL
 
 -- Part 2: only MODIFIED records (merge key = NULL)
 SELECT src.*, CAST(NULL AS INT) AS _mk_customer_id
-FROM source src
+FROM _iceberg_scd2_customers_scd2_source src
 JOIN target tgt
   ON src.customer_id = tgt.customer_id AND tgt.is_current = true
 WHERE src.tier != tgt.tier
@@ -451,7 +451,7 @@ The final MERGE operates on this staging view with three clauses:
 
 ```sql
 MERGE INTO catalog.default.customers_scd2 AS target
-USING staged_source AS source
+USING _iceberg_scd2_customers_scd2_staged AS source
 ON target.customer_id = source._mk_customer_id
    AND target.is_current = true
 

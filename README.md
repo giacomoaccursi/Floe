@@ -5,7 +5,7 @@
 [![Scala](https://img.shields.io/badge/Scala-2.12-red.svg)](https://www.scala-lang.org/)
 [![Spark](https://img.shields.io/badge/Spark-3.5-orange.svg)](https://spark.apache.org/)
 [![Iceberg](https://img.shields.io/badge/Iceberg-1.10-blue.svg)](https://iceberg.apache.org/)
-[![Docs](https://img.shields.io/badge/docs-online-green.svg)](https://giacomoaccursi.github.io/floe/)
+[![Docs](https://img.shields.io/badge/docs-online-green.svg)](https://giacomoaccursi.github.io/Floe/)
 
 Declarative ETL framework — built on Spark and Iceberg.
 
@@ -114,17 +114,17 @@ Works locally, on Spark clusters, and on managed platforms:
 - **Amazon EMR** — standard spark-submit
 - **Databricks** — use dbutils widgets for parameters
 
-See the [Cloud Deployment Guide](https://giacomoaccursi.github.io/floe/guides/cloud-deployment/) for platform-specific examples.
+See the [Cloud Deployment Guide](https://giacomoaccursi.github.io/Floe/guides/cloud-deployment/) for platform-specific examples.
 
 ## Documentation
 
-Full documentation at **[giacomoaccursi.github.io/floe](https://giacomoaccursi.github.io/floe/)**
+Full documentation at **[giacomoaccursi.github.io/Floe](https://giacomoaccursi.github.io/Floe/)**
 
-- [Quickstart](https://giacomoaccursi.github.io/floe/getting-started/quickstart/) — first pipeline in 5 minutes
-- [Configuration Reference](https://giacomoaccursi.github.io/floe/configuration/overview/) — all YAML settings
-- [Validation Engine](https://giacomoaccursi.github.io/floe/guides/validation/) — all rule types
-- [Iceberg Integration](https://giacomoaccursi.github.io/floe/guides/iceberg/) — write modes, snapshots, maintenance
-- [Pipeline Builder API](https://giacomoaccursi.github.io/floe/guides/pipeline-builder/) — programmatic configuration
+- [Quickstart](https://giacomoaccursi.github.io/Floe/getting-started/quickstart/) — first pipeline in 5 minutes
+- [Configuration Reference](https://giacomoaccursi.github.io/Floe/configuration/overview/) — all YAML settings
+- [Validation Engine](https://giacomoaccursi.github.io/Floe/guides/validation/) — all rule types
+- [Iceberg Integration](https://giacomoaccursi.github.io/Floe/guides/iceberg/) — write modes, snapshots, maintenance
+- [Pipeline Builder API](https://giacomoaccursi.github.io/Floe/guides/pipeline-builder/) — programmatic configuration
 
 ## License
 

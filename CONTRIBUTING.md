@@ -22,7 +22,7 @@ All types of contributions are encouraged and valued — whether it's reporting 
 
 Before opening an issue, please:
 
-1. Read the [documentation](https://giacomoaccursi.github.io/floe/)
+1. Read the [documentation](https://giacomoaccursi.github.io/Floe/)
 2. Search existing [issues](https://github.com/giacomoaccursi/floe/issues) for your question
 
 If you still need help, [open an issue](https://github.com/giacomoaccursi/floe/issues/new) with as much context as possible (Spark version, Scala version, config YAML, stack trace).
@@ -32,7 +32,7 @@ If you still need help, [open an issue](https://github.com/giacomoaccursi/floe/i
 ### Before Submitting
 
 - Make sure you are using the latest version
-- Check the [documentation](https://giacomoaccursi.github.io/floe/) to confirm it's a bug and not a configuration issue
+- Check the [documentation](https://giacomoaccursi.github.io/Floe/) to confirm it's a bug and not a configuration issue
 - Search existing [issues](https://github.com/giacomoaccursi/floe/issues?q=label%3Abug) to see if it's already reported
 
 ### How to Submit
@@ -71,7 +71,7 @@ Requires Java 17+ and SBT 1.9+.
 ### Workflow
 
 1. Create a branch from `develop` (`feat/my-feature`, `fix/my-fix`)
-2. Write your code following the [code quality rules](https://giacomoaccursi.github.io/floe/contributing/code-quality/)
+2. Write your code following the [code quality rules](https://giacomoaccursi.github.io/Floe/contributing/code-quality/)
 3. Add tests for new functionality or bug fixes
 4. Run `sbt scalafmtAll` before committing
 5. Run `sbt test` and make sure all tests pass
@@ -95,7 +95,7 @@ A bug fix without a covering test will not be accepted.
 - Minimize Spark actions (`count()`, `collect()`, `save()`)
 - Do not add features, refactoring, or improvements beyond what the PR addresses
 
-See the full [Code Quality Rules](https://giacomoaccursi.github.io/floe/contributing/code-quality/) for details.
+See the full [Code Quality Rules](https://giacomoaccursi.github.io/Floe/contributing/code-quality/) for details.
 
 ## Improving the Documentation
 

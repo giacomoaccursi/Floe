@@ -1,0 +1,2354 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Declarative ETL framework — built on Spark and Iceberg">
+      
+      
+      
+      
+        <link rel="prev" href="../pipeline-builder/">
+      
+      
+        <link rel="next" href="../batch-listeners/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Orphan Detection - Floe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#orphan-detection-post-batch-fk-integrity" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Floe" class="md-header__button md-logo" aria-label="Floe" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Floe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Orphan Detection
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/giacomoaccursi/floe" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    giacomoaccursi/floe
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Floe" class="md-nav__button md-logo" aria-label="Floe" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Floe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/giacomoaccursi/floe" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    giacomoaccursi/floe
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/project-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/global/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Global Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/flows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Flow Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/domains/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Domains
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DAG Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../iceberg/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iceberg Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scd2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SCD2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dag-aggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DAG Aggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipeline-builder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Builder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Orphan Detection
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Orphan Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The problem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The problem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-fk-validation-is-not-enough" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why FK validation is not enough
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-solution-post-batch-orphan-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The solution: post-batch orphan detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The solution: post-batch orphan detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-determine-which-parents-can-generate-orphans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Determine which parents can generate orphans
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-find-removed-keys-via-time-travel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Find removed keys via time travel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-find-orphaned-records-in-children" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Find orphaned records in children
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-apply-the-configured-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Apply the configured action
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-cascade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Cascade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-topological-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Topological order
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-does-orphan-detection-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When does orphan detection run?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="When does orphan detection run?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#guard-1-at-least-one-fk-must-be-actionable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard 1 — At least one FK must be actionable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guard-2-the-parent-flow-must-be-capable-of-removing-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard 2 — The parent flow must be capable of removing records
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Example">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#initial-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initial state
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-a-new-customers-snapshot-arrives-without-c2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch: a new customers snapshot arrives without C2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#orphan-detection-in-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Orphan detection in action
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#final-result-full-delete-cascade-scenario" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Final result (full delete cascade scenario)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#final-result-warn-scenario" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Final result (warn scenario)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations-and-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations and considerations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../batch-listeners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch Listeners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quality-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quality Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom-validators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Validators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cloud-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cloud Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/data-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/execution-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The problem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The problem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-fk-validation-is-not-enough" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why FK validation is not enough
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-solution-post-batch-orphan-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The solution: post-batch orphan detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The solution: post-batch orphan detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-determine-which-parents-can-generate-orphans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Determine which parents can generate orphans
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-find-removed-keys-via-time-travel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Find removed keys via time travel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-find-orphaned-records-in-children" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Find orphaned records in children
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-apply-the-configured-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Apply the configured action
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-cascade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Cascade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-topological-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Topological order
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-does-orphan-detection-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When does orphan detection run?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="When does orphan detection run?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#guard-1-at-least-one-fk-must-be-actionable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard 1 — At least one FK must be actionable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guard-2-the-parent-flow-must-be-capable-of-removing-records" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guard 2 — The parent flow must be capable of removing records
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Example">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#initial-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initial state
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-a-new-customers-snapshot-arrives-without-c2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch: a new customers snapshot arrives without C2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#orphan-detection-in-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Orphan detection in action
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#final-result-full-delete-cascade-scenario" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Final result (full delete cascade scenario)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#final-result-warn-scenario" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Final result (warn scenario)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations-and-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations and considerations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="orphan-detection-post-batch-fk-integrity">Orphan Detection — Post-Batch FK Integrity<a class="headerlink" href="#orphan-detection-post-batch-fk-integrity" title="Permanent link">&para;</a></h1>
+<h2 id="the-problem">The problem<a class="headerlink" href="#the-problem" title="Permanent link">&para;</a></h2>
+<p>An ETL framework managing multiple flows connected by foreign key relationships has a structural problem: when a parent flow removes records, child flows can end up with references to keys that no longer exist.</p>
+<p>This happens in two concrete scenarios:</p>
+<ol>
+<li>
+<p><strong>Full load</strong>: the parent receives a new complete snapshot that replaces all previous data. If the new snapshot is missing records that existed before, every child pointing to those keys becomes orphaned.</p>
+</li>
+<li>
+<p><strong>SCD2 with detectDeletes</strong>: the parent receives a snapshot and records absent from the source get closed (soft-delete: <code>is_current = false</code>, <code>is_active = false</code>). From a logical standpoint those keys are no longer active, but children keep referencing them.</p>
+</li>
+</ol>
+<p>In both cases, intra-batch FK validation does not help: FK validation runs <em>during</em> each flow's execution, comparing incoming data against what's already written. But the orphan problem arises <em>after</em> all flows have executed, because it's the parent that changes its own data and invalidates the children's references.</p>
+<h3 id="why-fk-validation-is-not-enough">Why FK validation is not enough<a class="headerlink" href="#why-fk-validation-is-not-enough" title="Permanent link">&para;</a></h3>
+<p>The framework's FK validation operates at ingestion time: when the child flow is processed, it checks that every FK value in its input has a match in the parent table. If the parent has already run in the same batch, its data is up to date and the check works for the child's <em>new</em> records.</p>
+<p>But child records already present in the table (written in previous batches) are not re-validated. They're already in Iceberg, they don't go through the validation pipeline. If the parent has since lost some keys, those child records remain with dangling FKs.</p>
+<h2 id="the-solution-post-batch-orphan-detection">The solution: post-batch orphan detection<a class="headerlink" href="#the-solution-post-batch-orphan-detection" title="Permanent link">&para;</a></h2>
+<p>Orphan detection runs <strong>after</strong> all batch flows have executed successfully and <strong>before</strong> Iceberg table maintenance. This ordering is critical: maintenance could expire previous snapshots, making the time travel comparison impossible.</p>
+<h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<h4 id="1-determine-which-parents-can-generate-orphans">1. Determine which parents can generate orphans<a class="headerlink" href="#1-determine-which-parents-can-generate-orphans" title="Permanent link">&para;</a></h4>
+<p>Not all load modes can remove records:</p>
+<table>
+<thead>
+<tr>
+<th>Load Mode</th>
+<th>Can remove records?</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Full</strong></td>
+<td>Yes</td>
+<td>Replaces all data with the new snapshot</td>
+</tr>
+<tr>
+<td><strong>SCD2 with detectDeletes</strong></td>
+<td>Yes</td>
+<td>Closes records absent from source (soft-delete)</td>
+</tr>
+<tr>
+<td><strong>SCD2 without detectDeletes</strong></td>
+<td>No</td>
+<td>Records absent from source are preserved as-is</td>
+</tr>
+<tr>
+<td><strong>Delta</strong></td>
+<td>No</td>
+<td>Insert and update only, never delete</td>
+</tr>
+</tbody>
+</table>
+<h4 id="2-find-removed-keys-via-time-travel">2. Find removed keys via time travel<a class="headerlink" href="#2-find-removed-keys-via-time-travel" title="Permanent link">&para;</a></h4>
+<p>Iceberg maintains snapshot history. Each flow, after writing, records the current <code>snapshotId</code> and the <code>parentSnapshotId</code> (the snapshot that existed before this execution).</p>
+<p>To find keys removed by a parent:</p>
+<ol>
+<li>Read PKs from the <strong>previous snapshot</strong> (<code>VERSION AS OF &lt;parentSnapshotId&gt;</code>)</li>
+<li>Read PKs from the <strong>current state</strong> of the table</li>
+<li>Compute the difference: <code>previous_PKs - current_PKs = removed_PKs</code></li>
+</ol>
+<p>For SCD2, the "current state" only considers records where <code>is_current = true</code>, because closed records are logically deleted even though they're still physically present.</p>
+<p>If no previous snapshot exists (first-ever execution of the parent), there's nothing to compare against and the check is skipped.</p>
+<h4 id="3-find-orphaned-records-in-children">3. Find orphaned records in children<a class="headerlink" href="#3-find-orphaned-records-in-children" title="Permanent link">&para;</a></h4>
+<p>With the removed parent keys, the detector looks for child records that reference them. The comparison is on the child's FK columns against the parent's referenced columns. Any matches are orphans.</p>
+<h4 id="4-apply-the-configured-action">4. Apply the configured action<a class="headerlink" href="#4-apply-the-configured-action" title="Permanent link">&para;</a></h4>
+<p>Each FK relationship in the child declares an <code>onOrphan</code> action that determines what to do when orphans are found:</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Behavior</th>
+<th>Propagates cascade?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Warn</strong></td>
+<td>Logs the number of orphans found. Does not modify data</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Delete</strong></td>
+<td>Removes orphaned records from the child table</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><strong>Ignore</strong></td>
+<td>Skips the check entirely for this FK</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h4 id="5-cascade">5. Cascade<a class="headerlink" href="#5-cascade" title="Permanent link">&para;</a></h4>
+<p>When a child flow undergoes a <code>Delete</code>, the deleted records have their own PKs and FK values. If a third flow (grandchild) has a FK towards the child, those records also become orphans.</p>
+<p>The cascade mechanism works as follows:</p>
+<ol>
+<li>After deleting orphaned records from the child, the PK and FK columns of deleted records are saved in a <code>removedKeysByFlow</code> map. Both column sets are preserved so that downstream flows can look up whichever columns they reference.</li>
+<li>When processing the grandchild, before performing time travel, the detector checks if its parent (the child) has entries in the cascade map.</li>
+<li>If the cascade map contains all the columns referenced by the grandchild's FK, those keys are used as "removed keys" instead of time travel. If the referenced columns are not present in the map (column mismatch), the cascade is skipped for that FK and the grandchild is not affected.</li>
+<li>When a child has multiple FKs and more than one triggers a <code>Delete</code>, the cascade map accumulates keys from each delete via union, so downstream flows see the combined set of removed keys.</li>
+</ol>
+<p>Cascade propagates only with <code>Delete</code>. With <code>Warn</code> the detector signals the issue but does not modify data, so the chain stops: there's no point propagating an alarm without having actually removed anything.</p>
+<h4 id="6-topological-order">6. Topological order<a class="headerlink" href="#6-topological-order" title="Permanent link">&para;</a></h4>
+<p>Flows are processed in topological order (the same order used for batch execution). This guarantees that:</p>
+<ul>
+<li>A parent is always analyzed before its children</li>
+<li>Cascade flows in the correct direction (parent → child → grandchild)</li>
+<li>No race conditions occur between flows at the same level</li>
+</ul>
+<h2 id="when-does-orphan-detection-run">When does orphan detection run?<a class="headerlink" href="#when-does-orphan-detection-run" title="Permanent link">&para;</a></h2>
+<p>Orphan detection is <strong>not</strong> executed on every batch. Two guard conditions must both be satisfied:</p>
+<h3 id="guard-1-at-least-one-fk-must-be-actionable">Guard 1 — At least one FK must be actionable<a class="headerlink" href="#guard-1-at-least-one-fk-must-be-actionable" title="Permanent link">&para;</a></h3>
+<p>If every FK across all flows has <code>onOrphan: ignore</code>, there is nothing to do. The orchestrator checks this before instantiating the detector and returns immediately if no actionable FK exists.</p>
+<p>In practice: as long as at least one FK is configured with <code>onOrphan: warn</code> or <code>onOrphan: delete</code>, this guard passes.</p>
+<h3 id="guard-2-the-parent-flow-must-be-capable-of-removing-records">Guard 2 — The parent flow must be capable of removing records<a class="headerlink" href="#guard-2-the-parent-flow-must-be-capable-of-removing-records" title="Permanent link">&para;</a></h3>
+<p>At the level of each individual parent flow, the detector only processes parents whose load mode can actually remove records:</p>
+<table>
+<thead>
+<tr>
+<th>Load Mode</th>
+<th>Analyzed as parent?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Full</strong></td>
+<td>Yes — replaces data, can remove keys</td>
+</tr>
+<tr>
+<td><strong>SCD2 with <code>detectDeletes: true</code></strong></td>
+<td>Yes — soft-deletes absent records</td>
+</tr>
+<tr>
+<td><strong>SCD2 with <code>detectDeletes: false</code></strong></td>
+<td>No — absent records are preserved</td>
+</tr>
+<tr>
+<td><strong>Delta</strong></td>
+<td>No — insert/update only, never deletes</td>
+</tr>
+</tbody>
+</table>
+<p>If the parent was processed in the current batch but its load mode cannot remove records, the detector skips it without performing time travel.</p>
+<h3 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>at least one FK with onOrphan != ignore
+    AND parent load mode in {Full, SCD2 with detectDeletes}
+        → run orphan detection
+</code></pre></div>
+<p>Only when both conditions are met does the detector actually read Iceberg snapshots and look for orphaned records.</p>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<p>In the child flow's YAML configuration, each FK declares its own <code>onOrphan</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">validation</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">primaryKey</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">foreignKeys</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">references</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customers</span>
+<span class="w">        </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">onOrphan</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span><span class="w">      </span><span class="c1"># warn | delete | ignore</span>
+</code></pre></div>
+<p>The default is <code>warn</code>: report the problem without touching the data.</p>
+<h2 id="output">Output<a class="headerlink" href="#output" title="Permanent link">&para;</a></h2>
+<p>Each detection produces an <code>OrphanReport</code> included in the batch metadata:</p>
+<ul>
+<li><strong>flowName</strong>: the child flow containing the orphans</li>
+<li><strong>fkName</strong>: the FK involved</li>
+<li><strong>parentFlowName</strong>: the parent flow that removed the keys</li>
+<li><strong>orphanCount</strong>: number of orphaned records found</li>
+<li><strong>removedParentKeyCount</strong>: number of keys removed by the parent</li>
+<li><strong>actionTaken</strong>: action taken (<code>warn</code> or <code>delete</code>)</li>
+<li><strong>deletedChildKeyCount</strong>: records actually deleted (only for <code>delete</code>)</li>
+<li><strong>cascadeSource</strong>: if the orphans were caused by a cascade delete (rather than time travel), this field contains the name of the flow whose delete triggered the cascade. Absent when the orphans were detected via time travel directly.</li>
+</ul>
+<h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h2>
+<p>Consider a data warehouse with three tables:</p>
+<div class="highlight"><pre><span></span><code>customers (Full load)
+    |
+    v
+orders (Delta) -- FK: orders.customer_id -&gt; customers.customer_id
+    |
+    v
+order_items (Delta) -- FK: order_items.order_id -&gt; orders.order_id
+</code></pre></div>
+<h3 id="initial-state">Initial state<a class="headerlink" href="#initial-state" title="Permanent link">&para;</a></h3>
+<p><strong>customers</strong></p>
+<table>
+<thead>
+<tr>
+<th>customer_id</th>
+<th>name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C1</td>
+<td>Alice</td>
+</tr>
+<tr>
+<td>C2</td>
+<td>Bob</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>Charlie</td>
+</tr>
+</tbody>
+</table>
+<p><strong>orders</strong></p>
+<table>
+<thead>
+<tr>
+<th>order_id</th>
+<th>customer_id</th>
+<th>total</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>O1</td>
+<td>C1</td>
+<td>100</td>
+</tr>
+<tr>
+<td>O2</td>
+<td>C2</td>
+<td>200</td>
+</tr>
+<tr>
+<td>O3</td>
+<td>C2</td>
+<td>150</td>
+</tr>
+</tbody>
+</table>
+<p><strong>order_items</strong></p>
+<table>
+<thead>
+<tr>
+<th>item_id</th>
+<th>order_id</th>
+<th>product</th>
+<th>qty</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>I1</td>
+<td>O1</td>
+<td>Widget</td>
+<td>2</td>
+</tr>
+<tr>
+<td>I2</td>
+<td>O2</td>
+<td>Gadget</td>
+<td>1</td>
+</tr>
+<tr>
+<td>I3</td>
+<td>O3</td>
+<td>Widget</td>
+<td>5</td>
+</tr>
+</tbody>
+</table>
+<h3 id="batch-a-new-customers-snapshot-arrives-without-c2">Batch: a new customers snapshot arrives without C2<a class="headerlink" href="#batch-a-new-customers-snapshot-arrives-without-c2" title="Permanent link">&para;</a></h3>
+<p>The source system sends a Full load of <code>customers</code> containing only C1 and C3. Bob (C2) has been removed.</p>
+<p>After flow execution:</p>
+<p><strong>customers</strong> (updated): C1 (Alice), C3 (Charlie)</p>
+<p><strong>orders</strong> (unchanged — Delta, no new data): O1→C1, O2→<strong>C2</strong>, O3→<strong>C2</strong></p>
+<p>Orders O2 and O3 are now orphans: they reference C2 which no longer exists.</p>
+<h3 id="orphan-detection-in-action">Orphan detection in action<a class="headerlink" href="#orphan-detection-in-action" title="Permanent link">&para;</a></h3>
+<p>The detector processes flows in topological order: <code>customers → orders → order_items</code>.</p>
+<p><strong>Step 1</strong>: <code>customers</code> is a parent with no outbound FKs. No action.</p>
+<p><strong>Step 2</strong>: <code>orders</code> has FK <code>fk_customer</code> towards <code>customers</code>.</p>
+<ul>
+<li>Time travel on <code>customers</code>: previous snapshot had <code>{C1, C2, C3}</code>, current state has <code>{C1, C3}</code>.</li>
+<li>Removed keys: <code>{C2}</code>.</li>
+<li>Orphaned records in <code>orders</code>: O2, O3 (both have <code>customer_id = C2</code>).</li>
+</ul>
+<p>If <code>onOrphan = warn</code>: logs "orders.fk_customer has 2 orphaned records (1 parent key removed from customers)". Done, no data modification.</p>
+<p>If <code>onOrphan = delete</code>:</p>
+<ol>
+<li>Deletes O2 and O3 from <code>orders</code>.</li>
+<li>Saves the deleted PKs <code>{O2, O3}</code> in the cascade map for <code>orders</code>.</li>
+</ol>
+<p><strong>Step 3</strong> (only if step 2 was <code>delete</code>): <code>order_items</code> has FK <code>fk_order</code> towards <code>orders</code>.</p>
+<ul>
+<li>The detector finds <code>orders</code> in the cascade map with keys <code>{O2, O3}</code>.</li>
+<li>Searches <code>order_items</code> for records with <code>order_id IN (O2, O3)</code>: finds I2 and I3.</li>
+</ul>
+<p>If <code>onOrphan = delete</code>: deletes I2 and I3 from <code>order_items</code>.
+If <code>onOrphan = warn</code>: logs the warning, does not delete.</p>
+<h3 id="final-result-full-delete-cascade-scenario">Final result (full delete cascade scenario)<a class="headerlink" href="#final-result-full-delete-cascade-scenario" title="Permanent link">&para;</a></h3>
+<p><strong>customers</strong>: C1, C3 · <strong>orders</strong>: O1 · <strong>order_items</strong>: I1</p>
+<p>All orphaned data has been removed through cascade, maintaining referential integrity.</p>
+<h3 id="final-result-warn-scenario">Final result (warn scenario)<a class="headerlink" href="#final-result-warn-scenario" title="Permanent link">&para;</a></h3>
+<p><strong>customers</strong>: C1, C3 · <strong>orders</strong>: O1, O2, O3 (O2 and O3 reported as orphans) · <strong>order_items</strong>: I1, I2, I3 (not checked because warn does not propagate)</p>
+<p>Orphaned data remains in the tables but the team receives notification in the batch metadata and can decide how to intervene.</p>
+<h2 id="limitations-and-considerations">Limitations and considerations<a class="headerlink" href="#limitations-and-considerations" title="Permanent link">&para;</a></h2>
+<ul>
+<li>
+<p><strong>Time travel and retention</strong>: if Iceberg maintenance has already expired the previous snapshot, time travel fails and the check is silently skipped (with a warning in the log). This is why orphan detection runs before maintenance.</p>
+</li>
+<li>
+<p><strong>First execution</strong>: on the very first batch there is no previous snapshot. The check is skipped because there's no baseline to compare against.</p>
+</li>
+<li>
+<p><strong>Performance</strong>: time travel and left_anti join on PKs are lightweight operations as long as parent tables have a reasonable number of distinct keys. The detector projects only FK and PK columns from the child table (not <code>SELECT *</code>), keeping the scan narrow even on wide tables.</p>
+</li>
+<li>
+<p><strong>Atomicity</strong>: each DELETE on an Iceberg table is atomic. If the process fails mid-cascade, tables already cleaned stay clean and tables not yet processed remain untouched. On the next batch the detector retries.</p>
+</li>
+<li>
+<p><strong>Warn as default</strong>: the default is <code>warn</code> intentionally. Automatic deletion is a destructive operation that requires a conscious choice. In a production environment it's preferable to signal and let the team decide, rather than silently deleting data.</p>
+</li>
+</ul>
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../configuration/flows/#foreign-key-fields">Flow Configuration — foreignKeys</a> — FK and onOrphan configuration</li>
+<li><a href="../validation/#foreign-key-integrity">Validation Engine — Foreign key integrity</a> — intra-batch FK validation</li>
+<li><a href="../iceberg/#post-batch-lifecycle">Iceberg Integration — Post-batch lifecycle</a> — where orphan detection fits</li>
+<li><a href="../scd2/">SCD2 Guide</a> — SCD2 with detectDeletes and orphan implications</li>
+<li><a href="../../architecture/execution-model/">Architecture: Execution Model</a> — topological ordering</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

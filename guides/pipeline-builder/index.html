@@ -1,0 +1,2787 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Declarative ETL framework — built on Spark and Iceberg">
+      
+      
+      
+      
+        <link rel="prev" href="../dag-aggregation/">
+      
+      
+        <link rel="next" href="../orphan-detection/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Pipeline Builder - Floe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#pipeline-builder-transformationcontext" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Floe" class="md-header__button md-logo" aria-label="Floe" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Floe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Pipeline Builder
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/giacomoaccursi/floe" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    giacomoaccursi/floe
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Floe" class="md-nav__button md-logo" aria-label="Floe" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Floe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/giacomoaccursi/floe" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    giacomoaccursi/floe
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/project-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/global/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Global Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/flows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Flow Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/domains/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Domains
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DAG Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../iceberg/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iceberg Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scd2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SCD2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dag-aggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DAG Aggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Builder
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Builder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ingestionpipelinebuilder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IngestionPipeline.builder()
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="IngestionPipeline.builder()">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#builder-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Builder methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#execute-vs-executeorthrow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        execute() vs executeOrThrow()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-loading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration loading
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flow-execution-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flow execution order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ingestionresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IngestionResult
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="IngestionResult">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flowresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FlowResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transformations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transformations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Transformations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pre-validation-transformations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-validation transformations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-validation-transformations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-validation transformations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#registering-transformations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering transformations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transformationcontext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TransformationContext
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TransformationContext">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#withdatanewdata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        withData(newData)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getflowflowname" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        getFlow(flowName)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#derived-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Derived tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Derived tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#registering-derived-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering derived tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ctxtablename" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ctx.table(name)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#execution-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#derivedtableresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivedTableResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-derived-tables-in-the-dag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using derived tables in the DAG
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-catalog-providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom catalog providers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Custom catalog providers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#registering-a-custom-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering a custom provider
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../orphan-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Orphan Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../batch-listeners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch Listeners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quality-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quality Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom-validators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Validators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cloud-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cloud Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/data-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/execution-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ingestionpipelinebuilder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IngestionPipeline.builder()
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="IngestionPipeline.builder()">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#builder-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Builder methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#execute-vs-executeorthrow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        execute() vs executeOrThrow()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-loading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration loading
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flow-execution-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flow execution order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ingestionresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IngestionResult
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="IngestionResult">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#flowresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FlowResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transformations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transformations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Transformations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pre-validation-transformations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-validation transformations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-validation-transformations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-validation transformations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#registering-transformations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering transformations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transformationcontext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TransformationContext
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TransformationContext">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#available-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Available fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#withdatanewdata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        withData(newData)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#getflowflowname" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        getFlow(flowName)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#derived-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Derived tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Derived tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#registering-derived-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering derived tables
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ctxtablename" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ctx.table(name)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#execution-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#derivedtableresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DerivedTableResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-derived-tables-in-the-dag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using derived tables in the DAG
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-catalog-providers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom catalog providers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Custom catalog providers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#registering-a-custom-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering a custom provider
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="pipeline-builder-transformationcontext">Pipeline Builder &amp; TransformationContext<a class="headerlink" href="#pipeline-builder-transformationcontext" title="Permanent link">&para;</a></h1>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p><code>IngestionPipeline</code> is the public entry point of the framework. It provides a fluent builder API for configuring and executing ETL pipelines. The builder loads configuration (from YAML files or programmatic objects), registers transformations, configures catalog providers, and produces an executable pipeline.</p>
+<p><code>TransformationContext</code> is the immutable context passed to every transformation function. It provides access to the current flow's data, previously validated flows, the batch ID, and the SparkSession.</p>
+<h2 id="ingestionpipelinebuilder">IngestionPipeline.builder()<a class="headerlink" href="#ingestionpipelinebuilder" title="Permanent link">&para;</a></h2>
+<p>Create a pipeline using the builder pattern:</p>
+<div class="highlight"><pre><span></span><code><span class="k">implicit</span><span class="w"> </span><span class="kd">val</span><span class="w"> </span><span class="n">spark</span><span class="p">:</span><span class="w"> </span><span class="nc">SparkSession</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">SparkSession</span><span class="p">.</span><span class="n">builder</span><span class="p">()</span>
+<span class="w">  </span><span class="p">.</span><span class="n">appName</span><span class="p">(</span><span class="s">&quot;My ETL&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">master</span><span class="p">(</span><span class="s">&quot;local[*]&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">config</span><span class="p">(</span><span class="s">&quot;spark.sql.extensions&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s">&quot;org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">getOrCreate</span><span class="p">()</span>
+
+<span class="kd">val</span><span class="w"> </span><span class="n">pipeline</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">IngestionPipeline</span><span class="p">.</span><span class="n">builder</span><span class="p">()</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withConfigDirectory</span><span class="p">(</span><span class="s">&quot;config&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withPreValidationTransformation</span><span class="p">(</span><span class="s">&quot;orders&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">enrichOrders</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withPostValidationTransformation</span><span class="p">(</span><span class="s">&quot;orders&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">computeDerivedFields</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">build</span><span class="p">()</span>
+
+<span class="kd">val</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pipeline</span><span class="p">.</span><span class="n">execute</span><span class="p">()</span>
+</code></pre></div>
+<h3 id="builder-methods">Builder methods<a class="headerlink" href="#builder-methods" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>withConfigDirectory(path)</code></td>
+<td>Loads <code>global.yaml</code>, <code>flows/*.yaml</code>, and optionally <code>domains.yaml</code> from the directory. Supports local paths and remote filesystems (S3, HDFS, GCS, Azure).</td>
+</tr>
+<tr>
+<td><code>withGlobalConfig(config)</code></td>
+<td>Sets <code>GlobalConfig</code> programmatically (alternative to directory)</td>
+</tr>
+<tr>
+<td><code>withFlowConfigs(configs)</code></td>
+<td>Sets flow configs programmatically</td>
+</tr>
+<tr>
+<td><code>withDomainsConfig(config)</code></td>
+<td>Sets <code>DomainsConfig</code> programmatically</td>
+</tr>
+<tr>
+<td><code>withFlowTransformation(flow, pre, post)</code></td>
+<td>Registers pre and/or post-validation transformations for a flow</td>
+</tr>
+<tr>
+<td><code>withPreValidationTransformation(flow, fn)</code></td>
+<td>Shorthand for pre-validation only</td>
+</tr>
+<tr>
+<td><code>withPostValidationTransformation(flow, fn)</code></td>
+<td>Shorthand for post-validation only</td>
+</tr>
+<tr>
+<td><code>withCustomValidator(name, factory)</code></td>
+<td>Registers a custom validator by name. Use the same name in the flow YAML <code>class</code> field.</td>
+</tr>
+<tr>
+<td><code>withCatalogProvider(type, provider)</code></td>
+<td>Registers a custom Iceberg catalog provider</td>
+</tr>
+<tr>
+<td><code>withDerivedTable(name, fn)</code></td>
+<td>Registers a derived table computed after all flows are written to Iceberg</td>
+</tr>
+<tr>
+<td><code>withDataReader(type, factory)</code></td>
+<td>Registers a custom data reader for a source type. See <a href="../data-sources/#custom-readers">Data Sources — Custom readers</a>.</td>
+</tr>
+<tr>
+<td><code>withBatchListener(listener)</code></td>
+<td>Registers a listener notified on batch completion or failure. See <a href="../batch-listeners/">Batch Listeners</a>.</td>
+</tr>
+<tr>
+<td><code>withVariables(variables)</code></td>
+<td>Sets variables for YAML substitution (priority over env vars). See <a href="../../configuration/overview/#variable-substitution">Configuration Overview</a></td>
+</tr>
+<tr>
+<td><code>build()</code></td>
+<td>Builds the pipeline (returns <code>IngestionPipeline</code>)</td>
+</tr>
+<tr>
+<td><code>validate()</code></td>
+<td>Validates configuration without executing. Returns <code>Seq[String]</code> of issues (empty = valid).</td>
+</tr>
+</tbody>
+</table>
+<p>The builder does not have an <code>execute()</code> method — call <code>build()</code> first, then <code>execute()</code> or <code>executeOrThrow()</code> on the returned pipeline.</p>
+<h3 id="execute-vs-executeorthrow">execute() vs executeOrThrow()<a class="headerlink" href="#execute-vs-executeorthrow" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>On success</th>
+<th>On failure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>execute()</code></td>
+<td>Returns <code>IngestionResult</code> with <code>success = true</code></td>
+<td>Returns <code>IngestionResult</code> with <code>success = false</code></td>
+</tr>
+<tr>
+<td><code>executeOrThrow()</code></td>
+<td>Returns <code>IngestionResult</code> with <code>success = true</code></td>
+<td>Throws <code>BatchFailedException</code></td>
+</tr>
+</tbody>
+</table>
+<p>Use <code>execute()</code> when you want to inspect the result programmatically. Use <code>executeOrThrow()</code> on managed platforms (AWS Glue, EMR, Databricks) where the runtime detects failure via uncaught exceptions:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// AWS Glue — job fails automatically if batch fails</span>
+<span class="nc">IngestionPipeline</span><span class="p">.</span><span class="n">builder</span><span class="p">()</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withConfigDirectory</span><span class="p">(</span><span class="s">&quot;config&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">build</span><span class="p">()</span>
+<span class="w">  </span><span class="p">.</span><span class="n">executeOrThrow</span><span class="p">()</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1">// Custom orchestration — inspect result</span>
+<span class="kd">val</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">IngestionPipeline</span><span class="p">.</span><span class="n">builder</span><span class="p">()</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withConfigDirectory</span><span class="p">(</span><span class="s">&quot;config&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">build</span><span class="p">()</span>
+<span class="w">  </span><span class="p">.</span><span class="n">execute</span><span class="p">()</span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">result</span><span class="p">.</span><span class="n">success</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// handle failure</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="configuration-validation">Configuration validation<a class="headerlink" href="#configuration-validation" title="Permanent link">&para;</a></h3>
+<p><code>validate()</code> checks your YAML configuration without starting Spark or reading data:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">val</span><span class="w"> </span><span class="n">issues</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">IngestionPipeline</span><span class="p">.</span><span class="n">builder</span><span class="p">()</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withConfigDirectory</span><span class="p">(</span><span class="s">&quot;config&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">validate</span><span class="p">()</span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">issues</span><span class="p">.</span><span class="n">nonEmpty</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">issues</span><span class="p">.</span><span class="n">foreach</span><span class="p">(</span><span class="n">println</span><span class="p">)</span>
+<span class="w">  </span><span class="n">sys</span><span class="p">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>It verifies:
+- YAML files are parseable and contain required fields
+- FK references point to existing flows
+- <code>dependsOn</code> references point to existing flows
+- No circular dependencies between flows</p>
+<p>Use it in CI pipelines to catch config errors before deployment.</p>
+<h3 id="configuration-loading">Configuration loading<a class="headerlink" href="#configuration-loading" title="Permanent link">&para;</a></h3>
+<p>The builder supports three configuration modes:</p>
+<ol>
+<li><strong>Directory-based</strong> — <code>withConfigDirectory("config")</code> loads everything from the directory:</li>
+<li><code>config/global.yaml</code> → <code>GlobalConfig</code></li>
+<li><code>config/domains.yaml</code> → <code>DomainsConfig</code></li>
+<li>
+<p><code>config/flows/*.yaml</code> → <code>Seq[FlowConfig]</code></p>
+</li>
+<li>
+<p><strong>Fully programmatic</strong> — provide <code>withGlobalConfig()</code> + <code>withFlowConfigs()</code> directly. No files are read.</p>
+</li>
+<li>
+<p><strong>Mixed</strong> — provide some configs programmatically and load the rest from the directory. For example, <code>withGlobalConfig(myConfig)</code> + <code>withConfigDirectory("config")</code> loads flows and domains from the directory but uses the provided global config.</p>
+</li>
+</ol>
+<p>If neither a config directory nor the required configs are provided, <code>build()</code> throws <code>MissingConfigFieldException</code>.</p>
+<h2 id="flow-execution-order">Flow execution order<a class="headerlink" href="#flow-execution-order" title="Permanent link">&para;</a></h2>
+<p>Flows are not executed in config file order. The framework builds an execution plan based on dependencies:</p>
+<ol>
+<li>FK references and explicit <code>dependsOn</code> declarations are analyzed to build a dependency graph</li>
+<li>Flows are topologically sorted so that dependencies execute before dependents</li>
+<li>Independent flows (no dependency relationship) are grouped for potential parallel execution</li>
+</ol>
+<p>If <code>performance.parallelFlows</code> is <code>true</code> in <code>global.yaml</code>, independent flows within the same group run in parallel using a bounded thread pool.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">performance</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">parallelFlows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>This means if flow <code>orders</code> has a FK referencing <code>customers</code> (or declares <code>dependsOn: [customers]</code>), <code>customers</code> is guaranteed to execute first — regardless of the order in the YAML files or the <code>withFlowConfigs()</code> list.</p>
+<h2 id="ingestionresult">IngestionResult<a class="headerlink" href="#ingestionresult" title="Permanent link">&para;</a></h2>
+<p><code>execute()</code> returns an <code>IngestionResult</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="k">case</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">IngestionResult</span><span class="p">(</span>
+<span class="w">  </span><span class="n">batchId</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="p">,</span>
+<span class="w">  </span><span class="n">flowResults</span><span class="p">:</span><span class="w"> </span><span class="nc">Seq</span><span class="p">[</span><span class="nc">FlowResult</span><span class="p">],</span>
+<span class="w">  </span><span class="n">success</span><span class="p">:</span><span class="w"> </span><span class="nc">Boolean</span><span class="p">,</span>
+<span class="w">  </span><span class="n">error</span><span class="p">:</span><span class="w"> </span><span class="nc">Option</span><span class="p">[</span><span class="nc">String</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">None</span><span class="p">,</span>
+<span class="w">  </span><span class="n">derivedTableResults</span><span class="p">:</span><span class="w"> </span><span class="nc">Seq</span><span class="p">[</span><span class="nc">DerivedTableResult</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Seq</span><span class="p">.</span><span class="n">empty</span>
+<span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>batchId</code></td>
+<td><code>String</code></td>
+<td>Batch identifier (formatted according to <code>processing.batchIdFormat</code>)</td>
+</tr>
+<tr>
+<td><code>flowResults</code></td>
+<td><code>Seq[FlowResult]</code></td>
+<td>Results for each executed flow</td>
+</tr>
+<tr>
+<td><code>success</code></td>
+<td><code>Boolean</code></td>
+<td><code>true</code> if all flows completed without fatal errors</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td><code>Option[String]</code></td>
+<td>Error message if the batch failed</td>
+</tr>
+<tr>
+<td><code>derivedTableResults</code></td>
+<td><code>Seq[DerivedTableResult]</code></td>
+<td>Results for each derived table (empty if none registered)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="flowresult">FlowResult<a class="headerlink" href="#flowresult" title="Permanent link">&para;</a></h3>
+<p>Each flow produces a <code>FlowResult</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>flowName</code></td>
+<td><code>String</code></td>
+<td>Name of the flow</td>
+</tr>
+<tr>
+<td><code>batchId</code></td>
+<td><code>String</code></td>
+<td>Batch identifier</td>
+</tr>
+<tr>
+<td><code>success</code></td>
+<td><code>Boolean</code></td>
+<td>Whether the flow completed successfully</td>
+</tr>
+<tr>
+<td><code>inputRecords</code></td>
+<td><code>Long</code></td>
+<td>Total records read from source (after pre-validation transform)</td>
+</tr>
+<tr>
+<td><code>validRecords</code></td>
+<td><code>Long</code></td>
+<td>Records that passed validation</td>
+</tr>
+<tr>
+<td><code>rejectedRecords</code></td>
+<td><code>Long</code></td>
+<td>Records that failed validation</td>
+</tr>
+<tr>
+<td><code>rejectionRate</code></td>
+<td><code>Double</code></td>
+<td><code>rejectedRecords / inputRecords</code></td>
+</tr>
+<tr>
+<td><code>mergedRecords</code></td>
+<td><code>Long</code></td>
+<td>Records after merge (equals inputRecords in current implementation)</td>
+</tr>
+<tr>
+<td><code>executionTimeMs</code></td>
+<td><code>Long</code></td>
+<td>Flow execution time in milliseconds</td>
+</tr>
+<tr>
+<td><code>rejectionReasons</code></td>
+<td><code>Map[String, Long]</code></td>
+<td>Count of rejections per validation step</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td><code>Option[String]</code></td>
+<td>Error message if the flow failed</td>
+</tr>
+<tr>
+<td><code>icebergMetadata</code></td>
+<td><code>Option[IcebergFlowMetadata]</code></td>
+<td>Iceberg snapshot metadata (see <a href="../iceberg/">Iceberg Integration</a>)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="transformations">Transformations<a class="headerlink" href="#transformations" title="Permanent link">&para;</a></h2>
+<p>Transformations are functions of type <code>TransformationContext =&gt; TransformationContext</code>. They run at two points in the pipeline:</p>
+<div class="highlight"><pre><span></span><code>Read → PreValidation Transform → Validate → PostValidation Transform → Write
+</code></pre></div>
+<h3 id="pre-validation-transformations">Pre-validation transformations<a class="headerlink" href="#pre-validation-transformations" title="Permanent link">&para;</a></h3>
+<p>Run before validation. The <code>TransformationContext</code> has <code>validatedFlows = Map.empty</code> at this stage — no flows have been validated yet, so <code>ctx.getFlow()</code> always returns <code>None</code>.</p>
+<p>Use cases:</p>
+<ul>
+<li>Data enrichment (add computed columns)</li>
+<li>Data cleansing (trim whitespace, normalize formats)</li>
+<li>Filtering out known-bad records before validation</li>
+<li>Joining with reference data from external sources</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="kd">val</span><span class="w"> </span><span class="n">enrichOrders</span><span class="p">:</span><span class="w"> </span><span class="nc">FlowTransformation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ctx</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">  </span><span class="n">ctx</span><span class="p">.</span><span class="n">withData</span><span class="p">(</span>
+<span class="w">    </span><span class="n">ctx</span><span class="p">.</span><span class="n">currentData</span>
+<span class="w">      </span><span class="p">.</span><span class="n">withColumn</span><span class="p">(</span><span class="s">&quot;order_year&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">year</span><span class="p">(</span><span class="n">col</span><span class="p">(</span><span class="s">&quot;order_date&quot;</span><span class="p">)))</span>
+<span class="w">      </span><span class="p">.</span><span class="n">withColumn</span><span class="p">(</span><span class="s">&quot;email_lower&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">lower</span><span class="p">(</span><span class="n">col</span><span class="p">(</span><span class="s">&quot;email&quot;</span><span class="p">)))</span>
+<span class="w">  </span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="post-validation-transformations">Post-validation transformations<a class="headerlink" href="#post-validation-transformations" title="Permanent link">&para;</a></h3>
+<p>Run after validation, on the valid records only. The <code>TransformationContext</code> now has <code>validatedFlows</code> populated with all flows that have been validated so far in this batch.</p>
+<p>Use cases:</p>
+<ul>
+<li>Computing derived fields from validated data</li>
+<li>Cross-flow lookups using <code>ctx.getFlow()</code></li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="kd">val</span><span class="w"> </span><span class="n">computeDerivedFields</span><span class="p">:</span><span class="w"> </span><span class="nc">FlowTransformation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ctx</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">customers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ctx</span><span class="p">.</span><span class="n">getFlow</span><span class="p">(</span><span class="s">&quot;customers&quot;</span><span class="p">).</span><span class="n">get</span>
+
+<span class="w">  </span><span class="n">ctx</span><span class="p">.</span><span class="n">withData</span><span class="p">(</span>
+<span class="w">    </span><span class="n">ctx</span><span class="p">.</span><span class="n">currentData</span>
+<span class="w">      </span><span class="p">.</span><span class="n">join</span><span class="p">(</span><span class="n">customers</span><span class="p">.</span><span class="n">select</span><span class="p">(</span><span class="s">&quot;customer_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;segment&quot;</span><span class="p">),</span>
+<span class="w">        </span><span class="nc">Seq</span><span class="p">(</span><span class="s">&quot;customer_id&quot;</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;left&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="n">withColumn</span><span class="p">(</span><span class="s">&quot;priority&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="n">when</span><span class="p">(</span><span class="n">col</span><span class="p">(</span><span class="s">&quot;segment&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s">&quot;premium&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">lit</span><span class="p">(</span><span class="s">&quot;high&quot;</span><span class="p">))</span>
+<span class="w">          </span><span class="p">.</span><span class="n">otherwise</span><span class="p">(</span><span class="n">lit</span><span class="p">(</span><span class="s">&quot;normal&quot;</span><span class="p">)))</span>
+<span class="w">  </span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="registering-transformations">Registering transformations<a class="headerlink" href="#registering-transformations" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nc">IngestionPipeline</span><span class="p">.</span><span class="n">builder</span><span class="p">()</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withConfigDirectory</span><span class="p">(</span><span class="s">&quot;config&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="c1">// Separate methods</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withPreValidationTransformation</span><span class="p">(</span><span class="s">&quot;orders&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">enrichOrders</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withPostValidationTransformation</span><span class="p">(</span><span class="s">&quot;orders&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">computeDerived</span><span class="p">)</span>
+<span class="w">  </span><span class="c1">// Or combined</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withFlowTransformation</span><span class="p">(</span><span class="s">&quot;customers&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="n">preValidation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="n">cleanCustomers</span><span class="p">),</span>
+<span class="w">    </span><span class="n">postValidation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="n">tagCustomers</span><span class="p">))</span>
+<span class="w">  </span><span class="p">.</span><span class="n">build</span><span class="p">()</span>
+</code></pre></div>
+<p>Multiple calls for the same flow merge transformations — a later <code>withPreValidationTransformation</code> does not overwrite a previously registered <code>withPostValidationTransformation</code>.</p>
+<h2 id="transformationcontext">TransformationContext<a class="headerlink" href="#transformationcontext" title="Permanent link">&para;</a></h2>
+<p>The context is immutable. Every method that modifies state returns a new instance.</p>
+<h3 id="available-fields">Available fields<a class="headerlink" href="#available-fields" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>currentFlow</code></td>
+<td><code>String</code></td>
+<td>Name of the flow being processed</td>
+</tr>
+<tr>
+<td><code>currentData</code></td>
+<td><code>DataFrame</code></td>
+<td>The flow's DataFrame at this point in the pipeline</td>
+</tr>
+<tr>
+<td><code>validatedFlows</code></td>
+<td><code>Map[String, DataFrame]</code></td>
+<td>All flows validated so far in this batch</td>
+</tr>
+<tr>
+<td><code>batchId</code></td>
+<td><code>String</code></td>
+<td>Current batch identifier</td>
+</tr>
+<tr>
+<td><code>spark</code></td>
+<td><code>SparkSession</code></td>
+<td>The active SparkSession</td>
+</tr>
+</tbody>
+</table>
+<h3 id="withdatanewdata">withData(newData)<a class="headerlink" href="#withdatanewdata" title="Permanent link">&para;</a></h3>
+<p>Returns a new context with a different DataFrame, preserving all other fields. This is the primary way to modify the flow's data in a transformation:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">val</span><span class="w"> </span><span class="n">transform</span><span class="p">:</span><span class="w"> </span><span class="nc">FlowTransformation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ctx</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">  </span><span class="n">ctx</span><span class="p">.</span><span class="n">withData</span><span class="p">(</span><span class="n">ctx</span><span class="p">.</span><span class="n">currentData</span><span class="p">.</span><span class="n">filter</span><span class="p">(</span><span class="n">col</span><span class="p">(</span><span class="s">&quot;active&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="kc">true</span><span class="p">))</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="getflowflowname">getFlow(flowName)<a class="headerlink" href="#getflowflowname" title="Permanent link">&para;</a></h3>
+<p>Returns the DataFrame of a previously validated flow, or <code>None</code> if the flow has not been processed yet.</p>
+<div class="highlight"><pre><span></span><code><span class="kd">val</span><span class="w"> </span><span class="n">postTransform</span><span class="p">:</span><span class="w"> </span><span class="nc">FlowTransformation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ctx</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">  </span><span class="n">ctx</span><span class="p">.</span><span class="n">getFlow</span><span class="p">(</span><span class="s">&quot;customers&quot;</span><span class="p">)</span><span class="w"> </span><span class="k">match</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="n">customers</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">      </span><span class="n">ctx</span><span class="p">.</span><span class="n">withData</span><span class="p">(</span>
+<span class="w">        </span><span class="n">ctx</span><span class="p">.</span><span class="n">currentData</span><span class="p">.</span><span class="n">join</span><span class="p">(</span>
+<span class="w">          </span><span class="n">customers</span><span class="p">.</span><span class="n">select</span><span class="p">(</span><span class="s">&quot;customer_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;tier&quot;</span><span class="p">),</span>
+<span class="w">          </span><span class="nc">Seq</span><span class="p">(</span><span class="s">&quot;customer_id&quot;</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;left&quot;</span><span class="p">))</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="nc">None</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">      </span><span class="n">ctx</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Flow availability depends on execution order. The framework orders flows by FK dependencies and <code>dependsOn</code> declarations (see <a href="#flow-execution-order">Flow execution order</a>), so if <code>orders</code> has a FK to <code>customers</code> (or declares <code>dependsOn: [customers]</code>), <code>customers</code> is always validated first and available via <code>getFlow("customers")</code>.</p>
+<h2 id="derived-tables">Derived tables<a class="headerlink" href="#derived-tables" title="Permanent link">&para;</a></h2>
+<p>Derived tables are Iceberg tables computed after all flows have been written. They read from the Iceberg catalog (full history, not just the current batch delta) and write the result as a full-load Iceberg table.</p>
+<p>This is the recommended way to produce aggregations, splits, denormalizations, or any other output derived from your ingested data. Derived tables are first-class Iceberg tables — they have snapshots, time travel, schema evolution, and can be referenced by the DAG or queried directly.</p>
+<h3 id="registering-derived-tables">Registering derived tables<a class="headerlink" href="#registering-derived-tables" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nc">IngestionPipeline</span><span class="p">.</span><span class="n">builder</span><span class="p">()</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withConfigDirectory</span><span class="p">(</span><span class="s">&quot;config&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withDerivedTable</span><span class="p">(</span><span class="s">&quot;order_summary&quot;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ctx</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">    </span><span class="n">ctx</span><span class="p">.</span><span class="n">table</span><span class="p">(</span><span class="s">&quot;orders&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="n">groupBy</span><span class="p">(</span><span class="s">&quot;category&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="n">agg</span><span class="p">(</span>
+<span class="w">        </span><span class="n">sum</span><span class="p">(</span><span class="s">&quot;total_amount&quot;</span><span class="p">).</span><span class="n">as</span><span class="p">(</span><span class="s">&quot;total_revenue&quot;</span><span class="p">),</span>
+<span class="w">        </span><span class="n">count</span><span class="p">(</span><span class="s">&quot;*&quot;</span><span class="p">).</span><span class="n">as</span><span class="p">(</span><span class="s">&quot;order_count&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">)</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withDerivedTable</span><span class="p">(</span><span class="s">&quot;orders_domestic&quot;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ctx</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">    </span><span class="n">ctx</span><span class="p">.</span><span class="n">table</span><span class="p">(</span><span class="s">&quot;orders&quot;</span><span class="p">).</span><span class="n">filter</span><span class="p">(</span><span class="n">col</span><span class="p">(</span><span class="s">&quot;country&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s">&quot;IT&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="p">.</span><span class="n">build</span><span class="p">()</span>
+</code></pre></div>
+<p>Each derived table function receives a <code>DerivedTableContext</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>spark</code></td>
+<td><code>SparkSession</code></td>
+<td>The active SparkSession</td>
+</tr>
+<tr>
+<td><code>batchId</code></td>
+<td><code>String</code></td>
+<td>Current batch identifier</td>
+</tr>
+<tr>
+<td><code>catalogName</code></td>
+<td><code>String</code></td>
+<td>Iceberg catalog name (from <code>global.yaml</code>)</td>
+</tr>
+<tr>
+<td><code>namespace</code></td>
+<td><code>String</code></td>
+<td>Iceberg namespace (from <code>global.yaml</code>, defaults to <code>default</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Each derived table must have a unique name. Registering two derived tables with the same name throws <code>IllegalArgumentException</code> at build time.</p>
+<h3 id="ctxtablename">ctx.table(name)<a class="headerlink" href="#ctxtablename" title="Permanent link">&para;</a></h3>
+<p>Reads a table from the Iceberg catalog. Returns the full table content (all historical data), not just the records from the current batch. This is the key difference from transformations, where <code>ctx.currentData</code> contains only the current batch's data.</p>
+<div class="highlight"><pre><span></span><code><span class="n">ctx</span><span class="p">.</span><span class="n">table</span><span class="p">(</span><span class="s">&quot;orders&quot;</span><span class="p">)</span><span class="w">     </span><span class="c1">// reads spark_catalog.default.orders</span>
+<span class="n">ctx</span><span class="p">.</span><span class="n">table</span><span class="p">(</span><span class="s">&quot;customers&quot;</span><span class="p">)</span><span class="w">  </span><span class="c1">// reads spark_catalog.default.customers</span>
+</code></pre></div>
+<p>You can also use <code>ctx.spark</code> for arbitrary Spark operations (reading external data, SQL queries, etc.).</p>
+<div class="admonition note">
+<p class="admonition-title">No validation on derived tables</p>
+<p>Derived tables are not validated by the framework's validation engine. Their input data comes from Iceberg tables that have already been validated during ingestion, so the source data is clean. If your derived table function introduces logic that could produce unexpected results (e.g. NULLs from left joins), handle it in the function itself.</p>
+</div>
+<h3 id="execution-order">Execution order<a class="headerlink" href="#execution-order" title="Permanent link">&para;</a></h3>
+<ol>
+<li>All flows execute (read → validate → transform → write to Iceberg)</li>
+<li>Derived tables execute in registration order</li>
+<li>Each derived table writes to <code>{catalogName}.{namespace}.{tableName}</code> as a full-load overwrite</li>
+<li>Each successful write is tagged with the batch ID (if <code>enableSnapshotTagging</code> is <code>true</code> in <code>global.yaml</code>)</li>
+<li>Iceberg maintenance runs on all successfully written derived tables (same settings as flow tables — see <a href="../../configuration/global/#maintenance">Iceberg maintenance</a>)</li>
+</ol>
+<p>If a derived table fails, the error is logged and the remaining derived tables continue executing. The <code>IngestionResult.derivedTableResults</code> contains the outcome of each derived table.</p>
+<div class="admonition warning">
+<p class="admonition-title">Known limitations</p>
+<ul>
+<li>Derived tables always perform a full overwrite. There is no delta/merge mode — the entire table is recomputed each batch. For most use cases (aggregations, splits, denormalizations) this is correct because the result depends on the full dataset.</li>
+<li>If a derived table reads from another derived table (via <code>ctx.table("other_derived")</code>), registration order matters. Register the dependency first. The framework does not validate or resolve inter-derived-table dependencies automatically.</li>
+</ul>
+</div>
+<h3 id="derivedtableresult">DerivedTableResult<a class="headerlink" href="#derivedtableresult" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tableName</code></td>
+<td><code>String</code></td>
+<td>Name of the derived table</td>
+</tr>
+<tr>
+<td><code>success</code></td>
+<td><code>Boolean</code></td>
+<td>Whether the table was written successfully</td>
+</tr>
+<tr>
+<td><code>recordsWritten</code></td>
+<td><code>Long</code></td>
+<td>Number of records written (0 on failure)</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td><code>Option[String]</code></td>
+<td>Error message on failure</td>
+</tr>
+</tbody>
+</table>
+<h3 id="using-derived-tables-in-the-dag">Using derived tables in the DAG<a class="headerlink" href="#using-derived-tables-in-the-dag" title="Permanent link">&para;</a></h3>
+<p>Once written, derived tables are regular Iceberg tables. Reference them in a DAG YAML like any flow:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">nodes</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">summary_node</span>
+<span class="w">    </span><span class="nt">sourceFlow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_summary</span><span class="w">    </span><span class="c1"># reads from the derived table</span>
+</code></pre></div>
+<h2 id="custom-catalog-providers">Custom catalog providers<a class="headerlink" href="#custom-catalog-providers" title="Permanent link">&para;</a></h2>
+<p>The framework ships with two built-in catalog providers:</p>
+<table>
+<thead>
+<tr>
+<th><code>catalogType</code></th>
+<th>Provider</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hadoop</code></td>
+<td><code>HadoopCatalogProvider</code></td>
+<td>Local/HDFS filesystem catalog. Zero infrastructure.</td>
+</tr>
+<tr>
+<td><code>glue</code></td>
+<td><code>GlueCatalogProvider</code></td>
+<td>AWS Glue Data Catalog. Requires S3 and Glue permissions.</td>
+</tr>
+</tbody>
+</table>
+<p>To use a built-in provider, set <code>catalogType</code> in <code>global.yaml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Hadoop (default)</span>
+<span class="nt">iceberg</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">catalogType</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;hadoop&quot;</span>
+<span class="w">  </span><span class="nt">catalogName</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;spark_catalog&quot;</span>
+<span class="w">  </span><span class="nt">warehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;output/warehouse&quot;</span>
+
+<span class="c1"># Glue</span>
+<span class="nt">iceberg</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">catalogType</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;glue&quot;</span>
+<span class="w">  </span><span class="nt">catalogName</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;spark_catalog&quot;</span>
+<span class="w">  </span><span class="nt">warehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;s3://my-bucket/warehouse&quot;</span>
+<span class="w">  </span><span class="nt">catalogProperties</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">glue.skip-name-validation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+</code></pre></div>
+<p>The <code>catalogProperties</code> map passes arbitrary key-value pairs to the catalog provider. For Glue, these are set as <code>spark.sql.catalog.{catalogName}.{key}</code> properties.</p>
+<h3 id="registering-a-custom-provider">Registering a custom provider<a class="headerlink" href="#registering-a-custom-provider" title="Permanent link">&para;</a></h3>
+<p>For catalogs not built into the framework (Hive, REST, Nessie), implement the <code>CatalogProvider</code> trait and register it on the builder:</p>
+<div class="highlight"><pre><span></span><code><span class="k">import</span><span class="w"> </span><span class="nn">com</span><span class="p">.</span><span class="nn">etl</span><span class="p">.</span><span class="nn">framework</span><span class="p">.</span><span class="nn">iceberg</span><span class="p">.</span><span class="nn">catalog</span><span class="p">.</span><span class="nc">CatalogProvider</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">com</span><span class="p">.</span><span class="nn">etl</span><span class="p">.</span><span class="nn">framework</span><span class="p">.</span><span class="nn">config</span><span class="p">.</span><span class="nc">IcebergConfig</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">org</span><span class="p">.</span><span class="nn">apache</span><span class="p">.</span><span class="nn">spark</span><span class="p">.</span><span class="nn">sql</span><span class="p">.</span><span class="nc">SparkSession</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">NessieCatalogProvider</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nc">CatalogProvider</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">override</span><span class="w"> </span><span class="k">def</span><span class="w"> </span><span class="nf">catalogType</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;nessie&quot;</span>
+
+<span class="w">  </span><span class="k">override</span><span class="w"> </span><span class="k">def</span><span class="w"> </span><span class="nf">configureCatalog</span><span class="p">(</span><span class="n">spark</span><span class="p">:</span><span class="w"> </span><span class="nc">SparkSession</span><span class="p">,</span><span class="w"> </span><span class="n">config</span><span class="p">:</span><span class="w"> </span><span class="nc">IcebergConfig</span><span class="p">):</span><span class="w"> </span><span class="nc">Unit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="n">prefix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">s&quot;spark.sql.catalog.</span><span class="si">${</span><span class="n">config</span><span class="p">.</span><span class="n">catalogName</span><span class="si">}</span><span class="s">&quot;</span>
+<span class="w">    </span><span class="n">spark</span><span class="p">.</span><span class="n">conf</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="n">prefix</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;org.apache.iceberg.spark.SparkCatalog&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="n">spark</span><span class="p">.</span><span class="n">conf</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">s&quot;</span><span class="si">$</span><span class="n">prefix</span><span class="s">.catalog-impl&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="s">&quot;org.apache.iceberg.nessie.NessieCatalog&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="n">spark</span><span class="p">.</span><span class="n">conf</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">s&quot;</span><span class="si">$</span><span class="n">prefix</span><span class="s">.warehouse&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">config</span><span class="p">.</span><span class="n">warehouse</span><span class="p">)</span>
+<span class="w">    </span><span class="n">config</span><span class="p">.</span><span class="n">catalogProperties</span><span class="p">.</span><span class="n">foreach</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">      </span><span class="n">spark</span><span class="p">.</span><span class="n">conf</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">s&quot;</span><span class="si">$</span><span class="n">prefix</span><span class="s">.</span><span class="si">$</span><span class="n">k</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="k">override</span><span class="w"> </span><span class="k">def</span><span class="w"> </span><span class="nf">validateConfig</span><span class="p">(</span><span class="n">config</span><span class="p">:</span><span class="w"> </span><span class="nc">IcebergConfig</span><span class="p">):</span><span class="w"> </span><span class="nc">Either</span><span class="p">[</span><span class="nc">String</span><span class="p">,</span><span class="w"> </span><span class="nc">Unit</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Right</span><span class="p">(())</span>
+<span class="p">}</span>
+
+<span class="nc">IngestionPipeline</span><span class="p">.</span><span class="n">builder</span><span class="p">()</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withConfigDirectory</span><span class="p">(</span><span class="s">&quot;config&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withCatalogProvider</span><span class="p">(</span><span class="s">&quot;nessie&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="nc">NessieCatalogProvider</span><span class="p">())</span>
+<span class="w">  </span><span class="p">.</span><span class="n">build</span><span class="p">()</span>
+</code></pre></div>
+<p>The <code>CatalogProvider</code> trait has three methods:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>catalogType</code></td>
+<td>Identifier string (must match <code>iceberg.catalogType</code> in YAML)</td>
+</tr>
+<tr>
+<td><code>configureCatalog(spark, config)</code></td>
+<td>Configures the SparkSession with catalog-specific properties at runtime</td>
+</tr>
+<tr>
+<td><code>validateConfig(config)</code></td>
+<td>Validates the IcebergConfig; returns <code>Left(error)</code> to abort startup</td>
+</tr>
+</tbody>
+</table>
+<p>Custom providers override built-in ones if the same type key is used. The provider is registered as a factory function (<code>() =&gt; CatalogProvider</code>) to support lazy initialization.</p>
+<h2 id="complete-example">Complete example<a class="headerlink" href="#complete-example" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="k">import</span><span class="w"> </span><span class="nn">com</span><span class="p">.</span><span class="nn">etl</span><span class="p">.</span><span class="nn">framework</span><span class="p">.</span><span class="nn">pipeline</span><span class="p">.</span><span class="nc">IngestionPipeline</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">com</span><span class="p">.</span><span class="nn">etl</span><span class="p">.</span><span class="nn">framework</span><span class="p">.</span><span class="nn">pipeline</span><span class="p">.</span><span class="nc">TransformationContext</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">org</span><span class="p">.</span><span class="nn">apache</span><span class="p">.</span><span class="nn">spark</span><span class="p">.</span><span class="nn">sql</span><span class="p">.{</span><span class="nc">SparkSession</span><span class="p">,</span><span class="w"> </span><span class="nc">DataFrame</span><span class="p">}</span>
+<span class="k">import</span><span class="w"> </span><span class="nn">org</span><span class="p">.</span><span class="nn">apache</span><span class="p">.</span><span class="nn">spark</span><span class="p">.</span><span class="nn">sql</span><span class="p">.</span><span class="nn">functions</span><span class="p">.</span><span class="n">_</span>
+
+<span class="k">object</span><span class="w"> </span><span class="nc">MyPipeline</span><span class="w"> </span><span class="k">extends</span><span class="w"> </span><span class="nc">App</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">  </span><span class="k">implicit</span><span class="w"> </span><span class="kd">val</span><span class="w"> </span><span class="n">spark</span><span class="p">:</span><span class="w"> </span><span class="nc">SparkSession</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">SparkSession</span><span class="p">.</span><span class="n">builder</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="n">appName</span><span class="p">(</span><span class="s">&quot;Customer Orders Pipeline&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="n">master</span><span class="p">(</span><span class="s">&quot;local[*]&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="n">config</span><span class="p">(</span><span class="s">&quot;spark.sql.extensions&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="s">&quot;org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="n">getOrCreate</span><span class="p">()</span>
+
+<span class="w">  </span><span class="c1">// Pre-validation: normalize emails</span>
+<span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">normalizeCustomers</span><span class="p">:</span><span class="w"> </span><span class="nc">TransformationContext</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nc">TransformationContext</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ctx</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">    </span><span class="n">ctx</span><span class="p">.</span><span class="n">withData</span><span class="p">(</span>
+<span class="w">      </span><span class="n">ctx</span><span class="p">.</span><span class="n">currentData</span><span class="p">.</span><span class="n">withColumn</span><span class="p">(</span><span class="s">&quot;email&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">lower</span><span class="p">(</span><span class="n">trim</span><span class="p">(</span><span class="n">col</span><span class="p">(</span><span class="s">&quot;email&quot;</span><span class="p">))))</span>
+<span class="w">    </span><span class="p">)</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// Post-validation: compute derived fields using cross-flow lookup</span>
+<span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">enrichOrders</span><span class="p">:</span><span class="w"> </span><span class="nc">TransformationContext</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nc">TransformationContext</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ctx</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">    </span><span class="n">ctx</span><span class="p">.</span><span class="n">getFlow</span><span class="p">(</span><span class="s">&quot;customers&quot;</span><span class="p">)</span><span class="w"> </span><span class="k">match</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="n">customers</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">        </span><span class="n">ctx</span><span class="p">.</span><span class="n">withData</span><span class="p">(</span>
+<span class="w">          </span><span class="n">ctx</span><span class="p">.</span><span class="n">currentData</span><span class="p">.</span><span class="n">join</span><span class="p">(</span>
+<span class="w">            </span><span class="n">customers</span><span class="p">.</span><span class="n">select</span><span class="p">(</span><span class="s">&quot;customer_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;segment&quot;</span><span class="p">),</span>
+<span class="w">            </span><span class="nc">Seq</span><span class="p">(</span><span class="s">&quot;customer_id&quot;</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;left&quot;</span><span class="p">)</span>
+<span class="w">            </span><span class="p">.</span><span class="n">withColumn</span><span class="p">(</span><span class="s">&quot;priority&quot;</span><span class="p">,</span>
+<span class="w">              </span><span class="n">when</span><span class="p">(</span><span class="n">col</span><span class="p">(</span><span class="s">&quot;segment&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s">&quot;premium&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">lit</span><span class="p">(</span><span class="s">&quot;high&quot;</span><span class="p">))</span>
+<span class="w">                </span><span class="p">.</span><span class="n">otherwise</span><span class="p">(</span><span class="n">lit</span><span class="p">(</span><span class="s">&quot;normal&quot;</span><span class="p">))))</span>
+<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="nc">None</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">        </span><span class="n">ctx</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="kd">val</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">IngestionPipeline</span><span class="p">.</span><span class="n">builder</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="n">withConfigDirectory</span><span class="p">(</span><span class="s">&quot;config&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="n">withPreValidationTransformation</span><span class="p">(</span><span class="s">&quot;customers&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">normalizeCustomers</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="n">withPostValidationTransformation</span><span class="p">(</span><span class="s">&quot;orders&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">enrichOrders</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="n">build</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="n">execute</span><span class="p">()</span>
+
+<span class="w">  </span><span class="n">println</span><span class="p">(</span><span class="s">s&quot;Batch </span><span class="si">${</span><span class="n">result</span><span class="p">.</span><span class="n">batchId</span><span class="si">}</span><span class="s"> completed — success: </span><span class="si">${</span><span class="n">result</span><span class="p">.</span><span class="n">success</span><span class="si">}</span><span class="s">&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="n">result</span><span class="p">.</span><span class="n">flowResults</span><span class="p">.</span><span class="n">foreach</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">fr</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">    </span><span class="n">println</span><span class="p">(</span><span class="s">f&quot;  </span><span class="si">${</span><span class="n">fr</span><span class="p">.</span><span class="n">flowName</span><span class="si">}</span><span class="s">: </span><span class="si">${</span><span class="n">fr</span><span class="p">.</span><span class="n">validRecords</span><span class="si">}</span><span class="s"> valid, &quot;</span><span class="w"> </span><span class="o">+</span>
+<span class="w">      </span><span class="s">f&quot;</span><span class="si">${</span><span class="n">fr</span><span class="p">.</span><span class="n">rejectedRecords</span><span class="si">}</span><span class="s"> rejected (</span><span class="si">${</span><span class="n">fr</span><span class="p">.</span><span class="n">rejectionRate</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="si">}</span><span class="s">%.1f%%), &quot;</span><span class="w"> </span><span class="o">+</span>
+<span class="w">      </span><span class="s">f&quot;</span><span class="si">${</span><span class="n">fr</span><span class="p">.</span><span class="n">executionTimeMs</span><span class="si">}</span><span class="s">ms&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../configuration/overview/">Configuration Overview</a> — YAML config loading</li>
+<li><a href="../../configuration/flows/">Flow Configuration</a> — flow YAML reference</li>
+<li><a href="../validation/">Validation Engine</a> — validation pipeline</li>
+<li><a href="../dag-aggregation/">DAG Aggregation</a> — downstream aggregation</li>
+<li><a href="../cloud-deployment/">Cloud Deployment</a> — deploying on managed platforms</li>
+<li><a href="../../architecture/data-flow/">Architecture: Data Flow</a> — end-to-end pipeline</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2605 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Declarative ETL framework — built on Spark and Iceberg">
+      
+      
+      
+      
+        <link rel="prev" href="../global/">
+      
+      
+        <link rel="next" href="../domains/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Flow Config - Floe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#flow-configuration" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Floe" class="md-header__button md-logo" aria-label="Floe" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Floe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Flow Config
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/giacomoaccursi/floe" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    giacomoaccursi/floe
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Floe" class="md-nav__button md-logo" aria-label="Floe" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Floe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/giacomoaccursi/floe" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    giacomoaccursi/floe
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/project-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../global/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Global Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Flow Config
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Flow Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#full-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#top-level-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-level fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Top-level fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dependson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dependsOn
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        source
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="source">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#file-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jdbc-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JDBC source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#incremental-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Incremental reads
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#column-definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#column-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loadmode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        loadMode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="validation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#foreign-key-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Foreign key fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rule-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        output
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="output">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#partition-transforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partition transforms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sort-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sort order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table properties
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../domains/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Domains
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DAG Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/iceberg/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iceberg Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/scd2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SCD2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/dag-aggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DAG Aggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/pipeline-builder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Builder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/orphan-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Orphan Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/batch-listeners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch Listeners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/quality-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quality Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/custom-validators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Validators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/cloud-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cloud Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/data-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/execution-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#full-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#top-level-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-level fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Top-level fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dependson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dependsOn
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        source
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="source">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#file-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jdbc-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JDBC source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#incremental-reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Incremental reads
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#column-definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#column-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column types
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#loadmode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        loadMode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="validation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#foreign-key-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Foreign key fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rule-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        output
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="output">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#partition-transforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partition transforms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sort-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sort order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table properties
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="flow-configuration">Flow Configuration<a class="headerlink" href="#flow-configuration" title="Permanent link">&para;</a></h1>
+<p>Complete reference for flow YAML files. Each file defines a single data ingestion pipeline and lives in the <code>flows/</code> subdirectory of the config directory.</p>
+<div class="admonition warning">
+<p class="admonition-title">Unique flow names</p>
+<p>Each flow must have a unique <code>name</code>. If two YAML files in the <code>flows/</code> directory define the same name, the framework rejects the configuration at startup.</p>
+</div>
+<h2 id="full-example">Full example<a class="headerlink" href="#full-example" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">orders</span>
+<span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Customer</span><span class="nv"> </span><span class="s">orders&quot;</span>
+<span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">data-team</span>
+
+<span class="nt">source</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;data/orders_*.csv&quot;</span>
+<span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">csv</span>
+<span class="w">  </span><span class="nt">options</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">header</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+
+<span class="nt">schema</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">enforceSchema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">allowExtraColumns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">columns</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_id</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">integer</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">      </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Unique</span><span class="nv"> </span><span class="s">order</span><span class="nv"> </span><span class="s">identifier&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">total_amount</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;decimal(10,</span><span class="nv"> </span><span class="s">2)&quot;</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">      </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Order</span><span class="nv"> </span><span class="s">total&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_date</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">date</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">      </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Date</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">order</span><span class="nv"> </span><span class="s">was</span><span class="nv"> </span><span class="s">placed&quot;</span>
+
+<span class="nt">loadMode</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+
+<span class="nt">validation</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">primaryKey</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">foreignKeys</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">references</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customers</span>
+<span class="w">        </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">onOrphan</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span>
+<span class="w">  </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
+<span class="w">      </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
+<span class="w">      </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$&quot;</span>
+<span class="w">      </span><span class="nt">onFailure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reject</span>
+
+<span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">icebergPartitions</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;month(order_date)&quot;</span>
+<span class="w">  </span><span class="nt">sortOrder</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_date</span>
+<span class="w">  </span><span class="nt">tableProperties</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">write.merge.mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;merge-on-read&quot;</span>
+</code></pre></div>
+<h2 id="top-level-fields">Top-level fields<a class="headerlink" href="#top-level-fields" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>—</td>
+<td>Flow name — maps to the Iceberg table name</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>no</td>
+<td><code>""</code></td>
+<td>Human-readable description</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>no</td>
+<td><code>""</code></td>
+<td>Flow version string</td>
+</tr>
+<tr>
+<td><code>owner</code></td>
+<td>no</td>
+<td><code>""</code></td>
+<td>Team or person responsible</td>
+</tr>
+<tr>
+<td><code>dependsOn</code></td>
+<td>no</td>
+<td><code>[]</code></td>
+<td>List of flow names that must execute before this flow</td>
+</tr>
+<tr>
+<td><code>maxRejectionRate</code></td>
+<td>no</td>
+<td>—</td>
+<td>Per-flow rejection rate threshold. Overrides the global <code>processing.maxRejectionRate</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dependson">dependsOn<a class="headerlink" href="#dependson" title="Permanent link">&para;</a></h3>
+<p>Declares explicit execution dependencies on other flows. Use this when a flow's transformation needs data from another flow (via <code>ctx.getFlow()</code>) but there is no FK relationship between them.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_report</span>
+<span class="nt">dependsOn</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customers</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">products</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p>Dependencies declared via <code>dependsOn</code> are merged with FK-inferred dependencies. The framework validates that all referenced flow names exist and rejects self-references. Circular dependencies (including via <code>dependsOn</code>) are detected at startup.</p>
+<h2 id="source">source<a class="headerlink" href="#source" title="Permanent link">&para;</a></h2>
+<p>Defines where data is read from.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>no</td>
+<td><code>file</code></td>
+<td>Source type: <code>file</code> or <code>jdbc</code></td>
+</tr>
+<tr>
+<td><code>path</code></td>
+<td>yes</td>
+<td>—</td>
+<td>For <code>file</code>: path to data (file, directory, or glob). For <code>jdbc</code>: table name (e.g. <code>public.customers</code>), ignored when <code>query</code> is provided in options.</td>
+</tr>
+<tr>
+<td><code>format</code></td>
+<td>for <code>file</code></td>
+<td>—</td>
+<td>File format: <code>csv</code>, <code>parquet</code>, <code>json</code>, <code>avro</code>, <code>orc</code>. Not used for <code>jdbc</code>.</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td>no</td>
+<td><code>{}</code></td>
+<td>Options passed to the Spark reader</td>
+</tr>
+</tbody>
+</table>
+<h3 id="file-source">File source<a class="headerlink" href="#file-source" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">source</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;data/orders/&quot;</span>
+<span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">csv</span>
+<span class="w">  </span><span class="nt">options</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">header</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="w">    </span><span class="nt">delimiter</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;;&quot;</span>
+</code></pre></div>
+<p>These are standard <a href="https://spark.apache.org/docs/latest/sql-data-sources-csv.html">Spark CSV reader options</a>. For Parquet and JSON, options are rarely needed.</p>
+<div class="admonition note">
+<p class="admonition-title">Quote boolean values in options</p>
+<p>YAML interprets <code>true</code> and <code>false</code> without quotes as booleans. Spark reader options are strings, so always quote them: <code>header: "true"</code>, not <code>header: true</code>.</p>
+</div>
+<h3 id="jdbc-source">JDBC source<a class="headerlink" href="#jdbc-source" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">source</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jdbc</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;public.customers&quot;</span>
+<span class="w">  </span><span class="nt">options</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;jdbc:postgresql://${DB_HOST}:5432/${DB_NAME}&quot;</span>
+<span class="w">    </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${DB_USER}&quot;</span>
+<span class="w">    </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${DB_PASSWORD}&quot;</span>
+<span class="w">    </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;org.postgresql.Driver&quot;</span>
+<span class="w">    </span><span class="nt">fetchSize</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;10000&quot;</span>
+</code></pre></div>
+<p>To read a custom query instead of a full table:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">source</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jdbc</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;public.customers&quot;</span>
+<span class="w">  </span><span class="nt">options</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;jdbc:postgresql://host:5432/mydb&quot;</span>
+<span class="w">    </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${DB_USER}&quot;</span>
+<span class="w">    </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${DB_PASSWORD}&quot;</span>
+<span class="w">    </span><span class="nt">query</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;SELECT</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">FROM</span><span class="nv"> </span><span class="s">customers</span><span class="nv"> </span><span class="s">WHERE</span><span class="nv"> </span><span class="s">updated_at</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">&#39;${LAST_BATCH_DATE}&#39;&quot;</span>
+</code></pre></div>
+<p>When <code>query</code> is provided, <code>path</code> is ignored. The query is wrapped as a subquery for Spark.</p>
+<p>For parallel reads on large tables, add Spark JDBC partitioning options:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">options</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">partitionColumn</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;id&quot;</span>
+<span class="w">  </span><span class="nt">lowerBound</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1&quot;</span>
+<span class="w">  </span><span class="nt">upperBound</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1000000&quot;</span>
+<span class="w">  </span><span class="nt">numPartitions</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;10&quot;</span>
+</code></pre></div>
+<p>The JDBC driver must be on the classpath. The framework does not bundle any database drivers.</p>
+<h3 id="incremental-reads">Incremental reads<a class="headerlink" href="#incremental-reads" title="Permanent link">&para;</a></h3>
+<p>For both JDBC and file sources, use variable substitution to read only new data:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># JDBC: filter by timestamp</span>
+<span class="nt">source</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jdbc</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;public.orders&quot;</span>
+<span class="w">  </span><span class="nt">options</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;jdbc:postgresql://host:5432/mydb&quot;</span>
+<span class="w">    </span><span class="nt">query</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;SELECT</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">FROM</span><span class="nv"> </span><span class="s">orders</span><span class="nv"> </span><span class="s">WHERE</span><span class="nv"> </span><span class="s">updated_at</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">&#39;${LAST_BATCH_DATE}&#39;&quot;</span>
+
+<span class="c1"># File: read only today&#39;s partition</span>
+<span class="nt">source</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;s3://bucket/data/orders/date=${BATCH_DATE}/&quot;</span>
+<span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">parquet</span>
+</code></pre></div>
+<p>Pass the variable values at runtime via the pipeline builder:</p>
+<div class="highlight"><pre><span></span><code><span class="nc">IngestionPipeline</span><span class="p">.</span><span class="n">builder</span><span class="p">()</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withConfigDirectory</span><span class="p">(</span><span class="s">&quot;config&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">withVariables</span><span class="p">(</span><span class="nc">Map</span><span class="p">(</span>
+<span class="w">    </span><span class="s">&quot;LAST_BATCH_DATE&quot;</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="s">&quot;2024-03-15&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s">&quot;BATCH_DATE&quot;</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="s">&quot;2024-03-16&quot;</span>
+<span class="w">  </span><span class="p">))</span>
+<span class="w">  </span><span class="p">.</span><span class="n">build</span><span class="p">()</span>
+<span class="w">  </span><span class="p">.</span><span class="n">execute</span><span class="p">()</span>
+</code></pre></div>
+<p>The framework substitutes <code>${VAR_NAME}</code> in the YAML before parsing. Variables passed via <code>withVariables()</code> take priority over environment variables.</p>
+<p>For details on file formats, see <a href="../../guides/data-sources/">Data Sources</a>.</p>
+<h2 id="schema">schema<a class="headerlink" href="#schema" title="Permanent link">&para;</a></h2>
+<p>Defines the expected schema and controls enforcement during read.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enforceSchema</code></td>
+<td>yes</td>
+<td>—</td>
+<td>If <code>true</code>, validate column presence and apply Spark schema during read</td>
+</tr>
+<tr>
+<td><code>allowExtraColumns</code></td>
+<td>no</td>
+<td><code>true</code></td>
+<td>If <code>false</code>, reject data with columns not defined in <code>columns</code>. Only evaluated when <code>enforceSchema: true</code>.</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td>no</td>
+<td><code>[]</code></td>
+<td>List of column definitions. Required when <code>enforceSchema: true</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>When schema enforcement is not needed, the minimal configuration is:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">schema</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">enforceSchema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<h3 id="column-definition">Column definition<a class="headerlink" href="#column-definition" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>—</td>
+<td>Column name</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>yes</td>
+<td>—</td>
+<td>Data type (see table below)</td>
+</tr>
+<tr>
+<td><code>nullable</code></td>
+<td>yes</td>
+<td>—</td>
+<td>Whether the column allows NULL values. <code>false</code> triggers not-null validation.</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>no</td>
+<td><code>""</code></td>
+<td>Human-readable description</td>
+</tr>
+<tr>
+<td><code>sourceColumn</code></td>
+<td>no</td>
+<td>—</td>
+<td>Original column name in the source data. When set, the framework renames this column to <code>name</code> before validation. When omitted, the source column must already match <code>name</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="column-types">Column types<a class="headerlink" href="#column-types" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Spark type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>string</code>, <code>varchar</code>, <code>text</code></td>
+<td><code>StringType</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>int</code>, <code>integer</code></td>
+<td><code>IntegerType</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>long</code>, <code>bigint</code></td>
+<td><code>LongType</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>float</code></td>
+<td><code>FloatType</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>double</code></td>
+<td><code>DoubleType</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>boolean</code>, <code>bool</code></td>
+<td><code>BooleanType</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>date</code></td>
+<td><code>DateType</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>timestamp</code>, <code>datetime</code></td>
+<td><code>TimestampType</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>decimal</code></td>
+<td><code>DecimalType(38, 18)</code></td>
+<td>Default precision</td>
+</tr>
+<tr>
+<td><code>decimal(p, s)</code></td>
+<td><code>DecimalType(p, s)</code></td>
+<td>Custom precision, e.g. <code>decimal(10, 2)</code></td>
+</tr>
+<tr>
+<td><code>binary</code></td>
+<td><code>BinaryType</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>byte</code>, <code>tinyint</code></td>
+<td><code>ByteType</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>short</code>, <code>smallint</code></td>
+<td><code>ShortType</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">Decimal precision</p>
+<p>Use <code>decimal(p, s)</code> for financial amounts: <code>decimal(10, 2)</code> gives 10 total digits with 2 decimal places. Plain <code>decimal</code> defaults to <code>(38, 18)</code> which may be more precision than needed.</p>
+</div>
+<h2 id="loadmode">loadMode<a class="headerlink" href="#loadmode" title="Permanent link">&para;</a></h2>
+<p>Controls how data is written to the Iceberg table.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>yes</td>
+<td>—</td>
+<td>Load mode: <code>full</code>, <code>delta</code>, <code>scd2</code></td>
+</tr>
+<tr>
+<td><code>compareColumns</code></td>
+<td>SCD2 only</td>
+<td>—</td>
+<td>Columns used for SCD2 change detection. For delta mode, all non-PK columns are compared automatically.</td>
+</tr>
+<tr>
+<td><code>validFromColumn</code></td>
+<td>no</td>
+<td><code>valid_from</code></td>
+<td>SCD2 valid-from timestamp column</td>
+</tr>
+<tr>
+<td><code>validToColumn</code></td>
+<td>no</td>
+<td><code>valid_to</code></td>
+<td>SCD2 valid-to timestamp column</td>
+</tr>
+<tr>
+<td><code>isCurrentColumn</code></td>
+<td>no</td>
+<td><code>is_current</code></td>
+<td>SCD2 current-version flag column</td>
+</tr>
+<tr>
+<td><code>detectDeletes</code></td>
+<td>no</td>
+<td><code>false</code></td>
+<td>SCD2: soft-delete records absent from source</td>
+</tr>
+<tr>
+<td><code>isActiveColumn</code></td>
+<td>no</td>
+<td><code>is_active</code></td>
+<td>SCD2: active flag column (used with <code>detectDeletes</code>)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>full</strong> — replaces all data atomically each batch</li>
+<li><strong>delta</strong> — upsert via MERGE INTO with value-based change detection</li>
+<li><strong>scd2</strong> — maintains full history with versioned rows</li>
+</ul>
+<p>For SCD2 details, see <a href="../../guides/scd2/">SCD2 Guide</a>. For Iceberg write mechanics, see <a href="../../guides/iceberg/">Iceberg Integration</a>.</p>
+<h2 id="validation">validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<p>Defines data quality rules. For the complete validation reference, see <a href="../../guides/validation/">Validation Engine</a>.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">validation</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">primaryKey</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">foreignKeys</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">references</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customers</span>
+<span class="w">        </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">onOrphan</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span>
+<span class="w">  </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
+<span class="w">      </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
+<span class="w">      </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$&quot;</span>
+<span class="w">      </span><span class="nt">onFailure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reject</span>
+</code></pre></div>
+<p>The entire <code>validation</code> section is optional. If omitted, no validation is performed. <code>primaryKey</code> is required for delta and SCD2 modes (used for MERGE INTO matching). For full load, <code>primaryKey</code> is optional — if empty, PK uniqueness validation is skipped. For SCD2, all PK columns must also be non-nullable.</p>
+<h3 id="foreign-key-fields">Foreign key fields<a class="headerlink" href="#foreign-key-fields" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td>list</td>
+<td>yes</td>
+<td>—</td>
+<td>Column(s) in the current flow</td>
+</tr>
+<tr>
+<td><code>references.flow</code></td>
+<td>string</td>
+<td>yes</td>
+<td>—</td>
+<td>Name of the parent flow</td>
+</tr>
+<tr>
+<td><code>references.columns</code></td>
+<td>list</td>
+<td>yes</td>
+<td>—</td>
+<td>Column(s) in the parent flow (same order as <code>columns</code>)</td>
+</tr>
+<tr>
+<td><code>onOrphan</code></td>
+<td>string</td>
+<td>—</td>
+<td><code>warn</code></td>
+<td>Post-batch orphan action: <code>warn</code>, <code>delete</code>, <code>ignore</code>. See <a href="../../guides/orphan-detection/">Orphan Detection</a>.</td>
+</tr>
+</tbody>
+</table>
+<p>The FK is identified by an auto-generated display name (e.g. <code>(customer_id) -&gt; customers.(customer_id)</code>).</p>
+<h3 id="rule-fields">Rule fields<a class="headerlink" href="#rule-fields" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>string</td>
+<td>yes</td>
+<td>—</td>
+<td>Rule type: <code>regex</code>, <code>range</code>, <code>domain</code>, <code>custom</code></td>
+</tr>
+<tr>
+<td><code>column</code></td>
+<td>string</td>
+<td>conditional</td>
+<td>—</td>
+<td>Column to validate. Required for <code>regex</code>, <code>range</code>, <code>domain</code>. Optional for <code>custom</code> (custom validators can do cross-column validation).</td>
+</tr>
+<tr>
+<td><code>pattern</code></td>
+<td>string</td>
+<td>—</td>
+<td>—</td>
+<td>Regex pattern (for <code>regex</code> type)</td>
+</tr>
+<tr>
+<td><code>min</code></td>
+<td>string</td>
+<td>—</td>
+<td>—</td>
+<td>Minimum value (for <code>range</code> type)</td>
+</tr>
+<tr>
+<td><code>max</code></td>
+<td>string</td>
+<td>—</td>
+<td>—</td>
+<td>Maximum value (for <code>range</code> type)</td>
+</tr>
+<tr>
+<td><code>domainName</code></td>
+<td>string</td>
+<td>—</td>
+<td>—</td>
+<td>Domain name from <code>domains.yaml</code> (for <code>domain</code> type)</td>
+</tr>
+<tr>
+<td><code>class</code></td>
+<td>string</td>
+<td>—</td>
+<td>—</td>
+<td>Validator name (registered via builder) or fully qualified class name (for <code>custom</code> type)</td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td>map</td>
+<td>—</td>
+<td>—</td>
+<td>Key-value config passed to custom validators</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>string</td>
+<td>—</td>
+<td>—</td>
+<td>Human-readable description</td>
+</tr>
+<tr>
+<td><code>skipNull</code></td>
+<td>boolean</td>
+<td>—</td>
+<td><code>true</code></td>
+<td>If true, NULL values pass without being checked</td>
+</tr>
+<tr>
+<td><code>onFailure</code></td>
+<td>string</td>
+<td>—</td>
+<td><code>reject</code></td>
+<td>Action on failure: <code>reject</code>, <code>warn</code>, <code>skip</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="output">output<a class="headerlink" href="#output" title="Permanent link">&para;</a></h2>
+<p>Controls how validated data is written.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rejectedPath</code></td>
+<td>—</td>
+<td>Path for rejected records (overrides global <code>rejectedPath</code>)</td>
+</tr>
+<tr>
+<td><code>sortOrder</code></td>
+<td><code>[]</code></td>
+<td>Iceberg write sort order columns</td>
+</tr>
+<tr>
+<td><code>icebergPartitions</code></td>
+<td><code>[]</code></td>
+<td>Iceberg partition expressions</td>
+</tr>
+<tr>
+<td><code>tableProperties</code></td>
+<td><code>{}</code></td>
+<td>Iceberg table properties</td>
+</tr>
+</tbody>
+</table>
+<h3 id="partition-transforms">Partition transforms<a class="headerlink" href="#partition-transforms" title="Permanent link">&para;</a></h3>
+<p>Supported transforms for <code>icebergPartitions</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Transform</th>
+<th>Example</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>identity</td>
+<td><code>country</code></td>
+<td>Partition by raw column value</td>
+</tr>
+<tr>
+<td><code>year(col)</code></td>
+<td><code>year(order_date)</code></td>
+<td>Partition by year</td>
+</tr>
+<tr>
+<td><code>month(col)</code></td>
+<td><code>month(order_date)</code></td>
+<td>Partition by year-month</td>
+</tr>
+<tr>
+<td><code>day(col)</code></td>
+<td><code>day(created_at)</code></td>
+<td>Partition by date</td>
+</tr>
+<tr>
+<td><code>hour(col)</code></td>
+<td><code>hour(event_time)</code></td>
+<td>Partition by hour</td>
+</tr>
+<tr>
+<td><code>bucket(n, col)</code></td>
+<td><code>bucket(16, customer_id)</code></td>
+<td>Hash-partition into n buckets</td>
+</tr>
+<tr>
+<td><code>truncate(len, col)</code></td>
+<td><code>truncate(3, zip_code)</code></td>
+<td>Partition by truncated value</td>
+</tr>
+</tbody>
+</table>
+<p>Transforms are case-insensitive.</p>
+<div class="admonition warning">
+<p class="admonition-title">Partitioning guidelines</p>
+<ul>
+<li>Partition on low-cardinality temporal columns (<code>month(order_date)</code>, <code>year(created_at)</code>)</li>
+<li>Do <strong>not</strong> partition on high-cardinality columns (IDs, timestamps with seconds/milliseconds)</li>
+<li>Do <strong>not</strong> partition on boolean columns (<code>is_current</code>) — only 2 values, creates severely imbalanced partitions</li>
+</ul>
+</div>
+<h3 id="sort-order">Sort order<a class="headerlink" href="#sort-order" title="Permanent link">&para;</a></h3>
+<p><code>sortOrder</code> controls data layout within files via <code>WRITE ORDERED BY</code>. This improves scan performance without affecting query semantics:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">sortOrder</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_date</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id</span>
+</code></pre></div>
+<h3 id="table-properties">Table properties<a class="headerlink" href="#table-properties" title="Permanent link">&para;</a></h3>
+<p>Pass Iceberg table properties per-flow:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">tableProperties</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">write.merge.mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;merge-on-read&quot;</span>
+<span class="w">    </span><span class="nt">write.format.default</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;parquet&quot;</span>
+<span class="w">    </span><span class="nt">commit.retry.num-retries</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;4&quot;</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">commit.retry vs framework retry</p>
+<p><code>commit.retry.num-retries</code> is an Iceberg property that retries the atomic commit if another writer modified the table concurrently (optimistic concurrency conflict). This is different from the framework's <code>maxRetries</code> in <code>processing</code>, which retries the entire flow on any failure. They operate at different levels and do not conflict.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,3208 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Declarative ETL framework — built on Spark and Iceberg">
+      
+      
+      
+      
+        <link rel="prev" href="../validation/">
+      
+      
+        <link rel="next" href="../scd2/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Iceberg Integration - Floe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#iceberg-integration" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Floe" class="md-header__button md-logo" aria-label="Floe" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Floe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Iceberg Integration
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/giacomoaccursi/floe" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    giacomoaccursi/floe
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Floe" class="md-nav__button md-logo" aria-label="Floe" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Floe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/giacomoaccursi/floe" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    giacomoaccursi/floe
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/project-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/global/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Global Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/flows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Flow Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/domains/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Domains
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DAG Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iceberg Integration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iceberg Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Prerequisites">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sparksession-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SparkSession configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#java-18-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Java 18+ compatibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuring-iceberg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuring Iceberg
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuring Iceberg">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configuration-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#maintenance-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Maintenance settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#catalog-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Catalog provider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-creation-and-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table creation and schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-evolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema evolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-configuration-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table configuration updates
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Table configuration updates">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#partition-spec-on-tables-with-existing-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partition spec on tables with existing data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partitioning-and-sort-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partitioning and sort order
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#write-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Write operations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Write operations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full load
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delta-upsert" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delta (upsert)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Delta (upsert)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#idempotency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Idempotency
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#copy-on-write-vs-merge-on-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Copy-on-write vs merge-on-read
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partition-pruning-and-merge-into" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partition pruning and MERGE INTO
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scd2-slowly-changing-dimension-type-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCD2 (Slowly Changing Dimension Type 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snapshot-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshot management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Snapshot management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tagging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tagging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metadata-capture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metadata capture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Metadata capture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#interpreting-snapshot-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interpreting snapshot summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#post-batch-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-batch lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Post-batch lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-orphan-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Orphan detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-batch-metadata-write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Batch metadata write
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-table-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Table maintenance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Table maintenance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#file-accumulation-in-the-warehouse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File accumulation in the warehouse
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline data flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flow-configuration-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flow configuration examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Flow configuration examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#delta-with-fk-validation-and-iceberg-partitioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delta with FK validation and Iceberg partitioning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-load-dimension-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full load (dimension table)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scd2-with-detect-deletes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCD2 with detect-deletes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time-travel-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time travel queries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Limitations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-writer-per-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single writer per table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#no-automatic-column-removal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No automatic column removal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#maintenance-is-not-transactional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Maintenance is not transactional
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scd2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SCD2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dag-aggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DAG Aggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipeline-builder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Builder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../orphan-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Orphan Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../batch-listeners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch Listeners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quality-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quality Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom-validators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Validators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cloud-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cloud Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/data-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/execution-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Prerequisites">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sparksession-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SparkSession configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#java-18-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Java 18+ compatibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuring-iceberg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuring Iceberg
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuring Iceberg">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configuration-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#maintenance-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Maintenance settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#catalog-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Catalog provider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-creation-and-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table creation and schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-evolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema evolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-configuration-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table configuration updates
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Table configuration updates">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#partition-spec-on-tables-with-existing-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partition spec on tables with existing data
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partitioning-and-sort-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partitioning and sort order
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#write-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Write operations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Write operations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full load
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delta-upsert" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delta (upsert)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Delta (upsert)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#idempotency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Idempotency
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#copy-on-write-vs-merge-on-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Copy-on-write vs merge-on-read
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#partition-pruning-and-merge-into" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partition pruning and MERGE INTO
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scd2-slowly-changing-dimension-type-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCD2 (Slowly Changing Dimension Type 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snapshot-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshot management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Snapshot management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tagging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tagging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metadata-capture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metadata capture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Metadata capture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#interpreting-snapshot-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interpreting snapshot summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#post-batch-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-batch lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Post-batch lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-orphan-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Orphan detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-batch-metadata-write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Batch metadata write
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-table-maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Table maintenance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Table maintenance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#file-accumulation-in-the-warehouse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File accumulation in the warehouse
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline data flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flow-configuration-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flow configuration examples
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Flow configuration examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#delta-with-fk-validation-and-iceberg-partitioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delta with FK validation and Iceberg partitioning
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-load-dimension-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full load (dimension table)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scd2-with-detect-deletes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCD2 with detect-deletes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time-travel-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time travel queries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Limitations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-writer-per-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single writer per table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#no-automatic-column-removal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No automatic column removal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#maintenance-is-not-transactional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Maintenance is not transactional
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="iceberg-integration">Iceberg Integration<a class="headerlink" href="#iceberg-integration" title="Permanent link">&para;</a></h1>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>The framework uses Apache Iceberg as its storage layer. Write operations use atomic Iceberg operations — <code>MERGE INTO</code> for delta and SCD2, <code>overwrite</code> for full loads. Every batch produces a tagged snapshot for time travel, and post-batch maintenance runs automatically.</p>
+<p>The <code>iceberg</code> section is required in <code>global.yaml</code>. At startup, the pipeline validates the config and configures the SparkSession with the Iceberg catalog. If the section is missing or invalid, execution stops immediately (fail-fast).</p>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<h3 id="sparksession-configuration">SparkSession configuration<a class="headerlink" href="#sparksession-configuration" title="Permanent link">&para;</a></h3>
+<p>The Iceberg Spark extensions <strong>must</strong> be configured before the SparkSession is created. Spark does not allow changing <code>spark.sql.extensions</code> after session creation. The framework configures the catalog settings automatically from <code>global.yaml</code>, but the extensions must be set by the application entry point:</p>
+<div class="highlight"><pre><span></span><code><span class="k">implicit</span><span class="w"> </span><span class="kd">val</span><span class="w"> </span><span class="n">spark</span><span class="p">:</span><span class="w"> </span><span class="nc">SparkSession</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">SparkSession</span><span class="p">.</span><span class="n">builder</span><span class="p">()</span>
+<span class="w">  </span><span class="p">.</span><span class="n">appName</span><span class="p">(</span><span class="s">&quot;My ETL Pipeline&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">master</span><span class="p">(</span><span class="s">&quot;local[*]&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">config</span><span class="p">(</span><span class="s">&quot;spark.sql.extensions&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s">&quot;org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions&quot;</span><span class="p">)</span>
+<span class="w">  </span><span class="p">.</span><span class="n">getOrCreate</span><span class="p">()</span>
+</code></pre></div>
+<p>All other Iceberg catalog settings (warehouse path, catalog type, catalog class) are applied automatically by the framework at pipeline startup.</p>
+<div class="admonition tip">
+<p class="admonition-title">Keep Adaptive Query Execution enabled</p>
+<p>Spark 3.5 enables AQE by default (<code>spark.sql.adaptive.enabled = true</code>). AQE optimizes MERGE INTO and DAG joins at runtime by coalescing small partitions, converting to broadcast joins, and handling data skew automatically. Do not disable it — the framework relies on these optimizations for efficient execution.</p>
+</div>
+<h3 id="java-18-compatibility">Java 18+ compatibility<a class="headerlink" href="#java-18-compatibility" title="Permanent link">&para;</a></h3>
+<p>On Java 18 or newer, Hadoop's <code>UserGroupInformation</code> requires the security manager to be explicitly allowed. Add this JVM option:</p>
+<div class="highlight"><pre><span></span><code>-Djava.security.manager=allow
+</code></pre></div>
+<p>In SBT:</p>
+<div class="highlight"><pre><span></span><code><span class="n">run</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">javaOptions</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="s">&quot;-Djava.security.manager=allow&quot;</span>
+</code></pre></div>
+<p>Without this flag, Spark fails at startup with <code>UnsupportedOperationException: getSubject is supported only if a security manager is allowed</code>.</p>
+<h2 id="configuring-iceberg">Configuring Iceberg<a class="headerlink" href="#configuring-iceberg" title="Permanent link">&para;</a></h2>
+<p>The <code>iceberg</code> block in <code>global.yaml</code> is required:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">iceberg</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">catalogType</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;hadoop&quot;</span>
+<span class="w">  </span><span class="nt">catalogName</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;spark_catalog&quot;</span>
+<span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;default&quot;</span>
+<span class="w">  </span><span class="nt">warehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;output/warehouse&quot;</span>
+<span class="w">  </span><span class="nt">fileFormat</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;parquet&quot;</span>
+<span class="w">  </span><span class="nt">enableSnapshotTagging</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">maintenance</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">snapshotRetentionDays</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">7</span>
+<span class="w">    </span><span class="nt">targetFileSizeMb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">128</span>
+<span class="w">    </span><span class="nt">orphanRetentionMinutes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1440</span>
+<span class="w">    </span><span class="nt">enableManifestRewrite</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<p>For the full field reference, see <a href="../../configuration/global/#iceberg">Global Configuration — iceberg</a>.</p>
+<h3 id="configuration-reference">Configuration reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>catalogType</code></td>
+<td><code>hadoop</code></td>
+<td>Iceberg catalog implementation: <code>hadoop</code>, <code>glue</code>, or a custom type registered via the <a href="../pipeline-builder/#custom-catalog-providers">Pipeline Builder</a></td>
+</tr>
+<tr>
+<td><code>catalogName</code></td>
+<td><code>spark_catalog</code></td>
+<td>Name used in SQL queries (<code>catalog.namespace.table</code>)</td>
+</tr>
+<tr>
+<td><code>namespace</code></td>
+<td><code>default</code></td>
+<td>Iceberg namespace for tables</td>
+</tr>
+<tr>
+<td><code>warehouse</code></td>
+<td><em>required</em></td>
+<td>Path to the Iceberg warehouse directory</td>
+</tr>
+<tr>
+<td><code>fileFormat</code></td>
+<td><code>parquet</code></td>
+<td>Default data file format</td>
+</tr>
+<tr>
+<td><code>enableSnapshotTagging</code></td>
+<td><code>true</code></td>
+<td>Tag each batch snapshot for time travel by batch ID</td>
+</tr>
+<tr>
+<td><code>catalogProperties</code></td>
+<td><code>{}</code></td>
+<td>Additional key-value properties passed to the catalog provider</td>
+</tr>
+<tr>
+<td><code>maintenance.*</code></td>
+<td>see below</td>
+<td>Post-batch maintenance settings</td>
+</tr>
+</tbody>
+</table>
+<h3 id="maintenance-settings">Maintenance settings<a class="headerlink" href="#maintenance-settings" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>snapshotRetentionDays</code></td>
+<td><code>7</code></td>
+<td>Days to retain snapshots. Remove to disable expiration.</td>
+</tr>
+<tr>
+<td><code>targetFileSizeMb</code></td>
+<td><code>128</code></td>
+<td>Target file size after compaction. Remove to disable.</td>
+</tr>
+<tr>
+<td><code>orphanRetentionMinutes</code></td>
+<td><code>1440</code></td>
+<td>Grace period before orphan files are removed (min 1440). Remove to disable.</td>
+</tr>
+<tr>
+<td><code>enableManifestRewrite</code></td>
+<td><code>false</code></td>
+<td>Rewrite manifest files for scan optimization</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Orphan cleanup minimum retention</p>
+<p>Iceberg enforces a <strong>minimum retention of 24 hours</strong> (1440 minutes) for orphan file cleanup. Values below this are automatically clamped with a warning. This prevents accidental data corruption from concurrent operations.</p>
+</div>
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<h3 id="catalog-provider">Catalog provider<a class="headerlink" href="#catalog-provider" title="Permanent link">&para;</a></h3>
+<p>The catalog system is pluggable. The <code>CatalogProvider</code> trait defines three methods: <code>catalogType</code>, <code>configureCatalog</code>, and <code>validateConfig</code>. The built-in hadoop provider verifies that Iceberg extensions are registered on the SparkSession and configures the catalog with:</p>
+<div class="highlight"><pre><span></span><code>spark.sql.catalog.{name}          = org.apache.iceberg.spark.SparkCatalog
+spark.sql.catalog.{name}.type     = hadoop
+spark.sql.catalog.{name}.warehouse = {path}
+</code></pre></div>
+<p>The extensions (<code>spark.sql.extensions</code>) must be set by the user before creating the SparkSession — the provider validates their presence and throws an error if missing.</p>
+<p>The framework maps the <code>catalogType</code> string to the right provider. Adding a new catalog type (Hive, REST, Nessie) means implementing the <code>CatalogProvider</code> trait and registering it on the builder. See <a href="../pipeline-builder/#custom-catalog-providers">Pipeline Builder — Custom catalog providers</a> for details.</p>
+<h3 id="table-naming">Table naming<a class="headerlink" href="#table-naming" title="Permanent link">&para;</a></h3>
+<p>Every flow maps to a single Iceberg table with the convention:</p>
+<div class="highlight"><pre><span></span><code>{catalogName}.{namespace}.{flowName}
+</code></pre></div>
+<p>For example, a flow named <code>customers</code> with catalog <code>spark_catalog</code> and namespace <code>default</code> becomes <code>spark_catalog.default.customers</code>. The namespace is configurable via <code>iceberg.namespace</code> in <code>global.yaml</code> (defaults to <code>default</code>).</p>
+<h3 id="table-creation-and-schema">Table creation and schema<a class="headerlink" href="#table-creation-and-schema" title="Permanent link">&para;</a></h3>
+<p>Tables are created on first write with <code>CREATE TABLE IF NOT EXISTS</code>. The schema is derived from the flow's <code>SchemaConfig</code> columns plus any system columns added by the load mode (e.g., <code>valid_from</code>, <code>valid_to</code>, <code>is_current</code> for SCD2).</p>
+<h3 id="schema-evolution">Schema evolution<a class="headerlink" href="#schema-evolution" title="Permanent link">&para;</a></h3>
+<p>Every run, the framework compares the incoming schema with the existing table schema and adds any new columns via <code>ALTER TABLE ADD COLUMN</code>. Columns present in the table but absent from the incoming schema are left untouched — the framework never drops columns.</p>
+<p>The framework also applies safe type widening automatically. If an existing column's type can be safely widened to match the incoming schema, the change is applied via <code>ALTER TABLE ALTER COLUMN TYPE</code>:</p>
+<table>
+<thead>
+<tr>
+<th>From</th>
+<th>To</th>
+<th>Safe?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>int</code></td>
+<td><code>long</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>float</code></td>
+<td><code>double</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>decimal(p1, s)</code></td>
+<td><code>decimal(p2, s)</code> where <code>p2 &gt; p1</code></td>
+<td>Yes (same scale, wider precision)</td>
+</tr>
+<tr>
+<td>Any other combination</td>
+<td></td>
+<td>No — logged as warning, skipped</td>
+</tr>
+</tbody>
+</table>
+<p>Incompatible type changes (e.g. <code>string</code> → <code>int</code>, <code>long</code> → <code>int</code>) are not applied. The framework logs a warning and leaves the column unchanged. Resolve these manually with <code>ALTER TABLE</code>.</p>
+<p>This means adding a column to a flow's <code>schema.columns</code> section takes effect at the next run without manual intervention:</p>
+<ol>
+<li>The new column is added to the Iceberg table via ALTER TABLE</li>
+<li>Existing rows have <code>NULL</code> for the new column</li>
+<li>The MERGE INTO includes the new column in the change detection and update logic</li>
+<li>Rows with a non-NULL value for the new column are updated; rows where the source also has NULL are skipped</li>
+</ol>
+<p>Example: adding a <code>notes</code> column to an orders flow.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Before</span>
+<span class="nt">columns</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;order_id&quot;</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;integer&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;status&quot;</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;string&quot;</span>
+
+<span class="c1"># After — just add the new column</span>
+<span class="nt">columns</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;order_id&quot;</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;integer&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;status&quot;</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;string&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;notes&quot;</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;string&quot;</span>
+<span class="w">    </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>At the next run, the framework logs <code>Added column notes (STRING) to catalog.default.orders</code> and the column becomes available.</p>
+<div class="admonition note">
+<p class="admonition-title">Special case: <code>is_active</code> column on existing SCD2 tables</p>
+<p>When <code>detectDeletes</code> is enabled mid-stream, the <code>is_active</code> column is added via schema evolution. Existing rows will have <code>is_active = NULL</code>, which causes <code>WHERE is_active = true</code> queries to exclude them. The framework emits a specific warning for this case. See <a href="../scd2/#enabling-detectdeletes-on-an-existing-table">SCD2 Guide</a> for details and the recommended backfill procedure.</p>
+</div>
+<h3 id="table-configuration-updates">Table configuration updates<a class="headerlink" href="#table-configuration-updates" title="Permanent link">&para;</a></h3>
+<p>Every run, the framework compares the current table state against the flow config and applies any differences:</p>
+<ul>
+<li><strong>Schema</strong>: new columns are added via <code>ALTER TABLE ADD COLUMN</code> (see above).</li>
+<li><strong>Table properties</strong>: reads current properties via <code>SHOW TBLPROPERTIES</code> and applies only new or changed entries via <code>ALTER TABLE SET TBLPROPERTIES</code>. Existing properties not mentioned in the config are left untouched.</li>
+<li><strong>Partition spec</strong>: attempts <code>ALTER TABLE ADD PARTITION FIELD</code> for each configured partition. If the field already exists, the operation is silently skipped.</li>
+</ul>
+<p>This means adding <code>icebergPartitions</code>, <code>tableProperties</code>, or new schema columns to an existing flow config takes effect at the next run without manual intervention.</p>
+<h4 id="partition-spec-on-tables-with-existing-data">Partition spec on tables with existing data<a class="headerlink" href="#partition-spec-on-tables-with-existing-data" title="Permanent link">&para;</a></h4>
+<p>Adding a partition field to a table that already contains data does <strong>not</strong> rewrite existing files. Iceberg applies the new spec only to files written after the change. The result is a mixed layout:</p>
+<ul>
+<li>Files written before the change: no partition metadata, always scanned</li>
+<li>Files written after the change: partitioned, eligible for pruning</li>
+</ul>
+<p>The framework logs a <code>WARN</code> message whenever a new partition field is applied to an existing table:</p>
+<div class="highlight"><pre><span></span><code>WARN  Partition field &#39;month(order_date)&#39; was added to an existing table (catalog.default.orders).
+      Data written before this change is NOT retroactively partitioned:
+      partition pruning will apply only to files written from this run onwards.
+</code></pre></div>
+<p>To apply the new partition layout to all existing data, perform a one-time full reload: temporarily set <code>loadMode.type: full</code>, run the pipeline with a complete source dataset, then revert to <code>delta</code>. This rewrites all files under the new partition spec. For large tables, the equivalent Iceberg maintenance procedure is preferable:</p>
+<div class="highlight"><pre><span></span><code><span class="k">CALL</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">system</span><span class="p">.</span><span class="n">rewrite_data_files</span><span class="p">(</span>
+<span class="w">  </span><span class="k">table</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;catalog.default.orders&#39;</span><span class="p">,</span>
+<span class="w">  </span><span class="n">strategy</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;sort&#39;</span><span class="p">,</span>
+<span class="w">  </span><span class="n">sort_order</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;order_date ASC&#39;</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>The <code>sort</code> strategy rewrites all data files, reorganizing rows according to the new partition layout. This is different from the default <code>binpack</code> strategy used by the framework's automatic compaction, which only merges small files into larger ones without reordering data. After running the sort compaction once, switch back to the normal batch flow — subsequent runs will write correctly partitioned files and <code>binpack</code> compaction is sufficient from that point on.</p>
+<p>For tables with frequent queries on multiple columns, Iceberg also supports a <code>zorder</code> strategy that optimizes file layout for multi-column pruning:</p>
+<div class="highlight"><pre><span></span><code><span class="k">CALL</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">system</span><span class="p">.</span><span class="n">rewrite_data_files</span><span class="p">(</span>
+<span class="w">  </span><span class="k">table</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;catalog.default.orders&#39;</span><span class="p">,</span>
+<span class="w">  </span><span class="n">strategy</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;zorder&#39;</span><span class="p">,</span>
+<span class="w">  </span><span class="n">sort_order</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="s1">&#39;order_date, customer_id&#39;</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Both <code>sort</code> and <code>zorder</code> are one-time operations — run them manually when needed, not as part of the regular batch cycle.</p>
+<h3 id="partitioning-and-sort-order">Partitioning and sort order<a class="headerlink" href="#partitioning-and-sort-order" title="Permanent link">&para;</a></h3>
+<p>Partitions are configured per-flow in the output section:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">icebergPartitions</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;month(order_date)&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;bucket(16,</span><span class="nv"> </span><span class="s">customer_id)&quot;</span>
+<span class="w">  </span><span class="nt">sortOrder</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;order_date&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;customer_id&quot;</span>
+</code></pre></div>
+<p>Supported partition transforms: <code>year()</code>, <code>month()</code>, <code>day()</code>, <code>hour()</code>, <code>bucket(n, col)</code>, <code>truncate(len, col)</code>, and identity (bare column name). Transforms are case-insensitive (<code>MONTH(ts)</code> and <code>month(ts)</code> are equivalent).</p>
+<table>
+<thead>
+<tr>
+<th>Transform</th>
+<th>Example</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>year(col)</code></td>
+<td><code>year(created_at)</code></td>
+<td>Low-volume tables with multi-year history</td>
+</tr>
+<tr>
+<td><code>month(col)</code></td>
+<td><code>month(order_date)</code></td>
+<td>Most common choice for date-based tables</td>
+</tr>
+<tr>
+<td><code>day(col)</code></td>
+<td><code>day(event_time)</code></td>
+<td>High-volume tables with daily queries</td>
+</tr>
+<tr>
+<td><code>hour(col)</code></td>
+<td><code>hour(event_time)</code></td>
+<td>Very high-volume tables (millions of rows/day)</td>
+</tr>
+<tr>
+<td><code>bucket(n, col)</code></td>
+<td><code>bucket(16, customer_id)</code></td>
+<td>Distribute rows evenly across N buckets for non-temporal columns</td>
+</tr>
+<tr>
+<td><code>truncate(len, col)</code></td>
+<td><code>truncate(2, country_code)</code></td>
+<td>Group string values by prefix length</td>
+</tr>
+<tr>
+<td>identity</td>
+<td><code>region</code></td>
+<td>Column with very few distinct values (use sparingly)</td>
+</tr>
+</tbody>
+</table>
+<p>Sort order is applied with <code>WRITE ORDERED BY</code>, which controls data layout within files for better scan performance without affecting query semantics.</p>
+<div class="admonition warning">
+<p class="admonition-title">Partitioning guidelines</p>
+<ul>
+<li>Partition on low-cardinality temporal columns (<code>month(order_date)</code>, <code>year(created_at)</code>)</li>
+<li>Do not partition on high-cardinality columns (IDs, timestamps with seconds/milliseconds)</li>
+<li>Do not partition on boolean columns (<code>is_current</code>) — only 2 values, creates severely imbalanced partitions</li>
+</ul>
+</div>
+<p>Table properties can also be set per-flow:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">tableProperties</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">write.format.default</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;parquet&quot;</span>
+<span class="w">    </span><span class="nt">commit.retry.num-retries</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;4&quot;</span>
+</code></pre></div>
+<h2 id="write-operations">Write operations<a class="headerlink" href="#write-operations" title="Permanent link">&para;</a></h2>
+<p>All writes select the appropriate strategy based on the flow's <code>loadMode.type</code>. For YAML configuration of load modes, see <a href="../../configuration/flows/">Flow Configuration</a>. This section covers the Iceberg-level behavior of each mode.</p>
+<h3 id="full-load">Full load<a class="headerlink" href="#full-load" title="Permanent link">&para;</a></h3>
+<p>Replaces all data atomically using <code>writeTo().overwrite(lit(true))</code>. This replaces all existing rows regardless of partitioning — even an empty source clears the table. The previous data is not deleted from disk until snapshot expiration runs; it remains accessible via time travel.</p>
+<p>The snapshot summary includes <code>overwritten-records</code> to distinguish full reloads from delta writes:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;added-records&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;35&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;deleted-records&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;35&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;total-records&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;35&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="delta-upsert">Delta (upsert)<a class="headerlink" href="#delta-upsert" title="Permanent link">&para;</a></h3>
+<p>Executes a single <code>MERGE INTO</code> statement with value-based change detection:</p>
+<div class="highlight"><pre><span></span><code><span class="n">MERGE</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">orders</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">target</span>
+<span class="k">USING</span><span class="w"> </span><span class="n">_iceberg_merge_orders_</span><span class="o">&lt;</span><span class="n">uuid</span><span class="o">&gt;</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="k">source</span>
+<span class="k">ON</span><span class="w"> </span><span class="n">target</span><span class="p">.</span><span class="n">order_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">source</span><span class="p">.</span><span class="n">order_id</span>
+<span class="k">WHEN</span><span class="w"> </span><span class="n">MATCHED</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="k">NOT</span><span class="w"> </span><span class="p">(</span><span class="k">source</span><span class="p">.</span><span class="n">status</span><span class="w">    </span><span class="o">&lt;=&gt;</span><span class="w"> </span><span class="n">target</span><span class="p">.</span><span class="n">status</span><span class="p">)</span><span class="w">    </span><span class="k">OR</span>
+<span class="w">  </span><span class="k">NOT</span><span class="w"> </span><span class="p">(</span><span class="k">source</span><span class="p">.</span><span class="n">total</span><span class="w">     </span><span class="o">&lt;=&gt;</span><span class="w"> </span><span class="n">target</span><span class="p">.</span><span class="n">total</span><span class="p">)</span><span class="w">     </span><span class="k">OR</span>
+<span class="w">  </span><span class="k">NOT</span><span class="w"> </span><span class="p">(</span><span class="k">source</span><span class="p">.</span><span class="n">order_date</span><span class="w"> </span><span class="o">&lt;=&gt;</span><span class="w"> </span><span class="n">target</span><span class="p">.</span><span class="n">order_date</span><span class="p">)</span>
+<span class="p">)</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="k">UPDATE</span><span class="w"> </span><span class="k">SET</span>
+<span class="w">  </span><span class="n">target</span><span class="p">.</span><span class="n">status</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="k">source</span><span class="p">.</span><span class="n">status</span><span class="p">,</span>
+<span class="w">  </span><span class="n">target</span><span class="p">.</span><span class="n">total</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="k">source</span><span class="p">.</span><span class="n">total</span><span class="p">,</span>
+<span class="w">  </span><span class="n">target</span><span class="p">.</span><span class="n">order_date</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">source</span><span class="p">.</span><span class="n">order_date</span>
+<span class="k">WHEN</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="n">MATCHED</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="k">INSERT</span><span class="w"> </span><span class="p">(</span><span class="n">order_id</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">total</span><span class="p">,</span><span class="w"> </span><span class="n">order_date</span><span class="p">)</span>
+<span class="w">  </span><span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="k">source</span><span class="p">.</span><span class="n">order_id</span><span class="p">,</span><span class="w"> </span><span class="k">source</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="k">source</span><span class="p">.</span><span class="n">total</span><span class="p">,</span><span class="w"> </span><span class="k">source</span><span class="p">.</span><span class="n">order_date</span><span class="p">)</span>
+</code></pre></div>
+<p>The <code>WHEN MATCHED AND (...)</code> condition uses Spark SQL's null-safe equality operator <code>&lt;=&gt;</code> to correctly handle NULL comparisons:</p>
+<ul>
+<li><code>NULL</code> vs <code>NULL</code> → <strong>equal</strong> (no update)</li>
+<li><code>NULL</code> vs <code>'value'</code> → <strong>different</strong> (update)</li>
+<li><code>'a'</code> vs <code>'a'</code> → <strong>equal</strong> (no update)</li>
+</ul>
+<p>This means rows where no column has actually changed are skipped entirely by the MERGE engine.</p>
+<p>If no primary key is defined, the write degrades to an append.</p>
+<h4 id="idempotency">Idempotency<a class="headerlink" href="#idempotency" title="Permanent link">&para;</a></h4>
+<p>Re-running the same batch with the same source data produces no logical changes. The change detection compares every non-PK column and finds no differences, so neither the <code>WHEN MATCHED</code> (update) nor <code>WHEN NOT MATCHED</code> (insert) clause fires for any row.</p>
+<p>At the storage level, Iceberg may still create a new snapshot depending on the write mode (see copy-on-write vs merge-on-read below), but the data content is identical.</p>
+<h4 id="copy-on-write-vs-merge-on-read">Copy-on-write vs merge-on-read<a class="headerlink" href="#copy-on-write-vs-merge-on-read" title="Permanent link">&para;</a></h4>
+<p>Iceberg supports two write strategies that affect how MERGE INTO behaves:</p>
+<p><strong>Copy-on-write (default):</strong></p>
+<ul>
+<li>Rewrites entire data files for any file containing a matched row, even if the row was not actually updated</li>
+<li>Even fully idempotent runs (zero changes) rewrite all scanned files and create a new snapshot</li>
+<li>Snapshot summary shows <code>added-records = N, deleted-records = N</code> — this reflects file-level rewrites, not row-level changes</li>
+<li>Simpler and better for read-heavy workloads (no read-time merge overhead)</li>
+</ul>
+<p><strong>Merge-on-read:</strong></p>
+<ul>
+<li>Writes only delete files (position deletes) for changed rows</li>
+<li>Idempotent runs produce no file rewrites: <code>changed-partition-count = 0</code></li>
+<li>Better for write-heavy workloads or frequent idempotent runs</li>
+<li>Slight read overhead: queries must merge delete files at scan time</li>
+</ul>
+<p>To enable merge-on-read for a specific flow:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">tableProperties</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">write.merge.mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;merge-on-read&quot;</span>
+</code></pre></div>
+<p>Comparison from actual test runs (idempotent batch, 35 records across 3 partitions):</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Copy-on-write</th>
+<th>Merge-on-read</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>added-data-files</code></td>
+<td>3</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>deleted-data-files</code></td>
+<td>3</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>changed-partition-count</code></td>
+<td>3</td>
+<td>0</td>
+</tr>
+<tr>
+<td>File I/O</td>
+<td>Full rewrite</td>
+<td>None</td>
+</tr>
+</tbody>
+</table>
+<h4 id="partition-pruning-and-merge-into">Partition pruning and MERGE INTO<a class="headerlink" href="#partition-pruning-and-merge-into" title="Permanent link">&para;</a></h4>
+<p>The <code>MERGE INTO</code> statement scans all partitions of the target table to match rows, regardless of the source data's partition range. Even if the source only contains records for January 2024, all partitions (January, February, March...) are scanned and potentially rewritten under copy-on-write.</p>
+<p>The framework does not add partition pruning hints to the MERGE ON condition. This is a deliberate choice: automatically inferring partition predicates from the source data is fragile (requires knowing the partition expression semantics and the data's value range) and could silently skip rows that should be matched.</p>
+<p>For large partitioned tables, merge-on-read (<code>write.merge.mode: merge-on-read</code>) significantly reduces the I/O impact by avoiding rewrites of untouched partitions.</p>
+<h3 id="scd2-slowly-changing-dimension-type-2">SCD2 (Slowly Changing Dimension Type 2)<a class="headerlink" href="#scd2-slowly-changing-dimension-type-2" title="Permanent link">&para;</a></h3>
+<p>SCD2 maintains full history of every record using versioned rows with <code>valid_from</code>, <code>valid_to</code>, and <code>is_current</code> columns. It is the most complex write mode.</p>
+<p>For complete documentation including configuration, behavior per scenario, edge cases, query examples, and implementation details, see the dedicated <a href="../scd2/">SCD2 Guide</a>.</p>
+<h2 id="snapshot-management">Snapshot management<a class="headerlink" href="#snapshot-management" title="Permanent link">&para;</a></h2>
+<h3 id="tagging">Tagging<a class="headerlink" href="#tagging" title="Permanent link">&para;</a></h3>
+<p>After every write, if <code>enableSnapshotTagging</code> is true, the framework tags the new snapshot:</p>
+<div class="highlight"><pre><span></span><code><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers</span><span class="w"> </span><span class="k">CREATE</span><span class="w"> </span><span class="n">TAG</span><span class="w"> </span><span class="o">`</span><span class="n">batch_20260218_150000</span><span class="o">`</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="k">OF</span><span class="w"> </span><span class="k">VERSION</span><span class="w"> </span><span class="mi">4857209365014528</span>
+</code></pre></div>
+<p>This allows querying any historical batch by name:</p>
+<div class="highlight"><pre><span></span><code><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers</span><span class="w"> </span><span class="k">VERSION</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="k">OF</span><span class="w"> </span><span class="s1">&#39;batch_20260218_150000&#39;</span>
+</code></pre></div>
+<p>Tags are retained as long as the underlying snapshot exists. When a snapshot is expired by maintenance, its tag is also removed.</p>
+<h3 id="metadata-capture">Metadata capture<a class="headerlink" href="#metadata-capture" title="Permanent link">&para;</a></h3>
+<p>Each write produces an <code>IcebergFlowMetadata</code> object containing:</p>
+<ul>
+<li><code>tableName</code>: fully qualified Iceberg table name</li>
+<li><code>snapshotId</code>: numeric snapshot ID</li>
+<li><code>snapshotTag</code>: batch tag string, or absent if tagging is disabled or the tag operation failed. When absent, use <code>snapshotId</code> for time travel instead.</li>
+<li><code>parentSnapshotId</code>: the snapshot that existed before this write (used for time travel in <a href="../orphan-detection/">orphan detection</a>)</li>
+<li><code>snapshotTimestampMs</code>: creation timestamp</li>
+<li><code>recordsWritten</code>: number of records in the source DataFrame submitted to the write operation. For full loads, this equals the table's final row count. For delta and SCD2 modes, this is the number of source records processed, not the number of rows actually inserted or updated. Use the snapshot <code>summary</code> fields (<code>added-records</code>, <code>deleted-records</code>) for file-level write statistics.</li>
+<li><code>manifestListLocation</code>: path to the manifest list file</li>
+<li><code>summary</code>: Iceberg summary map (added/deleted records, file counts, etc.)</li>
+</ul>
+<p>This metadata is written to the batch metadata JSON at <code>{metadataPath}/{batchId}/flows/{flowName}.json</code>.</p>
+<h4 id="interpreting-snapshot-summary">Interpreting snapshot summary<a class="headerlink" href="#interpreting-snapshot-summary" title="Permanent link">&para;</a></h4>
+<p>The snapshot summary contains file-level statistics, not row-level change counts. Key fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>added-records</code></td>
+<td>Total records in newly written data files</td>
+</tr>
+<tr>
+<td><code>deleted-records</code></td>
+<td>Total records in replaced (old) data files</td>
+</tr>
+<tr>
+<td><code>total-records</code></td>
+<td>Total records in the table after this snapshot</td>
+</tr>
+<tr>
+<td><code>added-data-files</code></td>
+<td>Number of new data files written</td>
+</tr>
+<tr>
+<td><code>deleted-data-files</code></td>
+<td>Number of old data files replaced</td>
+</tr>
+<tr>
+<td><code>changed-partition-count</code></td>
+<td>Number of partitions with file changes</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>A <code>deleted-records = 35, added-records = 35</code> on a delta run does <strong>not</strong> mean 35 rows were updated — it means the files containing those 35 rows were rewritten (copy-on-write). The actual number of changed rows can be 0.</p>
+</div>
+<h2 id="post-batch-lifecycle">Post-batch lifecycle<a class="headerlink" href="#post-batch-lifecycle" title="Permanent link">&para;</a></h2>
+<p>After all flows execute successfully, three things happen in order:</p>
+<h3 id="1-orphan-detection">1. Orphan detection<a class="headerlink" href="#1-orphan-detection" title="Permanent link">&para;</a></h3>
+<p>Uses time travel to find parent keys removed during this batch and resolves orphaned child records according to the FK's <code>onOrphan</code> action. See <a href="../orphan-detection/">Orphan Detection</a> for details.</p>
+<p>This runs <strong>before</strong> maintenance because maintenance may expire the snapshots needed for time travel comparison.</p>
+<h3 id="2-batch-metadata-write">2. Batch metadata write<a class="headerlink" href="#2-batch-metadata-write" title="Permanent link">&para;</a></h3>
+<p>The batch metadata JSON includes Iceberg snapshot details for every flow and any orphan reports generated in step 1.</p>
+<h3 id="3-table-maintenance">3. Table maintenance<a class="headerlink" href="#3-table-maintenance" title="Permanent link">&para;</a></h3>
+<p>For each flow's table, the framework runs the enabled maintenance operations:</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>SQL</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Snapshot expiration</td>
+<td><code>CALL system.expire_snapshots(table, older_than)</code></td>
+<td>Removes snapshots older than the retention period. Frees metadata and data files no longer referenced by any surviving snapshot.</td>
+</tr>
+<tr>
+<td>Data compaction</td>
+<td><code>CALL system.rewrite_data_files(table, target_size)</code></td>
+<td>Merges small files into larger ones (target: 128MB default). Improves scan performance.</td>
+</tr>
+<tr>
+<td>Orphan file cleanup</td>
+<td><code>CALL system.remove_orphan_files(table, older_than)</code></td>
+<td>Removes data files not referenced by any snapshot. Cleans up after failed writes.</td>
+</tr>
+<tr>
+<td>Manifest rewrite</td>
+<td><code>CALL system.rewrite_manifests(table)</code></td>
+<td>Consolidates manifest files for faster metadata operations. Disabled by default.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Maintenance is best-effort</p>
+<p>A maintenance failure causes the individual operation to fail but does not abort the batch. The batch result still reports SUCCESS if all flow writes completed. However, subsequent maintenance operations in the same batch may be skipped if the failure propagates.</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Metadata file cleanup</p>
+<p>Every commit creates a new metadata JSON file in the table's <code>metadata/</code> directory (e.g. <code>v1.metadata.json</code>, <code>v2.metadata.json</code>). These files are small (KB) but accumulate over time. To enable automatic cleanup, add these table properties:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">tableProperties</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">write.metadata.delete-after-commit.enabled</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="w">    </span><span class="nt">write.metadata.previous-versions-max</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;100&quot;</span>
+</code></pre></div>
+<p>With these settings, Iceberg deletes old metadata files after each commit, keeping only the last 100 versions. Recommended for production environments with frequent batch runs.</p>
+</div>
+<h4 id="file-accumulation-in-the-warehouse">File accumulation in the warehouse<a class="headerlink" href="#file-accumulation-in-the-warehouse" title="Permanent link">&para;</a></h4>
+<p>Without maintenance enabled, Iceberg data files accumulate across runs. Each delta or full load write creates new data files but does not delete old ones — they remain on disk referenced by previous snapshots (or as orphans after snapshot expiration).</p>
+<p>A typical warehouse directory after several delta runs:</p>
+<div class="highlight"><pre><span></span><code>orders/data/order_date_month=2024-01/
+  00000-98-abc123.parquet   ← Run 1
+  00000-106-def456.parquet  ← Run 2 (replaced Run 1 under copy-on-write)
+  00000-106-ghi789.parquet  ← Run 3 (replaced Run 2)
+</code></pre></div>
+<p>Only the latest file per partition is referenced by the current snapshot. The older files are kept for time travel (if their snapshots still exist) or are orphans (if their snapshots were expired).</p>
+<p>To control file accumulation:</p>
+<ol>
+<li><strong>Snapshot expiration</strong> removes snapshots and their exclusively-referenced data files</li>
+<li><strong>Orphan cleanup</strong> removes data files that no surviving snapshot references</li>
+<li><strong>Compaction</strong> rewrites many small files into fewer, larger files</li>
+</ol>
+<p>In production with daily runs and <code>snapshotRetentionDays: 7</code>, at most ~7 versions of each data file coexist. After expiration, orphan cleanup removes the old files.</p>
+<h2 id="pipeline-data-flow">Pipeline data flow<a class="headerlink" href="#pipeline-data-flow" title="Permanent link">&para;</a></h2>
+<p>Every flow follows the same pipeline:</p>
+<div class="highlight"><pre><span></span><code>Read -&gt; Rename columns -&gt; PreTransform -&gt; Validate (new data only) -&gt; PostTransform -&gt; Write (Iceberg)
+</code></pre></div>
+<ul>
+<li>Validation runs only on incoming data, not on data already in the table</li>
+<li>Merge happens atomically during the write phase via SQL</li>
+<li>Iceberg guarantees ACID semantics</li>
+</ul>
+<h2 id="flow-configuration-examples">Flow configuration examples<a class="headerlink" href="#flow-configuration-examples" title="Permanent link">&para;</a></h2>
+<h3 id="delta-with-fk-validation-and-iceberg-partitioning">Delta with FK validation and Iceberg partitioning<a class="headerlink" href="#delta-with-fk-validation-and-iceberg-partitioning" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">orders</span>
+<span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Customer</span><span class="nv"> </span><span class="s">orders&quot;</span>
+<span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">data-team</span>
+
+<span class="nt">source</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;data/orders.csv&quot;</span>
+<span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">csv</span>
+<span class="w">  </span><span class="nt">options</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">header</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+
+<span class="nt">schema</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">enforceSchema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">allowExtraColumns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">columns</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_id</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">integer</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">integer</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">status</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">total_amount</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">double</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_date</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">date</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+
+<span class="nt">loadMode</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">delta</span>
+
+<span class="nt">validation</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">primaryKey</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">order_id</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">foreignKeys</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">references</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">flow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customers</span>
+<span class="w">        </span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">onOrphan</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warn</span>
+<span class="w">  </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">domain</span>
+<span class="w">      </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">status</span>
+<span class="w">      </span><span class="nt">domainName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">order_status</span>
+<span class="w">      </span><span class="nt">onFailure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reject</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">range</span>
+<span class="w">      </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">total_amount</span>
+<span class="w">      </span><span class="nt">min</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0.01&quot;</span>
+<span class="w">      </span><span class="nt">onFailure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reject</span>
+
+<span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">icebergPartitions</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;month(order_date)&quot;</span>
+<span class="w">  </span><span class="nt">tableProperties</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">write.merge.mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;merge-on-read&quot;</span>
+</code></pre></div>
+<h3 id="full-load-dimension-table">Full load (dimension table)<a class="headerlink" href="#full-load-dimension-table" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customers</span>
+<span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Customer</span><span class="nv"> </span><span class="s">master</span><span class="nv"> </span><span class="s">data</span><span class="nv"> </span><span class="s">—</span><span class="nv"> </span><span class="s">full</span><span class="nv"> </span><span class="s">reload</span><span class="nv"> </span><span class="s">each</span><span class="nv"> </span><span class="s">batch&quot;</span>
+<span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">data-team</span>
+
+<span class="nt">source</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;data/customers.csv&quot;</span>
+<span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">csv</span>
+<span class="w">  </span><span class="nt">options</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">header</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+
+<span class="nt">schema</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">enforceSchema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">allowExtraColumns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">columns</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer_id</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">integer</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">country</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+
+<span class="nt">loadMode</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">full</span>
+
+<span class="nt">validation</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">primaryKey</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">customer_id</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">foreignKeys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<span class="w">  </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
+<span class="w">      </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
+<span class="w">      </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$&quot;</span>
+<span class="w">      </span><span class="nt">onFailure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reject</span>
+
+<span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+</code></pre></div>
+<h3 id="scd2-with-detect-deletes">SCD2 with detect-deletes<a class="headerlink" href="#scd2-with-detect-deletes" title="Permanent link">&para;</a></h3>
+<p>See <a href="../scd2/">SCD2 Guide</a> for the full SCD2 flow configuration example and all available options.</p>
+<h2 id="time-travel-queries">Time travel queries<a class="headerlink" href="#time-travel-queries" title="Permanent link">&para;</a></h2>
+<p>With snapshot tagging enabled, historical data is accessible via SQL:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">-- Query a specific batch by tag</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">spark_catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers</span>
+<span class="k">VERSION</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="k">OF</span><span class="w"> </span><span class="s1">&#39;batch_20260218_150000&#39;</span>
+
+<span class="c1">-- Query by snapshot ID (from batch metadata JSON)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">spark_catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers</span>
+<span class="k">VERSION</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="k">OF</span><span class="w"> </span><span class="mi">4857209365014528</span>
+
+<span class="c1">-- Compare two batches</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">curr</span><span class="p">.</span><span class="n">customer_id</span><span class="p">,</span><span class="w"> </span><span class="n">curr</span><span class="p">.</span><span class="n">name</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">current_name</span><span class="p">,</span><span class="w"> </span><span class="n">prev</span><span class="p">.</span><span class="n">name</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">previous_name</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">spark_catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers</span><span class="w"> </span><span class="n">curr</span>
+<span class="k">FULL</span><span class="w"> </span><span class="k">OUTER</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="n">spark_catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers</span><span class="w"> </span><span class="k">VERSION</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="k">OF</span><span class="w"> </span><span class="s1">&#39;batch_20260217_150000&#39;</span><span class="w"> </span><span class="n">prev</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">curr</span><span class="p">.</span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">prev</span><span class="p">.</span><span class="n">customer_id</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">curr</span><span class="p">.</span><span class="n">name</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">prev</span><span class="p">.</span><span class="n">name</span><span class="w"> </span><span class="k">OR</span><span class="w"> </span><span class="n">curr</span><span class="p">.</span><span class="n">customer_id</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">OR</span><span class="w"> </span><span class="n">prev</span><span class="p">.</span><span class="n">customer_id</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Time travel queries only work for snapshots that have not been expired by maintenance. If <code>snapshotRetentionDays: 7</code>, batches older than 7 days are no longer accessible via time travel.</p>
+</div>
+<h2 id="limitations">Limitations<a class="headerlink" href="#limitations" title="Permanent link">&para;</a></h2>
+<h3 id="single-writer-per-table">Single writer per table<a class="headerlink" href="#single-writer-per-table" title="Permanent link">&para;</a></h3>
+<p>The framework assumes a single writer per table per batch. Concurrent writes to the same table can cause commit conflicts. In multi-pipeline environments, ensure flows that write to the same table are serialized.</p>
+<h3 id="no-automatic-column-removal">No automatic column removal<a class="headerlink" href="#no-automatic-column-removal" title="Permanent link">&para;</a></h3>
+<p>Schema evolution only adds columns, never removes them. If a column is removed from the flow's schema config, it remains in the Iceberg table with NULL values for new rows. To remove a column, use <code>ALTER TABLE DROP COLUMN</code> manually.</p>
+<h3 id="maintenance-is-not-transactional">Maintenance is not transactional<a class="headerlink" href="#maintenance-is-not-transactional" title="Permanent link">&para;</a></h3>
+<p>If a maintenance operation fails mid-way (e.g., compaction fails on one table), subsequent maintenance operations for other tables may still run. There is no all-or-nothing guarantee for maintenance across tables. Each operation is independent.</p>
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../configuration/global/#iceberg">Global Configuration — iceberg</a> — configuration reference</li>
+<li><a href="../scd2/">SCD2 Guide</a> — SCD2 write mode</li>
+<li><a href="../orphan-detection/">Orphan Detection</a> — post-batch FK integrity</li>
+<li><a href="../../architecture/design-decisions/">Architecture: Design Decisions</a> — why Iceberg, why MERGE INTO</li>
+<li><a href="../pipeline-builder/">Pipeline Builder</a> — custom catalog providers</li>
+<li><a href="../quality-metrics/">Quality Metrics</a> — per-flow quality metrics table</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

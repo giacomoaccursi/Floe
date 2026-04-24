@@ -1,0 +1,3055 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Declarative ETL framework — built on Spark and Iceberg">
+      
+      
+      
+      
+        <link rel="prev" href="../iceberg/">
+      
+      
+        <link rel="next" href="../dag-aggregation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>SCD2 - Floe</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#scd2-slowly-changing-dimension-type-2" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Floe" class="md-header__button md-logo" aria-label="Floe" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Floe
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              SCD2
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/giacomoaccursi/floe" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    giacomoaccursi/floe
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Floe" class="md-nav__button md-logo" aria-label="Floe" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Floe
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/giacomoaccursi/floe" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    giacomoaccursi/floe
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/project-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/global/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Global Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/flows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Flow Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/domains/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Domains
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/dag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DAG Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../iceberg/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iceberg Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SCD2
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SCD2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-scd2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is SCD2
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minimal-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimal configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-configuration-with-detect-deletes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full configuration (with detect deletes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#primary-key-constraint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary key constraint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#system-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behavior-per-scenario" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavior per scenario
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Behavior per scenario">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#first-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First load
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modified-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modified record
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unchanged-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unchanged record
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New record
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#record-deleted-from-source-soft-delete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Record deleted from source (soft-delete)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reactivated-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reactivated record
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#idempotency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Idempotency
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#composite-primary-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composite primary key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#duplicate-records-in-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duplicate records in source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#empty-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Empty source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#null-values-in-comparecolumns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NULL values in compareColumns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modifying-comparecolumns-on-an-existing-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modifying compareColumns on an existing table
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comparecolumns-what-to-monitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compareColumns — what to monitor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#is_current-vs-is_active" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_current vs is_active
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enabling-detectdeletes-on-an-existing-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling detectDeletes on an existing table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example-flow-yaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete example: flow YAML
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#useful-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Useful queries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Useful queries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#current-state-of-all-customers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current state of all customers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#complete-history-of-a-single-customer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete history of a single customer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deleted-customers-soft-delete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deleted customers (soft-delete)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customer-state-at-a-specific-point-in-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customer state at a specific point in time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customers-who-changed-tier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customers who changed tier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-comparison-via-snapshot-tag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch comparison (via snapshot tag)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#partitioning-and-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partitioning and performance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Partitioning and performance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recommended-partitioning-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended partitioning strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#merge-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MERGE performance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#consistency-invariant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consistency invariant
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scd2-history-vs-iceberg-time-travel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCD2 history vs Iceberg time travel
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works-internally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works internally
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it works internally">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-atomicity-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The atomicity problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-solution-null-merge-key-trick" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The solution: NULL merge-key trick
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#temporal-continuity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Temporal continuity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#known-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Known limitations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-writer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single writer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#late-arriving-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Late-arriving data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#no-hard-delete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No hard-delete
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#primary-key-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary key change
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dag-aggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DAG Aggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipeline-builder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Builder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../orphan-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Orphan Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../batch-listeners/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch Listeners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quality-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quality Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom-validators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Validators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cloud-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cloud Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/data-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/execution-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/design-decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-scd2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is SCD2
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#minimal-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimal configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#full-configuration-with-detect-deletes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full configuration (with detect deletes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#primary-key-constraint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary key constraint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#system-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behavior-per-scenario" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavior per scenario
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Behavior per scenario">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#first-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First load
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modified-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modified record
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unchanged-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unchanged record
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New record
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#record-deleted-from-source-soft-delete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Record deleted from source (soft-delete)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reactivated-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reactivated record
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#idempotency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Idempotency
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#composite-primary-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Composite primary key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#duplicate-records-in-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Duplicate records in source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#empty-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Empty source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#null-values-in-comparecolumns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NULL values in compareColumns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modifying-comparecolumns-on-an-existing-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modifying compareColumns on an existing table
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comparecolumns-what-to-monitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compareColumns — what to monitor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#is_current-vs-is_active" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_current vs is_active
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enabling-detectdeletes-on-an-existing-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling detectDeletes on an existing table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-example-flow-yaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete example: flow YAML
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#useful-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Useful queries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Useful queries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#current-state-of-all-customers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current state of all customers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#complete-history-of-a-single-customer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete history of a single customer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deleted-customers-soft-delete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deleted customers (soft-delete)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customer-state-at-a-specific-point-in-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customer state at a specific point in time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customers-who-changed-tier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customers who changed tier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batch-comparison-via-snapshot-tag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch comparison (via snapshot tag)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#partitioning-and-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partitioning and performance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Partitioning and performance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recommended-partitioning-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended partitioning strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#merge-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MERGE performance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#consistency-invariant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consistency invariant
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scd2-history-vs-iceberg-time-travel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCD2 history vs Iceberg time travel
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works-internally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works internally
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it works internally">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-atomicity-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The atomicity problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-solution-null-merge-key-trick" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The solution: NULL merge-key trick
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#temporal-continuity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Temporal continuity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#known-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Known limitations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-writer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Single writer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#late-arriving-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Late-arriving data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#no-hard-delete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No hard-delete
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#primary-key-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary key change
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="scd2-slowly-changing-dimension-type-2">SCD2 — Slowly Changing Dimension Type 2<a class="headerlink" href="#scd2-slowly-changing-dimension-type-2" title="Permanent link">&para;</a></h1>
+<h2 id="what-is-scd2">What is SCD2<a class="headerlink" href="#what-is-scd2" title="Permanent link">&para;</a></h2>
+<p>SCD2 is a load strategy that maintains the <strong>complete history</strong> of every record. When an attribute changes, the previous version is closed (receives an end-of-validity date) and a new one is inserted. No data is ever deleted or overwritten: all versions remain in the table and are queryable.</p>
+<p>Example: a customer moves from tier SILVER to GOLD. After loading, the table contains:</p>
+<table>
+<thead>
+<tr>
+<th>customer_id</th>
+<th>tier</th>
+<th>valid_from</th>
+<th>valid_to</th>
+<th>is_current</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>SILVER</td>
+<td>2026-03-26 10:00</td>
+<td>2026-03-27 14:00</td>
+<td>false</td>
+</tr>
+<tr>
+<td>1</td>
+<td>GOLD</td>
+<td>2026-03-27 14:00</td>
+<td>NULL</td>
+<td>true</td>
+</tr>
+</tbody>
+</table>
+<p>The SILVER row is not lost — it's a historical version queryable via time travel or by filtering on <code>is_current = false</code>.</p>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<h3 id="minimal-configuration">Minimal configuration<a class="headerlink" href="#minimal-configuration" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">loadMode</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;scd2&quot;</span>
+<span class="w">  </span><span class="nt">validFromColumn</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;valid_from&quot;</span>
+<span class="w">  </span><span class="nt">validToColumn</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;valid_to&quot;</span>
+<span class="w">  </span><span class="nt">isCurrentColumn</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;is_current&quot;</span>
+<span class="w">  </span><span class="nt">compareColumns</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;tier&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;credit_limit&quot;</span>
+</code></pre></div>
+<h3 id="full-configuration-with-detect-deletes">Full configuration (with detect deletes)<a class="headerlink" href="#full-configuration-with-detect-deletes" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">loadMode</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;scd2&quot;</span>
+<span class="w">  </span><span class="nt">validFromColumn</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;valid_from&quot;</span>
+<span class="w">  </span><span class="nt">validToColumn</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;valid_to&quot;</span>
+<span class="w">  </span><span class="nt">isCurrentColumn</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;is_current&quot;</span>
+<span class="w">  </span><span class="nt">isActiveColumn</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;is_active&quot;</span>
+<span class="w">  </span><span class="nt">compareColumns</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;tier&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;credit_limit&quot;</span>
+<span class="w">  </span><span class="nt">detectDeletes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<h3 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>validFromColumn</code></td>
+<td>no</td>
+<td><code>valid_from</code></td>
+<td>Timestamp column: when this version became valid</td>
+</tr>
+<tr>
+<td><code>validToColumn</code></td>
+<td>no</td>
+<td><code>valid_to</code></td>
+<td>Timestamp column: when this version was superseded. <code>NULL</code> = current version</td>
+</tr>
+<tr>
+<td><code>isCurrentColumn</code></td>
+<td>no</td>
+<td><code>is_current</code></td>
+<td>Boolean column: <code>true</code> only for the most recent version of each record</td>
+</tr>
+<tr>
+<td><code>compareColumns</code></td>
+<td>yes</td>
+<td>—</td>
+<td>List of columns to compare for change detection. Only these columns are checked: if other unlisted columns change, the record is not considered modified</td>
+</tr>
+<tr>
+<td><code>detectDeletes</code></td>
+<td>no</td>
+<td><code>false</code></td>
+<td>If <code>true</code>, records that disappear from the source are marked as deleted (soft-delete)</td>
+</tr>
+<tr>
+<td><code>isActiveColumn</code></td>
+<td>no</td>
+<td><code>is_active</code></td>
+<td>Boolean column for soft-delete. Used only when <code>detectDeletes: true</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="primary-key-constraint">Primary key constraint<a class="headerlink" href="#primary-key-constraint" title="Permanent link">&para;</a></h3>
+<p>Primary key columns <strong>must be non-nullable</strong>. The framework validates this constraint at configuration load time and fails with an explicit error if not met. The reason is technical: SCD2 uses <code>NULL</code> as a sentinel value in merge keys during the MERGE INTO (see <a href="#how-it-works-internally">How it works internally</a>).</p>
+<h3 id="system-columns">System columns<a class="headerlink" href="#system-columns" title="Permanent link">&para;</a></h3>
+<p>The SCD2 columns (<code>valid_from</code>, <code>valid_to</code>, <code>is_current</code>, <code>is_active</code>) <strong>should not be declared in the flow schema</strong> — the framework adds them automatically to the Iceberg table. Only declare business columns in the schema:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">schema</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">columns</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;customer_id&quot;</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;integer&quot;</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tier&quot;</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;string&quot;</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;credit_limit&quot;</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;double&quot;</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</code></pre></div>
+<h2 id="behavior-per-scenario">Behavior per scenario<a class="headerlink" href="#behavior-per-scenario" title="Permanent link">&para;</a></h2>
+<h3 id="first-load">First load<a class="headerlink" href="#first-load" title="Permanent link">&para;</a></h3>
+<p>All records are inserted with:</p>
+<ul>
+<li><code>valid_from = current_timestamp()</code></li>
+<li><code>valid_to = NULL</code></li>
+<li><code>is_current = true</code></li>
+<li><code>is_active = true</code> (if <code>detectDeletes: true</code>)</li>
+</ul>
+<h3 id="modified-record">Modified record<a class="headerlink" href="#modified-record" title="Permanent link">&para;</a></h3>
+<p>A record is considered "modified" when at least one of the <code>compareColumns</code> has a different value compared to the current version in the table. The comparison is null-safe: <code>NULL</code> equals <code>NULL</code>, but <code>NULL</code> differs from any value.</p>
+<p>When a modification is detected:</p>
+<ol>
+<li>The current version is <strong>closed</strong>: <code>valid_to = now</code>, <code>is_current = false</code></li>
+<li>A new version is <strong>inserted</strong>: <code>valid_from = now</code>, <code>valid_to = NULL</code>, <code>is_current = true</code></li>
+</ol>
+<p>Both operations happen in a single atomic transaction.</p>
+<h3 id="unchanged-record">Unchanged record<a class="headerlink" href="#unchanged-record" title="Permanent link">&para;</a></h3>
+<p>If none of the <code>compareColumns</code> have changed, the record is not touched. No new version, no update.</p>
+<h3 id="new-record">New record<a class="headerlink" href="#new-record" title="Permanent link">&para;</a></h3>
+<p>A record with a primary key never seen in the table is inserted as the first version: <code>valid_from = now</code>, <code>valid_to = NULL</code>, <code>is_current = true</code>.</p>
+<h3 id="record-deleted-from-source-soft-delete">Record deleted from source (soft-delete)<a class="headerlink" href="#record-deleted-from-source-soft-delete" title="Permanent link">&para;</a></h3>
+<p><strong>Only if <code>detectDeletes: true</code>.</strong> When a record present in the table (with <code>is_current = true</code>) does not appear in the source, it is marked as deleted:</p>
+<ul>
+<li><code>valid_to = now</code></li>
+<li><code>is_current = false</code></li>
+<li><code>is_active = false</code></li>
+</ul>
+<p>The record is not physically deleted — it remains in the table as a queryable historical version. The difference from a version closed due to modification is the <code>is_active = false</code> flag.</p>
+<p><strong>If <code>detectDeletes: false</code></strong> (default), records absent from the source are simply ignored. They remain in the table with <code>is_current = true</code> as if they were still active.</p>
+<h3 id="reactivated-record">Reactivated record<a class="headerlink" href="#reactivated-record" title="Permanent link">&para;</a></h3>
+<p>A previously soft-deleted record (<code>is_active = false</code>) can reappear in the source. In this case, a new version is inserted with <code>is_current = true</code> and <code>is_active = true</code>. The soft-deleted version remains in the history.</p>
+<p>Example after delete and reactivation with tier change:</p>
+<table>
+<thead>
+<tr>
+<th>customer_id</th>
+<th>tier</th>
+<th>valid_to</th>
+<th>is_current</th>
+<th>is_active</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5</td>
+<td>GOLD</td>
+<td>2026-03-26 21:25</td>
+<td>false</td>
+<td>false</td>
+</tr>
+<tr>
+<td>5</td>
+<td>PLATINUM</td>
+<td>NULL</td>
+<td>true</td>
+<td>true</td>
+</tr>
+</tbody>
+</table>
+<h3 id="idempotency">Idempotency<a class="headerlink" href="#idempotency" title="Permanent link">&para;</a></h3>
+<p>Re-running the same batch with the same source data produces no new versions. The change detection compares every column in <code>compareColumns</code> and finds no differences → no action. This holds for consecutive runs without data changes.</p>
+<p>With copy-on-write (default), Iceberg still rewrites physical files even if no row changes logically. Snapshot statistics will show <code>added-records = N, deleted-records = N</code> — this is a file-level rewrite effect, not an indicator of actual changes. To avoid physical rewrites on idempotent runs, configure <code>write.merge.mode: merge-on-read</code> in <code>tableProperties</code>.</p>
+<h3 id="composite-primary-key">Composite primary key<a class="headerlink" href="#composite-primary-key" title="Permanent link">&para;</a></h3>
+<p>SCD2 supports multi-column primary keys. The framework creates a merge key for each PK column:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">validation</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">primaryKey</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;country_code&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;customer_id&quot;</span>
+</code></pre></div>
+<p>The staging view will contain <code>_mk_country_code</code> and <code>_mk_customer_id</code>, both NULL for records in part 2 of the UNION. The MERGE matches on both columns:</p>
+<div class="highlight"><pre><span></span><code><span class="k">ON</span><span class="w"> </span><span class="n">target</span><span class="p">.</span><span class="n">country_code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">source</span><span class="p">.</span><span class="n">_mk_country_code</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">target</span><span class="p">.</span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">source</span><span class="p">.</span><span class="n">_mk_customer_id</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">target</span><span class="p">.</span><span class="n">is_current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">true</span>
+</code></pre></div>
+<p>All columns in the composite PK must be non-nullable (same constraint as single PK).</p>
+<h3 id="duplicate-records-in-source">Duplicate records in source<a class="headerlink" href="#duplicate-records-in-source" title="Permanent link">&para;</a></h3>
+<p>If the source contains two rows with the same primary key and different values, the behavior depends on Spark's processing order and is non-deterministic. The framework does not deduplicate the source before the MERGE.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Ensure primary key uniqueness in the source. If not possible, add a custom validation rule or a pre-validation transformation that selects the most recent row.</p>
+</div>
+<h3 id="empty-source">Empty source<a class="headerlink" href="#empty-source" title="Permanent link">&para;</a></h3>
+<p>If the source contains no records:</p>
+<ul>
+<li><strong>With <code>detectDeletes: false</code></strong>: no changes to the table.</li>
+<li><strong>With <code>detectDeletes: true</code></strong>: <strong>all current records are soft-deleted</strong> (<code>is_active = false</code>). This is semantically correct (the source declares that no records exist anymore), but could be destructive if the source is empty by mistake (e.g., file not uploaded).</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Mitigation</p>
+<p>The framework validates the <code>maxRejectionRate</code> configured in <code>global.yaml</code>. If all records are rejected (100% rejection rate), the batch stops before the MERGE. However, an empty source (0 records) has no records to reject and passes validation. An explicit minimum cardinality check should be implemented at the pipeline level if needed.</p>
+</div>
+<h3 id="null-values-in-comparecolumns">NULL values in compareColumns<a class="headerlink" href="#null-values-in-comparecolumns" title="Permanent link">&para;</a></h3>
+<p>The comparison uses null-safe operators:</p>
+<ul>
+<li><code>NULL</code> vs <code>NULL</code> → <strong>equal</strong> (no modification)</li>
+<li><code>NULL</code> vs <code>'value'</code> → <strong>different</strong> (new version)</li>
+<li><code>'value'</code> vs <code>NULL</code> → <strong>different</strong> (new version)</li>
+</ul>
+<p>This means going from <code>credit_limit = 5000</code> to <code>credit_limit = NULL</code> generates a new version (correct), and re-running with <code>credit_limit = NULL</code> does not generate another version (idempotent).</p>
+<h3 id="modifying-comparecolumns-on-an-existing-table">Modifying compareColumns on an existing table<a class="headerlink" href="#modifying-comparecolumns-on-an-existing-table" title="Permanent link">&para;</a></h3>
+<p>Adding or removing columns from the <code>compareColumns</code> list takes effect from the next run:</p>
+<ul>
+<li><strong>Adding a column</strong> (e.g., adding <code>email</code> to the list): at the next run, all records with a different <code>email</code> between source and current table will be considered "modified" and generate new versions. If many records differ on the new column, this can cause a burst of versions.</li>
+<li><strong>Removing a column</strong> (e.g., removing <code>email</code>): differences on <code>email</code> no longer generate new versions. Historical versions created for <code>email</code> changes remain in the table.</li>
+</ul>
+<p>No migration is required — the framework uses the current <code>compareColumns</code> list at each run.</p>
+<h2 id="comparecolumns-what-to-monitor">compareColumns — what to monitor<a class="headerlink" href="#comparecolumns-what-to-monitor" title="Permanent link">&para;</a></h2>
+<p><code>compareColumns</code> defines <strong>which columns determine if a record has "changed"</strong>. Only these columns are compared. Fields not listed can change without generating a new version.</p>
+<p>Example: if <code>compareColumns: [tier, credit_limit]</code> and only the email changes, no new version is created. If the <code>tier</code> changes, a new version is created.</p>
+<p><strong>What to include:</strong></p>
+<ul>
+<li>Business attributes whose changes have historical value (tier, status, price, address)</li>
+</ul>
+<p><strong>What to exclude:</strong></p>
+<ul>
+<li>Columns that change every batch without historical value (update timestamps, technical flags)</li>
+<li>Primary key columns (cannot change by definition)</li>
+</ul>
+<p><strong>If <code>compareColumns</code> is empty:</strong> the config loader rejects the configuration. <code>compareColumns</code> is required and must be non-empty for SCD2.</p>
+<h2 id="is_current-vs-is_active">is_current vs is_active<a class="headerlink" href="#is_current-vs-is_active" title="Permanent link">&para;</a></h2>
+<p>These two boolean columns encode different information:</p>
+<table>
+<thead>
+<tr>
+<th>is_current</th>
+<th>is_active</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>true</td>
+<td>true</td>
+<td>Current version, record exists in source</td>
+</tr>
+<tr>
+<td>false</td>
+<td>true</td>
+<td>Historical version, superseded by a newer one</td>
+</tr>
+<tr>
+<td>false</td>
+<td>false</td>
+<td>Record deleted from source (soft-delete)</td>
+</tr>
+<tr>
+<td>true</td>
+<td>false</td>
+<td>Not possible under normal conditions</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>is_current</code></strong> tracks versioning. Each primary key has exactly one row with <code>is_current = true</code> (invariant guaranteed by the framework).</p>
+<p><strong><code>is_active</code></strong> tracks logical deletion. Enables queries like "show me the last known state of all deleted customers" (<code>is_current = true</code> in their last version, <code>is_active = false</code>).</p>
+<p><code>is_active</code> is present only when <code>detectDeletes: true</code> or when <code>isActiveColumn</code> is explicitly configured.</p>
+<h2 id="enabling-detectdeletes-on-an-existing-table">Enabling detectDeletes on an existing table<a class="headerlink" href="#enabling-detectdeletes-on-an-existing-table" title="Permanent link">&para;</a></h2>
+<p>If you enable <code>detectDeletes</code> on an SCD2 table that already contains data, the <code>is_active</code> column is added automatically via schema evolution (<code>ALTER TABLE ADD COLUMN</code>). However, existing rows will have <code>is_active = NULL</code>, not <code>true</code>.</p>
+<p>This means queries with <code>WHERE is_active = true</code> will exclude existing records — a <strong>data correctness problem</strong>.</p>
+<p>The framework emits a warning when it detects this situation:</p>
+<div class="highlight"><pre><span></span><code>WARN  Column &#39;is_active&#39; (is_active) was added to an existing table (catalog.default.customers).
+      Rows written before this change have is_active=NULL and will be excluded by queries
+      filtering on is_active = true.
+      Run a full reload to backfill is_active=true on all current records.
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Recommended action</p>
+<p>After enabling <code>detectDeletes</code> on an existing table, run a full reload to backfill <code>is_active = true</code> on all current rows:</p>
+<ol>
+<li>Temporarily change <code>loadMode.type</code> to <code>full</code></li>
+<li>Run the pipeline with the complete source dataset</li>
+<li>Restore <code>loadMode.type</code> to <code>scd2</code></li>
+</ol>
+</div>
+<h2 id="complete-example-flow-yaml">Complete example: flow YAML<a class="headerlink" href="#complete-example-flow-yaml" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;customers_scd2&quot;</span>
+<span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Customer</span><span class="nv"> </span><span class="s">tier</span><span class="nv"> </span><span class="s">history</span><span class="nv"> </span><span class="s">—</span><span class="nv"> </span><span class="s">SCD2</span><span class="nv"> </span><span class="s">tracking</span><span class="nv"> </span><span class="s">tier</span><span class="nv"> </span><span class="s">and</span><span class="nv"> </span><span class="s">credit_limit</span><span class="nv"> </span><span class="s">changes&quot;</span>
+<span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;data-team&quot;</span>
+
+<span class="nt">source</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;file&quot;</span>
+<span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;data/customers_scd2.csv&quot;</span>
+<span class="w">  </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;csv&quot;</span>
+<span class="w">  </span><span class="nt">options</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">header</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="w">    </span><span class="nt">delimiter</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;,&quot;</span>
+
+<span class="nt">schema</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">enforceSchema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">allowExtraColumns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">  </span><span class="nt">columns</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;customer_id&quot;</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;integer&quot;</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">      </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Customer</span><span class="nv"> </span><span class="s">identifier&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;email&quot;</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;string&quot;</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">      </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Customer</span><span class="nv"> </span><span class="s">email&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tier&quot;</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;string&quot;</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">      </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Customer</span><span class="nv"> </span><span class="s">tier</span><span class="nv"> </span><span class="s">(BRONZE/SILVER/GOLD/PLATINUM)&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;credit_limit&quot;</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;double&quot;</span>
+<span class="w">      </span><span class="nt">nullable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">      </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Credit</span><span class="nv"> </span><span class="s">limit</span><span class="nv"> </span><span class="s">(EUR)&quot;</span>
+
+<span class="nt">loadMode</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;scd2&quot;</span>
+<span class="w">  </span><span class="nt">validFromColumn</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;valid_from&quot;</span>
+<span class="w">  </span><span class="nt">validToColumn</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;valid_to&quot;</span>
+<span class="w">  </span><span class="nt">isCurrentColumn</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;is_current&quot;</span>
+<span class="w">  </span><span class="nt">isActiveColumn</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;is_active&quot;</span>
+<span class="w">  </span><span class="nt">compareColumns</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;tier&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;credit_limit&quot;</span>
+<span class="w">  </span><span class="nt">detectDeletes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="nt">validation</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">primaryKey</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;customer_id&quot;</span>
+<span class="w">  </span><span class="nt">foreignKeys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<span class="w">  </span><span class="nt">rules</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+
+<span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">icebergPartitions</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;year(valid_from)&quot;</span>
+</code></pre></div>
+<h2 id="useful-queries">Useful queries<a class="headerlink" href="#useful-queries" title="Permanent link">&para;</a></h2>
+<h3 id="current-state-of-all-customers">Current state of all customers<a class="headerlink" href="#current-state-of-all-customers" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers_scd2</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">is_current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">true</span>
+</code></pre></div>
+<h3 id="complete-history-of-a-single-customer">Complete history of a single customer<a class="headerlink" href="#complete-history-of-a-single-customer" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers_scd2</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">valid_from</span>
+</code></pre></div>
+<h3 id="deleted-customers-soft-delete">Deleted customers (soft-delete)<a class="headerlink" href="#deleted-customers-soft-delete" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers_scd2</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">is_current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">false</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="n">is_active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">false</span>
+</code></pre></div>
+<h3 id="customer-state-at-a-specific-point-in-time">Customer state at a specific point in time<a class="headerlink" href="#customer-state-at-a-specific-point-in-time" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers_scd2</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">valid_from</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="s1">&#39;2026-03-26 12:00:00&#39;</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="p">(</span><span class="n">valid_to</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">OR</span><span class="w"> </span><span class="n">valid_to</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="s1">&#39;2026-03-26 12:00:00&#39;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="customers-who-changed-tier">Customers who changed tier<a class="headerlink" href="#customers-who-changed-tier" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="k">SELECT</span><span class="w"> </span><span class="n">customer_id</span><span class="p">,</span><span class="w"> </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="k">versions</span>
+<span class="k">FROM</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers_scd2</span>
+<span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">customer_id</span>
+<span class="k">HAVING</span><span class="w"> </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">1</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="k">versions</span><span class="w"> </span><span class="k">DESC</span>
+</code></pre></div>
+<h3 id="batch-comparison-via-snapshot-tag">Batch comparison (via snapshot tag)<a class="headerlink" href="#batch-comparison-via-snapshot-tag" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="k">SELECT</span><span class="w"> </span><span class="n">curr</span><span class="p">.</span><span class="n">customer_id</span><span class="p">,</span><span class="w"> </span><span class="n">curr</span><span class="p">.</span><span class="n">tier</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">tier_now</span><span class="p">,</span><span class="w"> </span><span class="n">prev</span><span class="p">.</span><span class="n">tier</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">tier_before</span>
+<span class="k">FROM</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers_scd2</span><span class="w"> </span><span class="n">curr</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers_scd2</span><span class="w"> </span><span class="k">VERSION</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="k">OF</span><span class="w"> </span><span class="s1">&#39;batch_20260326_100000&#39;</span><span class="w"> </span><span class="n">prev</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">curr</span><span class="p">.</span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">prev</span><span class="p">.</span><span class="n">customer_id</span>
+<span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="n">curr</span><span class="p">.</span><span class="n">is_current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">true</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="n">prev</span><span class="p">.</span><span class="n">is_current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">true</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">curr</span><span class="p">.</span><span class="n">tier</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">prev</span><span class="p">.</span><span class="n">tier</span>
+</code></pre></div>
+<h2 id="partitioning-and-performance">Partitioning and performance<a class="headerlink" href="#partitioning-and-performance" title="Permanent link">&para;</a></h2>
+<h3 id="recommended-partitioning-strategy">Recommended partitioning strategy<a class="headerlink" href="#recommended-partitioning-strategy" title="Permanent link">&para;</a></h3>
+<p>The most common choice for SCD2 is to partition on <code>valid_from</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">output</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">icebergPartitions</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;year(valid_from)&quot;</span>
+</code></pre></div>
+<p>This ensures:</p>
+<ul>
+<li>New versions end up in the current year's partition</li>
+<li>Historical versions stay in the partition of the year they were created</li>
+<li>Point-in-time queries (<code>WHERE valid_from &lt;= X AND valid_to &gt; X</code>) benefit from partition pruning</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Do not partition on <code>is_current</code> — it has only 2 values and creates severely imbalanced partitions. Do not partition on high-cardinality columns (customer_id, email).</p>
+</div>
+<h3 id="merge-performance">MERGE performance<a class="headerlink" href="#merge-performance" title="Permanent link">&para;</a></h3>
+<p>The MERGE INTO for SCD2 only operates on rows with <code>is_current = true</code> thanks to the condition <code>AND target.is_current = true</code> in the <code>ON</code> clause. Historical versions (potentially millions) are not touched.</p>
+<p>This means MERGE performance scales with the number of <strong>current</strong> records, not the total number of versions in the table. A table with 1 million current records and 50 million historical versions has the same MERGE performance as a table with only 1 million records.</p>
+<h3 id="consistency-invariant">Consistency invariant<a class="headerlink" href="#consistency-invariant" title="Permanent link">&para;</a></h3>
+<p>The framework guarantees that for each primary key value there is <strong>exactly one row</strong> with <code>is_current = true</code>. This invariant is maintained by the atomicity of MERGE INTO: closing the old version and inserting the new one happen in the same transaction.</p>
+<p>If the batch fails mid-way, Iceberg performs automatic rollback and the table remains in the previous state — no row with <code>is_current</code> in an inconsistent state.</p>
+<h2 id="scd2-history-vs-iceberg-time-travel">SCD2 history vs Iceberg time travel<a class="headerlink" href="#scd2-history-vs-iceberg-time-travel" title="Permanent link">&para;</a></h2>
+<p>Both mechanisms allow viewing historical data, but they answer different questions:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>SCD2 history</th>
+<th>Iceberg time travel</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>What it tracks</strong></td>
+<td>Business changes (tier, status, price)</td>
+<td>Technical changes (batch, write operations)</td>
+</tr>
+<tr>
+<td><strong>Granularity</strong></td>
+<td>Per-record: each change has valid_from/valid_to</td>
+<td>Per-snapshot: entire table state at a given batch</td>
+</tr>
+<tr>
+<td><strong>Retention</strong></td>
+<td>Permanent — versions stay in the table</td>
+<td>Configurable — snapshots expire after N days</td>
+</tr>
+<tr>
+<td><strong>Query</strong></td>
+<td><code>WHERE customer_id = 1 ORDER BY valid_from</code></td>
+<td><code>VERSION AS OF 'batch_20260326'</code></td>
+</tr>
+<tr>
+<td><strong>Typical use</strong></td>
+<td>Audit, trend analysis, dimensional reporting</td>
+<td>Debug, rollback, batch comparison</td>
+</tr>
+</tbody>
+</table>
+<p>The two features are complementary. SCD2 lives in the data, time travel lives in Iceberg metadata.</p>
+<h2 id="how-it-works-internally">How it works internally<a class="headerlink" href="#how-it-works-internally" title="Permanent link">&para;</a></h2>
+<h3 id="the-atomicity-problem">The atomicity problem<a class="headerlink" href="#the-atomicity-problem" title="Permanent link">&para;</a></h3>
+<p>A naive SCD2 implementation would require two separate operations:</p>
+<ol>
+<li>A MERGE to close old versions of modified records</li>
+<li>An INSERT to insert new versions</li>
+</ol>
+<p>If the system fails between step 1 and step 2, the table is left in an inconsistent state: old versions are closed but new ones are not yet inserted.</p>
+<h3 id="the-solution-null-merge-key-trick">The solution: NULL merge-key trick<a class="headerlink" href="#the-solution-null-merge-key-trick" title="Permanent link">&para;</a></h3>
+<p>The framework solves this with a single atomic <code>MERGE INTO</code>, using a staging view that contains each modified source record <strong>twice</strong>:</p>
+<ol>
+<li><strong>With merge key = primary key</strong> — to match the current version in the table and close it</li>
+<li><strong>With merge key = NULL</strong> — to force the <code>NOT MATCHED</code> clause and insert the new version</li>
+</ol>
+<p>The staging view is constructed as:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">-- Part 1: all source records (merge key = real PK)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">src</span><span class="p">.</span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="n">src</span><span class="p">.</span><span class="n">customer_id</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">_mk_customer_id</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">_iceberg_scd2_src_customers_scd2_</span><span class="o">&lt;</span><span class="n">uuid</span><span class="o">&gt;</span><span class="w"> </span><span class="n">src</span>
+
+<span class="k">UNION</span><span class="w"> </span><span class="k">ALL</span>
+
+<span class="c1">-- Part 2: only MODIFIED records (merge key = NULL)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">src</span><span class="p">.</span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="k">CAST</span><span class="p">(</span><span class="k">NULL</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="nb">INT</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">_mk_customer_id</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">_iceberg_scd2_src_customers_scd2_</span><span class="o">&lt;</span><span class="n">uuid</span><span class="o">&gt;</span><span class="w"> </span><span class="n">src</span>
+<span class="k">JOIN</span><span class="w"> </span><span class="n">target</span><span class="w"> </span><span class="n">tgt</span>
+<span class="w">  </span><span class="k">ON</span><span class="w"> </span><span class="n">src</span><span class="p">.</span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tgt</span><span class="p">.</span><span class="n">customer_id</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="n">tgt</span><span class="p">.</span><span class="n">is_current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">true</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="p">(</span><span class="n">src</span><span class="p">.</span><span class="n">tier</span><span class="w"> </span><span class="o">&lt;=&gt;</span><span class="w"> </span><span class="n">tgt</span><span class="p">.</span><span class="n">tier</span><span class="p">)</span>
+<span class="w">   </span><span class="k">OR</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="p">(</span><span class="n">src</span><span class="p">.</span><span class="n">credit_limit</span><span class="w"> </span><span class="o">&lt;=&gt;</span><span class="w"> </span><span class="n">tgt</span><span class="p">.</span><span class="n">credit_limit</span><span class="p">)</span>
+</code></pre></div>
+<p>The final MERGE operates on this staging view with three clauses:</p>
+<div class="highlight"><pre><span></span><code><span class="n">MERGE</span><span class="w"> </span><span class="k">INTO</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">default</span><span class="p">.</span><span class="n">customers_scd2</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">target</span>
+<span class="k">USING</span><span class="w"> </span><span class="n">_iceberg_scd2_stg_customers_scd2_</span><span class="o">&lt;</span><span class="n">uuid</span><span class="o">&gt;</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="k">source</span>
+<span class="k">ON</span><span class="w"> </span><span class="n">target</span><span class="p">.</span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">source</span><span class="p">.</span><span class="n">_mk_customer_id</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">target</span><span class="p">.</span><span class="n">is_current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">true</span>
+
+<span class="c1">-- Clause 1: close the old version of the modified record</span>
+<span class="k">WHEN</span><span class="w"> </span><span class="n">MATCHED</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="p">(</span><span class="n">change</span><span class="w"> </span><span class="n">condition</span><span class="p">)</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="k">UPDATE</span><span class="w"> </span><span class="k">SET</span>
+<span class="w">  </span><span class="n">target</span><span class="p">.</span><span class="n">valid_to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">current_timestamp</span><span class="p">(),</span>
+<span class="w">  </span><span class="n">target</span><span class="p">.</span><span class="n">is_current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">false</span>
+
+<span class="c1">-- Clause 2: insert the new version (merge key NULL → NOT MATCHED)</span>
+<span class="c1">--           or a completely new record</span>
+<span class="k">WHEN</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="n">MATCHED</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="k">INSERT</span>
+<span class="w">  </span><span class="p">(</span><span class="n">customer_id</span><span class="p">,</span><span class="w"> </span><span class="n">email</span><span class="p">,</span><span class="w"> </span><span class="n">tier</span><span class="p">,</span><span class="w"> </span><span class="n">credit_limit</span><span class="p">,</span><span class="w"> </span><span class="n">valid_from</span><span class="p">,</span><span class="w"> </span><span class="n">valid_to</span><span class="p">,</span><span class="w"> </span><span class="n">is_current</span><span class="p">,</span><span class="w"> </span><span class="n">is_active</span><span class="p">)</span>
+<span class="w">  </span><span class="k">VALUES</span><span class="w"> </span><span class="p">(</span><span class="k">source</span><span class="p">.</span><span class="n">customer_id</span><span class="p">,</span><span class="w"> </span><span class="k">source</span><span class="p">.</span><span class="n">email</span><span class="p">,</span><span class="w"> </span><span class="k">source</span><span class="p">.</span><span class="n">tier</span><span class="p">,</span><span class="w"> </span><span class="k">source</span><span class="p">.</span><span class="n">credit_limit</span><span class="p">,</span>
+<span class="w">          </span><span class="k">current_timestamp</span><span class="p">(),</span><span class="w"> </span><span class="k">CAST</span><span class="p">(</span><span class="k">NULL</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="p">),</span><span class="w"> </span><span class="k">true</span><span class="p">,</span><span class="w"> </span><span class="k">true</span><span class="p">)</span>
+
+<span class="c1">-- Clause 3 (optional, only with detectDeletes=true):</span>
+<span class="c1">-- soft-delete records not present in the source</span>
+<span class="k">WHEN</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="n">MATCHED</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="k">SOURCE</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="n">target</span><span class="p">.</span><span class="n">is_current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">true</span><span class="w"> </span><span class="k">THEN</span><span class="w"> </span><span class="k">UPDATE</span><span class="w"> </span><span class="k">SET</span>
+<span class="w">  </span><span class="n">target</span><span class="p">.</span><span class="n">valid_to</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">current_timestamp</span><span class="p">(),</span>
+<span class="w">  </span><span class="n">target</span><span class="p">.</span><span class="n">is_current</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">false</span><span class="p">,</span>
+<span class="w">  </span><span class="n">target</span><span class="p">.</span><span class="n">is_active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">false</span>
+</code></pre></div>
+<p><strong>Why it works:</strong></p>
+<ul>
+<li>A modified record appears twice in the staging view: once with the real PK (matches clause 1, closes old version), and once with merge key NULL (matches clause 2, inserts new version)</li>
+<li>A new record appears once with the real PK, but has no match in the table → clause 2, insert</li>
+<li>An unchanged record appears once with the real PK, matches clause 1, but the change condition is <code>false</code> → no action</li>
+<li>A record absent from the source is only present in the table → clause 3 (if enabled), soft-delete</li>
+</ul>
+<p>Everything happens in a single atomic SQL statement. On error, Iceberg performs automatic rollback and the table remains in the previous state.</p>
+<h2 id="temporal-continuity">Temporal continuity<a class="headerlink" href="#temporal-continuity" title="Permanent link">&para;</a></h2>
+<p>For each pair of consecutive versions of the same record, the <code>valid_to</code> of the old version equals the <code>valid_from</code> of the new one:</p>
+<div class="highlight"><pre><span></span><code>version 1: valid_from=T1, valid_to=T2
+version 2: valid_from=T2, valid_to=NULL
+</code></pre></div>
+<p>This is guaranteed because both operations (close old, open new) use <code>current_timestamp()</code> within the same MERGE statement, which is evaluated once. There are no temporal gaps between versions.</p>
+<h2 id="known-limitations">Known limitations<a class="headerlink" href="#known-limitations" title="Permanent link">&para;</a></h2>
+<h3 id="single-writer">Single writer<a class="headerlink" href="#single-writer" title="Permanent link">&para;</a></h3>
+<p>The framework assumes a single writer per table. Concurrent executions of the same flow can violate the <code>is_current</code> invariant (two versions marked as current for the same PK). In environments with concurrent scheduling, ensure each SCD2 flow has at most one active instance.</p>
+<h3 id="late-arriving-data">Late-arriving data<a class="headerlink" href="#late-arriving-data" title="Permanent link">&para;</a></h3>
+<p>SCD2 in the framework uses <code>current_timestamp()</code> as <code>valid_from</code> for new versions. It does not support inserting historical versions with <code>valid_from</code> in the past. If a record arrives late with a state that was valid yesterday, it is inserted with <code>valid_from = now</code>, not <code>valid_from = yesterday</code>.</p>
+<h3 id="no-hard-delete">No hard-delete<a class="headerlink" href="#no-hard-delete" title="Permanent link">&para;</a></h3>
+<p>SCD2 never physically deletes rows from the table. With <code>detectDeletes: true</code>, records are only marked (<code>is_active = false</code>). The table grows monotonically. For environments with data retention requirements (e.g., GDPR), physical deletion must be handled separately via manual operations or Iceberg procedures like <code>DELETE FROM ... WHERE</code>.</p>
+<h3 id="primary-key-change">Primary key change<a class="headerlink" href="#primary-key-change" title="Permanent link">&para;</a></h3>
+<p>If a record's primary key changes in the source (e.g., a customer_id is reassigned), the framework treats it as two separate events: a soft-delete of the old PK and an insert of the new PK. There is no correlation between the two — the old PK's history is closed and the new PK starts an independent history.</p>
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../configuration/flows/">Flow Configuration</a> — loadMode reference</li>
+<li><a href="../iceberg/">Iceberg Integration</a> — write operations and snapshot management</li>
+<li><a href="../orphan-detection/">Orphan Detection</a> — SCD2 with detectDeletes and orphan handling</li>
+<li><a href="../../architecture/design-decisions/">Architecture: Design Decisions</a> — why the NULL merge-key trick</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.top", "content.code.copy", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

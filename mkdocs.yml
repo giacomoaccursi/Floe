@@ -73,4 +73,3 @@ nav:
     - Design Decisions: architecture/design-decisions.md
   - Reference:
     - Exceptions: reference/exceptions.md
-    - Changelog: reference/changelog.md

@@ -2,7 +2,7 @@
 
 ## What is SCD2
 
-SCD2 is a load strategy that maintains the **complete history** of every record. When an attribute changes, the previous version is closed (receives an end-of-validity date) and a new one is inserted. No data is ever deleted or overwritten: all versions remain in the table and are queryable.
+SCD2 is a load strategy that maintains versioned business history. When an attribute changes, the previous version is closed (receives an end-of-validity date) and a new one is inserted. The current table retains those historical rows unless a separate retention/deletion process removes them; Iceberg may physically rewrite data files during a MERGE, and snapshot time travel has its own retention policy.
 
 Example: a customer moves from tier SILVER to GOLD. After loading, the table contains:
 
@@ -133,7 +133,7 @@ Example after delete and reactivation with tier change:
 
 Re-running the same batch with the same source data produces no new versions. The change detection compares every column in `compareColumns` and finds no differences → no action. This holds for consecutive runs without data changes.
 
-With copy-on-write (default), Iceberg still rewrites physical files even if no row changes logically. Snapshot statistics will show `added-records = N, deleted-records = N` — this is a file-level rewrite effect, not an indicator of actual changes. To avoid physical rewrites on idempotent runs, configure `write.merge.mode: merge-on-read` in `tableProperties`.
+Even when no business attribute changes, an Iceberg MERGE may still create a snapshot or rewrite files, depending on the plan and write mode. Snapshot `added-records`/`deleted-records` count rows in files added/removed, not changed business keys. `write.merge.mode: merge-on-read` can reduce write amplification for some workloads but adds delete-file work to reads and maintenance; benchmark both modes rather than assuming unchanged batches are free.
 
 ### Composite primary key
 
@@ -158,10 +158,10 @@ All columns in the composite PK must be non-nullable (same constraint as single 
 
 ### Duplicate records in source
 
-If the source contains two rows with the same primary key and different values, the behavior depends on Spark's processing order and is non-deterministic. The framework does not deduplicate the source before the MERGE.
+FLOe now rejects a source batch with duplicate or NULL primary keys **before** the MERGE. Iceberg does not enforce PK uniqueness. The application must define which event/version wins if multiple source rows share a business key; an arbitrary Spark row order is not a valid resolution rule.
 
 !!!tip
-    Ensure primary key uniqueness in the source. If not possible, add a custom validation rule or a pre-validation transformation that selects the most recent row.
+    If duplicates are expected, add a pre-validation transformation using a deterministic source sequence (for example CDC LSN plus tie-breaker) and retain the rejected/conflicting records for diagnosis. The writer's check is a safeguard, not an ordering policy.
 
 ### Empty source
 
@@ -220,9 +220,9 @@ These two boolean columns encode different information:
 | false | false | Record deleted from source (soft-delete) |
 | true | false | Not possible under normal conditions |
 
-**`is_current`** tracks versioning. Each primary key has exactly one row with `is_current = true` (invariant guaranteed by the framework).
+**`is_current`** tracks the open version. An active key should have one open version; after a soft-delete it has **zero**. Iceberg does not enforce this invariant across pre-existing bad data or concurrent writers, so monitor it explicitly.
 
-**`is_active`** tracks logical deletion. Enables queries like "show me the last known state of all deleted customers" (`is_current = true` in their last version, `is_active = false`).
+**`is_active`** tracks logical deletion. In this implementation, a deleted customer's last version has `is_current = false` and `is_active = false`; query that state explicitly (and choose the latest `valid_to` per key if necessary).
 
 `is_active` is present only when `detectDeletes: true` or when `isActiveColumn` is explicitly configured.
 
@@ -385,11 +385,11 @@ This ensures:
 
 The MERGE INTO for SCD2 only operates on rows with `is_current = true` thanks to the condition `AND target.is_current = true` in the `ON` clause. Historical versions (potentially millions) are not touched.
 
-This means MERGE performance scales with the number of **current** records, not the total number of versions in the table. A table with 1 million current records and 50 million historical versions has the same MERGE performance as a table with only 1 million records.
+The `is_current` predicate is semantically necessary, but it does **not** guarantee that Spark/Iceberg reads only current rows or that a table with 50 million historical versions costs the same as one with 1 million total rows. Planning, partition/file pruning and file layout determine the scan. Check `EXPLAIN`, bytes read and rewritten files on representative tables.
 
 ### Consistency invariant
 
-The framework guarantees that for each primary key value there is **exactly one row** with `is_current = true`. This invariant is maintained by the atomicity of MERGE INTO: closing the old version and inserting the new one happen in the same transaction.
+For a valid single-writer input and a clean target, one MERGE atomically closes the old version and inserts the new version. This does not create a database PK constraint: duplicate target rows, concurrent writers or historical corruption can still violate "at most one current row per key". Add a post-write quality check, and remember that a soft-deleted key intentionally has no current row.
 
 If the batch fails mid-way, Iceberg performs automatic rollback and the table remains in the previous state — no row with `is_current` in an inconsistent state.
 
@@ -401,7 +401,7 @@ Both mechanisms allow viewing historical data, but they answer different questio
 |---|---|---|
 | **What it tracks** | Business changes (tier, status, price) | Technical changes (batch, write operations) |
 | **Granularity** | Per-record: each change has valid_from/valid_to | Per-snapshot: entire table state at a given batch |
-| **Retention** | Permanent — versions stay in the table | Configurable — snapshots expire after N days |
+| **Retention** | Historical rows remain until an explicit data-retention/deletion operation removes them | Snapshot availability depends on expiration rules and live tags/branches |
 | **Query** | `WHERE customer_id = 1 ORDER BY valid_from` | `VERSION AS OF 'batch_20260326'` |
 | **Typical use** | Audit, trend analysis, dimensional reporting | Debug, rollback, batch comparison |
 
@@ -501,9 +501,9 @@ The framework assumes a single writer per table. Concurrent executions of the sa
 
 SCD2 in the framework uses `current_timestamp()` as `valid_from` for new versions. It does not support inserting historical versions with `valid_from` in the past. If a record arrives late with a state that was valid yesterday, it is inserted with `valid_from = now`, not `valid_from = yesterday`.
 
-### No hard-delete
+### No hard-delete in this load mode
 
-SCD2 never physically deletes rows from the table. With `detectDeletes: true`, records are only marked (`is_active = false`). The table grows monotonically. For environments with data retention requirements (e.g., GDPR), physical deletion must be handled separately via manual operations or Iceberg procedures like `DELETE FROM ... WHERE`.
+The SCD2 writer does not issue a hard-delete. With `detectDeletes: true`, the last business version is closed and marked inactive; normal Iceberg rewrites and expiration can still remove or replace physical files. Logical history can grow across changes and needs an explicit retention/deletion policy. For legal erasure, a `DELETE FROM ... WHERE` is a separate table operation; also assess retained snapshots, branches, tags, backups and downstream copies before claiming data is erased.
 
 ### Primary key change
 

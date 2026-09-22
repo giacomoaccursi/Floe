@@ -29,6 +29,8 @@ libraryDependencies ++= Seq(
 
   // Iceberg table format
   "org.apache.iceberg" % "iceberg-spark-runtime-3.5_2.12" % icebergVersion,
+  // AWS SDK v2 clients required by the built-in GlueCatalog/S3FileIO provider
+  "org.apache.iceberg" % "iceberg-aws-bundle" % icebergVersion,
 
   // Configuration loading with YAML support (supports case class defaults natively)
   "com.github.pureconfig" %% "pureconfig" % "0.17.4",

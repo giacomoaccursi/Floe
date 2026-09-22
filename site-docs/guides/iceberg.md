@@ -2,7 +2,7 @@
 
 ## Overview
 
-The framework uses Apache Iceberg as its storage layer. Write operations use atomic Iceberg operations — `MERGE INTO` for delta and SCD2, `overwrite` for full loads. Every batch produces a tagged snapshot for time travel, and post-batch maintenance runs automatically.
+The framework uses Apache Iceberg as its table format. Each table write commits atomically; a batch that writes several tables is **not** one atomic transaction. Delta and SCD2 use `MERGE INTO`, while full loads overwrite table contents. Snapshot tagging and post-batch maintenance are configurable. Tagging a snapshot does not by itself prove which writer produced it if multiple writers race on the same table.
 
 The `iceberg` section is required in `global.yaml`. At startup, the pipeline validates the config and configures the SparkSession with the Iceberg catalog. If the section is missing or invalid, execution stops immediately (fail-fast).
 
@@ -80,13 +80,16 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `snapshotRetentionDays` | `7` | Days to retain snapshots. Remove to disable expiration. |
+| `snapshotRetentionDays` | `7` | Expiration threshold and retention for **new** batch tags. Live references can keep older snapshots. Remove to disable expiration and create tags without an explicit expiry; positive values are required when tagging is enabled. |
 | `targetFileSizeMb` | `128` | Target file size after compaction. Remove to disable. |
 | `orphanRetentionMinutes` | `1440` | Grace period before orphan files are removed (min 1440). Remove to disable. |
 | `enableManifestRewrite` | `false` | Rewrite manifest files for scan optimization |
 
 !!!warning "Orphan cleanup minimum retention"
-    Iceberg enforces a **minimum retention of 24 hours** (1440 minutes) for orphan file cleanup. Values below this are automatically clamped with a warning. This prevents accidental data corruption from concurrent operations.
+    FLOe clamps values below 24 hours (1440 minutes), but that is **not** a universal safe value: a write, checkpoint, backup or migration older than the threshold can still have in-flight files. Set the grace period above the longest expected operation and verify against your deployment before enabling cleanup.
+
+!!!warning "Catalogs on S3"
+    HadoopCatalog on S3 requires an appropriate lock manager for safe concurrent commits. FLOe rejects an S3 warehouse using the built-in Hadoop provider without `catalogProperties.lock-impl`; the [Iceberg AWS guide](https://iceberg.apache.org/docs/1.10.1/aws/) documents DynamoDB locking. GlueCatalog uses optimistic locking with supported AWS SDK versions. The built-in Glue provider also needs AWS SDK v2 client classes: the FLOe build now includes `iceberg-aws-bundle`, and deployed jobs must carry that JAR plus suitable AWS credentials, region and IAM permissions.
 
 ## Architecture
 
@@ -201,19 +204,19 @@ CALL catalog.system.rewrite_data_files(
 )
 ```
 
-The `sort` strategy rewrites all data files, reorganizing rows according to the new partition layout. This is different from the default `binpack` strategy used by the framework's automatic compaction, which only merges small files into larger ones without reordering data. After running the sort compaction once, switch back to the normal batch flow — subsequent runs will write correctly partitioned files and `binpack` compaction is sufficient from that point on.
+The `sort` strategy rewrites **selected** files and orders their rows; it does not guarantee that every historical file is selected. To migrate the physical layout, inspect the table's files and partition spec IDs, then use `rewrite-all` and `output-spec-id` where appropriate for the installed Iceberg version. Verify the resulting `files` metadata table. The framework's automatic `binpack` compaction targets small files and does not establish sort order.
 
-For tables with frequent queries on multiple columns, Iceberg also supports a `zorder` strategy that optimizes file layout for multi-column pruning:
+For some multi-column filters, Iceberg Spark supports Z-ordering as a sort-order expression; it is **not** a separate `zorder` strategy:
 
 ```sql
 CALL catalog.system.rewrite_data_files(
   table => 'catalog.default.orders',
-  strategy => 'zorder',
-  sort_order => 'order_date, customer_id'
+  strategy => 'sort',
+  sort_order => 'zorder(order_date,customer_id)'
 )
 ```
 
-Both `sort` and `zorder` are one-time operations — run them manually when needed, not as part of the regular batch cycle.
+Measure file bounds and bytes scanned before and after any rewrite. Layout can degrade with later writes, so this is not necessarily a one-time operation.
 
 ### Partitioning and sort order
 
@@ -305,9 +308,11 @@ This means rows where no column has actually changed are skipped entirely by the
 
 If no primary key is defined, the write degrades to an append.
 
+Before a keyed MERGE, FLOe rejects NULL or duplicate source keys. It does not choose a winner for competing source events, nor does Iceberg enforce uniqueness in the existing target table. Resolve source duplicates using a deterministic sequence before writing and monitor target-key uniqueness separately.
+
 #### Idempotency
 
-Re-running the same batch with the same source data produces no logical changes. The change detection compares every non-PK column and finds no differences, so neither the `WHEN MATCHED` (update) nor `WHEN NOT MATCHED` (insert) clause fires for any row.
+For a keyed MERGE against an unchanged target, re-running the same complete source can leave the logical rows unchanged: value-based change detection skips equal matches. This is **not** a general exactly-once guarantee. The no-PK append fallback can duplicate rows; concurrent writes, missing tombstones and replay order require their own policy.
 
 At the storage level, Iceberg may still create a new snapshot depending on the write mode (see copy-on-write vs merge-on-read below), but the data content is identical.
 
@@ -317,17 +322,17 @@ Iceberg supports two write strategies that affect how MERGE INTO behaves:
 
 **Copy-on-write (default):**
 
-- Rewrites entire data files for any file containing a matched row, even if the row was not actually updated
-- Even fully idempotent runs (zero changes) rewrite all scanned files and create a new snapshot
-- Snapshot summary shows `added-records = N, deleted-records = N` — this reflects file-level rewrites, not row-level changes
+- Rewrites data files selected for actual row-level changes; the amount of rewrite depends on the plan, file layout and Iceberg version
+- A logically unchanged MERGE may still produce work or a snapshot: measure it rather than assuming either outcome
+- Snapshot `added-records` and `deleted-records` describe files added/removed, not business rows changed
 - Simpler and better for read-heavy workloads (no read-time merge overhead)
 
 **Merge-on-read:**
 
-- Writes only delete files (position deletes) for changed rows
-- Idempotent runs produce no file rewrites: `changed-partition-count = 0`
-- Better for write-heavy workloads or frequent idempotent runs
-- Slight read overhead: queries must merge delete files at scan time
+- Can write delete files and new data files for row-level changes rather than rewriting every affected existing data file
+- An unchanged MERGE may avoid file rewrites, but this is not an execution guarantee
+- Can reduce write amplification when updates are frequent; compare total write, read and compaction costs
+- Reads must apply delete files, and the overhead can grow until maintenance rewrites affected files
 
 To enable merge-on-read for a specific flow:
 
@@ -337,26 +342,19 @@ output:
     write.merge.mode: "merge-on-read"
 ```
 
-Comparison from actual test runs (idempotent batch, 35 records across 3 partitions):
-
-| Metric | Copy-on-write | Merge-on-read |
-|--------|--------------|---------------|
-| `added-data-files` | 3 | 0 |
-| `deleted-data-files` | 3 | 0 |
-| `changed-partition-count` | 3 | 0 |
-| File I/O | Full rewrite | None |
+For a fair comparison, collect snapshot summary fields (`added-data-files`, `deleted-data-files`, `added-delete-files`, `changed-partition-count`), bytes scanned, elapsed time and the cost of later compaction on the **same representative input**. No single summary field is a business-row change counter.
 
 #### Partition pruning and MERGE INTO
 
-The `MERGE INTO` statement scans all partitions of the target table to match rows, regardless of the source data's partition range. Even if the source only contains records for January 2024, all partitions (January, February, March...) are scanned and potentially rewritten under copy-on-write.
+The framework's `MERGE ON` uses the configured business key and does not add an explicit partition predicate. This can make target pruning weak, especially when the key does not imply the partition value. It does **not** prove that every partition is fully scanned or rewritten: Spark planning, Iceberg metadata pruning, dynamic pruning where available, and actual matches determine the work. Inspect `EXPLAIN`, bytes read and rewritten files on representative data.
 
 The framework does not add partition pruning hints to the MERGE ON condition. This is a deliberate choice: automatically inferring partition predicates from the source data is fragile (requires knowing the partition expression semantics and the data's value range) and could silently skip rows that should be matched.
 
-For large partitioned tables, merge-on-read (`write.merge.mode: merge-on-read`) significantly reduces the I/O impact by avoiding rewrites of untouched partitions.
+For frequent row-level changes, `write.merge.mode: merge-on-read` may reduce write amplification but adds delete-file work to reads and later compaction. Compare it with copy-on-write under the real workload; neither mode rewrites all untouched partitions by definition.
 
 ### SCD2 (Slowly Changing Dimension Type 2)
 
-SCD2 maintains full history of every record using versioned rows with `valid_from`, `valid_to`, and `is_current` columns. It is the most complex write mode.
+SCD2 keeps versioned business rows using `valid_from`, `valid_to`, and `is_current` columns, subject to any separate data-retention or deletion process. It is the most complex write mode.
 
 For complete documentation including configuration, behavior per scenario, edge cases, query examples, and implementation details, see the dedicated [SCD2 Guide](scd2.md).
 
@@ -367,7 +365,8 @@ For complete documentation including configuration, behavior per scenario, edge 
 After every write, if `enableSnapshotTagging` is true, the framework tags the new snapshot:
 
 ```sql
-ALTER TABLE catalog.default.customers CREATE TAG `batch_20260218_150000` AS OF VERSION 4857209365014528
+ALTER TABLE catalog.default.customers CREATE TAG `batch_20260218_150000`
+AS OF VERSION 4857209365014528 RETAIN 7 DAYS
 ```
 
 This allows querying any historical batch by name:
@@ -376,7 +375,7 @@ This allows querying any historical batch by name:
 SELECT * FROM catalog.default.customers VERSION AS OF 'batch_20260218_150000'
 ```
 
-Tags are retained as long as the underlying snapshot exists. When a snapshot is expired by maintenance, its tag is also removed.
+Tags are snapshot references and protect the referenced snapshots from expiration. FLOe now sets tag retention from `maintenance.snapshotRetentionDays` when it is positive (seven days by default). If snapshot expiration is disabled with `None`, tags have no explicit retention and must be governed separately. **Existing tags created by older FLOe versions without retention are not migrated automatically**: inspect `table.refs` and plan their removal or replacement before expecting `expire_snapshots` to reclaim their files. Never drop audit/legal-hold tags without an approved retention policy.
 
 ### Metadata capture
 
@@ -429,7 +428,7 @@ For each flow's table, the framework runs the enabled maintenance operations:
 
 | Operation | SQL | Purpose |
 |-----------|-----|---------|
-| Snapshot expiration | `CALL system.expire_snapshots(table, older_than)` | Removes snapshots older than the retention period. Frees metadata and data files no longer referenced by any surviving snapshot. |
+| Snapshot expiration | `CALL system.expire_snapshots(table, older_than)` | Removes eligible old snapshots and files exclusive to them; live refs and retention rules can protect older snapshots. |
 | Data compaction | `CALL system.rewrite_data_files(table, target_size)` | Merges small files into larger ones (target: 128MB default). Improves scan performance. |
 | Orphan file cleanup | `CALL system.remove_orphan_files(table, older_than)` | Removes data files not referenced by any snapshot. Cleans up after failed writes. |
 | Manifest rewrite | `CALL system.rewrite_manifests(table)` | Consolidates manifest files for faster metadata operations. Disabled by default. |
@@ -447,11 +446,11 @@ For each flow's table, the framework runs the enabled maintenance operations:
         write.metadata.previous-versions-max: "100"
     ```
 
-    With these settings, Iceberg deletes old metadata files after each commit, keeping only the last 100 versions. Recommended for production environments with frequent batch runs.
+    With these settings, Iceberg can delete older metadata files **still tracked in its metadata log** after commits; it is not a promise that exactly 100 total files remain. Check rollback, copied catalogs and recovery requirements before enabling cleanup. Untracked metadata files may require separate orphan cleanup.
 
 #### File accumulation in the warehouse
 
-Without maintenance enabled, Iceberg data files accumulate across runs. Each delta or full load write creates new data files but does not delete old ones — they remain on disk referenced by previous snapshots (or as orphans after snapshot expiration).
+Without snapshot expiration, superseded data files can accumulate across runs because older snapshots may still reference them. A successful expiration can remove files no longer needed by surviving snapshots; do not assume those files become orphans requiring a separate cleanup.
 
 A typical warehouse directory after several delta runs:
 
@@ -462,15 +461,15 @@ orders/data/order_date_month=2024-01/
   00000-106-ghi789.parquet  ← Run 3 (replaced Run 2)
 ```
 
-Only the latest file per partition is referenced by the current snapshot. The older files are kept for time travel (if their snapshots still exist) or are orphans (if their snapshots were expired).
+The current snapshot can reference **many** files per partition. Old files that are exclusive to retained snapshots remain for time travel; `expire_snapshots` can delete files made unnecessary by expiring those snapshots. Orphan cleanup is mainly for files never committed or otherwise untracked, not the normal second step after every expiration.
 
 To control file accumulation:
 
 1. **Snapshot expiration** removes snapshots and their exclusively-referenced data files
-2. **Orphan cleanup** removes data files that no surviving snapshot references
+2. **Orphan cleanup** removes sufficiently old, untracked files in the table location (for example files from failed writes), after a safe grace period
 3. **Compaction** rewrites many small files into fewer, larger files
 
-In production with daily runs and `snapshotRetentionDays: 7`, at most ~7 versions of each data file coexist. After expiration, orphan cleanup removes the old files.
+Do not infer a fixed bound such as "seven file versions" from seven days of snapshot retention: commits per day, compaction, tags/branches and file reuse all matter. Monitor `refs`, snapshot ages, file counts and storage bytes; expiration and orphan cleanup have different responsibilities.
 
 ## Pipeline data flow
 
@@ -615,11 +614,12 @@ SELECT curr.customer_id, curr.name AS current_name, prev.name AS previous_name
 FROM spark_catalog.default.customers curr
 FULL OUTER JOIN spark_catalog.default.customers VERSION AS OF 'batch_20260217_150000' prev
   ON curr.customer_id = prev.customer_id
-WHERE curr.name != prev.name OR curr.customer_id IS NULL OR prev.customer_id IS NULL
+WHERE NOT (curr.name <=> prev.name)
+   OR curr.customer_id IS NULL OR prev.customer_id IS NULL
 ```
 
 !!!note
-    Time travel queries only work for snapshots that have not been expired by maintenance. If `snapshotRetentionDays: 7`, batches older than 7 days are no longer accessible via time travel.
+    Time travel requires the snapshot and its files to remain available. A seven-day expiration threshold does not mean that every older snapshot is gone: tags, branches and minimum retention can keep it; conversely an expired snapshot cannot be recovered just from its old ID. Check `table.refs` and `table.snapshots`.
 
 ## Limitations
 

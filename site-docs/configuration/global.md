@@ -121,7 +121,7 @@ For the complete Iceberg integration guide, see [Iceberg Integration](../guides/
 | `namespace` | `default` | Iceberg namespace (database) for tables. Tables are named `{catalogName}.{namespace}.{flowName}`. |
 | `warehouse` | — (required) | Path to the Iceberg warehouse directory |
 | `fileFormat` | `parquet` | Default data file format for Iceberg tables: `parquet`, `orc`, `avro`. Sets the `write.format.default` table property. If a flow specifies `write.format.default` in its `tableProperties`, that takes priority. |
-| `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel |
+| `enableSnapshotTagging` | `true` | Create a batch tag for the table's current snapshot after a write; a concurrent writer on the same table can invalidate attribution to this batch. |
 | `catalogProperties` | `{}` | Additional key-value properties passed to the catalog provider |
 
 ### Catalog types
@@ -132,8 +132,8 @@ The framework ships with two built-in catalog providers:
 
 | `catalogType` | When to use | Description |
 |---------------|-------------|-------------|
-| `hadoop` | Local development, HDFS, S3 without Glue | Stores table metadata as files in the warehouse directory. No external service needed. |
-| `glue` | AWS with Glue Data Catalog | Registers tables in AWS Glue, making them queryable from Athena, Redshift Spectrum, and EMR. Requires S3 and Glue IAM permissions. |
+| `hadoop` | Local development, HDFS; S3 only with a suitable lock manager | Stores table metadata as files in the warehouse directory. S3 deployments need external commit locking for concurrent writes; FLOe rejects an S3 warehouse without `catalogProperties.lock-impl`. |
+| `glue` | AWS with Glue Data Catalog | Registers tables in AWS Glue. Query-engine interoperability depends on each engine's Iceberg support and table features. Requires the Iceberg AWS bundle, credentials, region and suitable S3/Glue IAM permissions. |
 
 For local development, `hadoop` is the simplest choice — it works out of the box with no infrastructure:
 
@@ -164,13 +164,13 @@ Post-batch table maintenance settings. Maintenance runs after all flows execute 
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `snapshotRetentionDays` | `7` | Days to retain snapshots. Set to expire old snapshots after this period. Remove to disable. |
+| `snapshotRetentionDays` | `7` | Expiration threshold for eligible snapshots and retention of new batch tags. Tags/branches can preserve older snapshots. Remove to disable expiration; new tags then have no explicit expiry. Use a positive value when tagging is enabled. |
 | `targetFileSizeMb` | `128` | Target file size after compaction. Remove to disable compaction. |
 | `orphanRetentionMinutes` | `1440` | Grace period before orphan files are removed (min 1440). Remove to disable. |
 | `enableManifestRewrite` | `false` | Rewrite manifest files for scan optimization |
 
 !!!warning "Orphan cleanup minimum retention"
-    Iceberg enforces a **minimum retention of 24 hours** (1440 minutes) for orphan file cleanup. Values below 1440 are automatically clamped with a warning. This prevents data corruption from concurrent operations.
+    FLOe clamps the configured threshold to **at least 24 hours** (1440 minutes). That is not universally safe: set it above the longest running write, backup or migration, or concurrent operations may lose in-flight files.
 
 !!!note "Maintenance is best-effort"
     A maintenance failure does not abort the batch. The batch result still reports SUCCESS if all flow writes completed. However, subsequent maintenance operations in the same batch may be skipped if the failure propagates.

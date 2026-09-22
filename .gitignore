@@ -39,12 +39,21 @@ test-*.log
 !README.md
 !CONTRIBUTING.md
 !CHANGELOG.md
+!AGENTS.md
 !.github/**/*.md
 !docs/
 !docs/**/*.md
 !site-docs/
 !site-docs/**/*.md
 docs/technical-review.md
+
+# Graphify project knowledge graph
+!.codex/
+!.codex/**
+!graphify-out/
+!graphify-out/*.md
+!graphify-out/*.json
+graphify-out/cache/
 
 # Scripts
 create_git_history.sh

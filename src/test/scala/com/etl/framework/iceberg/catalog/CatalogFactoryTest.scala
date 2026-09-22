@@ -71,4 +71,32 @@ class CatalogFactoryTest extends AnyFlatSpec with Matchers {
     result shouldBe a[Left[_, _]]
     result.left.toOption.get should include("catalogName")
   }
+
+  "HadoopCatalogProvider.validateConfig" should "reject S3 without a lock manager" in {
+    val provider = new HadoopCatalogProvider()
+    val config = IcebergConfig(warehouse = "s3://bucket/warehouse")
+    provider.validateConfig(config).left.toOption.get should include("lock-impl")
+    provider.validateConfig(config.copy(warehouse = "s3a://bucket/warehouse")).left.toOption.get should include(
+      "lock-impl"
+    )
+  }
+
+  it should "accept S3 with an explicit lock manager" in {
+    val config = IcebergConfig(
+      warehouse = "s3://bucket/warehouse",
+      catalogProperties = Map(
+        "lock-impl" -> "org.apache.iceberg.aws.dynamodb.DynamoDbLockManager",
+        "lock.table" -> "iceberg_locks"
+      )
+    )
+    new HadoopCatalogProvider().validateConfig(config) shouldBe Right(())
+  }
+
+  it should "require a DynamoDB lock table when using DynamoDbLockManager" in {
+    val config = IcebergConfig(
+      warehouse = "s3://bucket/warehouse",
+      catalogProperties = Map("lock-impl" -> "org.apache.iceberg.aws.dynamodb.DynamoDbLockManager")
+    )
+    new HadoopCatalogProvider().validateConfig(config).left.toOption.get should include("lock.table")
+  }
 }

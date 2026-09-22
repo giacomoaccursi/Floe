@@ -233,6 +233,24 @@ class IcebergTableManagerTest extends AnyFlatSpec with Matchers with BeforeAndAf
     snapshotId shouldBe defined
   }
 
+  it should "read main after a rollback rather than the newest known snapshot" in {
+    val flowConfig = testFlowConfig("snapshot_head_test")
+    val tableName = tableManager.resolveTableName(flowConfig)
+    tableManager.createOrUpdateTable(flowConfig, testSchema)
+
+    Seq((1, "Alice", 10.0)).toDF("id", "name", "value").writeTo(tableName).append()
+    val firstSnapshot = tableManager.getCurrentSnapshotId(flowConfig).get
+    Seq((2, "Bob", 20.0)).toDF("id", "name", "value").writeTo(tableName).append()
+    val newerSnapshot = tableManager.getCurrentSnapshotId(flowConfig).get
+    newerSnapshot should not be firstSnapshot
+
+    spark.sql(
+      s"CALL test_catalog.system.set_current_snapshot(table => 'default.snapshot_head_test', snapshot_id => $firstSnapshot)"
+    )
+    tableManager.getCurrentSnapshotId(flowConfig) shouldBe Some(firstSnapshot)
+    spark.sql(s"SELECT COUNT(*) FROM $tableName").first().getLong(0) shouldBe 1L
+  }
+
   it should "return None for snapshot id on empty table" in {
     val flowConfig = testFlowConfig("empty_snapshot_test")
     tableManager.createOrUpdateTable(flowConfig, testSchema)
@@ -253,6 +271,14 @@ class IcebergTableManagerTest extends AnyFlatSpec with Matchers with BeforeAndAf
 
     val snapshotId = tableManager.getCurrentSnapshotId(flowConfig).get
     tableManager.tagSnapshot(flowConfig, snapshotId, "batch_001") shouldBe true
+    tableManager.tagSnapshot(flowConfig, snapshotId, "batch_001") shouldBe true
+
+    val tag = spark
+      .sql(s"SELECT snapshot_id, max_reference_age_in_ms FROM ${tableManager.resolveTableName(flowConfig)}.refs " +
+        "WHERE name = 'batch_batch_001'")
+      .first()
+    tag.getLong(0) shouldBe snapshotId
+    tag.getLong(1) shouldBe 7L * 24 * 60 * 60 * 1000
   }
 
   it should "collect snapshot metadata" in {

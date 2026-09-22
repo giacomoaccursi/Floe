@@ -136,6 +136,17 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     readBack(2).getAs[String]("name") shouldBe "Charlie"
   }
 
+  it should "reject duplicate source keys before a delta MERGE" in {
+    val fc = flowConfig("delta_duplicate_source", loadMode = LoadMode.Delta)
+    val duplicates = Seq((1, "Alice"), (1, "Alice_v2")).toDF("id", "name")
+
+    val error = intercept[IllegalArgumentException] {
+      writer.writeDeltaLoad(duplicates, fc)
+    }
+    error.getMessage should include("duplicate primary keys")
+    spark.sql("SELECT * FROM writer_catalog.default.delta_duplicate_source").count() shouldBe 0L
+  }
+
   it should "be idempotent: re-writing unchanged data leaves table content unchanged" in {
     val fc = flowConfig("delta_idempotent", loadMode = LoadMode.Delta)
     val data = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
@@ -200,6 +211,17 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
 
     val aliceRecords = readBack.filter("id = 1").orderBy("valid_from")
     aliceRecords.count() shouldBe 2
+  }
+
+  it should "reject duplicate source keys before an SCD2 load" in {
+    val fc = flowConfig("scd2_duplicate_source", loadMode = LoadMode.SCD2, compareColumns = Seq("name"))
+    val duplicates = Seq((1, "Alice"), (1, "Alice_v2")).toDF("id", "name")
+
+    val error = intercept[IllegalArgumentException] {
+      writer.writeSCD2Load(duplicates, fc)
+    }
+    error.getMessage should include("duplicate primary keys")
+    spark.sql("SELECT * FROM writer_catalog.default.scd2_duplicate_source").count() shouldBe 0L
   }
 
   // --- SCD2 Detect Deletes Tests ---

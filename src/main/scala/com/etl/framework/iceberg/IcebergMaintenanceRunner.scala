@@ -8,7 +8,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 /** Runs post-batch Iceberg maintenance: expire snapshots, compact data files, remove orphan files, and rewrite
-  * manifests. Operations run in a specific order to ensure correctness (see comments in run()).
+  * manifests. Each step is optional; the order is operational, not a universal correctness requirement.
   */
 class IcebergMaintenanceRunner(spark: SparkSession, icebergConfig: IcebergConfig) {
 
@@ -19,12 +19,10 @@ class IcebergMaintenanceRunner(spark: SparkSession, icebergConfig: IcebergConfig
 
   def run(tableName: String, config: MaintenanceConfig): Unit = {
     logger.info(s"Running maintenance on $tableName")
-    // Execution order matters:
-    // 1. Expire snapshots — removes old snapshot references, freeing data files
-    // 2. Compact data files — merges small files into larger ones (creates new snapshots)
-    // 3. Remove orphan files — deletes files not referenced by any surviving snapshot
-    //    (must run after expire, otherwise files still referenced by expired snapshots are kept)
-    // 4. Rewrite manifests — consolidates manifest files for faster metadata operations
+    // Expiration releases only files exclusive to expired snapshots; tagged snapshots
+    // remain protected until their references expire. Compaction creates a new
+    // snapshot, so its old files may be released by a later expiration run.
+    // Orphan cleanup targets unreferenced files left outside normal commits.
     config.snapshotRetentionDays.foreach(days => expireSnapshots(tableName, days))
     config.targetFileSizeMb.foreach(size => compactDataFiles(tableName, size))
     config.orphanRetentionMinutes.foreach(mins => removeOrphanFiles(tableName, mins))
@@ -35,7 +33,8 @@ class IcebergMaintenanceRunner(spark: SparkSession, icebergConfig: IcebergConfig
     val result = spark.sql(
       s"CALL ${icebergConfig.catalogName}.system.expire_snapshots(" +
         s"table => '$tableName', " +
-        s"older_than => TIMESTAMP '${sqlTimestampFmt.format(java.time.Instant.now().minusSeconds(retentionDays.toLong * 86400))}'" +
+        s"older_than => TIMESTAMP '${sqlTimestampFmt.format(java.time.Instant.now().minusSeconds(retentionDays.toLong * 86400))}', " +
+        s"stream_results => true" +
         s")"
     )
     val row = result.first()

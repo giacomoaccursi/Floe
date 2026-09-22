@@ -5,9 +5,6 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
 import org.slf4j.LoggerFactory
 
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
-
 /** Manages Iceberg table lifecycle: creation, schema evolution (add columns, widen types), partition evolution, table
   * properties, snapshot tagging, and maintenance delegation.
   */
@@ -17,10 +14,6 @@ class IcebergTableManager(
 ) {
 
   private val logger = LoggerFactory.getLogger(getClass)
-
-  private val sqlTimestampFmt = DateTimeFormatter
-    .ofPattern("yyyy-MM-dd HH:mm:ss")
-    .withZone(ZoneOffset.UTC)
 
   /** Returns the fully qualified Iceberg table name for a flow (catalogName.namespace.flowName). */
   def resolveTableName(flowConfig: FlowConfig): String =
@@ -243,15 +236,17 @@ class IcebergTableManager(
     logger.info(s"Sort order applied to $tableName: $sortExpr")
   }
 
-  /** Returns the latest snapshot ID for a flow's table, or None if the table has no snapshots. */
-  def getCurrentSnapshotId(flowConfig: FlowConfig): Option[Long] = {
-    val tableName = resolveTableName(flowConfig)
+  /** Returns the current main-branch snapshot ID, or None if the table has no snapshots. */
+  def getCurrentSnapshotId(flowConfig: FlowConfig): Option[Long] =
+    getCurrentSnapshotId(resolveTableName(flowConfig))
+
+  def getCurrentSnapshotId(tableName: String): Option[Long] = {
     try {
-      val snapshots = spark.sql(
-        s"SELECT snapshot_id FROM $tableName.snapshots ORDER BY committed_at DESC LIMIT 1"
+      val refs = spark.sql(
+        s"SELECT snapshot_id FROM $tableName.refs WHERE name = 'main'"
       )
-      if (snapshots.isEmpty) None
-      else Some(snapshots.first().getLong(0))
+      if (refs.isEmpty) None
+      else Some(refs.first().getLong(0))
     } catch {
       case _: org.apache.spark.sql.AnalysisException => None
     }
@@ -262,14 +257,38 @@ class IcebergTableManager(
       flowConfig: FlowConfig,
       snapshotId: Long,
       batchId: String
+  ): Boolean = tagSnapshot(resolveTableName(flowConfig), snapshotId, batchId)
+
+  def tagSnapshot(
+      tableName: String,
+      snapshotId: Long,
+      batchId: String
   ): Boolean = {
     if (!icebergConfig.enableSnapshotTagging) return false
 
-    val tableName = resolveTableName(flowConfig)
     val tagName = s"batch_$batchId"
+    val retentionClause = icebergConfig.maintenance.snapshotRetentionDays match {
+      case Some(days) if days > 0 => s" RETAIN $days DAYS"
+      case Some(days) =>
+        logger.error(s"Cannot tag $tableName: snapshotRetentionDays must be positive, got $days")
+        return false
+      case None => ""
+    }
+    val quotedTag = s"`${tagName.replace("`", "``")}`"
+    val escapedTag = tagName.replace("'", "''")
     try {
+      val existingSnapshot = spark
+        .sql(s"SELECT snapshot_id FROM $tableName.refs WHERE name = '$escapedTag'")
+        .collect()
+        .headOption
+        .map(_.getLong(0))
+      if (existingSnapshot.exists(_ != snapshotId)) {
+        logger.error(s"Tag '$tagName' on $tableName already references a different snapshot")
+        return false
+      }
+      val action = if (existingSnapshot.isEmpty) "CREATE TAG" else "REPLACE TAG"
       spark.sql(
-        s"ALTER TABLE $tableName CREATE TAG `$tagName` AS OF VERSION $snapshotId"
+        s"ALTER TABLE $tableName $action $quotedTag AS OF VERSION $snapshotId$retentionClause"
       )
       logger.info(s"Tagged snapshot $snapshotId as '$tagName' on $tableName")
       true

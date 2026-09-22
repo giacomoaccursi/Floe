@@ -1,13 +1,11 @@
 package com.etl.framework.pipeline
 
 import com.etl.framework.config.IcebergConfig
+import com.etl.framework.iceberg.{IcebergMaintenanceRunner, IcebergTableManager}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types.StructType
 import org.slf4j.LoggerFactory
-
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 
 /** Executes derived table functions and writes results to Iceberg as full-load tables. Each derived table gets snapshot
   * tagging and post-write maintenance.
@@ -17,10 +15,7 @@ class DerivedTableExecutor(
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
-
-  private val sqlTimestampFmt = DateTimeFormatter
-    .ofPattern("yyyy-MM-dd HH:mm:ss")
-    .withZone(ZoneOffset.UTC)
+  private val tableManager = new IcebergTableManager(spark, icebergConfig)
 
   /** Executes all derived table functions and writes results to Iceberg. Runs maintenance on successful tables. */
   def execute(
@@ -81,14 +76,10 @@ class DerivedTableExecutor(
     if (!icebergConfig.enableSnapshotTagging) return
 
     try {
-      val snapshotId = spark
-        .sql(s"SELECT snapshot_id FROM $fullTableName.snapshots ORDER BY committed_at DESC LIMIT 1")
-        .first()
-        .getLong(0)
-
-      val tagName = s"batch_$batchId"
-      spark.sql(s"ALTER TABLE $fullTableName CREATE TAG `$tagName` AS OF VERSION $snapshotId")
-      logger.info(s"Tagged snapshot $snapshotId as '$tagName' on $fullTableName")
+      tableManager.getCurrentSnapshotId(fullTableName).foreach { snapshotId =>
+        if (tableManager.tagSnapshot(fullTableName, snapshotId, batchId))
+          logger.info(s"Tagged derived table snapshot $snapshotId on $fullTableName")
+      }
     } catch {
       case e: Exception =>
         logger.warn(s"Failed to tag snapshot on $fullTableName: ${e.getMessage}")
@@ -96,37 +87,11 @@ class DerivedTableExecutor(
   }
 
   private def runMaintenance(tableNames: Seq[String]): Unit = {
-    val maintenance = icebergConfig.maintenance
+    val runner = new IcebergMaintenanceRunner(spark, icebergConfig)
     tableNames.foreach { tableName =>
       val fullTableName = resolveTableName(tableName)
       try {
-        maintenance.snapshotRetentionDays.foreach { days =>
-          val olderThan = java.time.Instant.now().minusSeconds(days.toLong * 86400)
-          spark.sql(
-            s"CALL ${icebergConfig.catalogName}.system.expire_snapshots(" +
-              s"table => '$fullTableName', " +
-              s"older_than => TIMESTAMP '${sqlTimestampFmt.format(olderThan)}')"
-          )
-        }
-        maintenance.targetFileSizeMb.foreach { size =>
-          spark.sql(
-            s"CALL ${icebergConfig.catalogName}.system.rewrite_data_files(" +
-              s"table => '$fullTableName', " +
-              s"options => map('target-file-size-bytes', '${size.toLong * 1024 * 1024}'))"
-          )
-        }
-        maintenance.orphanRetentionMinutes.foreach { mins =>
-          val retentionMinutes = math.max(mins, 1440)
-          val olderThan = java.time.Instant.now().minusSeconds(retentionMinutes.toLong * 60)
-          spark.sql(
-            s"CALL ${icebergConfig.catalogName}.system.remove_orphan_files(" +
-              s"table => '$fullTableName', " +
-              s"older_than => TIMESTAMP '${sqlTimestampFmt.format(olderThan)}')"
-          )
-        }
-        if (maintenance.enableManifestRewrite) {
-          spark.sql(s"CALL ${icebergConfig.catalogName}.system.rewrite_manifests('$fullTableName')")
-        }
+        runner.run(fullTableName, icebergConfig.maintenance)
         logger.info(s"Maintenance completed on $fullTableName")
       } catch {
         case e: Exception =>

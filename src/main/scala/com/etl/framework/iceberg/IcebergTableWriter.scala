@@ -2,7 +2,7 @@ package com.etl.framework.iceberg
 
 import com.etl.framework.config.{FlowConfig, IcebergConfig}
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.functions.lit
+import org.apache.spark.sql.functions.{col, count, lit}
 import org.apache.spark.sql.types.StructType
 import org.slf4j.LoggerFactory
 
@@ -24,6 +24,25 @@ class IcebergTableWriter(
 ) {
 
   private val logger = LoggerFactory.getLogger(getClass)
+
+  /** Iceberg identifier fields are metadata, not a uniqueness constraint. Never feed an ambiguous source to MERGE. */
+  private def validateMergeKeys(df: DataFrame, pkColumns: Seq[String]): Unit = {
+    require(pkColumns.nonEmpty, "MERGE requires at least one primary-key column")
+    val missing = pkColumns.filterNot(df.columns.contains)
+    require(missing.isEmpty, s"MERGE key columns missing from source: ${missing.mkString(", ")}")
+
+    val nullKey = pkColumns.map(c => col(c).isNull).reduce(_ || _)
+    require(df.filter(nullKey).limit(1).count() == 0L, "MERGE source contains a NULL primary key")
+
+    val duplicateCountCol = s"__floe_merge_key_count_${UUID.randomUUID().toString.replace("-", "")}"
+    val hasDuplicateKey = df
+      .groupBy(pkColumns.map(col): _*)
+      .agg(count(lit(1)).as(duplicateCountCol))
+      .filter(col(duplicateCountCol) > 1L)
+      .limit(1)
+      .count() > 0L
+    require(!hasDuplicateKey, "MERGE source contains duplicate primary keys; define a deterministic resolution upstream")
+  }
 
   private def sanitizeViewName(flowName: String): String =
     flowName.replaceAll("[^a-zA-Z0-9_]", "_")
@@ -76,6 +95,7 @@ class IcebergTableWriter(
         logger.warn(s"No primary key defined for $tableName, falling back to append")
         cachedDf.writeTo(tableName).append()
       } else {
+        validateMergeKeys(cachedDf, pkColumns)
         val mergeCondition = pkColumns
           .map(col => s"target.$col = source.$col")
           .mkString(" AND ")
@@ -144,6 +164,7 @@ class IcebergTableWriter(
 
     val cachedDf = df.cache()
     try {
+      validateMergeKeys(cachedDf, cfg.pkColumns)
       if (isInitialLoad)
         executeSCD2InitialLoad(cachedDf, tableName, flowConfig.name, cfg)
       else

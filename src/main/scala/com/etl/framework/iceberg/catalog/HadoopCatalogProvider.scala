@@ -3,7 +3,7 @@ package com.etl.framework.iceberg.catalog
 import com.etl.framework.config.IcebergConfig
 import org.apache.spark.sql.SparkSession
 
-/** Configures the Spark catalog for Hadoop-based Iceberg (local filesystem or HDFS). */
+/** Configures the Spark catalog for Hadoop-based Iceberg (local filesystem or HDFS; S3 needs a lock manager). */
 class HadoopCatalogProvider extends CatalogProvider {
 
   private val icebergExtensions =
@@ -38,8 +38,16 @@ class HadoopCatalogProvider extends CatalogProvider {
   override def validateConfig(
       config: IcebergConfig
   ): Either[String, Unit] = {
+    val objectStore = config.warehouse.matches("(?i)^s3(a|n)?://.*")
+    val lockImpl = config.catalogProperties.get("lock-impl").filter(_.nonEmpty)
     if (config.warehouse.isEmpty) {
       Left("warehouse path is required for hadoop catalog")
+    } else if (objectStore && lockImpl.isEmpty) {
+      Left("Hadoop catalog on S3 requires a catalog lock-impl (for example DynamoDbLockManager); " +
+        "consider GlueCatalog with optimistic locking instead")
+    } else if (objectStore && lockImpl.exists(_.endsWith("DynamoDbLockManager")) &&
+      !config.catalogProperties.get("lock.table").exists(_.nonEmpty)) {
+      Left("DynamoDbLockManager requires catalogProperties.lock.table")
     } else {
       Right(())
     }

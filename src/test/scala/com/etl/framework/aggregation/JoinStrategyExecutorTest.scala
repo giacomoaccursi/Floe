@@ -85,6 +85,22 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     bobOrders should have size 0
   }
 
+  it should "reject a nest alias that collides with a parent column" in {
+    val parent = Seq((1, "existing")).toDF("id", "orders")
+    val child = Seq((1, "order1")).toDF("parent_id", "order_name")
+    import com.etl.framework.config.JoinType._
+
+    val error = intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(LeftOuter, "child", Seq(JoinCondition("id", "parent_id")), Nest, nestAs = Some("orders"))
+      )
+    }
+
+    error.getMessage should include("orders")
+  }
+
   // --- Flatten strategy ---
 
   "JoinStrategyExecutor (flatten)" should "flatten child fields into parent record" in {
@@ -255,6 +271,96 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     intercept[ValidationConfigException] {
       executor.applyJoin(parent, child, joinConfig)
     }
+  }
+
+  it should "reject aggregate aliases that collide with parent columns" in {
+    val parent = Seq((1, "Alice")).toDF("id", "name")
+    val child = Seq((1, 10.0)).toDF("parent_id", "amount")
+    import com.etl.framework.config.AggregationFunction._
+    import com.etl.framework.config.JoinType._
+
+    val error = intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(
+          LeftOuter,
+          "child",
+          Seq(JoinCondition("id", "parent_id")),
+          Aggregate,
+          aggregations = Seq(AggregationSpec("amount", Sum, "name"))
+        )
+      )
+    }
+
+    error.getMessage should include("name")
+  }
+
+  it should "require orderBy for first and last aggregations" in {
+    val parent = Seq(1).toDF("id")
+    val child = Seq((1, "old", 1), (1, "new", 2)).toDF("parent_id", "value", "sequence")
+    import com.etl.framework.config.AggregationFunction._
+    import com.etl.framework.config.JoinType._
+
+    intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(
+          LeftOuter,
+          "child",
+          Seq(JoinCondition("id", "parent_id")),
+          Aggregate,
+          aggregations = Seq(AggregationSpec("value", First, "first_value"))
+        )
+      )
+    }
+  }
+
+  it should "compute first and last deterministically from orderBy" in {
+    val parent = Seq(1).toDF("id")
+    val child = Seq((1, "middle", 2), (1, "last", 3), (1, "first", 1))
+      .toDF("parent_id", "value", "sequence")
+    import com.etl.framework.config.AggregationFunction._
+    import com.etl.framework.config.JoinType._
+
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(
+        LeftOuter,
+        "child",
+        Seq(JoinCondition("id", "parent_id")),
+        Aggregate,
+        aggregations = Seq(
+          AggregationSpec("value", First, "first_value", orderBy = Seq("sequence")),
+          AggregationSpec("value", Last, "last_value", orderBy = Seq("sequence"))
+        )
+      )
+    )
+
+    result.select("first_value", "last_value").as[(String, String)].head() shouldBe (("first", "last"))
+  }
+
+  it should "sort collect_list output deterministically" in {
+    val parent = Seq(1).toDF("id")
+    val child = Seq((1, "c"), (1, "a"), (1, "b")).toDF("parent_id", "value").repartition(3)
+    import com.etl.framework.config.AggregationFunction._
+    import com.etl.framework.config.JoinType._
+
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(
+        LeftOuter,
+        "child",
+        Seq(JoinCondition("id", "parent_id")),
+        Aggregate,
+        aggregations = Seq(AggregationSpec("value", CollectList, "values"))
+      )
+    )
+
+    result.select("values").as[Seq[String]].head() shouldBe Seq("a", "b", "c")
   }
 
 }

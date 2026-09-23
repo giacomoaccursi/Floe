@@ -88,8 +88,11 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 | `column` | string | yes | Column to aggregate |
 | `function` | string | yes | Aggregation function |
 | `alias` | string | yes | Output column name |
+| `orderBy` | list | for `first`/`last` | Child columns defining ascending order |
 
 Supported aggregation functions: `sum`, `count`, `avg` (alias: `average`), `min`, `max`, `first`, `last`, `collect_list`, `collect_set`.
+
+`first` and `last` are rejected without `orderBy`; relying on Spark's post-shuffle row order is not deterministic. `collect_list` is returned in value order. `collect_set` expresses a set and its array order is unspecified. Output aliases cannot duplicate one another or a parent column.
 
 ## sourceTable — reading from external Iceberg tables
 

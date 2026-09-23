@@ -43,12 +43,13 @@ class JoinStrategyExecutor {
     )
 
     val nestFieldName = joinConfig.nestAs.getOrElse("nested_records")
+    rejectOutputNameCollisions(left, Seq(nestFieldName), "nest")
     val rightJoinKeys = joinConfig.conditions.map(_.right)
     val rightStruct = struct(right.columns.map(right(_)): _*)
 
     val groupedRight = right
       .groupBy(rightJoinKeys.map(right(_)): _*)
-      .agg(collect_list(rightStruct).as(nestFieldName))
+      .agg(sort_array(collect_list(rightStruct)).as(nestFieldName))
 
     val joined = left.join(
       groupedRight,
@@ -129,6 +130,7 @@ class JoinStrategyExecutor {
     )
 
     val rightJoinKeys = joinConfig.conditions.map(_.right)
+    rejectOutputNameCollisions(left, joinConfig.aggregations.map(_.alias), "aggregate")
 
     val aggExprs = joinConfig.aggregations.map { aggSpec =>
       import com.etl.framework.config.AggregationFunction._
@@ -138,9 +140,9 @@ class JoinStrategyExecutor {
         case Avg         => avg(right(aggSpec.column))
         case Min         => min(right(aggSpec.column))
         case Max         => max(right(aggSpec.column))
-        case First       => first(right(aggSpec.column))
-        case Last        => last(right(aggSpec.column))
-        case CollectList => collect_list(right(aggSpec.column))
+        case First       => min_by(right(aggSpec.column), orderingColumn(right, aggSpec))
+        case Last        => max_by(right(aggSpec.column), orderingColumn(right, aggSpec))
+        case CollectList => sort_array(collect_list(right(aggSpec.column)))
         case CollectSet  => collect_set(right(aggSpec.column))
       }
       aggFunc.as(aggSpec.alias)
@@ -171,5 +173,25 @@ class JoinStrategyExecutor {
     val leftSelects = left.columns.map(left(_))
     val aggSelects = joinConfig.aggregations.map(spec => aggregatedRight(spec.alias))
     result.select((leftSelects ++ aggSelects): _*)
+  }
+
+  private def orderingColumn(right: DataFrame, spec: com.etl.framework.config.AggregationSpec) = {
+    if (spec.orderBy.isEmpty)
+      throw ValidationConfigException(s"Aggregation '${spec.alias}' with ${spec.function.name} requires orderBy")
+    val missing = spec.orderBy.filterNot(right.columns.contains)
+    if (missing.nonEmpty)
+      throw ValidationConfigException(s"Aggregation '${spec.alias}' orderBy columns not found: ${missing.mkString(", ")}")
+    if (spec.orderBy.size == 1) right(spec.orderBy.head)
+    else struct(spec.orderBy.map(right(_)): _*)
+  }
+
+  private def rejectOutputNameCollisions(left: DataFrame, outputNames: Seq[String], strategy: String): Unit = {
+    val duplicates = outputNames.groupBy(identity).collect { case (name, values) if values.size > 1 => name }.toSeq
+    val parentCollisions = outputNames.distinct.filter(left.columns.contains)
+    val collisions = (duplicates ++ parentCollisions).distinct
+    if (collisions.nonEmpty)
+      throw ValidationConfigException(
+        s"$strategy join output names collide with parent or each other: ${collisions.mkString(", ")}"
+      )
   }
 }

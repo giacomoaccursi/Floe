@@ -45,5 +45,6 @@ case class JoinCondition(
 case class AggregationSpec(
     column: String,
     function: AggregationFunction,
-    alias: String
+    alias: String,
+    orderBy: Seq[String] = Seq.empty
 )

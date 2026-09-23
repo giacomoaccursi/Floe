@@ -195,4 +195,48 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
 
     issues shouldBe empty
   }
+
+  it should "reject an invalid programmatic FK during build" in {
+    val parent = TestFixtures.flowConfig("parent")
+    val child = TestFixtures.flowConfig(
+      "child",
+      foreignKeys = Seq(
+        ForeignKeyConfig(Seq("parent_id", "tenant_id"), ReferenceConfig("parent", Seq("id")))
+      )
+    )
+
+    val error = intercept[IllegalArgumentException] {
+      IngestionPipeline.builder().withGlobalConfig(TestFixtures.globalConfig()).withFlowConfigs(Seq(parent, child)).build()
+    }
+
+    error.getMessage should include("different local/reference arity")
+  }
+
+  it should "report missing SCD2 columns in a programmatic schema" in {
+    val flow = TestFixtures
+      .flowConfig(
+        "scd2_invalid",
+        loadMode = LoadMode.SCD2,
+        primaryKey = Seq("missing_id"),
+        columns = Seq(ColumnConfig("id", "string", nullable = false)),
+        enforceSchema = true,
+        compareColumns = Seq("missing_value")
+      )
+
+    val issues = IngestionPipeline.builder().withGlobalConfig(TestFixtures.globalConfig()).withFlowConfigs(Seq(flow)).validate()
+
+    issues.exists(_.contains("primaryKey columns are not declared")) shouldBe true
+    issues.exists(_.contains("compareColumns are not declared")) shouldBe true
+  }
+
+  it should "fail when domains.yaml exists but is malformed" in {
+    val dir = Files.createTempDirectory("validate-bad-domains")
+    setupValidConfig(dir)
+    writeFile(dir.resolve("domains.yaml"), "domains: [broken: yaml")
+
+    val issues = IngestionPipeline.builder().withConfigDirectory(dir.toString).validate()
+
+    issues should not be empty
+    issues.head should include("domains.yaml")
+  }
 }

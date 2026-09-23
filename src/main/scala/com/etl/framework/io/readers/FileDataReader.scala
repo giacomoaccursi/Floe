@@ -52,7 +52,7 @@ class FileDataReader(
   private def convertToSparkSchema(schema: SchemaConfig): StructType = {
     StructType(schema.columns.map { col =>
       StructField(
-        col.name,
+        col.sourceColumn.getOrElse(col.name),
         mapTypeToSparkType(col.`type`),
         col.nullable
       )

@@ -32,6 +32,8 @@ object ConfigHints {
 trait ConfigLoader[T] {
   def load(path: String): Either[ConfigurationException, T]
 
+  protected def hadoopConfiguration: Configuration = new Configuration()
+
   /** Load configuration from a YAML file using PureConfig
     */
   protected def loadFromYamlFile(
@@ -63,7 +65,7 @@ trait ConfigLoader[T] {
   private def loadFromHadoopFs(path: String): Either[ConfigurationException, String] = {
     try {
       val hadoopPath = new HadoopPath(path)
-      val fs = FileSystem.get(hadoopPath.toUri, new Configuration())
+      val fs = FileSystem.get(hadoopPath.toUri, hadoopConfiguration)
       val stream = fs.open(hadoopPath)
       try {
         Right(Source.fromInputStream(stream).mkString)
@@ -174,7 +176,8 @@ trait ConfigLoader[T] {
 
 /** Global configuration loader
   */
-class GlobalConfigLoader extends ConfigLoader[GlobalConfig] {
+class GlobalConfigLoader(configuration: Configuration = new Configuration()) extends ConfigLoader[GlobalConfig] {
+  override protected def hadoopConfiguration: Configuration = configuration
 
   override def load(
       path: String
@@ -189,7 +192,8 @@ class GlobalConfigLoader extends ConfigLoader[GlobalConfig] {
 
 /** Domains configuration loader
   */
-class DomainsConfigLoader extends ConfigLoader[DomainsConfig] {
+class DomainsConfigLoader(configuration: Configuration = new Configuration()) extends ConfigLoader[DomainsConfig] {
+  override protected def hadoopConfiguration: Configuration = configuration
 
   override def load(
       path: String
@@ -216,7 +220,8 @@ private[config] case class FlowConfigYaml(
     validation: ValidationConfig = ValidationConfig(),
     output: OutputConfig = OutputConfig(),
     dependsOn: Seq[String] = Seq.empty,
-    maxRejectionRate: Option[Double] = None
+    maxRejectionRate: Option[Double] = None,
+    minInputRecords: Option[Long] = None
 ) {
   def toFlowConfig: FlowConfig = FlowConfig(
     name = name,
@@ -230,6 +235,7 @@ private[config] case class FlowConfigYaml(
     output = output,
     dependsOn = dependsOn,
     maxRejectionRate = maxRejectionRate,
+    minInputRecords = minInputRecords,
     preValidationTransformation = None,
     postValidationTransformation = None
   )
@@ -247,13 +253,15 @@ private[config] object FlowConfigYaml {
     validation = fc.validation,
     output = fc.output,
     dependsOn = fc.dependsOn,
-    maxRejectionRate = fc.maxRejectionRate
+    maxRejectionRate = fc.maxRejectionRate,
+    minInputRecords = fc.minInputRecords
   )
 }
 
 /** Flow configuration loader
   */
-class FlowConfigLoader extends ConfigLoader[FlowConfig] {
+class FlowConfigLoader(configuration: Configuration = new Configuration()) extends ConfigLoader[FlowConfig] {
+  override protected def hadoopConfiguration: Configuration = configuration
 
   override def load(
       path: String
@@ -272,35 +280,14 @@ class FlowConfigLoader extends ConfigLoader[FlowConfig] {
     } yield flowConfig
   }
 
-  /** Validates SCD2-specific constraints: compareColumns required, PK required and non-nullable. */
+  /** Validates structural constraints shared with programmatic pipeline construction. */
   private def validateFlowConfig(
       config: FlowConfig,
       path: String
   ): Either[ConfigurationException, Unit] = {
-    def err(msg: String): Either[ConfigurationException, Unit] =
-      Left(ConfigFileException(file = path, message = s"Flow '${config.name}': $msg"))
-
-    config.loadMode.`type` match {
-      case LoadMode.SCD2 =>
-        if (config.loadMode.compareColumns.isEmpty)
-          err("SCD2 requires compareColumns to be non-empty")
-        else if (config.validation.primaryKey.isEmpty)
-          err("SCD2 requires non-empty primaryKey for record identification")
-        else {
-          // SCD2 uses NULL as a sentinel in merge key columns; a nullable PK
-          // collides with it and causes duplicate insertions on every run.
-          val nullablePkCols = config.validation.primaryKey.filter { pk =>
-            config.schema.columns.find(_.name == pk).exists(_.nullable)
-          }
-          if (nullablePkCols.nonEmpty)
-            err(
-              s"SCD2 requires all PK columns to be non-nullable; " +
-                s"declare nullable=false for: ${nullablePkCols.mkString(", ")}"
-            )
-          else Right(())
-        }
-      case _ => Right(())
-    }
+    val errors = FlowConfigValidator.validate(config)
+    if (errors.isEmpty) Right(())
+    else Left(ConfigFileException(file = path, message = s"Flow '${config.name}': ${errors.mkString("; ")}"))
   }
 
   /** Parses YAML to the intermediate FlowConfigYaml (excludes non-serializable FlowTransformation fields). */

@@ -72,6 +72,32 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
     }
   }
 
+  it should "enforce types using physical sourceColumn names before canonical rename" in {
+    val csvFile = createTempCsv("CustID,nm\n1,Alice")
+    try {
+      val sourceConfig = SourceConfig(
+        path = csvFile.toString,
+        format = Some(FileFormat.CSV),
+        options = Map("header" -> "true")
+      )
+      val schemaConfig = SchemaConfig(
+        enforceSchema = true,
+        columns = Seq(
+          ColumnConfig("customer_id", "integer", nullable = false, sourceColumn = Some("CustID")),
+          ColumnConfig("full_name", "string", nullable = true, sourceColumn = Some("nm"))
+        )
+      )
+
+      val df = new FileDataReader(sourceConfig, Some(schemaConfig)).read()
+
+      df.columns shouldBe Array("CustID", "nm")
+      df.schema("CustID").dataType.simpleString shouldBe "int"
+    } finally {
+      Files.deleteIfExists(csvFile)
+      Files.deleteIfExists(csvFile.getParent)
+    }
+  }
+
   // Removed obsolete test "throw exception for unsupported format"
   // because strong typing with Enums prevents invalid values at compile time.
 

@@ -109,6 +109,18 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     written.count() shouldBe 0L
   }
 
+  it should "retain rejected records from earlier batches" in {
+    val rejectedPath = tempDir.resolve("rejected_history").toString
+    val flowConfig = createFlowConfig("history_flow", rejectedPath = Some(rejectedPath))
+    val writer = createWriter(flowConfig, createGlobalConfig())
+
+    writer.writeRejected(Seq(("id1", "old")).toDF("id", "reason"), "batch_old")
+    writer.writeRejected(Seq(("id2", "new")).toDF("id", "reason"), "batch_new")
+
+    spark.read.parquet(rejectedPath).select("_batch_id").collect().map(_.getString(0)).toSet shouldBe
+      Set("batch_old", "batch_new")
+  }
+
   "FlowDataWriter.writeWarnings" should "write warnings to default path when warningsPath is not configured" in {
     val flowConfig = createFlowConfig("warn_flow")
     val globalConfig = createGlobalConfig()
@@ -138,5 +150,20 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     val written = spark.read.parquet(expectedPath)
     written.count() shouldBe 1L
     written.first().getAs[String]("_batch_id") shouldBe "batch_w2"
+  }
+
+  it should "retain warnings from earlier batches" in {
+    val warningsBase = tempDir.resolve("warnings_history").toString
+    val flowConfig = createFlowConfig("warn_history_flow")
+    val globalConfig = createGlobalConfig().copy(
+      paths = createGlobalConfig().paths.copy(warningsPath = Some(warningsBase))
+    )
+    val writer = createWriter(flowConfig, globalConfig)
+
+    writer.writeWarnings(Seq(("id1", "rule", "old")).toDF("pk", "_warning_rule", "_warning_message"), "batch_old")
+    writer.writeWarnings(Seq(("id2", "rule", "new")).toDF("pk", "_warning_rule", "_warning_message"), "batch_new")
+
+    spark.read.parquet(s"$warningsBase/${flowConfig.name}").select("_batch_id").collect()
+      .map(_.getString(0)).toSet shouldBe Set("batch_old", "batch_new")
   }
 }

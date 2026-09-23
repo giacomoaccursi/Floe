@@ -2,12 +2,13 @@ package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
 import com.etl.framework.util.{IcebergMetadataSerializer, JsonFileWriter}
+import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
 
 class FlowMetadataWriter(
     flowConfig: FlowConfig,
     globalConfig: GlobalConfig
-) {
+)(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -27,7 +28,9 @@ class FlowMetadataWriter(
       "rejection_rate" -> result.rejectionRate,
       "execution_time_ms" -> result.executionTimeMs,
       "rejection_reasons" -> result.rejectionReasons,
-      "error" -> result.error.getOrElse("")
+      "error" -> result.error.getOrElse(""),
+      "write_attempted" -> result.writeAttempted,
+      "retryable" -> result.retryable
     )
 
     val metadata = result.icebergMetadata match {
@@ -35,7 +38,7 @@ class FlowMetadataWriter(
       case None          => baseMetadata
     }
 
-    JsonFileWriter.write(metadata, metadataPath)
+    JsonFileWriter.write(metadata, metadataPath, spark.sparkContext.hadoopConfiguration)
     logger.debug(s"Flow metadata written: ${flowConfig.name} → $metadataPath")
   }
 }

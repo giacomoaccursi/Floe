@@ -2,12 +2,13 @@ package com.etl.framework.orchestration.batch
 
 import java.time.Instant
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 object BatchIdGenerator {
 
   def generate(format: String): String = {
     val timestamp = Instant.now()
-    format match {
+    val formattedTime = format match {
       case "timestamp" =>
         timestamp.toEpochMilli.toString
       case _ =>
@@ -17,5 +18,7 @@ object BatchIdGenerator {
           .withZone(java.time.ZoneId.systemDefault())
           .format(timestamp)
     }
+    val entropy = UUID.randomUUID().toString.replace("-", "")
+    s"${formattedTime}_$entropy"
   }
 }

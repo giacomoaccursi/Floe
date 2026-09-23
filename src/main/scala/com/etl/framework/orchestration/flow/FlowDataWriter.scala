@@ -35,9 +35,10 @@ class FlowDataWriter(
   /** Writes rejected data
     */
   def writeRejected(rejectedData: DataFrame, batchId: String): Unit = {
-    val rejectedPath = flowConfig.output.rejectedPath.getOrElse(
+    val rejectedBasePath = flowConfig.output.rejectedPath.getOrElse(
       s"${globalConfig.paths.rejectedPath}/${flowConfig.name}"
     )
+    val rejectedPath = s"$rejectedBasePath/batch_id=$batchId"
 
     TimingUtil.timed(logger, s"Write rejected data to $rejectedPath") {
       val rejectedWithAudit = rejectedData
@@ -54,7 +55,7 @@ class FlowDataWriter(
     */
   def writeWarnings(warnedData: DataFrame, batchId: String): Unit = {
     val basePath = globalConfig.paths.warningsPath.getOrElse(s"${globalConfig.paths.outputPath}/warnings")
-    val warningsPath = s"$basePath/${flowConfig.name}"
+    val warningsPath = s"$basePath/${flowConfig.name}/batch_id=$batchId"
 
     TimingUtil.timed(logger, s"Write warnings to $warningsPath") {
       warnedData

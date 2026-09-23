@@ -47,7 +47,7 @@ A batch execution follows this sequence:
    Read from Iceberg (full history) → Compute → Write to Iceberg
 
 6. Post-batch
-   Orphan detection → Batch metadata write → Table maintenance
+   Orphan detection → Derived tables → Table maintenance → Batch metadata and quality metrics
 
 7. DAG aggregation (if configured, separate execution)
    Load DAG config → Resolve join dependencies → Execute nodes → Produce output
@@ -60,7 +60,7 @@ A batch execution follows this sequence:
 - **Fail-fast**: configuration errors are caught at startup, not at runtime. Missing fields, invalid references, and type mismatches all fail before any data is processed.
 - **Immutable context**: `TransformationContext` is immutable. Every modification returns a new instance, preventing side effects between transformations.
 - **Bounded parallelism**: parallel execution uses explicitly sized thread pools, never the global execution context.
-- **Best-effort maintenance**: table maintenance (compaction, snapshot expiration) runs after writes but does not block batch success.
+- **Observable best-effort maintenance**: maintenance does not change data success, but per-table status is returned in `IngestionResult` and persisted in batch metadata.
 
 ## Modules
 

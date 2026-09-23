@@ -45,7 +45,7 @@ Base directories for all pipeline output.
 | `outputPath` | yes | — | Base directory for flow output data |
 | `rejectedPath` | yes | — | Directory for rejected records |
 | `metadataPath` | yes | — | Directory for batch and flow metadata JSON |
-| `warningsPath` | no | `{outputPath}/warnings` | Directory for validation warning records. If not set, defaults to `{outputPath}/warnings`. Each flow's warnings are written to `{warningsPath}/{flowName}/`. |
+| `warningsPath` | no | `{outputPath}/warnings` | Base directory for validation warning records. Each batch is written to `{warningsPath}/{flowName}/batch_id={batchId}/`. |
 
 The first three paths are required. `warningsPath` is optional — if omitted, warnings go to `{outputPath}/warnings`. They can use [variable substitution](overview.md#variable-substitution):
 
@@ -63,14 +63,14 @@ Controls batch execution and validation behavior. This entire section is optiona
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `batchIdFormat` | `yyyyMMdd_HHmmss` | Java `DateTimeFormatter` pattern for batch ID generation. Use `timestamp` for epoch millis. |
+| `batchIdFormat` | `yyyyMMdd_HHmmss` | Java `DateTimeFormatter` pattern for the readable prefix of a batch ID. Use `timestamp` for epoch millis. A random UUID suffix is always appended to avoid collisions. |
 | `maxRejectionRate` | — (disabled) | If set, the batch stops when any flow's rejection rate exceeds this threshold (0.1 = 10%). |
 | `maxRetries` | `0` | Maximum number of retries per flow on failure. `0` means no retry. |
 | `retryBackoffMs` | `1000` | Base delay in milliseconds for exponential backoff between retries. |
 | `qualityMetricsTable` | — (disabled) | If set, writes per-flow quality metrics to this Iceberg table after each batch. See [Quality Metrics](../guides/quality-metrics.md). |
 
 !!!warning "Batch ID collisions"
-    Low-granularity formats like `yyyyMMdd` produce the same batch ID if the pipeline runs more than once in the same day. This is safe for Full and Delta loads (idempotent), but SCD2 flows may create extra versions and snapshot tagging will fail on the duplicate tag. Use the default `yyyyMMdd_HHmmss` or `timestamp` to avoid collisions.
+    The timestamp pattern controls readability, not uniqueness: every generated ID also includes a UUID suffix. Full and Delta loads are **not** generally idempotent under replay (Delta without a primary key appends), so retain the generated ID and the exact source input when investigating a failed run.
 
 ### Rejection behavior
 
@@ -173,4 +173,4 @@ Post-batch table maintenance settings. Maintenance runs after all flows execute 
     FLOe clamps the configured threshold to **at least 24 hours** (1440 minutes). That is not universally safe: set it above the longest running write, backup or migration, or concurrent operations may lose in-flight files.
 
 !!!note "Maintenance is best-effort"
-    A maintenance failure does not abort the batch. The batch result still reports SUCCESS if all flow writes completed. However, subsequent maintenance operations in the same batch may be skipped if the failure propagates.
+    A maintenance failure does not change the data-success flag. Inspect `IngestionResult.maintenanceResults` or the batch summary's `maintenance_status`/`maintenance_results`, alert on failed targets, and retry only maintenance. A failure can skip later operations for that table; maintenance for other tables is still attempted.

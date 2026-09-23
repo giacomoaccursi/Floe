@@ -114,6 +114,8 @@ Duplicate detection uses `groupBy` + `count > 1`. All rows sharing a duplicated 
 
 Foreign keys validate that values in a child flow's columns exist in a parent flow's columns. The framework automatically executes parent flows before children based on FK dependencies, so the parent data is always available when the child is validated.
 
+When the parent uses SCD2, FK validation considers only its current versions (`is_current = true`, or the configured `isCurrentColumn`). Historical versions cannot satisfy a new child reference. For a full SCD2 load, missing parent keys are closed only when `detectDeletes: true`; otherwise they remain current and continue to satisfy FK checks.
+
 ```yaml
 foreignKeys:
   - columns: [customer_id]
@@ -300,11 +302,11 @@ The record is removed from the valid DataFrame and added to the rejected DataFra
 | `_rejected_at` | Timestamp of the validation step execution |
 | `_batch_id` | Batch identifier |
 
-Rejected records are written to the flow's `rejectedPath`.
+Rejected records are written to the flow's `rejectedPath` under `batch_id={batchId}/` (or `{global.rejectedPath}/{flowName}/batch_id={batchId}/` without a flow override). A new batch does not erase earlier diagnostic output; rerunning the same batch ID replaces only that batch's directory.
 
 ### warn
 
-The record stays in the valid DataFrame unchanged (no extra columns are added). A separate warning record is written to a Parquet file at `{warningsPath}/{flowName}/` (defaults to `{outputPath}/warnings/{flowName}/` if `warningsPath` is not configured in `global.yaml`). Each warning record contains the flow's primary key columns plus warning metadata:
+The record stays in the valid DataFrame unchanged (no extra columns are added). A separate warning record is written to Parquet at `{warningsPath}/{flowName}/batch_id={batchId}/` (defaults to `{outputPath}/warnings/{flowName}/batch_id={batchId}/` if `warningsPath` is not configured in `global.yaml`). Each warning record contains the flow's primary key columns plus warning metadata:
 
 | Column | Description |
 |--------|-------------|

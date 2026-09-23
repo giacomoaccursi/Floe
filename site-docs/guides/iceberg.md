@@ -434,7 +434,7 @@ For each flow's table, the framework runs the enabled maintenance operations:
 | Manifest rewrite | `CALL system.rewrite_manifests(table)` | Consolidates manifest files for faster metadata operations. Disabled by default. |
 
 !!!note "Maintenance is best-effort"
-    A maintenance failure causes the individual operation to fail but does not abort the batch. The batch result still reports SUCCESS if all flow writes completed. However, subsequent maintenance operations in the same batch may be skipped if the failure propagates.
+    A maintenance failure does not replay or invalidate a successful data commit. `IngestionResult.success` therefore remains the data outcome, while `maintenanceResults` reports each flow/derived table separately. The same statuses and errors are stored under `maintenance_status` and `maintenance_results` in `summary.json`; alert on failures and retry maintenance without rerunning ingestion. A failure inside one table's maintenance sequence can skip its later operations, while other tables are still attempted.
 
 !!!tip "Metadata file cleanup"
     Every commit creates a new metadata JSON file in the table's `metadata/` directory (e.g. `v1.metadata.json`, `v2.metadata.json`). These files are small (KB) but accumulate over time. To enable automatic cleanup, add these table properties:

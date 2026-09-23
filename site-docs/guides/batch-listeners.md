@@ -99,6 +99,7 @@ class LoggingListener extends BatchListener {
 | `success` | `Boolean` | Whether the batch completed successfully |
 | `error` | `Option[String]` | Error message if the batch failed |
 | `derivedTableResults` | `Seq[DerivedTableResult]` | Results of derived table execution |
+| `maintenanceResults` | `Seq[MaintenanceResult]` | Independent maintenance outcome for every attempted flow or derived table |
 
 Each `FlowResult` contains `flowName`, `batchId`, `success`, `inputRecords`, `validRecords`, `rejectedRecords`, `mergedRecords`, `rejectionRate`, `executionTimeMs`, `rejectionReasons`, `error`, and optional `icebergMetadata`.
 

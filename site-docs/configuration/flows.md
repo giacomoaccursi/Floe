@@ -73,6 +73,7 @@ output:
 | `owner` | no | `""` | Team or person responsible |
 | `dependsOn` | no | `[]` | List of flow names that must execute before this flow |
 | `maxRejectionRate` | no | — | Per-flow rejection rate threshold. Overrides the global `processing.maxRejectionRate`. |
+| `minInputRecords` | no | — | Pre-write cardinality gate. The flow fails before mutating Iceberg when the post-pre-transformation input count is below this value. Set deliberately on Full and SCD2 feeds where an unexpectedly empty/small snapshot would be destructive. |
 
 ### dependsOn
 

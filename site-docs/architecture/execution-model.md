@@ -99,9 +99,10 @@ graph TD
 
     subgraph Phase3["3. Post-batch phase"]
         P1["Orphan detection<br/>(time travel, cascade)"]
-        P2["Write batch metadata JSON"]
+        P2["Derived tables"]
         P3["Table maintenance<br/>(expire, compact, cleanup, rewrite)"]
-        P1 --> P2 --> P3
+        P4["Write batch metadata JSON<br/>and quality metrics"]
+        P1 --> P2 --> P3 --> P4
     end
 
     subgraph Phase4["4. DAG phase (separate execution)"]
@@ -134,7 +135,8 @@ Example: `20260328_150000`. The batch ID is used for:
 
 - **Flow failure**: if a flow fails, the batch stops. The failed flow is reported in `IngestionResult`.
 - **Rejection threshold**: if `maxRejectionRate` is configured (globally or per-flow) and any flow's rejection rate exceeds the threshold, the batch stops. In sequential execution, remaining flows in the current group are not executed. In parallel execution, flows already running complete but subsequent groups are not started.
-- **Post-batch failure**: orphan detection and maintenance failures do not affect the batch result. The batch reports SUCCESS if all flow writes completed.
+- **Orphan/derived failure**: orphan-detection and derived-table failures make `IngestionResult.success = false`; already committed tables are not rolled back.
+- **Maintenance failure**: maintenance does not change the data-success flag. Each flow and derived-table outcome is exposed separately in `maintenanceResults` and persisted in the batch summary, so operators can alert and retry maintenance without replaying ingestion.
 - **Iceberg atomicity**: if a write fails mid-way, Iceberg rolls back automatically. The table remains in the previous state.
 
 ## Related

@@ -45,7 +45,7 @@ To find keys removed by a parent:
 2. Read PKs from the **current state** of the table
 3. Compute the difference: `previous_PKs - current_PKs = removed_PKs`
 
-For SCD2, the "current state" only considers records where `is_current = true`, because closed records are logically deleted even though they're still physically present.
+For SCD2, **both** snapshots are filtered to records where `is_current = true` (or the configured current-version column). Closed historical versions are physically present but must not appear as newly removed keys in every later batch.
 
 If no previous snapshot exists (first-ever execution of the parent), there's nothing to compare against and the check is skipped.
 
@@ -240,15 +240,26 @@ Orphaned data remains in the tables but the team receives notification in the ba
 
 ## Limitations and considerations
 
-- **Time travel and retention**: if Iceberg maintenance has already expired the previous snapshot, time travel fails and the check is silently skipped (with a warning in the log). This is why orphan detection runs before maintenance.
+- **Time travel and retention**: if the previous snapshot is unavailable, the orphan check fails the batch; it is not treated as an empty set of removed keys. Derived tables and post-batch maintenance are skipped so that recovery evidence is preserved. This is why orphan detection runs before maintenance.
 
 - **First execution**: on the very first batch there is no previous snapshot. The check is skipped because there's no baseline to compare against.
 
 - **Performance**: time travel and left_anti join on PKs are lightweight operations as long as parent tables have a reasonable number of distinct keys. The detector projects only FK and PK columns from the child table (not `SELECT *`), keeping the scan narrow even on wide tables.
 
-- **Atomicity**: each DELETE on an Iceberg table is atomic. If the process fails mid-cascade, tables already cleaned stay clean and tables not yet processed remain untouched. On the next batch the detector retries.
+- **Atomicity**: each DELETE on one Iceberg table is atomic, but a cascade across tables is not. A failure can leave an already-cleaned child beside an unprocessed grandchild. The next batch does **not** reliably retry the missing step: its parent-snapshot diff may no longer contain the original removed key. Treat the failed batch as requiring reconciliation before another normal run.
 
 - **Warn as default**: the default is `warn` intentionally. Automatic deletion is a destructive operation that requires a conscious choice. In a production environment it's preferable to signal and let the team decide, rather than silently deleting data.
+
+- **SCD2 children**: orphan matching and `delete` apply only to the child's current version (`is_current = true`, or its configured current-version column). Closed versions remain historical evidence and are neither counted as current orphans nor hard-deleted.
+
+### Recovery after a partial batch or cascade
+
+1. Pause scheduled runs for the affected pipeline and retain the source input, batch metadata, Iceberg snapshots and tags. Do not expire snapshots or rerun the entire batch blindly: full, delta and SCD2 loads have different replay semantics, and append-only delta can duplicate rows.
+2. List every flow result and its table snapshot ID. Compare the pre-batch and post-batch snapshot of **each** table; a failed batch may already contain successful commits. If a flow failed after attempting a write, verify its current snapshot rather than assuming the commit failed.
+3. For an orphan cascade, compute the removed keys from the parent's **pre-batch current** state versus the intended post-batch current state. Compare each child and grandchild against that key set, including FKs renamed between levels. The detector's ordinary next-batch diff is not a durable worklist.
+4. Choose a table-specific repair: complete the missing delete with a reviewed predicate, or restore/replay affected tables from retained snapshots and original input. Validate row counts, current SCD2 versions, FK violations and derived outputs before resuming schedules. Record the repair's own snapshot IDs and operator approval.
+
+This is an operational runbook, not automatic rollback. FLOe does not currently persist a cross-table transaction log or an orphan-key worklist; exactly-once recovery from arbitrary process crashes remains an open design requirement.
 
 ## Related
 

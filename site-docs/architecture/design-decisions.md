@@ -18,7 +18,7 @@ A single MERGE INTO statement handles insert, update, and (for SCD2) close opera
 
 An `update-timestamp-column` approach is fragile — it assumes the source always provides a reliable, monotonically increasing timestamp, and silently overwrites data when the timestamp is missing or stale.
 
-Value-based change detection using the null-safe `<=>` operator makes no assumptions about the source: a row is updated if and only if at least one non-key column actually differs. This makes delta loads idempotent by default — re-running the same batch twice produces no writes and no data corruption.
+Value-based change detection using the null-safe `<=>` operator makes no assumptions about the source: for keyed Delta loads, a row is updated only when at least one compared non-key column differs. Replaying unchanged keyed input is therefore content-idempotent. Delta without a primary key is append-only and replay duplicates rows; post-commit failures also require snapshot inspection before retry.
 
 ## Why the NULL merge-key trick for SCD2
 

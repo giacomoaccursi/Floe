@@ -41,7 +41,7 @@ val result = IngestionPipeline.builder()
 ## What you get
 
 - **Write YAML, not code** — describe your data sources, schemas, and rules in config files. The framework reads, validates, and writes the data for you.
-- **Safe writes** — every write is atomic. If something fails mid-batch, your tables stay consistent. You can query any previous version of your data by batch ID.
+- **Atomic table commits** — each Iceberg write is atomic for one table and successful batch tags support time travel. A multi-table batch is not a distributed transaction: if a later flow fails, earlier table commits remain and require reconciliation.
 - **Data quality built in** — check for nulls, duplicates, invalid formats, value ranges, and referential integrity between tables. Bad records are separated and saved for review.
 - **Keep history** — track how records change over time with SCD2 (Slowly Changing Dimensions). The framework handles versioning, timestamps, and soft deletes automatically.
 - **Combine tables** — join data from multiple flows into aggregated views using a DAG. Nest child records, flatten columns, or compute summaries.

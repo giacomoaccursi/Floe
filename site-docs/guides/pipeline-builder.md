@@ -143,7 +143,8 @@ case class IngestionResult(
   flowResults: Seq[FlowResult],
   success: Boolean,
   error: Option[String] = None,
-  derivedTableResults: Seq[DerivedTableResult] = Seq.empty
+  derivedTableResults: Seq[DerivedTableResult] = Seq.empty,
+  maintenanceResults: Seq[MaintenanceResult] = Seq.empty
 )
 ```
 
@@ -151,9 +152,12 @@ case class IngestionResult(
 |-------|------|-------------|
 | `batchId` | `String` | Batch identifier (formatted according to `processing.batchIdFormat`) |
 | `flowResults` | `Seq[FlowResult]` | Results for each executed flow |
-| `success` | `Boolean` | `true` if all flows completed without fatal errors |
+| `success` | `Boolean` | `true` if all flows and all registered derived tables completed successfully |
 | `error` | `Option[String]` | Error message if the batch failed |
 | `derivedTableResults` | `Seq[DerivedTableResult]` | Results for each derived table (empty if none registered) |
+| `maintenanceResults` | `Seq[MaintenanceResult]` | Per-target maintenance status, independent from data success |
+
+`MaintenanceResult` identifies the `targetName`, whether it is a `flow` or `derived` target, its `success`, and any `error`. A maintenance failure should trigger an operational alert and maintenance-only retry; it must not cause an ingestion replay.
 
 ### FlowResult
 
@@ -346,7 +350,7 @@ You can also use `ctx.spark` for arbitrary Spark operations (reading external da
 4. Each successful write is tagged with the batch ID (if `enableSnapshotTagging` is `true` in `global.yaml`)
 5. Iceberg maintenance runs on all successfully written derived tables (same settings as flow tables — see [Iceberg maintenance](../configuration/global.md#maintenance))
 
-If a derived table fails, the error is logged and the remaining derived tables continue executing. The `IngestionResult.derivedTableResults` contains the outcome of each derived table.
+If a derived table fails, the remaining derived tables still execute, but the final batch result has `success = false`. `executeOrThrow()` throws, batch listeners receive `onBatchFailed`, and the batch summary and quality metrics record a failed batch. `IngestionResult.derivedTableResults` contains each derived table's outcome; already committed tables are not rolled back.
 
 !!!warning "Known limitations"
     - Derived tables always perform a full overwrite. There is no delta/merge mode — the entire table is recomputed each batch. For most use cases (aggregations, splits, denormalizations) this is correct because the result depends on the full dataset.

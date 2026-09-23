@@ -2,6 +2,7 @@ package com.etl.framework.iceberg
 
 import com.etl.framework.config.{FlowConfig, IcebergConfig, MaintenanceConfig}
 import com.etl.framework.util.SqlIdentifier
+import org.apache.iceberg.spark.Spark3Util
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
 import org.slf4j.LoggerFactory
@@ -264,6 +265,34 @@ class IcebergTableManager(
     }
   }
 
+  /** Finds every live snapshot produced by a FLOe logical operation. The operation ID is stored in the snapshot
+    * summary as part of the same Iceberg commit, so this is the authoritative reconciliation lookup.
+    */
+  def findSnapshotsByOperationId(flowConfig: FlowConfig, operationId: String): Seq[CommittedSnapshot] =
+    findSnapshotsByOperationId(resolveTableName(flowConfig), operationId)
+
+  def findSnapshotsByOperationId(tableName: String, operationId: String): Seq[CommittedSnapshot] = {
+    spark
+      .sql(
+        s"SELECT snapshot_id, parent_id, committed_at, manifest_list, summary " +
+          s"FROM ${SqlIdentifier.metadataTable(tableName, "snapshots")} " +
+          s"WHERE summary[${SqlIdentifier.stringLiteral("floe.operation-id")}] = " +
+          SqlIdentifier.stringLiteral(operationId) +
+          " ORDER BY committed_at"
+      )
+      .collect()
+      .toSeq
+      .map { row =>
+        CommittedSnapshot(
+          snapshotId = row.getLong(0),
+          parentSnapshotId = if (row.isNullAt(1)) None else Some(row.getLong(1)),
+          committedAtMs = row.getTimestamp(2).getTime,
+          manifestListLocation = row.getString(3),
+          summary = row.getMap[String, String](4).toMap
+        )
+      }
+  }
+
   /** Tags a snapshot with the batch ID for time travel (e.g. batch_20260115_100000). */
   def tagSnapshot(
       flowConfig: FlowConfig,
@@ -279,14 +308,13 @@ class IcebergTableManager(
     if (!icebergConfig.enableSnapshotTagging) return false
 
     val tagName = s"batch_$batchId"
-    val retentionClause = icebergConfig.maintenance.snapshotRetentionDays match {
-      case Some(days) if days > 0 => s" RETAIN $days DAYS"
+    val retentionMs = icebergConfig.maintenance.snapshotRetentionDays match {
+      case Some(days) if days > 0 => Some(days.toLong * 24 * 60 * 60 * 1000)
       case Some(days) =>
         logger.error(s"Cannot tag $tableName: snapshotRetentionDays must be positive, got $days")
         return false
-      case None => ""
+      case None => None
     }
-    val quotedTag = SqlIdentifier.quote(tagName)
     try {
       val existingSnapshot = spark
         .sql(
@@ -300,11 +328,12 @@ class IcebergTableManager(
         logger.error(s"Tag '$tagName' on $tableName already references a different snapshot")
         return false
       }
-      val action = if (existingSnapshot.isEmpty) "CREATE TAG" else "REPLACE TAG"
-      spark.sql(
-        s"ALTER TABLE ${SqlIdentifier.quoteMultipart(tableName)} $action $quotedTag " +
-          s"AS OF VERSION $snapshotId$retentionClause"
-      )
+      if (existingSnapshot.contains(snapshotId)) return true
+
+      val table = Spark3Util.loadIcebergTable(spark, SqlIdentifier.quoteMultipart(tableName))
+      val update = table.manageSnapshots().createTag(tagName, snapshotId)
+      retentionMs.foreach(maxAge => update.setMaxRefAgeMs(tagName, maxAge))
+      update.commit()
       logger.info(s"Tagged snapshot $snapshotId as '$tagName' on $tableName")
       true
     } catch {

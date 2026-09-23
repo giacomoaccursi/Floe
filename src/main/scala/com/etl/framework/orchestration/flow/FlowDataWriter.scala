@@ -1,12 +1,14 @@
 package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config.{FlowConfig, GlobalConfig, LoadMode}
-import com.etl.framework.iceberg.{IcebergTableWriter, WriteResult}
+import com.etl.framework.iceberg.{CommitContext, IcebergTableWriter, WriteResult}
 import com.etl.framework.util.TimingUtil
 import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SaveMode}
 import org.slf4j.LoggerFactory
+
+import java.time.Instant
 
 /** Handles writing of validated, rejected, and additional table data
   */
@@ -22,12 +24,15 @@ class FlowDataWriter(
     */
   def writeValidated(
       validData: DataFrame,
-      batchId: String
+      batchId: String,
+      effectiveAt: Instant
   ): WriteResult = {
+    val operationType = flowConfig.loadMode.`type`.name
+    val context = CommitContext.forFlow(batchId, flowConfig.name, operationType, effectiveAt)
     val result = flowConfig.loadMode.`type` match {
-      case LoadMode.Full  => icebergTableWriter.writeFullLoad(validData, flowConfig)
-      case LoadMode.Delta => icebergTableWriter.writeDeltaLoad(validData, flowConfig)
-      case LoadMode.SCD2  => icebergTableWriter.writeSCD2Load(validData, flowConfig)
+      case LoadMode.Full  => icebergTableWriter.writeFullLoad(validData, flowConfig, context)
+      case LoadMode.Delta => icebergTableWriter.writeDeltaLoad(validData, flowConfig, context)
+      case LoadMode.SCD2  => icebergTableWriter.writeSCD2Load(validData, flowConfig, context)
     }
     icebergTableWriter.tagBatchSnapshot(flowConfig, result, batchId)
   }

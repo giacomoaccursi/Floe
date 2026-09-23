@@ -1,12 +1,25 @@
 package com.etl.framework.pipeline
 
 import com.etl.framework.config.IcebergConfig
-import com.etl.framework.iceberg.{IcebergMaintenanceRunner, IcebergTableManager, MaintenanceResult}
+import com.etl.framework.iceberg.{
+  AmbiguousCommitException,
+  CommitContext,
+  DuplicateOperationCommitException,
+  IcebergMaintenanceRunner,
+  IcebergTableManager,
+  MaintenanceResult
+}
 import com.etl.framework.util.SqlIdentifier
+import org.apache.iceberg.exceptions.CommitStateUnknownException
+import org.apache.iceberg.spark.CommitMetadata
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.types.StructType
 import org.slf4j.LoggerFactory
+
+import java.time.Instant
+import java.util.concurrent.Callable
+import scala.collection.JavaConverters._
 
 /** Executes derived table functions and writes results to Iceberg as full-load tables. Each derived table gets snapshot
   * tagging and post-write maintenance.
@@ -21,12 +34,13 @@ class DerivedTableExecutor(
   /** Executes all derived table functions and writes results to Iceberg. Runs maintenance on successful tables. */
   def execute(
       derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
-      batchId: String
+      batchId: String,
+      effectiveAt: Instant = Instant.now()
   ): Seq[DerivedTableResult] = {
     val ctx = DerivedTableContext(spark, batchId, icebergConfig.catalogName, icebergConfig.namespace)
 
     val results = derivedTables.map { case (tableName, fn) =>
-      executeSingle(tableName, fn, ctx, batchId)
+      executeSingle(tableName, fn, ctx, batchId, effectiveAt)
     }
 
     results.map { result =>
@@ -40,16 +54,25 @@ class DerivedTableExecutor(
       tableName: String,
       fn: DerivedTableContext => DataFrame,
       ctx: DerivedTableContext,
-      batchId: String
+      batchId: String,
+      effectiveAt: Instant
   ): DerivedTableResult = {
     val fullTableName = resolveTableName(tableName)
     logger.info(s"Computing derived table: $tableName")
     try {
       val df = fn(ctx)
-      val recordsWritten = writeToIceberg(fullTableName, df)
-      tagSnapshot(fullTableName, batchId)
-      logger.info(s"Derived table $tableName written: $recordsWritten records")
-      DerivedTableResult(tableName, success = true, recordsWritten = recordsWritten)
+      val commitContext = CommitContext.forFlow(batchId, tableName, "derived-full", effectiveAt)
+      val write = writeToIceberg(fullTableName, df, commitContext)
+      write.snapshotId.foreach(tagSnapshot(fullTableName, _, batchId))
+      logger.info(s"Derived table $tableName written: ${write.recordsWritten} records")
+      DerivedTableResult(
+        tableName,
+        success = true,
+        recordsWritten = write.recordsWritten,
+        snapshotId = write.snapshotId,
+        operationId = Some(commitContext.operationId),
+        reconciled = write.reconciled
+      )
     } catch {
       case e: Exception =>
         logger.error(s"Derived table $tableName failed: ${e.getMessage}", e)
@@ -60,30 +83,74 @@ class DerivedTableExecutor(
   private def resolveTableName(tableName: String): String =
     icebergConfig.fullTableName(tableName)
 
-  private def writeToIceberg(fullTableName: String, df: DataFrame): Long = {
+  private case class DerivedWrite(recordsWritten: Long, snapshotId: Option[Long], reconciled: Boolean)
+
+  private def writeToIceberg(
+      fullTableName: String,
+      df: DataFrame,
+      context: CommitContext
+  ): DerivedWrite = {
     createOrUpdateTable(fullTableName, df.schema)
     val cachedDf = df.cache()
     try {
-      cachedDf.writeTo(SqlIdentifier.quoteMultipart(fullTableName)).overwrite(lit(true))
-      cachedDf.count()
+      val recordsWritten = cachedDf.count()
+      var reconciled = false
+      try {
+        CommitMetadata.withCommitProperties(
+          context.snapshotProperties.asJava,
+          new Callable[Unit] {
+            override def call(): Unit = {
+              cachedDf.writeTo(SqlIdentifier.quoteMultipart(fullTableName)).overwrite(lit(true))
+            }
+          },
+          classOf[RuntimeException]
+        )
+      } catch {
+        case error: Throwable =>
+          val matches = reconcileSnapshots(fullTableName, context, Some(error))
+          if (matches.nonEmpty) reconciled = true else throw error
+      }
+      val matches = reconcileSnapshots(fullTableName, context, None)
+      DerivedWrite(recordsWritten, matches.headOption.map(_.snapshotId), reconciled)
     } finally {
       cachedDf.unpersist()
     }
   }
 
-  private def tagSnapshot(fullTableName: String, batchId: String): Unit = {
+  private def tagSnapshot(fullTableName: String, snapshotId: Long, batchId: String): Unit = {
     if (!icebergConfig.enableSnapshotTagging) return
 
     try {
-      tableManager.getCurrentSnapshotId(fullTableName).foreach { snapshotId =>
-        if (tableManager.tagSnapshot(fullTableName, snapshotId, batchId))
-          logger.info(s"Tagged derived table snapshot $snapshotId on $fullTableName")
-      }
+      if (tableManager.tagSnapshot(fullTableName, snapshotId, batchId))
+        logger.info(s"Tagged derived table snapshot $snapshotId on $fullTableName")
     } catch {
       case e: Exception =>
         logger.warn(s"Failed to tag snapshot on $fullTableName: ${e.getMessage}")
     }
   }
+
+  private def reconcileSnapshots(
+      tableName: String,
+      context: CommitContext,
+      commitError: Option[Throwable]
+  ) = {
+    val snapshots = try tableManager.findSnapshotsByOperationId(tableName, context.operationId)
+    catch {
+      case lookupError: Throwable =>
+        throw AmbiguousCommitException(context.operationId, tableName, commitError.getOrElse(lookupError))
+    }
+    if (snapshots.size > 1)
+      throw DuplicateOperationCommitException(context.operationId, tableName, snapshots.map(_.snapshotId))
+    if (snapshots.isEmpty && commitError.exists(hasCommitStateUnknown))
+      throw AmbiguousCommitException(context.operationId, tableName, commitError.get)
+    snapshots
+  }
+
+  private def hasCommitStateUnknown(error: Throwable): Boolean =
+    Iterator
+      .iterate[Throwable](error)(_.getCause)
+      .takeWhile(_ != null)
+      .exists(_.isInstanceOf[CommitStateUnknownException])
 
   private def runMaintenance(tableName: String): MaintenanceResult = {
     val runner = new IcebergMaintenanceRunner(spark, icebergConfig)
@@ -141,5 +208,8 @@ case class DerivedTableResult(
     success: Boolean,
     recordsWritten: Long = 0,
     error: Option[String] = None,
-    maintenanceResult: Option[MaintenanceResult] = None
+    maintenanceResult: Option[MaintenanceResult] = None,
+    snapshotId: Option[Long] = None,
+    operationId: Option[String] = None,
+    reconciled: Boolean = false
 )

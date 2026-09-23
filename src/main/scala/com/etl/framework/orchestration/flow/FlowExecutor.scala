@@ -11,6 +11,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.col
 import org.slf4j.LoggerFactory
 
+import java.time.Instant
+
 import scala.util.{Failure, Success, Try}
 
 /** Executes a single flow through Read -> Validate -> Transform -> Write (Iceberg)
@@ -39,11 +41,11 @@ class FlowExecutor(
 
   /** Executes the complete flow
     */
-  def execute(batchId: String): FlowResult = {
+  def execute(batchId: String, effectiveAt: Instant = Instant.now()): FlowResult = {
     writeAttempted = false
     val (result, executionTimeMs) =
       TimingUtil.timedWithDuration(logger, s"Execute flow ${flowConfig.name}") {
-        executeFlow(batchId) match {
+        executeFlow(batchId, effectiveAt) match {
           case Success(metrics) if metrics.thresholdError.isDefined =>
             createThresholdFailureResult(batchId, metrics)
           case Success(metrics) => createSuccessResult(batchId, metrics)
@@ -72,7 +74,7 @@ class FlowExecutor(
 
   /** Core flow execution logic
     */
-  private def executeFlow(batchId: String): Try[FlowMetrics] = Try {
+  private def executeFlow(batchId: String, effectiveAt: Instant): Try[FlowMetrics] = Try {
     logger.info(
       s"Starting flow ${flowConfig.name} - batchId: $batchId, " +
         s"loadMode: ${flowConfig.loadMode.`type`.name}"
@@ -148,7 +150,7 @@ class FlowExecutor(
           val outputCount = cachedOutput.count()
 
           // 5. Write to Iceberg
-          val writeResult = writeAllData(cachedOutput, validationResult, batchId, rejectedCount)
+          val writeResult = writeAllData(cachedOutput, validationResult, batchId, effectiveAt, rejectedCount)
 
           FlowMetrics(
             inputCount = inputCount,
@@ -215,11 +217,12 @@ class FlowExecutor(
       validatedData: DataFrame,
       validationResult: ValidationResult,
       batchId: String,
+      effectiveAt: Instant,
       rejectedCount: Long
   ): WriteResult = {
     // A failed target write may already have committed; never replay the whole flow automatically.
     writeAttempted = true
-    val writeResult = dataWriter.writeValidated(validatedData, batchId)
+    val writeResult = dataWriter.writeValidated(validatedData, batchId, effectiveAt)
 
     if (rejectedCount > 0) {
       validationResult.rejected.foreach(rejDf => dataWriter.writeRejected(rejDf, batchId))

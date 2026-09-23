@@ -17,6 +17,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
 import java.util.concurrent.Executors
+import java.time.Instant
 import scala.concurrent.ExecutionContext
 
 /** Coordinates execution of all flows respecting dependencies. Uses specialized components following Single
@@ -72,6 +73,7 @@ class FlowOrchestrator(
     */
   def execute(): IngestionResult = {
     val batchId = BatchIdGenerator.generate(globalConfig.processing.batchIdFormat)
+    val effectiveAt = Instant.now()
     val startTime = System.nanoTime()
 
     executionLogger.logBatchStart(batchId, flowConfigs.size)
@@ -87,7 +89,7 @@ class FlowOrchestrator(
           if (stoppedResult.isEmpty) {
             executionLogger.logGroupStart(group)
 
-            val groupResults = executeGroup(group, batchId, state.validatedFlows)
+            val groupResults = executeGroup(group, batchId, state.validatedFlows, effectiveAt)
 
             resultProcessor.processGroupResults(groupResults, state, batchId) match {
               case resultProcessor.StopExecution(r) => stoppedResult = Some(r)
@@ -98,7 +100,7 @@ class FlowOrchestrator(
 
         stoppedResult match {
           case Some(failed) => finalizeStoppedResult(failed, startTime)
-          case None         => createSuccessResult(batchId, state.flowResults, startTime, plan)
+          case None         => createSuccessResult(batchId, effectiveAt, state.flowResults, startTime, plan)
         }
 
       } catch {
@@ -129,12 +131,13 @@ class FlowOrchestrator(
   private def executeGroup(
       group: ExecutionGroup,
       batchId: String,
-      validatedFlows: Map[String, DataFrame]
+      validatedFlows: Map[String, DataFrame],
+      effectiveAt: Instant
   ): Seq[FlowResult] = {
     if (group.parallel) {
-      groupExecutor.executeParallel(group, batchId, validatedFlows)
+      groupExecutor.executeParallel(group, batchId, validatedFlows, effectiveAt)
     } else {
-      groupExecutor.executeSequential(group, batchId, validatedFlows)
+      groupExecutor.executeSequential(group, batchId, validatedFlows, effectiveAt)
     }
   }
 
@@ -142,6 +145,7 @@ class FlowOrchestrator(
     */
   private def createSuccessResult(
       batchId: String,
+      effectiveAt: Instant,
       flowResults: Seq[FlowResult],
       startTime: Long,
       plan: ExecutionPlan
@@ -154,7 +158,7 @@ class FlowOrchestrator(
     }
     val derivedResults = if (derivedTables.nonEmpty && orphanError.isEmpty) {
       logger.info(s"Executing ${derivedTables.size} derived tables before finalizing batch $batchId")
-      new DerivedTableExecutor(globalConfig.iceberg).execute(derivedTables, batchId)
+      new DerivedTableExecutor(globalConfig.iceberg).execute(derivedTables, batchId, effectiveAt)
     } else Seq.empty
     val derivedFailures = derivedResults.filterNot(_.success)
     val failureMessages = orphanError.map(err => s"Orphan detection failed: $err").toSeq ++

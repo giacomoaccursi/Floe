@@ -14,6 +14,7 @@ import scala.collection.mutable
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
+import java.time.Instant
 
 /** Executes groups of flows sequentially or in parallel
   */
@@ -31,12 +32,13 @@ class FlowGroupExecutor(
   def executeSequential(
       group: ExecutionGroup,
       batchId: String,
-      validatedFlows: Map[String, DataFrame]
+      validatedFlows: Map[String, DataFrame],
+      effectiveAt: Instant = Instant.now()
   ): Seq[FlowResult] = {
     val results = mutable.ArrayBuffer[FlowResult]()
 
     for (flowConfig <- group.flows) {
-      val result = executeFlow(flowConfig, batchId, validatedFlows)
+      val result = executeFlow(flowConfig, batchId, validatedFlows, effectiveAt)
       results.append(result)
 
       // Check if we should stop execution immediately on failure
@@ -54,11 +56,12 @@ class FlowGroupExecutor(
   def executeParallel(
       group: ExecutionGroup,
       batchId: String,
-      validatedFlows: Map[String, DataFrame]
+      validatedFlows: Map[String, DataFrame],
+      effectiveAt: Instant = Instant.now()
   ): Seq[FlowResult] = {
     val futures = group.flows.map { flowConfig =>
       Future {
-        executeFlow(flowConfig, batchId, validatedFlows)
+        executeFlow(flowConfig, batchId, validatedFlows, effectiveAt)
       }(parallelEc).recover { case NonFatal(error) =>
         logger.error(s"Parallel flow ${flowConfig.name} terminated unexpectedly: ${error.getMessage}", error)
         FlowResult.failure(flowConfig.name, batchId, error.getMessage)
@@ -74,7 +77,8 @@ class FlowGroupExecutor(
   private def executeFlow(
       flowConfig: FlowConfig,
       batchId: String,
-      validatedFlows: Map[String, DataFrame]
+      validatedFlows: Map[String, DataFrame],
+      effectiveAt: Instant
   ): FlowResult = {
     logger.debug(s"Starting flow ${flowConfig.name} - batchId: $batchId")
 
@@ -89,7 +93,7 @@ class FlowGroupExecutor(
       ) {
         val executor =
           new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig, customValidators, customReaders)
-        val result = executor.execute(batchId)
+        val result = executor.execute(batchId, effectiveAt)
         if (!result.success && result.retryable)
           throw new RuntimeException(result.error.getOrElse("Flow failed"))
         result
@@ -97,7 +101,7 @@ class FlowGroupExecutor(
     } else {
       val executor =
         new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig, customValidators, customReaders)
-      executor.execute(batchId)
+      executor.execute(batchId, effectiveAt)
     }
   }
 

@@ -332,6 +332,21 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     )
   }
 
+  "IcebergTableWriter tracked commits" should "persist a stable operation identity in the committed snapshot" in {
+    val fc = flowConfig("tracked_commit")
+    val data = Seq((1, "Alice")).toDF("id", "name")
+    val context = CommitContext.forFlow("batch_20260923", fc.name, "full")
+
+    val result = writer.writeFullLoad(data, fc, context)
+
+    result.operationId shouldBe context.operationId
+    result.snapshotId shouldBe defined
+    tableManager.findSnapshotsByOperationId(fc, context.operationId).map(_.snapshotId) shouldBe Seq(
+      result.snapshotId.get
+    )
+    result.icebergMetadata.flatMap(_.summary.get("floe.operation-id")) shouldBe Some(context.operationId)
+  }
+
   it should "return unmodified result when no snapshot id" in {
     val noSnapshot = WriteResult(0, None)
     val fc = flowConfig("no_snapshot_tag")
@@ -545,6 +560,7 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     "scd2_detect_del",
     "scd2_no_detect_del",
     "tag_result_test",
+    "tracked_commit",
     "delta_no_pk",
     "scd2_null_change",
     "scd2_to_null",

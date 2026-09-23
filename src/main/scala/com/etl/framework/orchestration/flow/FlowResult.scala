@@ -16,7 +16,9 @@ case class FlowResult(
     executionTimeMs: Long = 0,
     rejectionReasons: Map[String, Long] = Map.empty,
     error: Option[String] = None,
-    icebergMetadata: Option[IcebergFlowMetadata] = None
+    icebergMetadata: Option[IcebergFlowMetadata] = None,
+    writeAttempted: Boolean = false,
+    retryable: Boolean = false
 )
 
 /** Factory for creating FlowResult instances

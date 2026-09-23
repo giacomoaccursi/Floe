@@ -1,7 +1,7 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig, OrphanAction}
-import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetectionResult, OrphanDetector}
+import com.etl.framework.iceberg.{IcebergTableManager, MaintenanceResult, OrphanDetectionResult, OrphanDetector}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.batch.{
   BatchIdGenerator,
@@ -11,7 +11,7 @@ import com.etl.framework.orchestration.batch.{
 }
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.ExecutionPlanBuilder
-import com.etl.framework.pipeline.DerivedTableResult
+import com.etl.framework.pipeline.{DerivedTableContext, DerivedTableExecutor, DerivedTableResult}
 import com.etl.framework.validation.Validator
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
@@ -57,7 +57,9 @@ class FlowOrchestrator(
     executionLogger: ExecutionLogger,
     threadPool: Option[java.util.concurrent.ExecutorService] = None,
     batchListeners: Seq[BatchListener] = Seq.empty,
-    customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty
+    customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty,
+    derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq.empty,
+    maintenanceExecutor: Option[(FlowConfig, com.etl.framework.config.MaintenanceConfig) => Unit] = None
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -79,22 +81,25 @@ class FlowOrchestrator(
     val result =
       try {
         val plan = buildExecutionPlan()
+        var stoppedResult: Option[IngestionResult] = None
 
         plan.groups.foreach { group =>
-          executionLogger.logGroupStart(group)
+          if (stoppedResult.isEmpty) {
+            executionLogger.logGroupStart(group)
 
-          val groupResults = executeGroup(group, batchId, state.validatedFlows)
+            val groupResults = executeGroup(group, batchId, state.validatedFlows)
 
-          resultProcessor.processGroupResults(groupResults, state, batchId) match {
-            case resultProcessor.StopExecution(r) =>
-              notifyListeners(r)
-              return r
-            case resultProcessor.ContinueWith(newState) =>
-              state = newState
+            resultProcessor.processGroupResults(groupResults, state, batchId) match {
+              case resultProcessor.StopExecution(r) => stoppedResult = Some(r)
+              case resultProcessor.ContinueWith(newState) => state = newState
+            }
           }
         }
 
-        createSuccessResult(batchId, state.flowResults, startTime, plan)
+        stoppedResult match {
+          case Some(failed) => finalizeStoppedResult(failed, startTime)
+          case None         => createSuccessResult(batchId, state.flowResults, startTime, plan)
+        }
 
       } catch {
         case e: Exception =>
@@ -141,22 +146,43 @@ class FlowOrchestrator(
       startTime: Long,
       plan: ExecutionPlan
   ): IngestionResult = {
-    val executionTimeMs = (System.nanoTime() - startTime) / 1000000
-
     // Run orphan detection BEFORE maintenance (maintenance may expire snapshots needed for time travel)
     val orphanResult = runPostBatchOrphanDetection(flowResults, plan)
+    val orphanError = orphanResult match {
+      case OrphanDetectionResult.Failed(err, _) => Some(err)
+      case _                                    => None
+    }
+    val derivedResults = if (derivedTables.nonEmpty && orphanError.isEmpty) {
+      logger.info(s"Executing ${derivedTables.size} derived tables before finalizing batch $batchId")
+      new DerivedTableExecutor(globalConfig.iceberg).execute(derivedTables, batchId)
+    } else Seq.empty
+    val derivedFailures = derivedResults.filterNot(_.success)
+    val failureMessages = orphanError.map(err => s"Orphan detection failed: $err").toSeq ++
+      (if (derivedFailures.nonEmpty)
+         Seq(s"Derived tables failed: ${derivedFailures.map(_.tableName).mkString(", ")}")
+       else Seq.empty)
+    val batchSuccess = failureMessages.isEmpty
+    val batchError = if (batchSuccess) None else Some(failureMessages.mkString("; "))
+    val derivedMaintenanceResults = derivedResults.flatMap(_.maintenanceResult)
+    val flowMaintenanceResults =
+      if (batchSuccess) runPostBatchMaintenance()
+      else {
+        logger.warn(s"Skipping post-batch maintenance for failed batch $batchId")
+        Seq.empty
+      }
+    val maintenanceResults = derivedMaintenanceResults ++ flowMaintenanceResults
+    val executionTimeMs = (System.nanoTime() - startTime) / 1000000
 
     try {
       metadataWriter.writeBatchMetadata(
         batchId,
         flowResults,
         executionTimeMs,
-        success = true,
+        success = batchSuccess,
         orphanReports = orphanResult.reports,
-        orphanDetectionError = orphanResult match {
-          case OrphanDetectionResult.Failed(err, _) => Some(err)
-          case _                                    => None
-        }
+        derivedTableResults = derivedResults,
+        orphanDetectionError = orphanError,
+        maintenanceResults = maintenanceResults
       )
     } catch {
       case e: Exception =>
@@ -165,22 +191,29 @@ class FlowOrchestrator(
 
     // Write quality metrics to Iceberg (if configured)
     val qualityWriter = new QualityMetricsWriter(globalConfig, flowConfigs)
-    qualityWriter.write(batchId, flowResults, orphanResult.reports, executionTimeMs, batchSuccess = true)
-
-    // Run Iceberg table maintenance post-batch
-    runPostBatchMaintenance()
+    qualityWriter.write(batchId, flowResults, orphanResult.reports, executionTimeMs, batchSuccess)
 
     executionLogger.logBatchSummary(batchId, flowResults, executionTimeMs)
 
     IngestionResult(
       batchId = batchId,
       flowResults = flowResults,
-      success = true
+      success = batchSuccess,
+      error = batchError,
+      derivedTableResults = derivedResults,
+      maintenanceResults = maintenanceResults
     )
   }
 
   /** Handles execution failure.
     */
+  private def finalizeStoppedResult(result: IngestionResult, startTime: Long): IngestionResult = {
+    val executionTimeMs = (System.nanoTime() - startTime) / 1000000
+    writeFailedBatchObservability(result.batchId, result.flowResults, executionTimeMs)
+    executionLogger.logBatchSummary(result.batchId, result.flowResults, executionTimeMs)
+    result
+  }
+
   private def handleExecutionFailure(
       batchId: String,
       flowResults: Seq[FlowResult],
@@ -190,17 +223,7 @@ class FlowOrchestrator(
     val executionTimeMs = (System.nanoTime() - startTime) / 1000000
     executionLogger.logExecutionFailure(batchId, executionTimeMs, error)
 
-    try {
-      metadataWriter.writeBatchMetadata(
-        batchId,
-        flowResults,
-        executionTimeMs,
-        success = false
-      )
-    } catch {
-      case e: Exception =>
-        logger.warn(s"Failed to write batch metadata for failed batch $batchId: ${e.getMessage}")
-    }
+    writeFailedBatchObservability(batchId, flowResults, executionTimeMs)
 
     IngestionResult(
       batchId = batchId,
@@ -208,6 +231,21 @@ class FlowOrchestrator(
       success = false,
       error = Some(error.getMessage)
     )
+  }
+
+  private def writeFailedBatchObservability(
+      batchId: String,
+      flowResults: Seq[FlowResult],
+      executionTimeMs: Long
+  ): Unit = {
+    try {
+      metadataWriter.writeBatchMetadata(batchId, flowResults, executionTimeMs, success = false)
+    } catch {
+      case e: Exception =>
+        logger.warn(s"Failed to write batch metadata for failed batch $batchId: ${e.getMessage}")
+    }
+    new QualityMetricsWriter(globalConfig, flowConfigs)
+      .write(batchId, flowResults, Seq.empty, executionTimeMs, batchSuccess = false)
   }
 
   /** Runs post-batch orphan detection if Iceberg is enabled and any FK has onOrphan != Ignore.
@@ -236,19 +274,25 @@ class FlowOrchestrator(
 
   /** Runs Iceberg table maintenance on all flow tables after batch completion.
     */
-  private def runPostBatchMaintenance(): Unit = {
+  private def runPostBatchMaintenance(): Seq[MaintenanceResult] = {
     val icebergConfig = globalConfig.iceberg
-    val tableManager = new IcebergTableManager(spark, icebergConfig)
+    lazy val tableManager = new IcebergTableManager(spark, icebergConfig)
     logger.info("Running post-batch Iceberg table maintenance")
 
-    flowConfigs.foreach { flowConfig =>
+    flowConfigs.map { flowConfig =>
       try {
-        tableManager.runMaintenance(flowConfig, icebergConfig.maintenance)
+        maintenanceExecutor match {
+          case Some(execute) => execute(flowConfig, icebergConfig.maintenance)
+          case None          => tableManager.runMaintenance(flowConfig, icebergConfig.maintenance)
+        }
+        MaintenanceResult(flowConfig.name, "flow", success = true)
       } catch {
         case e: Exception =>
           logger.error(
-            s"Maintenance failed for flow ${flowConfig.name}: ${e.getMessage}"
+            s"Maintenance failed for flow ${flowConfig.name}: ${e.getMessage}",
+            e
           )
+          MaintenanceResult(flowConfig.name, "flow", success = false, error = Some(e.getMessage))
       }
     }
   }
@@ -266,7 +310,9 @@ object FlowOrchestrator {
       domainsConfig: Option[DomainsConfig] = None,
       customValidators: Map[String, () => Validator] = Map.empty,
       batchListeners: Seq[BatchListener] = Seq.empty,
-      customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty
+      customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty,
+      derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq.empty,
+      maintenanceExecutor: Option[(FlowConfig, com.etl.framework.config.MaintenanceConfig) => Unit] = None
   )(implicit spark: SparkSession): FlowOrchestrator = {
     val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
     val ec = ExecutionContext.fromExecutorService(pool)
@@ -287,7 +333,9 @@ object FlowOrchestrator {
       executionLogger = executionLogger,
       threadPool = Some(pool),
       batchListeners = batchListeners,
-      customReaders = customReaders
+      customReaders = customReaders,
+      derivedTables = derivedTables,
+      maintenanceExecutor = maintenanceExecutor
     )
   }
 }
@@ -312,5 +360,6 @@ case class IngestionResult(
     flowResults: Seq[FlowResult],
     success: Boolean,
     error: Option[String] = None,
-    derivedTableResults: Seq[DerivedTableResult] = Seq.empty
+    derivedTableResults: Seq[DerivedTableResult] = Seq.empty,
+    maintenanceResults: Seq[MaintenanceResult] = Seq.empty
 )

@@ -118,6 +118,28 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     }
   }
 
+  it should "retain every completed result from a parallel group after one flow fails" in {
+    val globalConfig = createGlobalConfig()
+    val flowConfigs = Seq(createFlowConfig("flow_a"), createFlowConfig("flow_b"))
+    val processor = new FlowResultProcessor(globalConfig, flowConfigs, new MockFlowGroupExecutor())
+    import processor.StopExecution
+
+    val processingResult = processor.processGroupResults(
+      Seq(
+        FlowResult.failure("flow_a", "batch1", "failed first"),
+        FlowResult.success("flow_b", "batch1", 1, 1, 1, 0, Map.empty)
+      ),
+      BatchState(Seq.empty, Map.empty),
+      "batch1"
+    )
+
+    processingResult match {
+      case StopExecution(ingestionResult) =>
+        ingestionResult.flowResults.map(_.flowName) shouldBe Seq("flow_a", "flow_b")
+      case _ => fail("Expected StopExecution")
+    }
+  }
+
   it should "stop execution for high rejection rate" in {
     val globalConfig = createGlobalConfig(rejectionThreshold = 0.1)
     val flowConfigs = Seq(createFlowConfig("flow_a"))
@@ -187,7 +209,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     }
   }
 
-  it should "stop at first failure in mixed results" in {
+  it should "stop after a mixed group while retaining every supplied result" in {
     val globalConfig = createGlobalConfig()
     val flowConfigs = Seq(
       createFlowConfig("flow_a"),
@@ -215,7 +237,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     processingResult match {
       case StopExecution(ingestionResult) =>
         ingestionResult.success shouldBe false
-        ingestionResult.flowResults should have size 2 // flow_a and flow_b
+        ingestionResult.flowResults.map(_.flowName) shouldBe Seq("flow_a", "flow_b", "flow_c")
         ingestionResult.error.get should include("flow_b")
       case _ => fail("Expected StopExecution")
     }

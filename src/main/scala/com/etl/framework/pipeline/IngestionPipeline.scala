@@ -5,11 +5,12 @@ import com.etl.framework.config.{
   DomainsConfigLoader,
   FlowConfig,
   FlowConfigLoader,
+  FlowConfigValidator,
   GlobalConfig,
   GlobalConfigLoader,
   IcebergConfig
 }
-import com.etl.framework.exceptions.{BatchFailedException, MissingConfigFieldException}
+import com.etl.framework.exceptions.{BatchFailedException, ConfigFileException, MissingConfigFieldException}
 import com.etl.framework.iceberg.catalog.{CatalogFactory, CatalogProvider}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.{FlowOrchestrator, IngestionResult, BatchListener}
@@ -17,6 +18,9 @@ import com.etl.framework.validation.Validator
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 import scala.collection._
+import java.util.Locale
+import java.io.FileNotFoundException
+import java.nio.file.NoSuchFileException
 
 /** Fluent API builder for Ingestion pipeline (Extract, Load & Validation)
   */
@@ -63,23 +67,10 @@ class IngestionPipeline private (
         domainsConfig,
         customValidators.toMap,
         batchListeners,
-        customReaders.toMap
+        customReaders.toMap,
+        derivedTables
       )
-    val result = orchestrator.execute()
-
-    // Execute derived tables after all flows have been written to Iceberg
-    if (derivedTables.nonEmpty && result.success) {
-      logger.info(s"Executing ${derivedTables.size} derived tables")
-      val executor = new DerivedTableExecutor(globalConfig.iceberg)
-      val derivedResults = executor.execute(derivedTables, result.batchId)
-      val failures = derivedResults.filterNot(_.success)
-      if (failures.nonEmpty) {
-        logger.warn(s"${failures.size} derived tables failed: ${failures.flatMap(_.error).mkString(", ")}")
-      }
-      result.copy(derivedTableResults = derivedResults)
-    } else {
-      result
-    }
+    orchestrator.execute()
   }
 
   /** Executes the pipeline and throws BatchFailedException if any flow fails. Use this on managed platforms (Glue, EMR)
@@ -354,6 +345,15 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   def build(): IngestionPipeline = {
     logger.info("Building IngestionPipeline")
     val (globalConfig, flowConfigs) = loadConfigs()
+    val configErrors = flowConfigs.flatMap { config =>
+      FlowConfigValidator.validate(config).map(error => s"Flow '${config.name}': $error")
+    }
+    require(configErrors.isEmpty, s"Invalid flow configuration: ${configErrors.mkString("; ")}")
+    val collisions = derivedTableCollisions(globalConfig, flowConfigs)
+    require(
+      collisions.isEmpty,
+      s"Derived table names collide with managed tables: ${collisions.mkString(", ")}"
+    )
 
     logger.info(s"IngestionPipeline built with ${flowConfigs.size} flows")
     IngestionPipeline.create(
@@ -383,8 +383,15 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       case _ =>
     }
 
-    val (_, flowConfigs) = configs.get
+    val (globalConfig, flowConfigs) = configs.get
+    derivedTableCollisions(globalConfig, flowConfigs).foreach { name =>
+      errors += s"Derived table '$name' collides with a managed table"
+    }
     val flowNames = flowConfigs.map(_.name).toSet
+
+    flowConfigs.foreach { config =>
+      FlowConfigValidator.validate(config).foreach(error => errors += s"Flow '${config.name}': $error")
+    }
 
     // Check FK references point to existing flows
     flowConfigs.foreach { fc =>
@@ -412,6 +419,14 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     }
 
     errors.toSeq
+  }
+
+  private def derivedTableCollisions(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConfig]): Seq[String] = {
+    val managedNames =
+      (flowConfigs.map(_.name) ++ globalConfig.processing.qualityMetricsTable.toSeq)
+        .map(_.toLowerCase(Locale.ROOT))
+        .toSet
+    derivedTables.map(_._1).filter(name => managedNames.contains(name.toLowerCase(Locale.ROOT))).toSeq
   }
 
   private def loadConfigs(): (GlobalConfig, Seq[FlowConfig]) = {
@@ -444,9 +459,10 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private def loadConfigurationsFromDirectory(directory: String): (GlobalConfig, Seq[FlowConfig]) = {
     logger.info(s"Loading configurations from directory: $directory")
 
-    val globalConfigLoader = new GlobalConfigLoader()
-    val domainsConfigLoader = new DomainsConfigLoader()
-    val flowConfigLoader = new FlowConfigLoader()
+    val hadoopConfiguration = spark.sparkContext.hadoopConfiguration
+    val globalConfigLoader = new GlobalConfigLoader(hadoopConfiguration)
+    val domainsConfigLoader = new DomainsConfigLoader(hadoopConfiguration)
+    val flowConfigLoader = new FlowConfigLoader(hadoopConfiguration)
 
     val globalConfig = globalConfigLoader.load(s"$directory/global.yaml", configVariables) match {
       case Right(config) => config
@@ -457,9 +473,10 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       case Right(config) =>
         logger.info(s"Loaded ${config.domains.size} domains from domains.yaml")
         config
-      case Left(_) =>
+      case Left(error) if isMissingConfigFile(error) =>
         logger.info("No domains.yaml found, using empty domains")
         DomainsConfig(Map.empty)
+      case Left(error) => throw error
     }
 
     val flowConfigs = flowConfigLoader.loadAll(s"$directory/flows", configVariables) match {
@@ -477,7 +494,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     */
   private def loadGlobalConfigFromDirectory(directory: String): GlobalConfig = {
     logger.info(s"Loading global config from directory: $directory")
-    val loader = new GlobalConfigLoader()
+    val loader = new GlobalConfigLoader(spark.sparkContext.hadoopConfiguration)
     loader.load(s"$directory/global.yaml", configVariables) match {
       case Right(config) => config
       case Left(error)   => throw error
@@ -488,16 +505,18 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     */
   private def loadFlowConfigsFromDirectory(directory: String): Seq[FlowConfig] = {
     logger.info(s"Loading flow configs from directory: $directory")
-    val domainsLoader = new DomainsConfigLoader()
-    val flowLoader = new FlowConfigLoader()
+    val hadoopConfiguration = spark.sparkContext.hadoopConfiguration
+    val domainsLoader = new DomainsConfigLoader(hadoopConfiguration)
+    val flowLoader = new FlowConfigLoader(hadoopConfiguration)
 
     val domainsConfig = domainsLoader.load(s"$directory/domains.yaml", configVariables) match {
       case Right(config) =>
         logger.info(s"Loaded ${config.domains.size} domains from domains.yaml")
         config
-      case Left(_) =>
+      case Left(error) if isMissingConfigFile(error) =>
         logger.info("No domains.yaml found, using empty domains")
         DomainsConfig(Map.empty)
+      case Left(error) => throw error
     }
 
     // Store domainsConfig in builder for later use
@@ -506,6 +525,19 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     flowLoader.loadAll(s"$directory/flows", configVariables) match {
       case Right(configs) => configs
       case Left(error)    => throw error
+    }
+  }
+
+  private def isMissingConfigFile(error: Throwable): Boolean = {
+    @scala.annotation.tailrec
+    def causedByMissingFile(current: Throwable): Boolean = current match {
+      case _: FileNotFoundException | _: NoSuchFileException => true
+      case other if other.getCause != null                   => causedByMissingFile(other.getCause)
+      case _                                                 => false
+    }
+    error match {
+      case _: ConfigFileException => causedByMissingFile(error)
+      case _                      => false
     }
   }
 }

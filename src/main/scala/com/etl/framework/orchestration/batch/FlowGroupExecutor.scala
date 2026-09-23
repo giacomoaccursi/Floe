@@ -3,6 +3,7 @@ package com.etl.framework.orchestration.batch
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.flow.{FlowExecutor, FlowResult}
+import com.etl.framework.orchestration.RejectionThresholdPolicy
 import com.etl.framework.util.RetryExecutor
 import com.etl.framework.validation.Validator
 import com.etl.framework.orchestration.ExecutionGroup
@@ -12,6 +13,7 @@ import org.slf4j.LoggerFactory
 import scala.collection.mutable
 import scala.concurrent._
 import scala.concurrent.duration._
+import scala.util.control.NonFatal
 
 /** Executes groups of flows sequentially or in parallel
   */
@@ -57,6 +59,9 @@ class FlowGroupExecutor(
     val futures = group.flows.map { flowConfig =>
       Future {
         executeFlow(flowConfig, batchId, validatedFlows)
+      }(parallelEc).recover { case NonFatal(error) =>
+        logger.error(s"Parallel flow ${flowConfig.name} terminated unexpectedly: ${error.getMessage}", error)
+        FlowResult.failure(flowConfig.name, batchId, error.getMessage)
       }(parallelEc)
     }
 
@@ -85,7 +90,8 @@ class FlowGroupExecutor(
         val executor =
           new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig, customValidators, customReaders)
         val result = executor.execute(batchId)
-        if (!result.success) throw new RuntimeException(result.error.getOrElse("Flow failed"))
+        if (!result.success && result.retryable)
+          throw new RuntimeException(result.error.getOrElse("Flow failed"))
         result
       }
     } else {
@@ -102,10 +108,16 @@ class FlowGroupExecutor(
       return true
     }
 
-    val threshold = flowConfig.maxRejectionRate.orElse(globalConfig.processing.maxRejectionRate)
+    val threshold = RejectionThresholdPolicy.threshold(flowConfig, globalConfig)
 
     threshold match {
-      case Some(rate) if result.rejectedRecords > 0 && result.rejectionRate > rate =>
+      case Some(rate)
+          if RejectionThresholdPolicy.exceeded(
+            result.rejectionRate,
+            result.rejectedRecords,
+            flowConfig,
+            globalConfig
+          ) =>
         logger.warn(
           f"Flow ${result.flowName} rejection rate ${result.rejectionRate}%.2f%% " +
             f"exceeds threshold ${rate}%.2f%% " +

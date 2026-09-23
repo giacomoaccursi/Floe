@@ -1,9 +1,10 @@
 package com.etl.framework.orchestration
 
-import com.etl.framework.config.{FlowConfig, GlobalConfig}
+import com.etl.framework.config.{FlowConfig, GlobalConfig, LoadMode}
 import com.etl.framework.orchestration.batch.FlowGroupExecutor
 import com.etl.framework.orchestration.flow.FlowResult
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions.col
 import org.slf4j.LoggerFactory
 
 case class BatchState(
@@ -35,7 +36,8 @@ class FlowResultProcessor(
       batchId: String
   ): ProcessingResult = {
     groupResults.foldLeft[ProcessingResult](ContinueWith(currentState)) {
-      case (stop: StopExecution, _) => stop
+      case (StopExecution(stopped), result) =>
+        StopExecution(stopped.copy(flowResults = stopped.flowResults :+ result))
       case (ContinueWith(state), result) =>
         val newResults = state.flowResults :+ result
         processResult(result, state.validatedFlows, newResults, batchId)
@@ -85,7 +87,14 @@ class FlowResultProcessor(
   /** Loads the Iceberg table for a completed flow so downstream flows can use it for FK validation. */
   private def loadValidatedData(result: FlowResult): Option[DataFrame] = {
     val tableName = globalConfig.iceberg.fullTableName(result.flowName)
-    scala.util.Try(spark.table(tableName)).toOption match {
+    scala.util.Try {
+      val table = spark.table(tableName)
+      flowConfigs.find(_.name == result.flowName) match {
+        case Some(config) if config.loadMode.`type` == LoadMode.SCD2 =>
+          table.filter(col(config.loadMode.isCurrentColumn.getOrElse("is_current")) === true)
+        case _ => table
+      }
+    }.toOption match {
       case some @ Some(_) => some
       case None =>
         logger.warn(s"Could not load Iceberg table $tableName, FK checks against it will fail")

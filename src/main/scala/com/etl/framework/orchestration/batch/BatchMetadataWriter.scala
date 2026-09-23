@@ -1,9 +1,11 @@
 package com.etl.framework.orchestration.batch
 
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
-import com.etl.framework.iceberg.OrphanReport
+import com.etl.framework.iceberg.{MaintenanceResult, OrphanReport}
 import com.etl.framework.orchestration.flow.FlowResult
+import com.etl.framework.pipeline.DerivedTableResult
 import com.etl.framework.util.{IcebergMetadataSerializer, JsonFileWriter}
+import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
 
 import java.time.Instant
@@ -11,7 +13,7 @@ import java.time.Instant
 class BatchMetadataWriter(
     globalConfig: GlobalConfig,
     flowConfigs: Seq[FlowConfig]
-) {
+)(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -24,7 +26,9 @@ class BatchMetadataWriter(
       success: Boolean,
       rolledBack: Boolean = false,
       orphanReports: Seq[OrphanReport] = Seq.empty,
-      orphanDetectionError: Option[String] = None
+      orphanDetectionError: Option[String] = None,
+      derivedTableResults: Seq[DerivedTableResult] = Seq.empty,
+      maintenanceResults: Seq[MaintenanceResult] = Seq.empty
   ): Unit = {
     val metadataPath = s"${globalConfig.paths.metadataPath}/$batchId/summary.json"
 
@@ -62,6 +66,29 @@ class BatchMetadataWriter(
       "overall_rejection_rate" -> overallRejectionRate,
       "orphan_reports" -> orphanReportsData,
       "orphan_detection_error" -> orphanDetectionError.getOrElse(""),
+      "derived_tables_processed" -> derivedTableResults.size,
+      "derived_tables" -> derivedTableResults.map { result =>
+        Map[String, Any](
+          "table_name" -> result.tableName,
+          "success" -> result.success,
+          "records_written" -> result.recordsWritten,
+          "error" -> result.error.getOrElse(""),
+          "maintenance_success" -> result.maintenanceResult.map(_.success).map(Boolean.box).orNull,
+          "maintenance_error" -> result.maintenanceResult.flatMap(_.error).getOrElse("")
+        )
+      },
+      "maintenance_status" -> (if (maintenanceResults.isEmpty) "skipped"
+                                else if (maintenanceResults.forall(_.success)) "succeeded"
+                                else "failed"),
+      "maintenance_success" -> (maintenanceResults.nonEmpty && maintenanceResults.forall(_.success)),
+      "maintenance_results" -> maintenanceResults.map { result =>
+        Map[String, Any](
+          "target_name" -> result.targetName,
+          "target_type" -> result.targetType,
+          "success" -> result.success,
+          "error" -> result.error.getOrElse("")
+        )
+      },
       "flows" -> flowResults.map { result =>
         val baseFlowMetadata = Map[String, Any](
           "flow_name" -> result.flowName,
@@ -74,7 +101,9 @@ class BatchMetadataWriter(
           "rejection_rate" -> result.rejectionRate,
           "execution_time_ms" -> result.executionTimeMs,
           "rejection_reasons" -> result.rejectionReasons,
-          "error" -> result.error.getOrElse("")
+          "error" -> result.error.getOrElse(""),
+          "write_attempted" -> result.writeAttempted,
+          "retryable" -> result.retryable
         )
 
         result.icebergMetadata match {
@@ -85,7 +114,7 @@ class BatchMetadataWriter(
       }
     )
 
-    JsonFileWriter.write(metadata, metadataPath)
+    JsonFileWriter.write(metadata, metadataPath, spark.sparkContext.hadoopConfiguration)
 
     logger.debug(s"Batch metadata written - batchId: $batchId, path: $metadataPath")
   }

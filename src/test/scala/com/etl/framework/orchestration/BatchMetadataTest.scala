@@ -2,6 +2,7 @@ package com.etl.framework.orchestration
 
 import com.etl.framework.TestFixtures
 import com.etl.framework.config._
+import com.etl.framework.orchestration.batch.BatchIdGenerator
 import org.apache.spark.sql.SparkSession
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -109,6 +110,11 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     }
   }
 
+  it should "generate distinct IDs even within one timestamp second" in {
+    val ids = (1 to 100).map(_ => BatchIdGenerator.generate("yyyyMMdd_HHmmss"))
+    ids.distinct.size shouldBe ids.size
+  }
+
   it should "follow configured format for timestamp" in {
     val tempDir = Files.createTempDirectory("batch-format-test").toString
     try {
@@ -118,8 +124,7 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
       val orchestrator = FlowOrchestrator(globalConfig, Seq(flow))
       val result = orchestrator.execute()
 
-      result.batchId.forall(_.isDigit) shouldBe true
-      result.batchId.length should be >= 13
+      result.batchId should fullyMatch regex """\d{13,}_[0-9a-f]{32}"""
     } finally {
       cleanupTempDir(tempDir)
     }
@@ -134,7 +139,7 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
       val orchestrator = FlowOrchestrator(globalConfig, Seq(flow))
       val result = orchestrator.execute()
 
-      result.batchId should fullyMatch regex """\d{8}_\d{6}"""
+      result.batchId should fullyMatch regex """\d{8}_\d{6}_[0-9a-f]{32}"""
     } finally {
       cleanupTempDir(tempDir)
     }
@@ -246,6 +251,36 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
         include(""""flows_processed":0""") or
           include(""""flows_processed" : 0""")
       )
+    } finally {
+      cleanupTempDir(tempDir)
+    }
+  }
+
+  it should "expose and persist maintenance failures without changing data success" in {
+    val tempDir = Files.createTempDirectory("maintenance-status-test").toString
+    try {
+      val flow = createFlow("maintenance_flow", tempDir)
+      val globalConfig = createGlobalConfig(tempDir)
+      val failingMaintenance: (FlowConfig, MaintenanceConfig) => Unit =
+        (_, _) => throw new RuntimeException("compaction unavailable")
+
+      val result = FlowOrchestrator(
+        globalConfig,
+        Seq(flow),
+        maintenanceExecutor = Some(failingMaintenance)
+      ).execute()
+
+      result.success shouldBe true
+      result.maintenanceResults should have size 1
+      result.maintenanceResults.head.targetName shouldBe flow.name
+      result.maintenanceResults.head.targetType shouldBe "flow"
+      result.maintenanceResults.head.success shouldBe false
+      result.maintenanceResults.head.error should contain("compaction unavailable")
+
+      val metadataPath = Paths.get(s"$tempDir/metadata/${result.batchId}/summary.json")
+      val metadataContent = new String(Files.readAllBytes(metadataPath))
+      metadataContent should include("maintenance_success")
+      metadataContent should include("compaction unavailable")
     } finally {
       cleanupTempDir(tempDir)
     }

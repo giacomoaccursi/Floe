@@ -18,7 +18,8 @@ class ForeignKeyValidator(
     if (flowConfig.validation.foreignKeys.isEmpty) {
       ValidationUtils.validResult(df)
     } else {
-      // Pre-compute refs deduplicated by (flow, columns).
+      // Pre-compute distinct reference keys: historical or otherwise duplicated
+      // parent rows must not multiply valid child records in the left join.
       // No explicit broadcast — AQE decides the optimal join strategy at runtime.
       val refs: Map[(String, Seq[String]), DataFrame] =
         flowConfig.validation.foreignKeys
@@ -26,7 +27,7 @@ class ForeignKeyValidator(
           .distinct
           .flatMap { case (refFlow, refCols) =>
             validatedFlows.get(refFlow).map { refDf =>
-              (refFlow, refCols) -> refDf.select(refCols.map(col): _*)
+              (refFlow, refCols) -> refDf.select(refCols.map(col): _*).distinct()
             }
           }
           .toMap

@@ -4,6 +4,7 @@ import com.etl.framework.config.{FlowConfig, ValidationRule}
 import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 
 /** Validator for Primary Key uniqueness Validates that primary key columns contain unique values
@@ -19,32 +20,29 @@ class PrimaryKeyValidator(flowConfig: FlowConfig, flowName: Option[String] = Non
         s"Primary key is not defined for flow ${flowName.getOrElse("unknown")}"
       )
     } else {
-      val duplicates = df
-        .groupBy(pkColumns.map(col): _*)
-        .agg(count("*").as("_count"))
-        .filter(col("_count") > 1)
-        .drop("_count")
+      val keyWindow = Window.partitionBy(pkColumns.map(col): _*)
+      val hasNullKey = pkColumns.map(name => col(name).isNull).reduce(_ || _)
+      val classified = df
+        .withColumn("_pk_invalid", hasNullKey || count(lit(1)).over(keyWindow) > 1)
         .cache()
 
       try {
-        if (duplicates.isEmpty) {
+        if (classified.filter(col("_pk_invalid")).isEmpty) {
           ValidationUtils.validResult(df)
         } else {
-          val markedDuplicates = duplicates.withColumn("_is_dup", lit(true))
-          val joined = df.join(markedDuplicates, pkColumns, "left")
-          val rejectedDf = joined.filter(col("_is_dup").isNotNull).drop("_is_dup")
-          val validDf = joined.filter(col("_is_dup").isNull).drop("_is_dup")
+          val rejectedDf = classified.filter(col("_pk_invalid")).drop("_pk_invalid")
+          val validDf = classified.filter(not(col("_pk_invalid"))).drop("_pk_invalid")
 
           ValidationUtils.resultWithRejections(
             validDf,
             rejectedDf,
             "PK_DUPLICATE",
-            s"Duplicate primary key in flow $flowName: ${pkColumns.mkString(", ")}",
+            s"Null or duplicate primary key in flow $flowName: ${pkColumns.mkString(", ")}",
             "pk_validation"
           )
         }
       } finally {
-        duplicates.unpersist()
+        classified.unpersist()
       }
     }
   }

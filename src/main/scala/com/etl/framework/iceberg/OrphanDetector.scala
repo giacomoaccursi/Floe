@@ -1,6 +1,7 @@
 package com.etl.framework.iceberg
 
 import com.etl.framework.config._
+import com.etl.framework.util.SqlIdentifier
 import com.etl.framework.orchestration.ExecutionPlan
 import com.etl.framework.orchestration.flow.FlowResult
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -148,27 +149,38 @@ class OrphanDetector(
       case Some(prevSnapshotId) =>
         val tableName = tableManager.resolveTableName(parentCfg)
         val refCols = fk.references.columns
-        val selectExpr = refCols.map(c => s"`$c`").mkString(", ")
+        val selectExpr = refCols.map(SqlIdentifier.quote).mkString(", ")
+        val sqlTableName = SqlIdentifier.quoteMultipart(tableName)
 
         try {
+          val previousCurrentFilter = parentCfg.loadMode.`type` match {
+            case LoadMode.SCD2 =>
+              val isCurrentCol = parentCfg.loadMode.isCurrentColumn.getOrElse("is_current")
+              s" WHERE ${SqlIdentifier.quote(isCurrentCol)} = true"
+            case _ => ""
+          }
           val previousPKs = spark
-            .sql(s"SELECT $selectExpr FROM $tableName VERSION AS OF $prevSnapshotId")
+            .sql(s"SELECT $selectExpr FROM $sqlTableName VERSION AS OF $prevSnapshotId$previousCurrentFilter")
             .distinct()
 
           val currentPKs = parentCfg.loadMode.`type` match {
             case LoadMode.SCD2 =>
               val isCurrentCol = parentCfg.loadMode.isCurrentColumn.getOrElse("is_current")
-              spark.sql(s"SELECT $selectExpr FROM $tableName WHERE `$isCurrentCol` = true").distinct()
+              spark
+                .sql(s"SELECT $selectExpr FROM $sqlTableName WHERE ${SqlIdentifier.quote(isCurrentCol)} = true")
+                .distinct()
             case _ =>
-              spark.sql(s"SELECT $selectExpr FROM $tableName").distinct()
+              spark.sql(s"SELECT $selectExpr FROM $sqlTableName").distinct()
           }
 
           val removed = previousPKs.join(currentPKs, refCols, "left_anti")
           Some(removed)
         } catch {
           case e: Exception =>
-            logger.warn(s"Failed to perform time travel on ${parentCfg.name}: ${e.getMessage}")
-            None
+            throw new IllegalStateException(
+              s"Failed to perform time travel on ${parentCfg.name}: ${e.getMessage}",
+              e
+            )
         }
     }
   }
@@ -201,10 +213,15 @@ class OrphanDetector(
 
     // Select only FK + PK columns from child table instead of SELECT *
     val childPkCols = childFlow.validation.primaryKey
-    val childTableCols = spark.table(childTableName).columns.toSet
+    val childTable = spark.table(SqlIdentifier.quoteMultipart(childTableName))
+    val currentChild = childFlow.loadMode.`type` match {
+      case LoadMode.SCD2 =>
+        childTable.filter(col(childFlow.loadMode.isCurrentColumn.getOrElse("is_current")) === true)
+      case _ => childTable
+    }
+    val childTableCols = childTable.columns.toSet
     val columnsNeeded = (fkCols ++ childPkCols).distinct.filter(childTableCols.contains)
-    val selectCols = columnsNeeded.map(c => s"`$c`").mkString(", ")
-    val childProjection = spark.sql(s"SELECT $selectCols FROM $childTableName")
+    val childProjection = currentChild.select(columnsNeeded.map(col): _*)
     val orphans = childProjection.join(renamedKeys, fkCols, "inner")
 
     fk.onOrphan match {
@@ -245,15 +262,24 @@ class OrphanDetector(
         )
 
         // Build DELETE condition using temp view
-        val viewName =
-          s"_orphan_removed_pks_${childFlow.name}_${fkCols.mkString("_")}_${UUID.randomUUID().toString.replace("-", "").take(8)}"
+        val viewName = s"_orphan_removed_pks_${UUID.randomUUID().toString.replace("-", "")}"
         renamedKeys.createOrReplaceTempView(viewName)
         try {
           val deleteCondition = fkCols
-            .map(c => s"$childTableName.`$c` = $viewName.`$c`")
+            .map(c =>
+              s"${SqlIdentifier.qualified("child", c)} = ${SqlIdentifier.qualified("removed", c)}"
+            )
             .mkString(" AND ")
+          val currentCondition = childFlow.loadMode.`type` match {
+            case LoadMode.SCD2 =>
+              val currentColumn = childFlow.loadMode.isCurrentColumn.getOrElse("is_current")
+              s" AND ${SqlIdentifier.qualified("child", currentColumn)} = true"
+            case _ => ""
+          }
           spark.sql(
-            s"DELETE FROM $childTableName WHERE EXISTS (SELECT 1 FROM $viewName WHERE $deleteCondition)"
+            s"DELETE FROM ${SqlIdentifier.quoteMultipart(childTableName)} AS ${SqlIdentifier.quote("child")} " +
+              s"WHERE EXISTS (SELECT 1 FROM ${SqlIdentifier.quote(viewName)} AS ${SqlIdentifier.quote("removed")} " +
+              s"WHERE $deleteCondition)$currentCondition"
           )
         } finally {
           spark.catalog.dropTempView(viewName)

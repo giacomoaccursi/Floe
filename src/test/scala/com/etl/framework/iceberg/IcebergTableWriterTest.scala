@@ -136,6 +136,25 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     readBack(2).getAs[String]("name") shouldBe "Charlie"
   }
 
+  it should "quote reserved and spaced identifiers in delta MERGE" in {
+    val fc = flowConfig(
+      "order items",
+      loadMode = LoadMode.Delta,
+      primaryKey = Seq("select")
+    )
+    val initial = Seq((1, "Alice"), (2, "Bob")).toDF("select", "customer name")
+    writer.writeDeltaLoad(initial, fc)
+
+    val update = Seq((2, "Robert"), (3, "Charlie")).toDF("select", "customer name")
+    writer.writeDeltaLoad(update, fc)
+
+    val rows = spark
+      .sql("SELECT `select`, `customer name` FROM writer_catalog.default.`order items` ORDER BY `select`")
+      .collect()
+    rows.map(_.getInt(0)) shouldBe Array(1, 2, 3)
+    rows(1).getString(1) shouldBe "Robert"
+  }
+
   it should "reject duplicate source keys before a delta MERGE" in {
     val fc = flowConfig("delta_duplicate_source", loadMode = LoadMode.Delta)
     val duplicates = Seq((1, "Alice"), (1, "Alice_v2")).toDF("id", "name")

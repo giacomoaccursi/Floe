@@ -986,6 +986,43 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     reports.head.actionTaken shouldBe "warn"
   }
 
+  it should "not report a previously closed SCD2 parent key as removed again" in {
+    val parentConfig =
+      makeFlowConfig("od_scd2_repeat_parent", loadMode = LoadMode.SCD2, detectDeletes = true)
+    val childConfig = makeFlowConfig(
+      "od_scd2_repeat_child",
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("parent_id"),
+          references = ReferenceConfig(flow = parentConfig.name, columns = Seq("id")),
+          onOrphan = OrphanAction.Warn
+        )
+      )
+    )
+
+    writer.writeSCD2Load(Seq((1, "Alice"), (2, "Bob")).toDF("id", "name"), parentConfig)
+    writer.writeFullLoad(Seq((100, 2)).toDF("id", "parent_id"), childConfig)
+    val previous = writer.writeSCD2Load(Seq((1, "Alice")).toDF("id", "name"), parentConfig)
+    val current = writer.writeSCD2Load(Seq((1, "Alice")).toDF("id", "name"), parentConfig)
+
+    previous.snapshotId shouldBe defined
+    current.snapshotId shouldBe defined
+    spark.table(tableManager.resolveTableName(parentConfig)).filter("id = 2 AND is_current = false").count() shouldBe 1
+
+    val flowResults = Seq(
+      makeFlowResult(parentConfig.name, current.snapshotId, previous.snapshotId),
+      makeFlowResult(childConfig.name, None, None)
+    )
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parentConfig), parallel = false),
+        ExecutionGroup(Seq(childConfig), parallel = false)
+      )
+    )
+
+    runDetection(Seq(parentConfig, childConfig), flowResults, plan) shouldBe empty
+  }
+
   it should "skip orphan check for SCD2 parent without detectDeletes" in {
     val parentConfig =
       makeFlowConfig("od_scd2_nodelete_parent", loadMode = LoadMode.SCD2, primaryKey = Seq("id"), detectDeletes = false)
@@ -1031,6 +1068,77 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
     // SCD2 without detectDeletes cannot remove records → no orphan check
     reports shouldBe empty
+  }
+
+  it should "ignore historical SCD2 child versions during orphan detection" in {
+    val parentConfig = makeFlowConfig("od_scd2_childhist_parent")
+    val childConfig = makeFlowConfig(
+      "od_scd2_childhist_child",
+      loadMode = LoadMode.SCD2,
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("parent_id"),
+          references = ReferenceConfig(flow = parentConfig.name, columns = Seq("id")),
+          onOrphan = OrphanAction.Warn
+        )
+      )
+    ).copy(loadMode = LoadModeConfig(LoadMode.SCD2, compareColumns = Seq("parent_id")))
+
+    val parentPrevious = writer.writeFullLoad(Seq((1, "A"), (2, "B")).toDF("id", "name"), parentConfig)
+    writer.writeSCD2Load(Seq((10, 2)).toDF("id", "parent_id"), childConfig)
+    writer.writeSCD2Load(Seq((10, 1)).toDF("id", "parent_id"), childConfig)
+    val parentCurrent = writer.writeFullLoad(Seq((1, "A")).toDF("id", "name"), parentConfig)
+
+    val results = Seq(
+      makeFlowResult(parentConfig.name, parentCurrent.snapshotId, parentPrevious.snapshotId),
+      makeFlowResult(childConfig.name, None, None)
+    )
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parentConfig), parallel = false),
+        ExecutionGroup(Seq(childConfig), parallel = false)
+      )
+    )
+
+    runDetection(Seq(parentConfig, childConfig), results, plan) shouldBe empty
+  }
+
+  it should "delete only the current SCD2 child version and preserve its history" in {
+    val parentConfig = makeFlowConfig("od_scd2_childdel_parent")
+    val childConfig = makeFlowConfig(
+      "od_scd2_childdel_child",
+      loadMode = LoadMode.SCD2,
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("parent_id"),
+          references = ReferenceConfig(flow = parentConfig.name, columns = Seq("id")),
+          onOrphan = OrphanAction.Delete
+        )
+      )
+    ).copy(loadMode = LoadModeConfig(LoadMode.SCD2, compareColumns = Seq("parent_id")))
+
+    val parentPrevious = writer.writeFullLoad(Seq((1, "A"), (2, "B")).toDF("id", "name"), parentConfig)
+    writer.writeSCD2Load(Seq((10, 2)).toDF("id", "parent_id"), childConfig)
+    writer.writeSCD2Load(Seq((10, 1)).toDF("id", "parent_id"), childConfig)
+    writer.writeSCD2Load(Seq((10, 2)).toDF("id", "parent_id"), childConfig)
+    val parentCurrent = writer.writeFullLoad(Seq((1, "A")).toDF("id", "name"), parentConfig)
+
+    val results = Seq(
+      makeFlowResult(parentConfig.name, parentCurrent.snapshotId, parentPrevious.snapshotId),
+      makeFlowResult(childConfig.name, None, None)
+    )
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(parentConfig), parallel = false),
+        ExecutionGroup(Seq(childConfig), parallel = false)
+      )
+    )
+
+    val reports = runDetection(Seq(parentConfig, childConfig), results, plan)
+    reports.map(_.orphanCount) shouldBe Seq(1L)
+    val childTable = spark.table(tableManager.resolveTableName(childConfig))
+    childTable.filter("id = 10 AND is_current = true").count() shouldBe 0L
+    childTable.filter("id = 10 AND is_current = false").count() shouldBe 2L
   }
 
   // ── OrphanDetectionResult type tests ────────────────────────────────
@@ -1138,6 +1246,35 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     // child1 was processed successfully before child2 crashed
     failed.reports should have size 1
     failed.reports.head.flowName shouldBe "od_fail_child1"
+  }
+
+  it should "report a failed time-travel query instead of silently skipping the FK check" in {
+    val parent = makeFlowConfig("od_bad_time_parent")
+    val child = makeFlowConfig(
+      "od_bad_time_child",
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("parent_id"),
+          references = ReferenceConfig(flow = parent.name, columns = Seq("id")),
+          onOrphan = OrphanAction.Warn
+        )
+      )
+    )
+    val result = new OrphanDetector(
+      spark,
+      icebergConfig,
+      Seq(parent, child),
+      Seq(makeFlowResult(parent.name, Some(1L), Some(999L)))
+    ).detectAndResolveOrphans(
+      ExecutionPlan(
+        Seq(
+          ExecutionGroup(Seq(parent), parallel = false),
+          ExecutionGroup(Seq(child), parallel = false)
+        )
+      )
+    )
+
+    result shouldBe a[OrphanDetectionResult.Failed]
   }
 
   private val allTables = Seq(

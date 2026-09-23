@@ -1,5 +1,6 @@
 package com.etl.framework.pipeline
 
+import com.etl.framework.TestFixtures
 import com.etl.framework.config.IcebergConfig
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
@@ -50,11 +51,19 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
   }
 
   private def dropTable(name: String): Unit =
-    try { spark.sql(s"DROP TABLE IF EXISTS spark_catalog.default.$name") }
+    try { spark.sql(s"DROP TABLE IF EXISTS spark_catalog.default.`${name.replace("`", "``")}`") }
     catch { case _: Exception => }
 
   override def afterEach(): Unit = {
-    Seq("orders", "order_summary", "orders_domestic", "orders_intl", "empty_derived", "failing_derived")
+    Seq(
+      "orders",
+      "order_summary",
+      "orders_domestic",
+      "orders_intl",
+      "empty_derived",
+      "failing_derived",
+      "daily orders"
+    )
       .foreach(dropTable)
     super.afterEach()
   }
@@ -160,6 +169,22 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
 
     results.head.success shouldBe true
     results.head.recordsWritten shouldBe 0L
+  }
+
+  it should "quote a spaced table name and reserved derived column" in {
+    val executor = new DerivedTableExecutor(icebergConfig)
+    val derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq(
+      "daily orders" -> { _: DerivedTableContext =>
+        Seq((1, "A"), (2, "B")).toDF("select", "customer name")
+      }
+    )
+
+    val result = executor.execute(derivedTables, "batch_quoted_identifiers").head
+
+    result.success shouldBe true
+    val written = spark.table("spark_catalog.default.`daily orders`")
+    written.columns should contain allOf ("select", "customer name")
+    written.count() shouldBe 2L
   }
 
   it should "report failure without stopping other derived tables" in {
@@ -284,5 +309,36 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     }
     ex.getMessage should include("my_table")
     ex.getMessage should include("already registered")
+  }
+
+  it should "reject a derived table that collides with a primary flow table" in {
+    val builder = IngestionPipeline
+      .builder()
+      .withGlobalConfig(TestFixtures.globalConfig(iceberg = icebergConfig))
+      .withFlowConfigs(Seq(TestFixtures.flowConfig(name = "orders")))
+      .withDerivedTable("orders", (_: DerivedTableContext) => spark.emptyDataFrame)
+
+    val ex = intercept[IllegalArgumentException] {
+      builder.build()
+    }
+    ex.getMessage should include("orders")
+    builder.validate().mkString(" ") should include("orders")
+  }
+
+  it should "reject a derived table that collides with the quality metrics table" in {
+    val baseConfig = TestFixtures.globalConfig(iceberg = icebergConfig)
+    val globalConfig = baseConfig.copy(
+      processing = baseConfig.processing.copy(qualityMetricsTable = Some("quality_metrics"))
+    )
+    val builder = IngestionPipeline
+      .builder()
+      .withGlobalConfig(globalConfig)
+      .withFlowConfigs(Seq(TestFixtures.flowConfig(name = "orders")))
+      .withDerivedTable("QUALITY_METRICS", (_: DerivedTableContext) => spark.emptyDataFrame)
+
+    intercept[IllegalArgumentException] {
+      builder.build()
+    }
+    builder.validate().mkString(" ") should include("QUALITY_METRICS")
   }
 }

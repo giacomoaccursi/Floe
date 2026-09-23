@@ -3,6 +3,7 @@ package com.etl.framework.orchestration.batch
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
 import com.etl.framework.iceberg.OrphanReport
 import com.etl.framework.orchestration.flow.FlowResult
+import com.etl.framework.util.SqlIdentifier
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{col, current_timestamp}
 import org.slf4j.LoggerFactory
@@ -28,7 +29,7 @@ class QualityMetricsWriter(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConf
           val fullTableName = globalConfig.iceberg.fullTableName(tableName)
           ensureTable(fullTableName)
           val df = buildMetricsDataFrame(batchId, flowResults, orphanReports, executionTimeMs, batchSuccess)
-          df.writeTo(fullTableName).append()
+          df.writeTo(SqlIdentifier.quoteMultipart(fullTableName)).append()
           logger.info(s"Quality metrics written to $fullTableName: ${flowResults.size} flow rows")
         } catch {
           case e: Exception =>
@@ -39,11 +40,11 @@ class QualityMetricsWriter(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConf
 
   private def ensureTable(fullTableName: String): Unit = {
     try {
-      spark.sql(s"DESCRIBE TABLE $fullTableName")
+      spark.sql(s"DESCRIBE TABLE ${SqlIdentifier.quoteMultipart(fullTableName)}")
     } catch {
       case _: org.apache.spark.sql.AnalysisException =>
         spark.sql(
-          s"""CREATE TABLE $fullTableName (
+          s"""CREATE TABLE ${SqlIdentifier.quoteMultipart(fullTableName)} (
              |  batch_id STRING,
              |  batch_timestamp TIMESTAMP,
              |  batch_success BOOLEAN,

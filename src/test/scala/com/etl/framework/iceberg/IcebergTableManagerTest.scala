@@ -347,33 +347,33 @@ class IcebergTableManagerTest extends AnyFlatSpec with Matchers with BeforeAndAf
   // --- parsePartitionTransform tests ---
 
   "parsePartitionTransform" should "pass through identity partitions" in {
-    tableManager.parsePartitionTransform("status") shouldBe "status"
+    tableManager.parsePartitionTransform("status") shouldBe "`status`"
   }
 
   it should "parse temporal transforms" in {
-    tableManager.parsePartitionTransform("year(ts)") shouldBe "year(ts)"
-    tableManager.parsePartitionTransform("month(ts)") shouldBe "month(ts)"
-    tableManager.parsePartitionTransform("day(ts)") shouldBe "day(ts)"
-    tableManager.parsePartitionTransform("hour(ts)") shouldBe "hour(ts)"
+    tableManager.parsePartitionTransform("year(ts)") shouldBe "year(`ts`)"
+    tableManager.parsePartitionTransform("month(ts)") shouldBe "month(`ts`)"
+    tableManager.parsePartitionTransform("day(ts)") shouldBe "day(`ts`)"
+    tableManager.parsePartitionTransform("hour(ts)") shouldBe "hour(`ts`)"
   }
 
   it should "parse bucket transform" in {
     tableManager.parsePartitionTransform("bucket(16, id)") shouldBe
-      "bucket(16, id)"
+      "bucket(16, `id`)"
   }
 
   it should "parse truncate transform" in {
     tableManager.parsePartitionTransform("truncate(10, name)") shouldBe
-      "truncate(10, name)"
+      "truncate(10, `name`)"
   }
 
   it should "handle case-insensitive transforms" in {
-    tableManager.parsePartitionTransform("MONTH(ts)") shouldBe "month(ts)"
-    tableManager.parsePartitionTransform("Year(ts)") shouldBe "year(ts)"
+    tableManager.parsePartitionTransform("MONTH(ts)") shouldBe "month(`ts`)"
+    tableManager.parsePartitionTransform("Year(ts)") shouldBe "year(`ts`)"
   }
 
-  it should "pass through unknown transforms" in {
-    tableManager.parsePartitionTransform("custom(x)") shouldBe "custom(x)"
+  it should "reject unknown transforms instead of accepting SQL fragments" in {
+    an[IllegalArgumentException] should be thrownBy tableManager.parsePartitionTransform("custom(x)")
   }
 
   "IcebergTableManager type widening" should "widen int to long automatically" in {

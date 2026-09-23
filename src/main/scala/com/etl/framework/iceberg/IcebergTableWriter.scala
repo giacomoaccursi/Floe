@@ -1,6 +1,7 @@
 package com.etl.framework.iceberg
 
 import com.etl.framework.config.{FlowConfig, IcebergConfig}
+import com.etl.framework.util.SqlIdentifier
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{col, count, lit}
 import org.apache.spark.sql.types.StructType
@@ -56,6 +57,7 @@ class IcebergTableWriter(
       flowConfig: FlowConfig
   ): WriteResult = {
     val tableName = tableManager.resolveTableName(flowConfig)
+    val sqlTableName = SqlIdentifier.quoteMultipart(tableName)
     tableManager.createOrUpdateTable(flowConfig, df.schema)
 
     logger.info(s"Writing full load to $tableName")
@@ -66,7 +68,7 @@ class IcebergTableWriter(
       // overwrite(lit(true)) replaces ALL existing rows regardless of partitioning,
       // which is the correct semantic for a full load — even an empty source clears the table.
       // overwritePartitions() would be a no-op with an empty DataFrame (no partitions to replace).
-      cachedDf.writeTo(tableName).overwrite(lit(true))
+      cachedDf.writeTo(sqlTableName).overwrite(lit(true))
       val recordCount = cachedDf.count()
       val snapshotId = tableManager.getCurrentSnapshotId(flowConfig)
       snapshotId.foreach { sid =>
@@ -84,6 +86,7 @@ class IcebergTableWriter(
       flowConfig: FlowConfig
   ): WriteResult = {
     val tableName = tableManager.resolveTableName(flowConfig)
+    val sqlTableName = SqlIdentifier.quoteMultipart(tableName)
     tableManager.createOrUpdateTable(flowConfig, df.schema)
 
     val pkColumns = flowConfig.validation.primaryKey
@@ -93,11 +96,11 @@ class IcebergTableWriter(
     try {
       if (pkColumns.isEmpty) {
         logger.warn(s"No primary key defined for $tableName, falling back to append")
-        cachedDf.writeTo(tableName).append()
+        cachedDf.writeTo(sqlTableName).append()
       } else {
         validateMergeKeys(cachedDf, pkColumns)
         val mergeCondition = pkColumns
-          .map(col => s"target.$col = source.$col")
+          .map(c => s"${SqlIdentifier.qualified("target", c)} = ${SqlIdentifier.qualified("source", c)}")
           .mkString(" AND ")
 
         val updateCols = cachedDf.columns
@@ -105,22 +108,26 @@ class IcebergTableWriter(
 
         val matchedClause = if (updateCols.nonEmpty) {
           val changeCondition = updateCols
-            .map(c => s"NOT (source.$c <=> target.$c)")
+            .map(c =>
+              s"NOT (${SqlIdentifier.qualified("source", c)} <=> ${SqlIdentifier.qualified("target", c)})"
+            )
             .mkString(" OR ")
           s"WHEN MATCHED AND ($changeCondition) THEN UPDATE SET " +
-            updateCols.map(c => s"target.$c = source.$c").mkString(", ")
+            updateCols
+              .map(c => s"${SqlIdentifier.qualified("target", c)} = ${SqlIdentifier.qualified("source", c)}")
+              .mkString(", ")
         } else ""
 
-        val insertCols = cachedDf.columns.mkString(", ")
-        val insertVals = cachedDf.columns.map(c => s"source.$c").mkString(", ")
+        val insertCols = cachedDf.columns.map(SqlIdentifier.quote).mkString(", ")
+        val insertVals = cachedDf.columns.map(c => SqlIdentifier.qualified("source", c)).mkString(", ")
         val insertClause =
           s"WHEN NOT MATCHED THEN INSERT ($insertCols) VALUES ($insertVals)"
 
         val allClauses = Seq(matchedClause, insertClause).filter(_.nonEmpty).mkString("\n")
         val mergeView = uniqueViewName("_iceberg_merge", flowConfig.name)
         val mergeSql =
-          s"""MERGE INTO $tableName AS target
-             |USING $mergeView AS source
+          s"""MERGE INTO $sqlTableName AS ${SqlIdentifier.quote("target")}
+             |USING ${SqlIdentifier.quote(mergeView)} AS ${SqlIdentifier.quote("source")}
              |ON $mergeCondition
              |$allClauses""".stripMargin
 
@@ -224,14 +231,14 @@ class IcebergTableWriter(
     val sourceView = uniqueViewName("_iceberg_scd2_src", flowName)
     df.createOrReplaceTempView(sourceView)
     try {
-      val columns = df.columns.mkString(", ")
-      val isActiveInsert = cfg.isActiveCol.map(c => s",\n  true AS $c").getOrElse("")
+      val quotedColumns = df.columns.map(SqlIdentifier.quote).mkString(", ")
+      val isActiveInsert = cfg.isActiveCol.map(c => s",\n  true AS ${SqlIdentifier.quote(c)}").getOrElse("")
       spark.sql(
-        s"""INSERT INTO $tableName
-           |SELECT $columns, current_timestamp() AS ${cfg.validFromCol},
-           |  CAST(NULL AS TIMESTAMP) AS ${cfg.validToCol},
-           |  true AS ${cfg.isCurrentCol}$isActiveInsert
-           |FROM $sourceView""".stripMargin
+        s"""INSERT INTO ${SqlIdentifier.quoteMultipart(tableName)}
+           |SELECT $quotedColumns, current_timestamp() AS ${SqlIdentifier.quote(cfg.validFromCol)},
+           |  CAST(NULL AS TIMESTAMP) AS ${SqlIdentifier.quote(cfg.validToCol)},
+           |  true AS ${SqlIdentifier.quote(cfg.isCurrentCol)}$isActiveInsert
+           |FROM ${SqlIdentifier.quote(sourceView)}""".stripMargin
       )
     } finally {
       spark.catalog.dropTempView(sourceView)
@@ -268,25 +275,29 @@ class IcebergTableWriter(
       stagedView: String,
       cfg: SCD2Config
   ): Unit = {
-    val srcCols = df.columns.map(c => s"src.$c").mkString(", ")
-    val mkFromPk = cfg.pkColumns.map(c => s"src.$c AS _mk_$c").mkString(", ")
+    val srcCols = df.columns.map(c => SqlIdentifier.qualified("src", c)).mkString(", ")
+    val mkFromPk = cfg.pkColumns
+      .map(c => s"${SqlIdentifier.qualified("src", c)} AS ${SqlIdentifier.quote(s"_mk_$c")}")
+      .mkString(", ")
     val mkNull = cfg.pkColumns
       .map { c =>
         val dataType = df.schema(c).dataType.sql
-        s"CAST(NULL AS $dataType) AS _mk_$c"
+        s"CAST(NULL AS $dataType) AS ${SqlIdentifier.quote(s"_mk_$c")}"
       }
       .mkString(", ")
-    val joinCond = cfg.pkColumns.map(c => s"src.$c = tgt.$c").mkString(" AND ")
+    val joinCond = cfg.pkColumns
+      .map(c => s"${SqlIdentifier.qualified("src", c)} = ${SqlIdentifier.qualified("tgt", c)}")
+      .mkString(" AND ")
     val changeCond = buildChangeCondition(cfg.compareColumns, "src", "tgt")
 
     spark
       .sql(
         s"""SELECT $srcCols, $mkFromPk
-           |FROM $sourceView src
+           |FROM ${SqlIdentifier.quote(sourceView)} AS ${SqlIdentifier.quote("src")}
            |UNION ALL
            |SELECT $srcCols, $mkNull
-           |FROM $sourceView src
-           |JOIN $tableName tgt ON $joinCond AND tgt.${cfg.isCurrentCol} = true
+           |FROM ${SqlIdentifier.quote(sourceView)} AS ${SqlIdentifier.quote("src")}
+           |JOIN ${SqlIdentifier.quoteMultipart(tableName)} AS ${SqlIdentifier.quote("tgt")} ON $joinCond AND ${SqlIdentifier.qualified("tgt", cfg.isCurrentCol)} = true
            |WHERE $changeCond""".stripMargin
       )
       .createOrReplaceTempView(stagedView)
@@ -299,47 +310,55 @@ class IcebergTableWriter(
       cfg: SCD2Config
   ): String = {
     val mergeOn =
-      cfg.pkColumns.map(c => s"target.$c = source._mk_$c").mkString(" AND ") +
-        s" AND target.${cfg.isCurrentCol} = true"
+      cfg.pkColumns
+        .map(c =>
+          s"${SqlIdentifier.qualified("target", c)} = ${SqlIdentifier.qualified("source", s"_mk_$c")}"
+        )
+        .mkString(" AND ") +
+        s" AND ${SqlIdentifier.qualified("target", cfg.isCurrentCol)} = true"
 
     val matchedClause = {
       val changeCond = buildChangeCondition(cfg.compareColumns, "source", "target")
       s"""WHEN MATCHED AND ($changeCond) THEN UPDATE SET
-         |  target.${cfg.validToCol} = current_timestamp(),
-         |  target.${cfg.isCurrentCol} = false""".stripMargin
+         |  ${SqlIdentifier.qualified("target", cfg.validToCol)} = current_timestamp(),
+         |  ${SqlIdentifier.qualified("target", cfg.isCurrentCol)} = false""".stripMargin
     }
 
     val notMatchedClause = {
       val insertColNames =
         (df.columns.toSeq ++ Seq(cfg.validFromCol, cfg.validToCol, cfg.isCurrentCol) ++ cfg.isActiveCol.toSeq)
+          .map(SqlIdentifier.quote)
           .mkString(", ")
       val isActiveVal = cfg.isActiveCol.map(_ => ", true").getOrElse("")
       val insertVals =
-        df.columns.map(c => s"source.$c").mkString(", ") +
+        df.columns.map(c => SqlIdentifier.qualified("source", c)).mkString(", ") +
           s", current_timestamp(), CAST(NULL AS TIMESTAMP), true$isActiveVal"
       s"WHEN NOT MATCHED THEN INSERT ($insertColNames) VALUES ($insertVals)"
     }
 
     val softDeleteClause =
       if (cfg.detectDeletes) {
-        val isActiveUpdate = cfg.isActiveCol.map(c => s",\n  target.$c = false").getOrElse("")
+        val isActiveUpdate =
+          cfg.isActiveCol.map(c => s",\n  ${SqlIdentifier.qualified("target", c)} = false").getOrElse("")
         Seq(
-          s"""WHEN NOT MATCHED BY SOURCE AND target.${cfg.isCurrentCol} = true THEN UPDATE SET
-             |  target.${cfg.validToCol} = current_timestamp(),
-             |  target.${cfg.isCurrentCol} = false$isActiveUpdate""".stripMargin
+          s"""WHEN NOT MATCHED BY SOURCE AND ${SqlIdentifier.qualified("target", cfg.isCurrentCol)} = true THEN UPDATE SET
+             |  ${SqlIdentifier.qualified("target", cfg.validToCol)} = current_timestamp(),
+             |  ${SqlIdentifier.qualified("target", cfg.isCurrentCol)} = false$isActiveUpdate""".stripMargin
         )
       } else Seq.empty
 
     val allClauses = Seq(matchedClause, notMatchedClause) ++ softDeleteClause
-    s"""MERGE INTO $tableName AS target
-       |USING $stagedView AS source
+    s"""MERGE INTO ${SqlIdentifier.quoteMultipart(tableName)} AS ${SqlIdentifier.quote("target")}
+       |USING ${SqlIdentifier.quote(stagedView)} AS ${SqlIdentifier.quote("source")}
        |ON $mergeOn
        |${allClauses.mkString("\n")}""".stripMargin
   }
 
   private def buildChangeCondition(columns: Seq[String], leftAlias: String, rightAlias: String): String =
     columns
-      .map(c => s"NOT ($leftAlias.$c <=> $rightAlias.$c)")
+      .map(c =>
+        s"NOT (${SqlIdentifier.qualified(leftAlias, c)} <=> ${SqlIdentifier.qualified(rightAlias, c)})"
+      )
       .mkString(" OR ")
 
   /** Tags the batch snapshot and collects Iceberg metadata for the batch metadata JSON. */

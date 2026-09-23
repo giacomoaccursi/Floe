@@ -1,6 +1,7 @@
 package com.etl.framework.iceberg
 
 import com.etl.framework.config.{FlowConfig, IcebergConfig, MaintenanceConfig}
+import com.etl.framework.util.SqlIdentifier
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
 import org.slf4j.LoggerFactory
@@ -44,11 +45,12 @@ class IcebergTableManager(
 
   /** Adds columns present in the incoming schema but missing from the table. */
   private def addNewColumns(tableName: String, schema: StructType, flowConfig: FlowConfig): Unit = {
-    val currentColumns = spark.table(tableName).schema.fieldNames.toSet
+    val sqlTableName = SqlIdentifier.quoteMultipart(tableName)
+    val currentColumns = spark.table(sqlTableName).schema.fieldNames.toSet
     val newColumns = schema.fields.filterNot(f => currentColumns.contains(f.name))
     val isActiveCol = flowConfig.loadMode.isActiveColumn
     newColumns.foreach { field =>
-      spark.sql(s"ALTER TABLE $tableName ADD COLUMN ${field.name} ${field.dataType.sql}")
+      spark.sql(s"ALTER TABLE $sqlTableName ADD COLUMN ${SqlIdentifier.quote(field.name)} ${field.dataType.sql}")
       logger.info(s"Added column ${field.name} (${field.dataType.sql}) to $tableName")
       if (isActiveCol.contains(field.name)) {
         logger.warn(
@@ -63,12 +65,15 @@ class IcebergTableManager(
 
   /** Widens column types where safe (int→long, float→double, decimal precision up). */
   private def widenColumnTypes(tableName: String, schema: StructType): Unit = {
-    val currentSchema = spark.table(tableName).schema
+    val sqlTableName = SqlIdentifier.quoteMultipart(tableName)
+    val currentSchema = spark.table(sqlTableName).schema
     schema.fields.foreach { incomingField =>
       currentSchema.fields.find(_.name == incomingField.name).foreach { existingField =>
         if (existingField.dataType != incomingField.dataType) {
           if (isSafeWidening(existingField.dataType, incomingField.dataType)) {
-            spark.sql(s"ALTER TABLE $tableName ALTER COLUMN ${incomingField.name} TYPE ${incomingField.dataType.sql}")
+            spark.sql(
+              s"ALTER TABLE $sqlTableName ALTER COLUMN ${SqlIdentifier.quote(incomingField.name)} TYPE ${incomingField.dataType.sql}"
+            )
             logger.info(
               s"Widened column ${incomingField.name} from ${existingField.dataType.sql} to ${incomingField.dataType.sql} on $tableName"
             )
@@ -88,7 +93,7 @@ class IcebergTableManager(
   private def updateTableProperties(tableName: String, flowConfig: FlowConfig): Unit = {
     if (flowConfig.output.tableProperties.nonEmpty) {
       val currentProps = spark
-        .sql(s"SHOW TBLPROPERTIES $tableName")
+        .sql(s"SHOW TBLPROPERTIES ${SqlIdentifier.quoteMultipart(tableName)}")
         .collect()
         .map(row => row.getString(0) -> row.getString(1))
         .toMap
@@ -96,7 +101,10 @@ class IcebergTableManager(
         .filterNot { case (k, v) => currentProps.get(k).contains(v) }
       if (toApply.nonEmpty) {
         toApply.foreach { case (key, value) =>
-          spark.sql(s"ALTER TABLE $tableName SET TBLPROPERTIES ('$key' = '$value')")
+          spark.sql(
+            s"ALTER TABLE ${SqlIdentifier.quoteMultipart(tableName)} SET TBLPROPERTIES " +
+              s"(${SqlIdentifier.stringLiteral(key)} = ${SqlIdentifier.stringLiteral(value)})"
+          )
         }
         logger.info(s"Applied ${toApply.size} property updates to $tableName: ${toApply.keys.mkString(", ")}")
       }
@@ -109,7 +117,7 @@ class IcebergTableManager(
       flowConfig.output.icebergPartitions.foreach { partition =>
         val partitionExpr = parsePartitionTransform(partition)
         try {
-          spark.sql(s"ALTER TABLE $tableName ADD PARTITION FIELD $partitionExpr")
+          spark.sql(s"ALTER TABLE ${SqlIdentifier.quoteMultipart(tableName)} ADD PARTITION FIELD $partitionExpr")
           logger.info(s"Added partition field $partitionExpr to $tableName")
           logger.warn(
             s"Partition field '$partitionExpr' was added to an existing table ($tableName). " +
@@ -141,7 +149,7 @@ class IcebergTableManager(
     try {
       // spark.catalog.tableExists does not support fully-qualified Iceberg names (catalog.namespace.table),
       // so we use DESCRIBE TABLE which works with any catalog.
-      spark.sql(s"DESCRIBE TABLE $tableName")
+      spark.sql(s"DESCRIBE TABLE ${SqlIdentifier.quoteMultipart(tableName)}")
       true
     } catch {
       case _: org.apache.spark.sql.AnalysisException => false
@@ -155,11 +163,11 @@ class IcebergTableManager(
   ): Unit = {
     val columns = schema.fields
       .map { field =>
-        s"${field.name} ${field.dataType.sql}"
+        s"${SqlIdentifier.quote(field.name)} ${field.dataType.sql}"
       }
       .mkString(", ")
 
-    val createSql = s"CREATE TABLE IF NOT EXISTS $tableName ($columns) USING iceberg"
+    val createSql = s"CREATE TABLE IF NOT EXISTS ${SqlIdentifier.quoteMultipart(tableName)} ($columns) USING iceberg"
     logger.info(s"Creating Iceberg table: $createSql")
     spark.sql(createSql)
 
@@ -181,7 +189,8 @@ class IcebergTableManager(
 
     allProperties.foreach { case (key, value) =>
       spark.sql(
-        s"ALTER TABLE $tableName SET TBLPROPERTIES ('$key' = '$value')"
+        s"ALTER TABLE ${SqlIdentifier.quoteMultipart(tableName)} SET TBLPROPERTIES " +
+          s"(${SqlIdentifier.stringLiteral(key)} = ${SqlIdentifier.stringLiteral(value)})"
       )
     }
 
@@ -195,7 +204,7 @@ class IcebergTableManager(
     partitions.foreach { partition =>
       val partitionExpr = parsePartitionTransform(partition)
       spark.sql(
-        s"ALTER TABLE $tableName ADD PARTITION FIELD $partitionExpr"
+        s"ALTER TABLE ${SqlIdentifier.quoteMultipart(tableName)} ADD PARTITION FIELD $partitionExpr"
       )
     }
     logger.info(
@@ -210,18 +219,20 @@ class IcebergTableManager(
       case transformPattern(func, args) =>
         func.toLowerCase match {
           case "year" | "month" | "day" | "hour" =>
-            s"${func.toLowerCase}($args)"
+            s"${func.toLowerCase}(${SqlIdentifier.quote(args.trim)})"
           case "bucket" =>
             val parts = args.split(",").map(_.trim)
-            s"bucket(${parts(0)}, ${parts(1)})"
+            require(parts.length == 2 && parts(0).forall(_.isDigit), s"Invalid bucket partition transform: $partition")
+            s"bucket(${parts(0)}, ${SqlIdentifier.quote(parts(1))})"
           case "truncate" =>
             val parts = args.split(",").map(_.trim)
-            s"truncate(${parts(0)}, ${parts(1)})"
+            require(parts.length == 2 && parts(0).forall(_.isDigit), s"Invalid truncate partition transform: $partition")
+            s"truncate(${parts(0)}, ${SqlIdentifier.quote(parts(1))})"
           case _ =>
-            partition
+            throw new IllegalArgumentException(s"Unsupported Iceberg partition transform: $func")
         }
       case _ =>
-        partition
+        SqlIdentifier.quote(partition.trim)
     }
   }
 
@@ -229,9 +240,9 @@ class IcebergTableManager(
       tableName: String,
       sortColumns: Seq[String]
   ): Unit = {
-    val sortExpr = sortColumns.mkString(", ")
+    val sortExpr = sortColumns.map(SqlIdentifier.quote).mkString(", ")
     spark.sql(
-      s"ALTER TABLE $tableName WRITE ORDERED BY $sortExpr"
+      s"ALTER TABLE ${SqlIdentifier.quoteMultipart(tableName)} WRITE ORDERED BY $sortExpr"
     )
     logger.info(s"Sort order applied to $tableName: $sortExpr")
   }
@@ -243,7 +254,8 @@ class IcebergTableManager(
   def getCurrentSnapshotId(tableName: String): Option[Long] = {
     try {
       val refs = spark.sql(
-        s"SELECT snapshot_id FROM $tableName.refs WHERE name = 'main'"
+        s"SELECT snapshot_id FROM ${SqlIdentifier.metadataTable(tableName, "refs")} " +
+          s"WHERE name = ${SqlIdentifier.stringLiteral("main")}"
       )
       if (refs.isEmpty) None
       else Some(refs.first().getLong(0))
@@ -274,11 +286,13 @@ class IcebergTableManager(
         return false
       case None => ""
     }
-    val quotedTag = s"`${tagName.replace("`", "``")}`"
-    val escapedTag = tagName.replace("'", "''")
+    val quotedTag = SqlIdentifier.quote(tagName)
     try {
       val existingSnapshot = spark
-        .sql(s"SELECT snapshot_id FROM $tableName.refs WHERE name = '$escapedTag'")
+        .sql(
+          s"SELECT snapshot_id FROM ${SqlIdentifier.metadataTable(tableName, "refs")} " +
+            s"WHERE name = ${SqlIdentifier.stringLiteral(tagName)}"
+        )
         .collect()
         .headOption
         .map(_.getLong(0))
@@ -288,7 +302,8 @@ class IcebergTableManager(
       }
       val action = if (existingSnapshot.isEmpty) "CREATE TAG" else "REPLACE TAG"
       spark.sql(
-        s"ALTER TABLE $tableName $action $quotedTag AS OF VERSION $snapshotId$retentionClause"
+        s"ALTER TABLE ${SqlIdentifier.quoteMultipart(tableName)} $action $quotedTag " +
+          s"AS OF VERSION $snapshotId$retentionClause"
       )
       logger.info(s"Tagged snapshot $snapshotId as '$tagName' on $tableName")
       true
@@ -314,7 +329,7 @@ class IcebergTableManager(
       val row = spark
         .sql(
           s"SELECT parent_id, committed_at, manifest_list, summary " +
-            s"FROM $tableName.snapshots WHERE snapshot_id = $snapshotId"
+            s"FROM ${SqlIdentifier.metadataTable(tableName, "snapshots")} WHERE snapshot_id = $snapshotId"
         )
         .first()
 

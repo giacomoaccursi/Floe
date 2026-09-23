@@ -1,5 +1,6 @@
 package com.etl.framework.pipeline
 
+import com.etl.framework.util.SqlIdentifier
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /** Immutable context available during derived table computation. Provides access to Iceberg tables (full history) and
@@ -13,5 +14,5 @@ final case class DerivedTableContext(
 ) {
 
   def table(name: String): DataFrame =
-    spark.table(s"$catalogName.$namespace.$name")
+    spark.table(Seq(catalogName, namespace, name).map(SqlIdentifier.quote).mkString("."))
 }

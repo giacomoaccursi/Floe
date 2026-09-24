@@ -44,6 +44,7 @@ val result = pipeline.execute()
 | `withDataReader(type, factory)` | Registers a custom data reader for a source type. See [Data Sources — Custom readers](data-sources.md#custom-readers). |
 | `withBatchListener(listener)` | Registers a listener notified on batch completion or failure. See [Batch Listeners](batch-listeners.md). |
 | `withRunStore(store)` | Configures the durable coordinator used for CAS transitions, leases, recovery, release manifests, and maintenance tasks. Use `JdbcRunStore` in production. |
+| `withPipelineVersion(version)` | Sets a stable deployment revision used by resume/replay validation for transformation and derived-table code that cannot be serialized into the pipeline hash. |
 | `withVariables(variables)` | Sets variables for YAML substitution (priority over env vars). See [Configuration Overview](../configuration/overview.md#variable-substitution) |
 | `build()` | Builds the pipeline (returns `IngestionPipeline`) |
 | `validate()` | Validates configuration without executing. Returns `Seq[String]` of issues (empty = valid). |
@@ -169,6 +170,7 @@ val runStore = new JdbcRunStore(() => dataSource.getConnection)
 val pipeline = IngestionPipeline.builder()
   .withConfigDirectory("config")
   .withRunStore(runStore)
+  .withPipelineVersion(sys.env("APP_RELEASE_SHA"))
   .build()
 
 val first = pipeline.execute()

@@ -157,6 +157,10 @@ class IcebergTableManager(
     }
   }
 
+  /** Checks whether an exact snapshot is still addressable (for release/recovery validation). */
+  def snapshotExists(tableName: String, snapshotId: Long): Boolean =
+    tableExists(tableName) && Option(Spark3Util.loadIcebergTable(spark, tableName).snapshot(snapshotId)).isDefined
+
   private def createTable(
       tableName: String,
       schema: StructType,

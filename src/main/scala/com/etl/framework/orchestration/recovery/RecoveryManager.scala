@@ -52,14 +52,25 @@ class RecoveryManager(
   }
 
   private def reconcileOperation(operation: OperationRecord): ReconciliationItem = {
-    if (operation.status == OperationStatus.CommittedNoChange) {
-      return ReconciliationItem(operation, ReconciliationOutcome.Committed, operation.snapshotId)
-    }
-
     val tableName = resolveTableName(operation)
     try {
       if (!tableManager.tableExists(tableName))
         return ReconciliationItem(operation, ReconciliationOutcome.Absent, None)
+      if (operation.status == OperationStatus.CommittedNoChange) {
+        val snapshotIsValid = operation.snapshotId match {
+          case Some(snapshotId) => tableManager.snapshotExists(tableName, snapshotId)
+          case None             => tableManager.getCurrentSnapshotId(tableName).isEmpty
+        }
+        return if (snapshotIsValid)
+          ReconciliationItem(operation, ReconciliationOutcome.Committed, operation.snapshotId)
+        else
+          ReconciliationItem(
+            operation,
+            ReconciliationOutcome.Inconsistent,
+            None,
+            Some("the snapshot pinned for a no-change operation is no longer addressable")
+          )
+      }
       val snapshots = tableManager.findSnapshotsByOperationId(tableName, operation.operationId)
       snapshots.size match {
         case 0

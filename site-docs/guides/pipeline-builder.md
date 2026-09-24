@@ -43,11 +43,12 @@ val result = pipeline.execute()
 | `withDerivedTable(name, fn)` | Registers a derived table computed after all flows are written to Iceberg |
 | `withDataReader(type, factory)` | Registers a custom data reader for a source type. See [Data Sources — Custom readers](data-sources.md#custom-readers). |
 | `withBatchListener(listener)` | Registers a listener notified on batch completion or failure. See [Batch Listeners](batch-listeners.md). |
+| `withRunStore(store)` | Configures the durable coordinator used for CAS transitions, leases, recovery, release manifests, and maintenance tasks. Use `JdbcRunStore` in production. |
 | `withVariables(variables)` | Sets variables for YAML substitution (priority over env vars). See [Configuration Overview](../configuration/overview.md#variable-substitution) |
 | `build()` | Builds the pipeline (returns `IngestionPipeline`) |
 | `validate()` | Validates configuration without executing. Returns `Seq[String]` of issues (empty = valid). |
 
-The builder does not have an `execute()` method — call `build()` first, then `execute()` or `executeOrThrow()` on the returned pipeline.
+The builder does not have an `execute()` method — call `build()` first, then `execute()`, `executeOrThrow()`, `resume(batchId)`, or `replay(batchId)` on the returned pipeline.
 
 ### execute() vs executeOrThrow()
 
@@ -144,7 +145,8 @@ case class IngestionResult(
   success: Boolean,
   error: Option[String] = None,
   derivedTableResults: Seq[DerivedTableResult] = Seq.empty,
-  maintenanceResults: Seq[MaintenanceResult] = Seq.empty
+  maintenanceResults: Seq[MaintenanceResult] = Seq.empty,
+  status: RunStatus
 )
 ```
 
@@ -155,9 +157,38 @@ case class IngestionResult(
 | `success` | `Boolean` | `true` if all flows and all registered derived tables completed successfully |
 | `error` | `Option[String]` | Error message if the batch failed |
 | `derivedTableResults` | `Seq[DerivedTableResult]` | Results for each derived table (empty if none registered) |
-| `maintenanceResults` | `Seq[MaintenanceResult]` | Per-target maintenance status, independent from data success |
+| `maintenanceResults` | `Seq[MaintenanceResult]` | Per-target asynchronous maintenance status; successful ingestion normally returns `QUEUED` |
+| `status` | `RunStatus` | Authoritative durable status such as `PUBLISHED`, `FAILED_PARTIAL`, `UNKNOWN`, or `SUCCEEDED_WITH_WARNINGS` |
 
-`MaintenanceResult` identifies the `targetName`, whether it is a `flow` or `derived` target, its `success`, and any `error`. A maintenance failure should trigger an operational alert and maintenance-only retry; it must not cause an ingestion replay.
+`MaintenanceResult` identifies the `targetName`, whether it is a `flow` or `derived` target, its `status`, and any `error`. Run `MaintenanceWorker` from a separate scheduled job; a maintenance failure triggers a maintenance-only retry and must not cause an ingestion replay.
+
+### Recovery example
+
+```scala
+val runStore = new JdbcRunStore(() => dataSource.getConnection)
+val pipeline = IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .withRunStore(runStore)
+  .build()
+
+val first = pipeline.execute()
+
+// Same batch and effectiveAt; committed operations are never written again.
+val resumed = pipeline.resume(first.batchId)
+
+// New linked batch and operation IDs over the same immutable input.
+val replayed = pipeline.replay(first.batchId)
+```
+
+For JDBC or custom sources, configure an immutable source version:
+
+```yaml
+source:
+  type: jdbc
+  path: "jdbc:postgresql://db/app"
+  options:
+    replayToken: "orders-watermark-2026-09-24T00:00:00Z"
+```
 
 ### FlowResult
 
@@ -177,6 +208,7 @@ Each flow produces a `FlowResult`:
 | `rejectionReasons` | `Map[String, Long]` | Count of rejections per validation step |
 | `error` | `Option[String]` | Error message if the flow failed |
 | `icebergMetadata` | `Option[IcebergFlowMetadata]` | Iceberg snapshot metadata (see [Iceberg Integration](iceberg.md)) |
+| `warnings` | `Seq[String]` | Operational side-output failures that did not invalidate the committed target data |
 
 ## Transformations
 

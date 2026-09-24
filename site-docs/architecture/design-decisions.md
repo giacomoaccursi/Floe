@@ -38,11 +38,21 @@ Copy-on-write has no read-time overhead — queries scan data files directly wit
 
 Merge-on-read should be opted into explicitly via `tableProperties` for write-heavy flows or flows with frequent idempotent runs. The choice is per-flow, not global, because different flows have different read/write patterns.
 
-## Why maintenance runs after orphan detection
+## Why maintenance is queued after orphan detection
 
 Snapshot expiration removes old snapshots. Orphan detection needs the previous snapshot for time travel comparison (to find which parent keys were removed). If maintenance ran first, it could expire the snapshot that orphan detection needs.
 
-Running orphan detection first guarantees the previous snapshot is still available. Maintenance then runs safely afterward.
+Running orphan detection first guarantees the previous snapshot is still available. FLOe then persists maintenance tasks for an independent worker. Compaction, snapshot expiration, manifest rewriting, and orphan-file deletion are operational work: they must not lengthen the ingestion critical path or force data replay when they fail.
+
+## Why multi-table publication uses a manifest
+
+Iceberg commits are atomic per table, not across a set of tables. FLOe therefore treats table writes as preparation and publishes one application-level release manifest only after every required flow and derived target succeeds. The manifest pins each target to an exact snapshot ID. Consumers that require batch consistency must read through that manifest; querying mutable table heads cannot provide a cross-table atomic view.
+
+## Why resume requires reconciliation and immutable input
+
+A client-side exception can occur after a catalog accepted an Iceberg commit. Blind retry can duplicate append data or create a second logical operation. FLOe writes a deterministic operation ID into every snapshot summary and reconciles that identity before resuming.
+
+Resume is allowed only for operations proven absent and only when the source fingerprint still matches the original run. JDBC and custom sources cannot be inferred safely, so they require an explicit immutable `replayToken`. A deliberate replay creates a new batch and new operation IDs instead of pretending to be a continuation of the old run.
 
 ## Why partition spec changes do not rewrite existing data
 

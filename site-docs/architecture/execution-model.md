@@ -100,9 +100,10 @@ graph TD
     subgraph Phase3["3. Post-batch phase"]
         P1["Orphan detection<br/>(time travel, cascade)"]
         P2["Derived tables"]
-        P3["Table maintenance<br/>(expire, compact, cleanup, rewrite)"]
-        P4["Write batch metadata JSON<br/>and quality metrics"]
-        P1 --> P2 --> P3 --> P4
+        P3["Persist release manifest<br/>with exact snapshot IDs"]
+        P4["Queue table maintenance<br/>(outside ingestion)"]
+        P5["Write diagnostic metadata<br/>and quality metrics"]
+        P1 --> P2 --> P3 --> P4 --> P5
     end
 
     subgraph Phase4["4. DAG phase (separate execution)"]
@@ -136,8 +137,19 @@ Example: `20260328_150000`. The batch ID is used for:
 - **Flow failure**: if a flow fails, the batch stops. The failed flow is reported in `IngestionResult`.
 - **Rejection threshold**: if `maxRejectionRate` is configured (globally or per-flow) and any flow's rejection rate exceeds the threshold, the batch stops. In sequential execution, remaining flows in the current group are not executed. In parallel execution, flows already running complete but subsequent groups are not started.
 - **Orphan/derived failure**: orphan-detection and derived-table failures make `IngestionResult.success = false`; already committed tables are not rolled back.
-- **Maintenance failure**: maintenance does not change the data-success flag. Each flow and derived-table outcome is exposed separately in `maintenanceResults` and persisted in the batch summary, so operators can alert and retry maintenance without replaying ingestion.
-- **Iceberg atomicity**: if a write fails mid-way, Iceberg rolls back automatically. The table remains in the previous state.
+- **Diagnostic-output failure**: rejected-row, warning, and per-flow metadata failures do not reinterpret an already committed Iceberg write as failed. They are exposed in `FlowResult.warnings`, and the run is published as `SUCCEEDED_WITH_WARNINGS`.
+- **Maintenance failure**: ingestion only persists `QUEUED` maintenance tasks. A separate `MaintenanceWorker` claims and retries them; a failure changes the durable run status to `SUCCEEDED_WITH_WARNINGS` without replaying ingestion.
+- **Iceberg commit uncertainty**: a failed client call does not prove that an Iceberg commit failed. Every mutation carries a deterministic operation ID in the snapshot summary. Recovery searches Iceberg history for that ID and classifies the operation as committed, absent, unknown, or inconsistent before any resume.
+
+## Durable run states, resume, and replay
+
+Production deployments should configure a `JdbcRunStore`. It stores versioned run and operation states, exact snapshot IDs, input fingerprints, leases with fencing tokens, release manifests, and maintenance tasks. `InMemoryRunStore` has the same state model but is only suitable for tests and single-process development.
+
+`pipeline.resume(batchId)` keeps the original batch ID and `effectiveAt`. It acquires the run lease, reconciles operation IDs against Iceberg, validates that pending inputs have not changed, and executes only operations proven absent. Already committed targets are loaded at their recorded snapshots for downstream dependency checks.
+
+`pipeline.replay(batchId)` is different: it requires a terminal source batch and immutable input fingerprints, then creates a new linked batch with new operation IDs. File inputs are fingerprinted from their file inventory; JDBC and custom readers must provide `source.options.replayToken`.
+
+A successful run is visible to consumers through one release manifest containing the exact snapshot ID for every flow and derived table. Per-table commits remain independent—Iceberg has no cross-table transaction—but consumers using `SnapshotPinnedReader` see the application-level release boundary instead of a mixture of table heads.
 
 ## Related
 

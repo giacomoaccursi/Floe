@@ -2,7 +2,7 @@
 
 ## Overview
 
-The framework uses Apache Iceberg as its table format. Each table write commits atomically; a batch that writes several tables is **not** one atomic transaction. Delta and SCD2 use `MERGE INTO`, while full loads overwrite table contents. Snapshot tagging and post-batch maintenance are configurable. Tagging a snapshot does not by itself prove which writer produced it if multiple writers race on the same table.
+The framework uses Apache Iceberg as its table format. Each table write commits atomically; a batch that writes several tables is **not** one Iceberg transaction. Delta and SCD2 use `MERGE INTO`, while full loads overwrite table contents. FLOe publishes a cross-table release manifest with exact snapshot IDs and queues maintenance outside the ingestion critical path.
 
 The `iceberg` section is required in `global.yaml`. At startup, the pipeline validates the config and configures the SparkSession with the Iceberg catalog. If the section is missing or invalid, execution stops immediately (fail-fast).
 
@@ -392,6 +392,20 @@ Each write produces an `IcebergFlowMetadata` object containing:
 
 This metadata is written to the batch metadata JSON at `{metadataPath}/{batchId}/flows/{flowName}.json`.
 
+### Commit identity and reconciliation
+
+Every mutating write adds these properties to the Iceberg snapshot summary:
+
+- `floe.batch-id`
+- `floe.target-name`
+- `floe.operation-type`
+- `floe.operation-id`
+- `floe.effective-at`
+
+`floe.operation-id` is deterministic for the batch, target, and operation type. If the client loses the commit response, FLOe searches snapshot history for that identity. Exactly one match proves the commit; no match permits re-execution only when the source fingerprint is unchanged; multiple matches are an invariant violation. A lookup failure remains `UNKNOWN_COMMIT` and is never converted into a blind retry.
+
+Snapshot tags are useful retention and time-travel references, but the operation ID—not a mutable table head or tag naming convention—is the commit identity used for recovery.
+
 #### Interpreting snapshot summary
 
 The snapshot summary contains file-level statistics, not row-level change counts. Key fields:
@@ -410,7 +424,7 @@ The snapshot summary contains file-level statistics, not row-level change counts
 
 ## Post-batch lifecycle
 
-After all flows execute successfully, three things happen in order:
+After all flows execute successfully, the publication path is:
 
 ### 1. Orphan detection
 
@@ -418,11 +432,24 @@ Uses time travel to find parent keys removed during this batch and resolves orph
 
 This runs **before** maintenance because maintenance may expire the snapshots needed for time travel comparison.
 
-### 2. Batch metadata write
+### 2. Derived tables and release manifest
 
-The batch metadata JSON includes Iceberg snapshot details for every flow and any orphan reports generated in step 1.
+Derived tables are committed with the same operation-identity protocol. Only after every required target succeeds does FLOe persist one release manifest containing the exact snapshot ID of each flow and derived table. Consumers requiring a consistent multi-table view must use `SnapshotPinnedReader`; reading current table heads can observe a partially completed batch.
 
-### 3. Table maintenance
+### 3. Diagnostic metadata and maintenance queue
+
+JSON batch metadata and quality metrics are diagnostic outputs. A failure there is reported as an operational warning and does not negate a committed target. Maintenance tasks are durably queued with the published batch and returned as `QUEUED` in `maintenanceResults`.
+
+Run maintenance from a separate scheduled process:
+
+```scala
+val worker = new MaintenanceWorker(globalConfig.iceberg, runStore, maxAttempts = 3)
+val results = worker.runPending(limit = 50)
+```
+
+The worker claims each task with a versioned compare-and-set, runs the configured operations, and persists `SUCCEEDED` or `FAILED`. Failed tasks are retryable up to `maxAttempts`; a worker failure changes a published run to `SUCCEEDED_WITH_WARNINGS` but never replays ingestion.
+
+For each queued table, the worker runs:
 
 For each flow's table, the framework runs the enabled maintenance operations:
 
@@ -433,8 +460,8 @@ For each flow's table, the framework runs the enabled maintenance operations:
 | Orphan file cleanup | `CALL system.remove_orphan_files(table, older_than)` | Removes data files not referenced by any snapshot. Cleans up after failed writes. |
 | Manifest rewrite | `CALL system.rewrite_manifests(table)` | Consolidates manifest files for faster metadata operations. Disabled by default. |
 
-!!!note "Maintenance is best-effort"
-    A maintenance failure does not replay or invalidate a successful data commit. `IngestionResult.success` therefore remains the data outcome, while `maintenanceResults` reports each flow/derived table separately. The same statuses and errors are stored under `maintenance_status` and `maintenance_results` in `summary.json`; alert on failures and retry maintenance without rerunning ingestion. A failure inside one table's maintenance sequence can skip its later operations, while other tables are still attempted.
+!!!note "Maintenance is asynchronous"
+    `summary.json` records that maintenance was queued at publication time. The authoritative later task state is in `RunStore`, because a worker may finish after the batch metadata file was written. Alert on durable `FAILED` tasks and retry the worker without rerunning ingestion.
 
 !!!tip "Metadata file cleanup"
     Every commit creates a new metadata JSON file in the table's `metadata/` directory (e.g. `v1.metadata.json`, `v2.metadata.json`). These files are small (KB) but accumulate over time. To enable automatic cleanup, add these table properties:
@@ -623,9 +650,9 @@ WHERE NOT (curr.name <=> prev.name)
 
 ## Limitations
 
-### Single writer per table
+### Writer coordination
 
-The framework assumes a single writer per table per batch. Concurrent writes to the same table can cause commit conflicts. In multi-pipeline environments, ensure flows that write to the same table are serialized.
+The run lease prevents two FLOe executors from driving the same batch concurrently and is renewed with a fencing token. It does not serialize unrelated pipelines that target the same table. Iceberg optimistic concurrency detects many conflicts, but external table-level coordination is still required when separate pipelines can write the same target—especially for append operations.
 
 ### No automatic column removal
 

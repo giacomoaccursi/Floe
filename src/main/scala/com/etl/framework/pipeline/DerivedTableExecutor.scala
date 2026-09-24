@@ -5,9 +5,7 @@ import com.etl.framework.iceberg.{
   AmbiguousCommitException,
   CommitContext,
   DuplicateOperationCommitException,
-  IcebergMaintenanceRunner,
-  IcebergTableManager,
-  MaintenanceResult
+  IcebergTableManager
 }
 import com.etl.framework.util.SqlIdentifier
 import org.apache.iceberg.exceptions.CommitStateUnknownException
@@ -21,9 +19,7 @@ import java.time.Instant
 import java.util.concurrent.Callable
 import scala.collection.JavaConverters._
 
-/** Executes derived table functions and writes results to Iceberg as full-load tables. Each derived table gets snapshot
-  * tagging and post-write maintenance.
-  */
+/** Executes derived table functions and writes results to Iceberg as full-load tables. */
 class DerivedTableExecutor(
     icebergConfig: IcebergConfig
 )(implicit spark: SparkSession) {
@@ -31,7 +27,7 @@ class DerivedTableExecutor(
   private val logger = LoggerFactory.getLogger(getClass)
   private val tableManager = new IcebergTableManager(spark, icebergConfig)
 
-  /** Executes all derived table functions and writes results to Iceberg. Runs maintenance on successful tables. */
+  /** Executes all derived table functions and writes results to Iceberg. */
   def execute(
       derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
       batchId: String,
@@ -39,13 +35,8 @@ class DerivedTableExecutor(
   ): Seq[DerivedTableResult] = {
     val ctx = DerivedTableContext(spark, batchId, icebergConfig.catalogName, icebergConfig.namespace)
 
-    val results = derivedTables.map { case (tableName, fn) =>
+    derivedTables.map { case (tableName, fn) =>
       executeSingle(tableName, fn, ctx, batchId, effectiveAt)
-    }
-
-    results.map { result =>
-      if (result.success) result.copy(maintenanceResult = Some(runMaintenance(result.tableName)))
-      else result
     }
   }
 
@@ -134,11 +125,12 @@ class DerivedTableExecutor(
       context: CommitContext,
       commitError: Option[Throwable]
   ) = {
-    val snapshots = try tableManager.findSnapshotsByOperationId(tableName, context.operationId)
-    catch {
-      case lookupError: Throwable =>
-        throw AmbiguousCommitException(context.operationId, tableName, commitError.getOrElse(lookupError))
-    }
+    val snapshots =
+      try tableManager.findSnapshotsByOperationId(tableName, context.operationId)
+      catch {
+        case lookupError: Throwable =>
+          throw AmbiguousCommitException(context.operationId, tableName, commitError.getOrElse(lookupError))
+      }
     if (snapshots.size > 1)
       throw DuplicateOperationCommitException(context.operationId, tableName, snapshots.map(_.snapshotId))
     if (snapshots.isEmpty && commitError.exists(hasCommitStateUnknown))
@@ -151,20 +143,6 @@ class DerivedTableExecutor(
       .iterate[Throwable](error)(_.getCause)
       .takeWhile(_ != null)
       .exists(_.isInstanceOf[CommitStateUnknownException])
-
-  private def runMaintenance(tableName: String): MaintenanceResult = {
-    val runner = new IcebergMaintenanceRunner(spark, icebergConfig)
-    val fullTableName = resolveTableName(tableName)
-    try {
-      runner.run(fullTableName, icebergConfig.maintenance)
-      logger.info(s"Maintenance completed on $fullTableName")
-      MaintenanceResult(tableName, "derived", success = true)
-    } catch {
-      case e: Exception =>
-        logger.warn(s"Maintenance failed on $fullTableName: ${e.getMessage}", e)
-        MaintenanceResult(tableName, "derived", success = false, error = Some(e.getMessage))
-    }
-  }
 
   /** Creates the Iceberg table if it doesn't exist, or adds missing columns if it does. */
   private def createOrUpdateTable(fullTableName: String, schema: StructType): Unit = {
@@ -208,7 +186,6 @@ case class DerivedTableResult(
     success: Boolean,
     recordsWritten: Long = 0,
     error: Option[String] = None,
-    maintenanceResult: Option[MaintenanceResult] = None,
     snapshotId: Option[Long] = None,
     operationId: Option[String] = None,
     reconciled: Boolean = false

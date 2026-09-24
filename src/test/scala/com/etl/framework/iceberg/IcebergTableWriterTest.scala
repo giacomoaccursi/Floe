@@ -2,12 +2,15 @@ package com.etl.framework.iceberg
 
 import com.etl.framework.config._
 import com.etl.framework.TestFixtures
+import com.etl.framework.orchestration.recovery.{ReconciliationOutcome, RecoveryManager}
+import com.etl.framework.orchestration.state.{InMemoryRunStore, OperationRecord, OperationStatus, RunRecord, RunStatus}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.{Files, Path}
+import java.time.Instant
 
 class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
@@ -347,6 +350,46 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     result.icebergMetadata.flatMap(_.summary.get("floe.operation-id")) shouldBe Some(context.operationId)
   }
 
+  it should "reconcile committed and absent operations without guessing" in {
+    val batchId = "batch_recovery"
+    val effectiveAt = Instant.parse("2026-09-23T10:15:30Z")
+    val fc = flowConfig("recovery_commit")
+    val committedContext = CommitContext.forFlow(batchId, fc.name, "full", effectiveAt)
+    val committed = writer.writeFullLoad(Seq((1, "Alice")).toDF("id", "name"), fc, committedContext)
+    val absentOperationId = "operation-that-never-committed"
+    val store = new InMemoryRunStore()
+    store.createRun(RunRecord.planned(batchId, "pipeline", effectiveAt).copy(status = RunStatus.Unknown))
+    store.createOperation(
+      OperationRecord
+        .pending(batchId, committedContext.operationId, fc.name, "flow")
+        .copy(
+          status = OperationStatus.UnknownCommit
+        )
+    )
+    store.createOperation(
+      OperationRecord
+        .pending(batchId, absentOperationId, fc.name, "flow")
+        .copy(
+          status = OperationStatus.UnknownCommit
+        )
+    )
+    val globalConfig = TestFixtures.globalConfig(iceberg = icebergConfig)
+    val recovery = new RecoveryManager(globalConfig, Seq(fc), Seq.empty, store)
+
+    val dryRun = recovery.reconcileBatch(batchId)
+    dryRun.items.map(item => item.operation.operationId -> item.outcome).toMap should contain allOf (
+      committedContext.operationId -> ReconciliationOutcome.Committed,
+      absentOperationId -> ReconciliationOutcome.Absent
+    )
+    store.getOperations(batchId).map(_.status).toSet shouldBe Set(OperationStatus.UnknownCommit)
+
+    recovery.reconcileBatch(batchId, applyChanges = true).safeToResume shouldBe true
+    val reconciled = store.getOperations(batchId).map(operation => operation.operationId -> operation).toMap
+    reconciled(committedContext.operationId).status shouldBe OperationStatus.ReconciledCommitted
+    reconciled(committedContext.operationId).snapshotId shouldBe committed.snapshotId
+    reconciled(absentOperationId).status shouldBe OperationStatus.ReconciledAbsent
+  }
+
   it should "return unmodified result when no snapshot id" in {
     val noSnapshot = WriteResult(0, None)
     val fc = flowConfig("no_snapshot_tag")
@@ -487,7 +530,7 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     writer.writeDeltaLoad(batch1, fc)
 
     val batch2 = Seq(2, 3, 4).toDF("id")
-    val result = writer.writeDeltaLoad(batch2, fc)
+    writer.writeDeltaLoad(batch2, fc)
 
     // id=4 is new, id=2 and id=3 already exist (no columns to update), id=1 stays
     val rows = spark
@@ -561,6 +604,7 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     "scd2_no_detect_del",
     "tag_result_test",
     "tracked_commit",
+    "recovery_commit",
     "delta_no_pk",
     "scd2_null_change",
     "scd2_to_null",

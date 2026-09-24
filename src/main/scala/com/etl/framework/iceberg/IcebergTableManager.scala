@@ -146,7 +146,7 @@ class IcebergTableManager(
     msg.contains("already exists") || msg.contains("redundant") || msg.contains("duplicate")
   }
 
-  private def tableExists(tableName: String): Boolean = {
+  def tableExists(tableName: String): Boolean = {
     try {
       // spark.catalog.tableExists does not support fully-qualified Iceberg names (catalog.namespace.table),
       // so we use DESCRIBE TABLE which works with any catalog.
@@ -227,7 +227,10 @@ class IcebergTableManager(
             s"bucket(${parts(0)}, ${SqlIdentifier.quote(parts(1))})"
           case "truncate" =>
             val parts = args.split(",").map(_.trim)
-            require(parts.length == 2 && parts(0).forall(_.isDigit), s"Invalid truncate partition transform: $partition")
+            require(
+              parts.length == 2 && parts(0).forall(_.isDigit),
+              s"Invalid truncate partition transform: $partition"
+            )
             s"truncate(${parts(0)}, ${SqlIdentifier.quote(parts(1))})"
           case _ =>
             throw new IllegalArgumentException(s"Unsupported Iceberg partition transform: $func")
@@ -265,8 +268,8 @@ class IcebergTableManager(
     }
   }
 
-  /** Finds every live snapshot produced by a FLOe logical operation. The operation ID is stored in the snapshot
-    * summary as part of the same Iceberg commit, so this is the authoritative reconciliation lookup.
+  /** Finds every live snapshot produced by a FLOe logical operation. The operation ID is stored in the snapshot summary
+    * as part of the same Iceberg commit, so this is the authoritative reconciliation lookup.
     */
   def findSnapshotsByOperationId(flowConfig: FlowConfig, operationId: String): Seq[CommittedSnapshot] =
     findSnapshotsByOperationId(resolveTableName(flowConfig), operationId)

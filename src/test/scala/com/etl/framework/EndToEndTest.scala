@@ -1,6 +1,7 @@
 package com.etl.framework
 
 import com.etl.framework.orchestration.{BatchListener, IngestionResult}
+import com.etl.framework.orchestration.state.RunStatus
 import com.etl.framework.pipeline.IngestionPipeline
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfterAll
@@ -487,7 +488,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     ids shouldBe Seq("1")
   }
 
-  it should "not retry a delta append after post-commit metadata failure" in {
+  it should "publish a delta append with warnings after post-commit metadata failure" in {
     val configDir = tempDir.resolve("e2e_post_commit_retry").resolve("config")
     val dataDir = tempDir.resolve("e2e_post_commit_retry").resolve("data")
     val blockedMetadataPath = tempDir.resolve("e2e_post_commit_retry").resolve("blocked-metadata")
@@ -517,7 +518,9 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
     val result = IngestionPipeline.builder().withConfigDirectory(configDir.toString).build().execute()
 
-    result.success shouldBe false
+    result.success shouldBe true
+    result.status shouldBe RunStatus.SucceededWithWarnings
+    result.flowResults.head.warnings.mkString(" ") should include("Flow metadata write failed")
     spark.sql("SELECT * FROM spark_catalog.default.retry_append").count() shouldBe 1L
   }
 

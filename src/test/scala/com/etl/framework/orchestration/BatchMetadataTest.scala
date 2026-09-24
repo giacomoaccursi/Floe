@@ -2,12 +2,23 @@ package com.etl.framework.orchestration
 
 import com.etl.framework.TestFixtures
 import com.etl.framework.config._
+import com.etl.framework.io.readers.{DataReader, DataReaderFactory}
+import com.etl.framework.iceberg.MaintenanceStatus
 import com.etl.framework.orchestration.batch.BatchIdGenerator
+import com.etl.framework.orchestration.maintenance.MaintenanceWorker
+import com.etl.framework.orchestration.state.{
+  InMemoryRunStore,
+  OperationStatus,
+  ReleaseManifest,
+  RunStatus,
+  SnapshotPinnedReader
+}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.{Files, Paths}
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.util.Try
 
 class BatchMetadataTest extends AnyFlatSpec with Matchers {
@@ -256,31 +267,180 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     }
   }
 
-  it should "expose and persist maintenance failures without changing data success" in {
+  it should "queue maintenance outside ingestion and persist worker failures as warnings" in {
     val tempDir = Files.createTempDirectory("maintenance-status-test").toString
     try {
       val flow = createFlow("maintenance_flow", tempDir)
       val globalConfig = createGlobalConfig(tempDir)
-      val failingMaintenance: (FlowConfig, MaintenanceConfig) => Unit =
-        (_, _) => throw new RuntimeException("compaction unavailable")
+      val runStore = new InMemoryRunStore()
 
       val result = FlowOrchestrator(
         globalConfig,
         Seq(flow),
-        maintenanceExecutor = Some(failingMaintenance)
+        runStore = runStore
       ).execute()
 
       result.success shouldBe true
+      result.status shouldBe RunStatus.Published
       result.maintenanceResults should have size 1
       result.maintenanceResults.head.targetName shouldBe flow.name
       result.maintenanceResults.head.targetType shouldBe "flow"
-      result.maintenanceResults.head.success shouldBe false
-      result.maintenanceResults.head.error should contain("compaction unavailable")
+      result.maintenanceResults.head.status shouldBe MaintenanceStatus.Queued
+
+      val worker = new MaintenanceWorker(
+        globalConfig.iceberg,
+        runStore,
+        executor = Some(_ => throw new RuntimeException("compaction unavailable"))
+      )
+      val workerResults = worker.runPending()
+      workerResults.head.status shouldBe MaintenanceStatus.Failed
+      workerResults.head.error should contain("compaction unavailable")
+      runStore.getRun(result.batchId).get.status shouldBe RunStatus.SucceededWithWarnings
+      runStore.getMaintenanceTasks(Some(result.batchId)).head.status shouldBe MaintenanceStatus.Failed
 
       val metadataPath = Paths.get(s"$tempDir/metadata/${result.batchId}/summary.json")
       val metadataContent = new String(Files.readAllBytes(metadataPath))
-      metadataContent should include("maintenance_success")
-      metadataContent should include("compaction unavailable")
+      metadataContent should include("queued")
+    } finally {
+      cleanupTempDir(tempDir)
+    }
+  }
+
+  it should "publish an atomic release manifest and durable operation state" in {
+    val tempDir = Files.createTempDirectory("release-manifest-test").toString
+    try {
+      val flow = createFlow("published_flow", tempDir)
+      val globalConfig = createGlobalConfig(tempDir)
+      val runStore = new InMemoryRunStore()
+
+      val result = FlowOrchestrator(globalConfig, Seq(flow), runStore = runStore).execute()
+
+      result.status shouldBe RunStatus.Published
+      val persisted = runStore.getRun(result.batchId).get
+      persisted.status shouldBe RunStatus.Published
+      persisted.lease shouldBe None
+      val operation = runStore.getOperations(result.batchId).head
+      operation.status shouldBe OperationStatus.Committed
+      operation.snapshotId shouldBe defined
+
+      val manifest = ReleaseManifest.fromJson(persisted.releaseManifest.get)
+      manifest.batchId shouldBe result.batchId
+      manifest.targets.map(_.targetName) should contain only "published_flow"
+      new SnapshotPinnedReader(manifest).table("published_flow").count() shouldBe 3L
+    } finally {
+      cleanupTempDir(tempDir)
+    }
+  }
+
+  it should "resume a partial batch without rewriting an already committed target" in {
+    val tempDir = Files.createTempDirectory("batch-resume-test").toString
+    try {
+      val stable = createFlow("resume_stable", tempDir).copy(
+        source = SourceConfig(
+          `type` = SourceType.Custom("resumable"),
+          path = "stable",
+          options = Map("replayToken" -> "immutable-input-v1")
+        )
+      )
+      val unstable = createFlow("resume_unstable", tempDir).copy(
+        source = SourceConfig(
+          `type` = SourceType.Custom("resumable"),
+          path = "unstable",
+          options = Map("replayToken" -> "immutable-input-v1")
+        )
+      )
+      val failOnce = new AtomicBoolean(true)
+      val readerFactory: DataReaderFactory.ReaderFactory = (source, _, session) =>
+        new DataReader {
+          override def read() = {
+            if (source.path == "unstable" && failOnce.compareAndSet(true, false))
+              throw new RuntimeException("transient source outage")
+            import session.implicits._
+            Seq((source.path + "_1", "value")).toDF("id", "value")
+          }
+        }
+      val globalConfig = createGlobalConfig(tempDir)
+      val runStore = new InMemoryRunStore()
+
+      val first = FlowOrchestrator(
+        globalConfig,
+        Seq(stable, unstable),
+        customReaders = Map("resumable" -> readerFactory),
+        runStore = runStore
+      ).execute()
+
+      first.status shouldBe RunStatus.FailedPartial
+      val stableBefore = runStore.getOperations(first.batchId).find(_.targetName == stable.name).get.snapshotId
+      stableBefore shouldBe defined
+
+      val resumed = FlowOrchestrator(
+        globalConfig,
+        Seq(stable, unstable),
+        customReaders = Map("resumable" -> readerFactory),
+        runStore = runStore
+      ).resume(first.batchId)
+
+      resumed.status shouldBe RunStatus.Published
+      resumed.success shouldBe true
+      val operations = runStore.getOperations(first.batchId).map(operation => operation.targetName -> operation).toMap
+      operations(stable.name).snapshotId shouldBe stableBefore
+      operations(stable.name).status shouldBe OperationStatus.ReconciledCommitted
+      operations(unstable.name).status shouldBe OperationStatus.Committed
+      spark.table(globalConfig.iceberg.fullTableName(stable.name)).count() shouldBe 1L
+      spark.table(globalConfig.iceberg.fullTableName(unstable.name)).count() shouldBe 1L
+    } finally {
+      cleanupTempDir(tempDir)
+    }
+  }
+
+  it should "replay immutable inputs under a new linked batch" in {
+    val tempDir = Files.createTempDirectory("batch-replay-test").toString
+    try {
+      val flow = createFlow("replay_flow", tempDir)
+      val globalConfig = createGlobalConfig(tempDir)
+      val runStore = new InMemoryRunStore()
+
+      val first = FlowOrchestrator(globalConfig, Seq(flow), runStore = runStore).execute()
+      val replayed = FlowOrchestrator(globalConfig, Seq(flow), runStore = runStore).replay(first.batchId)
+
+      replayed.success shouldBe true
+      replayed.status shouldBe RunStatus.Published
+      replayed.batchId should not be first.batchId
+      runStore.getRun(replayed.batchId).get.replayOf should contain(first.batchId)
+      runStore.getOperations(replayed.batchId).head.operationId should not be
+        runStore.getOperations(first.batchId).head.operationId
+    } finally {
+      cleanupTempDir(tempDir)
+    }
+  }
+
+  it should "publish committed data with warnings when a diagnostic side output fails" in {
+    val tempDir = Files.createTempDirectory("diagnostic-warning-test").toString
+    try {
+      val base = createFlow("diagnostic_warning_flow", tempDir)
+      val flow = base.copy(
+        validation = base.validation.copy(
+          rules = Seq(
+            ValidationRule(
+              `type` = ValidationRuleType.Regex,
+              column = Some("value"),
+              pattern = Some("accepted"),
+              onFailure = OnFailureAction.Reject
+            )
+          )
+        ),
+        output = base.output.copy(rejectedPath = Some("unsupported-fs://bucket/rejected"))
+      )
+      val globalConfig = createGlobalConfig(tempDir)
+      val runStore = new InMemoryRunStore()
+
+      val result = FlowOrchestrator(globalConfig, Seq(flow), runStore = runStore).execute()
+
+      result.success shouldBe true
+      result.status shouldBe RunStatus.SucceededWithWarnings
+      result.flowResults.head.warnings.mkString(" ") should include("Failed to write rejected records")
+      runStore.getOperations(result.batchId).head.status shouldBe OperationStatus.Committed
+      spark.table(globalConfig.iceberg.fullTableName(flow.name)).count() shouldBe 0L
     } finally {
       cleanupTempDir(tempDir)
     }

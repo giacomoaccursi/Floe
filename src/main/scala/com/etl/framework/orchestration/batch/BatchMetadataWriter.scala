@@ -72,19 +72,19 @@ class BatchMetadataWriter(
           "table_name" -> result.tableName,
           "success" -> result.success,
           "records_written" -> result.recordsWritten,
-          "error" -> result.error.getOrElse(""),
-          "maintenance_success" -> result.maintenanceResult.map(_.success).map(Boolean.box).orNull,
-          "maintenance_error" -> result.maintenanceResult.flatMap(_.error).getOrElse("")
+          "error" -> result.error.getOrElse("")
         )
       },
       "maintenance_status" -> (if (maintenanceResults.isEmpty) "skipped"
-                                else if (maintenanceResults.forall(_.success)) "succeeded"
-                                else "failed"),
+                               else if (maintenanceResults.forall(_.status.name == "QUEUED")) "queued"
+                               else if (maintenanceResults.forall(_.success)) "succeeded"
+                               else "failed"),
       "maintenance_success" -> (maintenanceResults.nonEmpty && maintenanceResults.forall(_.success)),
       "maintenance_results" -> maintenanceResults.map { result =>
         Map[String, Any](
           "target_name" -> result.targetName,
           "target_type" -> result.targetType,
+          "status" -> result.status.name,
           "success" -> result.success,
           "error" -> result.error.getOrElse("")
         )
@@ -102,6 +102,7 @@ class BatchMetadataWriter(
           "execution_time_ms" -> result.executionTimeMs,
           "rejection_reasons" -> result.rejectionReasons,
           "error" -> result.error.getOrElse(""),
+          "warnings" -> result.warnings,
           "write_attempted" -> result.writeAttempted,
           "retryable" -> result.retryable
         )

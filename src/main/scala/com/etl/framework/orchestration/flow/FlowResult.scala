@@ -18,7 +18,8 @@ case class FlowResult(
     error: Option[String] = None,
     icebergMetadata: Option[IcebergFlowMetadata] = None,
     writeAttempted: Boolean = false,
-    retryable: Boolean = false
+    retryable: Boolean = false,
+    warnings: Seq[String] = Seq.empty
 )
 
 /** Factory for creating FlowResult instances

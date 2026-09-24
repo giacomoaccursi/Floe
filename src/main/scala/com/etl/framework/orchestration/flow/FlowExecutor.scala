@@ -38,11 +38,13 @@ class FlowExecutor(
   private val metadataWriter = new FlowMetadataWriter(flowConfig, globalConfig)
   private val transformer = new FlowTransformer(flowConfig)
   private var writeAttempted = false
+  private var operationalWarnings = Vector.empty[String]
 
   /** Executes the complete flow
     */
   def execute(batchId: String, effectiveAt: Instant = Instant.now()): FlowResult = {
     writeAttempted = false
+    operationalWarnings = Vector.empty
     val (result, executionTimeMs) =
       TimingUtil.timedWithDuration(logger, s"Execute flow ${flowConfig.name}") {
         executeFlow(batchId, effectiveAt) match {
@@ -53,20 +55,21 @@ class FlowExecutor(
         }
       }
 
-    val finalResult = result.copy(executionTimeMs = executionTimeMs, writeAttempted = writeAttempted)
+    val finalResult = result.copy(
+      executionTimeMs = executionTimeMs,
+      writeAttempted = writeAttempted,
+      warnings = result.warnings ++ operationalWarnings
+    )
 
-    val reportedResult = try {
-      metadataWriter.writeFlowMetadata(finalResult, batchId)
-      finalResult
-    } catch {
-      case e: Exception =>
-        logger.error(s"Flow metadata write failed for ${flowConfig.name}: ${e.getMessage}", e)
-        finalResult.copy(
-          success = false,
-          retryable = false,
-          error = Some(s"Flow metadata write failed: ${e.getMessage}")
-        )
-    }
+    val reportedResult =
+      try {
+        metadataWriter.writeFlowMetadata(finalResult, batchId)
+        finalResult
+      } catch {
+        case e: Exception =>
+          logger.error(s"Flow metadata write failed for ${flowConfig.name}: ${e.getMessage}", e)
+          finalResult.copy(warnings = finalResult.warnings :+ s"Flow metadata write failed: ${e.getMessage}")
+      }
     logFlowSummary(reportedResult)
 
     reportedResult
@@ -118,8 +121,12 @@ class FlowExecutor(
 
       if (RejectionThresholdPolicy.exceeded(rejectionRate, rejectedCount, flowConfig, globalConfig)) {
         // Keep the diagnostic side outputs, but never mutate the target table.
-        validationResult.rejected.foreach(dataWriter.writeRejected(_, batchId))
-        validationResult.warned.foreach(dataWriter.writeWarnings(_, batchId))
+        validationResult.rejected.foreach(df =>
+          writeDiagnostic("rejected records")(dataWriter.writeRejected(df, batchId))
+        )
+        validationResult.warned.foreach(df =>
+          writeDiagnostic("validation warnings")(dataWriter.writeWarnings(df, batchId))
+        )
         val maxRate = RejectionThresholdPolicy.threshold(flowConfig, globalConfig).get
         FlowMetrics(
           inputCount = inputCount,
@@ -186,7 +193,10 @@ class FlowExecutor(
     require(
       finalNames.distinct.length == finalNames.length,
       s"Flow ${flowConfig.name} sourceColumn mappings produce duplicate columns: " +
-        finalNames.groupBy(identity).collect { case (name, occurrences) if occurrences.length > 1 => name }.mkString(", ")
+        finalNames
+          .groupBy(identity)
+          .collect { case (name, occurrences) if occurrences.length > 1 => name }
+          .mkString(", ")
     )
     df.select(df.columns.map(name => col(name).as(renames.getOrElse(name, name))): _*)
   }
@@ -225,15 +235,26 @@ class FlowExecutor(
     val writeResult = dataWriter.writeValidated(validatedData, batchId, effectiveAt)
 
     if (rejectedCount > 0) {
-      validationResult.rejected.foreach(rejDf => dataWriter.writeRejected(rejDf, batchId))
+      validationResult.rejected.foreach(rejDf =>
+        writeDiagnostic("rejected records")(dataWriter.writeRejected(rejDf, batchId))
+      )
     }
 
     validationResult.warned.foreach { warnedDf =>
-      dataWriter.writeWarnings(warnedDf, batchId)
+      writeDiagnostic("validation warnings")(dataWriter.writeWarnings(warnedDf, batchId))
     }
 
     writeResult
   }
+
+  private def writeDiagnostic(label: String)(write: => Unit): Unit =
+    try write
+    catch {
+      case error: Exception =>
+        val warning = s"Failed to write $label for ${flowConfig.name}: ${error.getMessage}"
+        operationalWarnings :+= warning
+        logger.warn(warning, error)
+    }
 
   private def createSuccessResult(
       batchId: String,
@@ -270,10 +291,12 @@ class FlowExecutor(
       error: Throwable
   ): FlowResult = {
     logger.error(s"Flow ${flowConfig.name} failed: ${error.getMessage}", error)
-    FlowResult.failure(flowConfig.name, batchId, error.getMessage).copy(
-      writeAttempted = writeAttempted,
-      retryable = !writeAttempted
-    )
+    FlowResult
+      .failure(flowConfig.name, batchId, error.getMessage)
+      .copy(
+        writeAttempted = writeAttempted,
+        retryable = !writeAttempted
+      )
   }
 
   private def logFlowSummary(result: FlowResult): Unit = {

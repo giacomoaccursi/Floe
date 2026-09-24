@@ -29,6 +29,7 @@ class FlowMetadataWriter(
       "execution_time_ms" -> result.executionTimeMs,
       "rejection_reasons" -> result.rejectionReasons,
       "error" -> result.error.getOrElse(""),
+      "warnings" -> result.warnings,
       "write_attempted" -> result.writeAttempted,
       "retryable" -> result.retryable
     )

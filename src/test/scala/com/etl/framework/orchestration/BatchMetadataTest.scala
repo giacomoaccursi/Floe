@@ -121,6 +121,18 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     }
   }
 
+  it should "derive a stable pipeline identity from config and an explicit code version" in {
+    val base = TestFixtures.flowConfig("pipeline_identity")
+    val first = base.copy(preValidationTransformation = Some(context => context))
+    val second = base.copy(preValidationTransformation = Some(context => context))
+    val config = createGlobalConfig(Files.createTempDirectory("pipeline-id-test").toString)
+
+    ReleaseManifest.pipelineId(config, Seq(first), Seq("derived"), "release-a") shouldBe
+      ReleaseManifest.pipelineId(config, Seq(second), Seq("derived"), "release-a")
+    ReleaseManifest.pipelineId(config, Seq(first), Seq("derived"), "release-a") should not be
+      ReleaseManifest.pipelineId(config, Seq(first), Seq("derived"), "release-b")
+  }
+
   it should "generate distinct IDs even within one timestamp second" in {
     val ids = (1 to 100).map(_ => BatchIdGenerator.generate("yyyyMMdd_HHmmss"))
     ids.distinct.size shouldBe ids.size

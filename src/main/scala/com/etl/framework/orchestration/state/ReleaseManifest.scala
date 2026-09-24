@@ -35,11 +35,20 @@ object ReleaseManifest {
   def toJson(manifest: ReleaseManifest): String = Serialization.write(manifest)
   def fromJson(json: String): ReleaseManifest = Serialization.read[ReleaseManifest](json)
 
-  def pipelineId(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConfig], derivedNames: Seq[String]): String = {
+  def pipelineId(
+      globalConfig: GlobalConfig,
+      flowConfigs: Seq[FlowConfig],
+      derivedNames: Seq[String],
+      pipelineVersion: String = "unversioned"
+  ): String = {
+    val canonicalFlows = flowConfigs
+      .map(_.copy(preValidationTransformation = None, postValidationTransformation = None))
+      .sortBy(_.name)
     val identity = Seq(
+      pipelineVersion,
       globalConfig.iceberg.catalogName,
       globalConfig.iceberg.namespace,
-      flowConfigs.sortBy(_.name).mkString(","),
+      canonicalFlows.mkString(","),
       derivedNames.sorted.mkString(",")
     ).mkString("|")
     MessageDigest

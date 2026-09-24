@@ -84,6 +84,7 @@ class FlowOrchestrator(
     batchListeners: Seq[BatchListener] = Seq.empty,
     customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty,
     derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq.empty,
+    pipelineVersion: String = "unversioned",
     runStore: RunStore = new InMemoryRunStore()
 )(implicit spark: SparkSession) {
 
@@ -106,7 +107,8 @@ class FlowOrchestrator(
       .getRun(originalBatchId)
       .getOrElse(throw new NoSuchElementException(s"Unknown batch '$originalBatchId'"))
     require(original.status.terminal, s"Batch '$originalBatchId' is not terminal and must be resumed, not replayed")
-    val currentPipelineId = ReleaseManifest.pipelineId(globalConfig, flowConfigs, derivedTables.map(_._1))
+    val currentPipelineId =
+      ReleaseManifest.pipelineId(globalConfig, flowConfigs, derivedTables.map(_._1), pipelineVersion)
     require(
       original.pipelineId == currentPipelineId,
       s"Pipeline definition changed since batch '$originalBatchId'; replay would not be deterministic"
@@ -118,7 +120,7 @@ class FlowOrchestrator(
   private def startNewRun(replayOf: Option[String]): IngestionResult = {
     val batchId = BatchIdGenerator.generate(globalConfig.processing.batchIdFormat)
     val effectiveAt = Instant.now()
-    val pipelineId = ReleaseManifest.pipelineId(globalConfig, flowConfigs, derivedTables.map(_._1))
+    val pipelineId = ReleaseManifest.pipelineId(globalConfig, flowConfigs, derivedTables.map(_._1), pipelineVersion)
 
     runStore.initialize()
     runStore.createRun(RunRecord.planned(batchId, pipelineId, effectiveAt, replayOf))
@@ -134,7 +136,8 @@ class FlowOrchestrator(
       run.status != RunStatus.Published && run.status != RunStatus.SucceededWithWarnings,
       s"Batch '$batchId' is already published with status ${run.status.name}"
     )
-    val currentPipelineId = ReleaseManifest.pipelineId(globalConfig, flowConfigs, derivedTables.map(_._1))
+    val currentPipelineId =
+      ReleaseManifest.pipelineId(globalConfig, flowConfigs, derivedTables.map(_._1), pipelineVersion)
     require(
       run.pipelineId == currentPipelineId,
       s"Pipeline definition changed since batch '$batchId'; resume would not be deterministic"
@@ -706,6 +709,7 @@ object FlowOrchestrator {
       batchListeners: Seq[BatchListener] = Seq.empty,
       customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty,
       derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq.empty,
+      pipelineVersion: String = "unversioned",
       runStore: RunStore = new InMemoryRunStore()
   )(implicit spark: SparkSession): FlowOrchestrator = {
     val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
@@ -729,6 +733,7 @@ object FlowOrchestrator {
       batchListeners = batchListeners,
       customReaders = customReaders,
       derivedTables = derivedTables,
+      pipelineVersion = pipelineVersion,
       runStore = runStore
     )
   }

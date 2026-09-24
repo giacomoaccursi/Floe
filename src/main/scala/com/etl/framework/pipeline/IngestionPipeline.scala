@@ -34,8 +34,9 @@ class IngestionPipeline private (
     customValidators: Map[String, () => Validator],
     derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
     batchListeners: Seq[BatchListener],
+    pipelineVersion: String,
     runStore: RunStore,
-    customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty
+    customReaders: Map[String, DataReaderFactory.ReaderFactory]
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -91,6 +92,7 @@ class IngestionPipeline private (
       batchListeners,
       customReaders.toMap,
       derivedTables,
+      pipelineVersion = pipelineVersion,
       runStore = runStore
     )
   }
@@ -145,6 +147,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private val derivedTables = mutable.ListBuffer[(String, DerivedTableContext => DataFrame)]()
   private val batchListeners = mutable.ListBuffer[BatchListener]()
   private val customReaders = mutable.Map[String, DataReaderFactory.ReaderFactory]()
+  private var pipelineVersion: String = "unversioned"
   private var runStore: RunStore = new InMemoryRunStore()
   private var configVariables: scala.collection.immutable.Map[String, String] = scala.collection.immutable.Map.empty
 
@@ -343,6 +346,15 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     this
   }
 
+  /** Sets the deployment/config revision used to reject recovery across code changes that cannot be serialized, such as
+    * transformation and derived-table functions.
+    */
+  def withPipelineVersion(version: String): IngestionPipelineBuilder = {
+    require(version.trim.nonEmpty, "pipelineVersion must not be blank")
+    this.pipelineVersion = version.trim
+    this
+  }
+
   /** Registers a custom DataReader factory for a given source type name. Use this to read from sources not supported by
     * the built-in readers (file, jdbc).
     */
@@ -384,6 +396,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       customValidators.toMap,
       derivedTables.toSeq,
       batchListeners.toSeq,
+      pipelineVersion,
       runStore,
       customReaders.toMap
     )
@@ -577,6 +590,7 @@ object IngestionPipeline {
       customValidators: Map[String, () => Validator],
       derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
       batchListeners: Seq[BatchListener] = Seq.empty,
+      pipelineVersion: String = "unversioned",
       runStore: RunStore = new InMemoryRunStore(),
       customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty
   )(implicit spark: SparkSession): IngestionPipeline = {
@@ -589,6 +603,7 @@ object IngestionPipeline {
       customValidators,
       derivedTables,
       batchListeners,
+      pipelineVersion,
       runStore,
       customReaders
     )

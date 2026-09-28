@@ -62,8 +62,8 @@ class IngestionPipeline private (
     createOrchestrator().replay(batchId)
   }
 
-  /** Executes the pipeline and throws BatchFailedException if any flow fails. Use this on managed platforms (Glue, EMR)
-    * where a failed pipeline should stop the job.
+  /** Executes the pipeline and throws BatchFailedException when synchronous batch publication fails. Use this on
+    * managed platforms (Glue, EMR) where a failed pipeline should stop the job.
     */
   def executeOrThrow(): IngestionResult = {
     val result = execute()
@@ -313,8 +313,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   }
 
   /** Registers a derived table that will be computed after all flows are written to Iceberg. The function receives a
-    * DerivedTableContext with access to Iceberg tables (full history). The result is written to Iceberg as a full-load
-    * table.
+    * DerivedTableContext with access to the current state of Iceberg tables. The result is written to Iceberg as a
+    * full-load table.
     *
     * @param tableName
     *   Name of the derived table (becomes the Iceberg table name)
@@ -402,8 +402,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     )
   }
 
-  /** Validates the pipeline configuration without starting Spark. Checks FK references, dependency cycles, and config
-    * loading. Returns a list of error messages (empty if valid).
+  /** Validates pipeline configuration without reading source data or executing Spark jobs. Checks FK references,
+    * dependency cycles, and config loading. Returns a list of error messages (empty if valid).
     */
   def validate(): Seq[String] = {
     val errors = scala.collection.mutable.ArrayBuffer[String]()

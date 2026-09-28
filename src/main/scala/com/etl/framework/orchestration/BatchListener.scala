@@ -8,6 +8,6 @@ trait BatchListener {
   /** Called when all flows complete successfully. */
   def onBatchCompleted(result: IngestionResult): Unit
 
-  /** Called when any flow fails or the batch is aborted. */
+  /** Called when synchronous batch publication fails. */
   def onBatchFailed(result: IngestionResult): Unit
 }

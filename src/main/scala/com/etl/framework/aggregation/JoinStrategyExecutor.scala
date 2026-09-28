@@ -180,7 +180,9 @@ class JoinStrategyExecutor {
       throw ValidationConfigException(s"Aggregation '${spec.alias}' with ${spec.function.name} requires orderBy")
     val missing = spec.orderBy.filterNot(right.columns.contains)
     if (missing.nonEmpty)
-      throw ValidationConfigException(s"Aggregation '${spec.alias}' orderBy columns not found: ${missing.mkString(", ")}")
+      throw ValidationConfigException(
+        s"Aggregation '${spec.alias}' orderBy columns not found: ${missing.mkString(", ")}"
+      )
     if (spec.orderBy.size == 1) right(spec.orderBy.head)
     else struct(spec.orderBy.map(right(_)): _*)
   }

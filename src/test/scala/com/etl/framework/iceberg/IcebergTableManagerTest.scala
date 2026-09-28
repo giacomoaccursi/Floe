@@ -274,8 +274,10 @@ class IcebergTableManagerTest extends AnyFlatSpec with Matchers with BeforeAndAf
     tableManager.tagSnapshot(flowConfig, snapshotId, "batch_001") shouldBe true
 
     val tag = spark
-      .sql(s"SELECT snapshot_id, max_reference_age_in_ms FROM ${tableManager.resolveTableName(flowConfig)}.refs " +
-        "WHERE name = 'batch_batch_001'")
+      .sql(
+        s"SELECT snapshot_id, max_reference_age_in_ms FROM ${tableManager.resolveTableName(flowConfig)}.refs " +
+          "WHERE name = 'batch_batch_001'"
+      )
       .first()
     tag.getLong(0) shouldBe snapshotId
     tag.getLong(1) shouldBe 7L * 24 * 60 * 60 * 1000

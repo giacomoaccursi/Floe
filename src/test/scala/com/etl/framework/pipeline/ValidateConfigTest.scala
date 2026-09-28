@@ -206,7 +206,11 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
     )
 
     val error = intercept[IllegalArgumentException] {
-      IngestionPipeline.builder().withGlobalConfig(TestFixtures.globalConfig()).withFlowConfigs(Seq(parent, child)).build()
+      IngestionPipeline
+        .builder()
+        .withGlobalConfig(TestFixtures.globalConfig())
+        .withFlowConfigs(Seq(parent, child))
+        .build()
     }
 
     error.getMessage should include("different local/reference arity")
@@ -223,7 +227,8 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
         compareColumns = Seq("missing_value")
       )
 
-    val issues = IngestionPipeline.builder().withGlobalConfig(TestFixtures.globalConfig()).withFlowConfigs(Seq(flow)).validate()
+    val issues =
+      IngestionPipeline.builder().withGlobalConfig(TestFixtures.globalConfig()).withFlowConfigs(Seq(flow)).validate()
 
     issues.exists(_.contains("primaryKey columns are not declared")) shouldBe true
     issues.exists(_.contains("compareColumns are not declared")) shouldBe true

@@ -51,7 +51,10 @@ class IcebergTableWriter(
       .filter(col(duplicateCountCol) > 1L)
       .limit(1)
       .count() > 0L
-    require(!hasDuplicateKey, "MERGE source contains duplicate primary keys; define a deterministic resolution upstream")
+    require(
+      !hasDuplicateKey,
+      "MERGE source contains duplicate primary keys; define a deterministic resolution upstream"
+    )
   }
 
   private def sanitizeViewName(flowName: String): String =
@@ -155,8 +158,10 @@ class IcebergTableWriter(
           logger.debug(s"Merge SQL: $mergeSql")
           try {
             cachedDf.createOrReplaceTempView(mergeView)
-            spark.sql(mergeSql)
-          } finally spark.catalog.dropTempView(mergeView)
+            val _ = spark.sql(mergeSql)
+          } finally {
+            val _ = spark.catalog.dropTempView(mergeView)
+          }
         }
       }
       result.snapshotId.foreach { sid =>
@@ -202,7 +207,9 @@ class IcebergTableWriter(
         else
           executeSCD2MergeLoad(cachedDf, tableName, flowConfig.name, cfg, commitContext)
       }
-      result.snapshotId.foreach(sid => logger.info(s"SCD2 load complete on $tableName: $recordCount records, snapshot: $sid"))
+      result.snapshotId.foreach(sid =>
+        logger.info(s"SCD2 load complete on $tableName: $recordCount records, snapshot: $sid")
+      )
       result
     } finally {
       cachedDf.unpersist()
@@ -257,7 +264,7 @@ class IcebergTableWriter(
     try {
       val quotedColumns = df.columns.map(SqlIdentifier.quote).mkString(", ")
       val isActiveInsert = cfg.isActiveCol.map(c => s",\n  true AS ${SqlIdentifier.quote(c)}").getOrElse("")
-      spark.sql(
+      val _ = spark.sql(
         s"""INSERT INTO ${SqlIdentifier.quoteMultipart(tableName)}
            |SELECT $quotedColumns, ${timestampLiteral(commitContext)} AS ${SqlIdentifier.quote(cfg.validFromCol)},
            |  CAST(NULL AS TIMESTAMP) AS ${SqlIdentifier.quote(cfg.validToCol)},
@@ -265,7 +272,7 @@ class IcebergTableWriter(
            |FROM ${SqlIdentifier.quote(sourceView)}""".stripMargin
       )
     } finally {
-      spark.catalog.dropTempView(sourceView)
+      val _ = spark.catalog.dropTempView(sourceView)
     }
   }
 
@@ -286,10 +293,11 @@ class IcebergTableWriter(
       val mergeSql = buildMergeSql(df, tableName, stagedView, cfg, commitContext)
       logger.info(s"Executing SCD2 MERGE INTO on $tableName")
       logger.debug(s"SCD2 Merge SQL: $mergeSql")
-      spark.sql(mergeSql)
+      val _ = spark.sql(mergeSql)
     } finally {
-      spark.catalog.dropTempView(sourceView)
-      spark.catalog.dropTempView(stagedView)
+      Seq(sourceView, stagedView).foreach { viewName =>
+        val _ = spark.catalog.dropTempView(viewName)
+      }
     }
   }
 
@@ -322,7 +330,9 @@ class IcebergTableWriter(
            |UNION ALL
            |SELECT $srcCols, $mkNull
            |FROM ${SqlIdentifier.quote(sourceView)} AS ${SqlIdentifier.quote("src")}
-           |JOIN ${SqlIdentifier.quoteMultipart(tableName)} AS ${SqlIdentifier.quote("tgt")} ON $joinCond AND ${SqlIdentifier.qualified("tgt", cfg.isCurrentCol)} = true
+           |JOIN ${SqlIdentifier.quoteMultipart(tableName)} AS ${SqlIdentifier.quote(
+            "tgt"
+          )} ON $joinCond AND ${SqlIdentifier.qualified("tgt", cfg.isCurrentCol)} = true
            |WHERE $changeCond""".stripMargin
       )
       .createOrReplaceTempView(stagedView)
@@ -337,9 +347,7 @@ class IcebergTableWriter(
   ): String = {
     val mergeOn =
       cfg.pkColumns
-        .map(c =>
-          s"${SqlIdentifier.qualified("target", c)} = ${SqlIdentifier.qualified("source", s"_mk_$c")}"
-        )
+        .map(c => s"${SqlIdentifier.qualified("target", c)} = ${SqlIdentifier.qualified("source", s"_mk_$c")}")
         .mkString(" AND ") +
         s" AND ${SqlIdentifier.qualified("target", cfg.isCurrentCol)} = true"
 
@@ -367,7 +375,10 @@ class IcebergTableWriter(
         val isActiveUpdate =
           cfg.isActiveCol.map(c => s",\n  ${SqlIdentifier.qualified("target", c)} = false").getOrElse("")
         Seq(
-          s"""WHEN NOT MATCHED BY SOURCE AND ${SqlIdentifier.qualified("target", cfg.isCurrentCol)} = true THEN UPDATE SET
+          s"""WHEN NOT MATCHED BY SOURCE AND ${SqlIdentifier.qualified(
+              "target",
+              cfg.isCurrentCol
+            )} = true THEN UPDATE SET
              |  ${SqlIdentifier.qualified("target", cfg.validToCol)} = ${timestampLiteral(commitContext)},
              |  ${SqlIdentifier.qualified("target", cfg.isCurrentCol)} = false$isActiveUpdate""".stripMargin
         )
@@ -382,9 +393,7 @@ class IcebergTableWriter(
 
   private def buildChangeCondition(columns: Seq[String], leftAlias: String, rightAlias: String): String =
     columns
-      .map(c =>
-        s"NOT (${SqlIdentifier.qualified(leftAlias, c)} <=> ${SqlIdentifier.qualified(rightAlias, c)})"
-      )
+      .map(c => s"NOT (${SqlIdentifier.qualified(leftAlias, c)} <=> ${SqlIdentifier.qualified(rightAlias, c)})")
       .mkString(" OR ")
 
   private def timestampLiteral(context: CommitContext): String =
@@ -440,11 +449,12 @@ class IcebergTableWriter(
       context: CommitContext,
       commitError: Option[Throwable]
   ): Seq[CommittedSnapshot] = {
-    val snapshots = try tableManager.findSnapshotsByOperationId(tableName, context.operationId)
-    catch {
-      case lookupError: Throwable =>
-        throw AmbiguousCommitException(context.operationId, tableName, commitError.getOrElse(lookupError))
-    }
+    val snapshots =
+      try tableManager.findSnapshotsByOperationId(tableName, context.operationId)
+      catch {
+        case lookupError: Throwable =>
+          throw AmbiguousCommitException(context.operationId, tableName, commitError.getOrElse(lookupError))
+      }
 
     if (snapshots.size > 1)
       throw DuplicateOperationCommitException(context.operationId, tableName, snapshots.map(_.snapshotId))

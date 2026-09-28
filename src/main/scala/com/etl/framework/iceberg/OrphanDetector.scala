@@ -266,9 +266,7 @@ class OrphanDetector(
         renamedKeys.createOrReplaceTempView(viewName)
         try {
           val deleteCondition = fkCols
-            .map(c =>
-              s"${SqlIdentifier.qualified("child", c)} = ${SqlIdentifier.qualified("removed", c)}"
-            )
+            .map(c => s"${SqlIdentifier.qualified("child", c)} = ${SqlIdentifier.qualified("removed", c)}")
             .mkString(" AND ")
           val currentCondition = childFlow.loadMode.`type` match {
             case LoadMode.SCD2 =>
@@ -276,13 +274,13 @@ class OrphanDetector(
               s" AND ${SqlIdentifier.qualified("child", currentColumn)} = true"
             case _ => ""
           }
-          spark.sql(
+          val _ = spark.sql(
             s"DELETE FROM ${SqlIdentifier.quoteMultipart(childTableName)} AS ${SqlIdentifier.quote("child")} " +
               s"WHERE EXISTS (SELECT 1 FROM ${SqlIdentifier.quote(viewName)} AS ${SqlIdentifier.quote("removed")} " +
               s"WHERE $deleteCondition)$currentCondition"
           )
         } finally {
-          spark.catalog.dropTempView(viewName)
+          val _ = spark.catalog.dropTempView(viewName)
         }
 
         // Save cascade keys for downstream grandchild detection

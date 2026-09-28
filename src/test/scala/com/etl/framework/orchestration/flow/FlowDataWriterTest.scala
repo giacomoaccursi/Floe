@@ -163,7 +163,11 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     writer.writeWarnings(Seq(("id1", "rule", "old")).toDF("pk", "_warning_rule", "_warning_message"), "batch_old")
     writer.writeWarnings(Seq(("id2", "rule", "new")).toDF("pk", "_warning_rule", "_warning_message"), "batch_new")
 
-    spark.read.parquet(s"$warningsBase/${flowConfig.name}").select("_batch_id").collect()
-      .map(_.getString(0)).toSet shouldBe Set("batch_old", "batch_new")
+    spark.read
+      .parquet(s"$warningsBase/${flowConfig.name}")
+      .select("_batch_id")
+      .collect()
+      .map(_.getString(0))
+      .toSet shouldBe Set("batch_old", "batch_new")
   }
 }

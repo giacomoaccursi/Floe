@@ -2,8 +2,8 @@ package com.etl.framework.util
 
 /** Centralized Spark SQL rendering for identifiers and string literals.
   *
-  * Identifiers and values deliberately use separate methods: backticks quote identifiers, while apostrophes delimit
-  * SQL string literals. Keeping the two paths separate prevents valid names (spaces, reserved words, backticks) from
+  * Identifiers and values deliberately use separate methods: backticks quote identifiers, while apostrophes delimit SQL
+  * string literals. Keeping the two paths separate prevents valid names (spaces, reserved words, backticks) from
   * producing invalid SQL and avoids treating configured values as SQL fragments.
   */
 object SqlIdentifier {

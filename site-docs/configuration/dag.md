@@ -68,7 +68,7 @@ nodes:
 | `column` | string | yes | Column to aggregate |
 | `function` | string | yes | `sum`, `count`, `avg`, `min`, `max`, `first`, `last`, `collect_list`, `collect_set` |
 | `alias` | string | yes | Output column name |
-| `orderBy` | list | for `first`/`last` | Child columns that define ascending semantic order. `first` uses the minimum ordering tuple and `last` the maximum. |
+| `orderBy` | list | for `first`/`last` | Child columns that define ascending semantic order. `first` uses the minimum ordering tuple and `last` the maximum; include a unique tie-breaker for deterministic selection. |
 
 `nestAs` and aggregation aliases must be unique and must not collide with parent columns. Nested arrays are sorted by their complete child struct, and `collect_list` is sorted by value for deterministic output. `collect_set` remains semantically unordered.
 

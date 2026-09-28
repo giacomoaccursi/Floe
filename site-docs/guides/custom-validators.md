@@ -58,9 +58,9 @@ class MyValidator extends Validator {
 
 Requirements:
 
-1. The class must have a **no-argument constructor**
-2. It must implement the `validate` method
-3. It must be on the classpath at runtime
+1. The class must implement the `Validator` trait and its `validate` method
+2. It must be on the classpath at runtime
+3. A **no-argument constructor is required only for reflection loading**. A registered factory can construct a validator with dependencies.
 
 The `validate` method receives:
 
@@ -215,7 +215,7 @@ Or using the fully qualified class name:
 
 Custom validators interact with the standard `skipNull` and `onFailure` settings:
 
-- **skipNull**: the framework handles `skipNull` for all rule types, including custom validators. When `skipNull` is `true` (the default) and the rule has a `column` field, NULL values in that column are filtered out before your `validate` method is called. You do not need to handle NULLs yourself. If the rule has no `column` field (cross-column validation), `skipNull` has no effect — your validator receives all rows including NULLs.
+- **skipNull**: the framework handles `skipNull` for all rule types, including custom validators. When `skipNull` is `true` (the default) and the rule has a `column` field, NULL values in that column bypass your `validate` method and remain valid. If it is `false`, your validator receives the NULL rows and must classify them itself. If the rule has no `column` field (cross-column validation), `skipNull` has no effect and your validator receives every row.
 
 - **onFailure**: the framework applies the `onFailure` action (reject, warn, skip) based on the `ValidationStepResult` you return. If `onFailure: skip`, your validator is never called.
 
@@ -223,4 +223,4 @@ Custom validators interact with the standard `skipNull` and `onFailure` settings
 
 - [Validation Engine](validation.md) — full validation pipeline
 - [Flow Configuration — rules](../configuration/flows.md#rule-fields) — rule YAML reference
-- [Reference: Exceptions](../reference/exceptions.md) — `CustomValidatorLoadException`, `CustomValidatorExecutionException`
+- [Reference: Exceptions](../reference/exceptions.md) — validation and configuration failures

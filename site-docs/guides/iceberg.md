@@ -2,7 +2,7 @@
 
 ## Overview
 
-The framework uses Apache Iceberg as its table format. Each table write commits atomically; a batch that writes several tables is **not** one Iceberg transaction. Delta and SCD2 use `MERGE INTO`, while full loads overwrite table contents. FLOe publishes a cross-table release manifest with exact snapshot IDs and queues maintenance outside the ingestion critical path.
+The framework uses Apache Iceberg as its table format. Each table write commits atomically; a batch that writes several tables is **not** one Iceberg transaction. Delta and SCD2 use `MERGE INTO`, while full loads overwrite table contents. FLOe publishes a cross-table release manifest with pinned target states and queues maintenance outside the ingestion critical path.
 
 The `iceberg` section is required in `global.yaml`. At startup, the pipeline validates the config and configures the SparkSession with the Iceberg catalog. If the section is missing or invalid, execution stops immediately (fail-fast).
 
@@ -24,23 +24,9 @@ implicit val spark: SparkSession = SparkSession.builder()
 All other Iceberg catalog settings (warehouse path, catalog type, catalog class) are applied automatically by the framework at pipeline startup.
 
 !!!tip "Keep Adaptive Query Execution enabled"
-    Spark 3.5 enables AQE by default (`spark.sql.adaptive.enabled = true`). AQE optimizes MERGE INTO and DAG joins at runtime by coalescing small partitions, converting to broadcast joins, and handling data skew automatically. Do not disable it — the framework relies on these optimizations for efficient execution.
+    Spark 3.5 enables AQE by default (`spark.sql.adaptive.enabled = true`). It can improve MERGE and DAG joins through runtime partition coalescing, join conversion, and skew handling. Treat it as a workload-tuned Spark feature rather than a correctness requirement, and benchmark before changing its settings.
 
-### Java 18+ compatibility
-
-On Java 18 or newer, Hadoop's `UserGroupInformation` requires the security manager to be explicitly allowed. Add this JVM option:
-
-```
--Djava.security.manager=allow
-```
-
-In SBT:
-
-```scala
-run / javaOptions += "-Djava.security.manager=allow"
-```
-
-Without this flag, Spark fails at startup with `UnsupportedOperationException: getSubject is supported only if a security manager is allowed`.
+Floe pins [Spark 3.5.8](https://spark.apache.org/docs/3.5.8/), Scala 2.12.18, and [Iceberg 1.10.1](https://iceberg.apache.org/docs/1.10.1/spark-configuration/), and is built and tested on Java 17. Spark 3.5 documents support for Java 8, 11, and 17; see [Installation](../getting-started/installation.md#java-compatibility) before changing the JDK. Keep the Iceberg runtime artifact aligned with both the Spark and Scala binary versions.
 
 ## Configuring Iceberg
 
@@ -49,7 +35,7 @@ The `iceberg` block in `global.yaml` is required:
 ```yaml
 iceberg:
   catalogType: "hadoop"
-  catalogName: "spark_catalog"
+  catalogName: "floe"
   namespace: "default"
   warehouse: "output/warehouse"
   fileFormat: "parquet"
@@ -68,13 +54,13 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 | Field | Default | Description |
 |-------|---------|-------------|
 | `catalogType` | `hadoop` | Iceberg catalog implementation: `hadoop`, `glue`, or a custom type registered via the [Pipeline Builder](pipeline-builder.md#custom-catalog-providers) |
-| `catalogName` | `spark_catalog` | Name used in SQL queries (`catalog.namespace.table`) |
+| `catalogName` | `floe` | Name used in SQL queries (`catalog.namespace.table`). The built-in providers reject Spark's reserved `spark_catalog` name because they install `SparkCatalog`, not `SparkSessionCatalog`. |
 | `namespace` | `default` | Iceberg namespace for tables |
 | `warehouse` | *required* | Path to the Iceberg warehouse directory |
 | `fileFormat` | `parquet` | Default data file format |
 | `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel by batch ID |
 | `catalogProperties` | `{}` | Additional key-value properties passed to the catalog provider |
-| `maintenance.*` | see below | Post-batch maintenance settings |
+| `maintenance.*` | see below | Settings consumed by the asynchronous maintenance worker |
 
 ### Maintenance settings
 
@@ -115,7 +101,7 @@ Every flow maps to a single Iceberg table with the convention:
 {catalogName}.{namespace}.{flowName}
 ```
 
-For example, a flow named `customers` with catalog `spark_catalog` and namespace `default` becomes `spark_catalog.default.customers`. The namespace is configurable via `iceberg.namespace` in `global.yaml` (defaults to `default`).
+For example, a flow named `customers` with catalog `floe` and namespace `default` becomes `floe.default.customers`. The namespace is configurable via `iceberg.namespace` in `global.yaml` (defaults to `default`).
 
 ### Table creation and schema
 
@@ -150,15 +136,19 @@ Example: adding a `notes` column to an orders flow.
 columns:
   - name: "order_id"
     type: "integer"
+    nullable: false
   - name: "status"
     type: "string"
+    nullable: false
 
 # After — just add the new column
 columns:
   - name: "order_id"
     type: "integer"
+    nullable: false
   - name: "status"
     type: "string"
+    nullable: false
   - name: "notes"
     type: "string"
     nullable: true
@@ -183,7 +173,7 @@ This means adding `icebergPartitions`, `tableProperties`, or new schema columns 
 
 Adding a partition field to a table that already contains data does **not** rewrite existing files. Iceberg applies the new spec only to files written after the change. The result is a mixed layout:
 
-- Files written before the change: no partition metadata, always scanned
+- Files written under the old unpartitioned spec have no value for the new partition field, so the new transform cannot prune them; other Iceberg statistics may still prune files for a particular query
 - Files written after the change: partitioned, eligible for pruning
 
 The framework logs a `WARN` message whenever a new partition field is applied to an existing table:
@@ -268,15 +258,17 @@ All writes select the appropriate strategy based on the flow's `loadMode.type`. 
 
 Replaces all data atomically using `writeTo().overwrite(lit(true))`. This replaces all existing rows regardless of partitioning — even an empty source clears the table. The previous data is not deleted from disk until snapshot expiration runs; it remains accessible via time travel.
 
-The snapshot summary includes `overwritten-records` to distinguish full reloads from delta writes:
+Iceberg normally records an `overwrite` snapshot with summary fields such as:
 
 ```json
 {
   "added-records": "35",
-  "deleted-records": "35",
+  "deleted-records": "42",
   "total-records": "35"
 }
 ```
+
+Summary keys are produced by Iceberg and can vary by operation/version. Use the snapshot `operation` column together with the summary; Floe does not add an `overwritten-records` field.
 
 ### Delta (upsert)
 
@@ -284,7 +276,7 @@ Executes a single `MERGE INTO` statement with value-based change detection:
 
 ```sql
 MERGE INTO catalog.default.orders AS target
-USING _iceberg_merge_orders_<uuid> AS source
+USING _iceberg_merge_orders_2b58c1d40ee84aa5a67a891f174e0f47 AS source
 ON target.order_id = source.order_id
 WHEN MATCHED AND (
   NOT (source.status    <=> target.status)    OR
@@ -362,17 +354,17 @@ For complete documentation including configuration, behavior per scenario, edge 
 
 ### Tagging
 
-After every write, if `enableSnapshotTagging` is true, the framework tags the new snapshot:
+After a managed write creates a snapshot, if `enableSnapshotTagging` is true, the framework tags that snapshot. A no-change MERGE may create no snapshot and therefore no new tag:
 
 ```sql
-ALTER TABLE catalog.default.customers CREATE TAG `batch_20260218_150000`
+ALTER TABLE catalog.default.customers CREATE TAG `batch_20260218_150000_2b58c1d40ee84aa5a67a891f174e0f47`
 AS OF VERSION 4857209365014528 RETAIN 7 DAYS
 ```
 
 This allows querying any historical batch by name:
 
 ```sql
-SELECT * FROM catalog.default.customers VERSION AS OF 'batch_20260218_150000'
+SELECT * FROM catalog.default.customers VERSION AS OF 'batch_20260218_150000_2b58c1d40ee84aa5a67a891f174e0f47'
 ```
 
 Tags are snapshot references and protect the referenced snapshots from expiration. FLOe now sets tag retention from `maintenance.snapshotRetentionDays` when it is positive (seven days by default). If snapshot expiration is disabled with `None`, tags have no explicit retention and must be governed separately. **Existing tags created by older FLOe versions without retention are not migrated automatically**: inspect `table.refs` and plan their removal or replacement before expecting `expire_snapshots` to reclaim their files. Never drop audit/legal-hold tags without an approved retention policy.
@@ -394,7 +386,7 @@ This metadata is written to the batch metadata JSON at `{metadataPath}/{batchId}
 
 ### Commit identity and reconciliation
 
-Every mutating write adds these properties to the Iceberg snapshot summary:
+Every managed flow and derived-table write that creates a snapshot adds these properties to its Iceberg snapshot summary:
 
 - `floe.batch-id`
 - `floe.target-name`
@@ -434,11 +426,14 @@ This runs **before** maintenance because maintenance may expire the snapshots ne
 
 ### 2. Derived tables and release manifest
 
-Derived tables are committed with the same operation-identity protocol. Only after every required target succeeds does FLOe persist one release manifest containing the exact snapshot ID of each flow and derived table. Consumers requiring a consistent multi-table view must use `SnapshotPinnedReader`; reading current table heads can observe a partially completed batch.
+Derived tables are committed with the same operation-identity protocol. Only after every required target succeeds does FLOe persist one release manifest containing each flow and derived table's exact snapshot ID when present, or an explicit no-snapshot empty state. Consumers requiring a consistent multi-table view must use `SnapshotPinnedReader`; reading current table heads can observe a partially completed batch.
+
+!!! warning "Cascading orphan deletes"
+    Managed flow and derived writes have durable operation identities. Individual `onOrphan: delete` commits are not yet separate `RunStore` operations. When such a delete changes a child after its flow write, the current release entry still pins the tracked flow-write snapshot, not that later cleanup snapshot. A partial multi-table cascade therefore requires the [manual orphan recovery runbook](orphan-detection.md#recovery-after-a-partial-batch-or-cascade); do not treat ordinary `resume` or the manifest as an exactly-once cascade worklist.
 
 ### 3. Diagnostic metadata and maintenance queue
 
-JSON batch metadata and quality metrics are diagnostic outputs. A failure there is reported as an operational warning and does not negate a committed target. Maintenance tasks are durably queued with the published batch and returned as `QUEUED` in `maintenanceResults`.
+Per-flow diagnostic-output failures are returned in `FlowResult.warnings` and publish the run as `SUCCEEDED_WITH_WARNINGS`. Batch-summary and quality-metric failures are logged and do not negate committed targets. Maintenance tasks are durably queued with the published batch and returned as `QUEUED` in `maintenanceResults`.
 
 Run maintenance from a separate scheduled process:
 
@@ -447,11 +442,9 @@ val worker = new MaintenanceWorker(globalConfig.iceberg, runStore, maxAttempts =
 val results = worker.runPending(limit = 50)
 ```
 
-The worker claims each task with a versioned compare-and-set, runs the configured operations, and persists `SUCCEEDED` or `FAILED`. Failed tasks are retryable up to `maxAttempts`; a worker failure changes a published run to `SUCCEEDED_WITH_WARNINGS` but never replays ingestion.
+The worker considers tasks only after their run reaches `PUBLISHED` or `SUCCEEDED_WITH_WARNINGS`, claims each task with a versioned compare-and-set, runs the configured operations, and persists `SUCCEEDED` or `FAILED`. Failed tasks are retryable up to `maxAttempts`; a worker failure changes a published run to `SUCCEEDED_WITH_WARNINGS` but never replays ingestion.
 
-For each queued table, the worker runs:
-
-For each flow's table, the framework runs the enabled maintenance operations:
+For each queued flow or derived table, the worker runs the enabled maintenance operations:
 
 | Operation | SQL | Purpose |
 |-----------|-----|---------|
@@ -461,7 +454,7 @@ For each flow's table, the framework runs the enabled maintenance operations:
 | Manifest rewrite | `CALL system.rewrite_manifests(table)` | Consolidates manifest files for faster metadata operations. Disabled by default. |
 
 !!!note "Maintenance is asynchronous"
-    `summary.json` records that maintenance was queued at publication time. The authoritative later task state is in `RunStore`, because a worker may finish after the batch metadata file was written. Alert on durable `FAILED` tasks and retry the worker without rerunning ingestion.
+    `summary.json` records that maintenance was queued at publication time. The authoritative later task state is in `RunStore`, because a worker may finish after the batch metadata file was written. Alert on durable `FAILED` tasks and retry the worker without rerunning ingestion. The default `InMemoryRunStore` loses queued tasks at JVM exit; use `JdbcRunStore` in production.
 
 !!!tip "Metadata file cleanup"
     Every commit creates a new metadata JSON file in the table's `metadata/` directory (e.g. `v1.metadata.json`, `v2.metadata.json`). These files are small (KB) but accumulate over time. To enable automatic cleanup, add these table properties:
@@ -508,7 +501,7 @@ Read -> Rename columns -> PreTransform -> Validate (new data only) -> PostTransf
 
 - Validation runs only on incoming data, not on data already in the table
 - Merge happens atomically during the write phase via SQL
-- Iceberg guarantees ACID semantics
+- Each Iceberg table write has ACID commit semantics; a multi-table batch relies on FLOe's release manifest, not a distributed Iceberg transaction
 
 ## Flow configuration examples
 
@@ -629,17 +622,17 @@ With snapshot tagging enabled, historical data is accessible via SQL:
 
 ```sql
 -- Query a specific batch by tag
-SELECT * FROM spark_catalog.default.customers
-VERSION AS OF 'batch_20260218_150000'
+SELECT * FROM floe.default.customers
+VERSION AS OF 'batch_20260218_150000_2b58c1d40ee84aa5a67a891f174e0f47'
 
 -- Query by snapshot ID (from batch metadata JSON)
-SELECT * FROM spark_catalog.default.customers
+SELECT * FROM floe.default.customers
 VERSION AS OF 4857209365014528
 
 -- Compare two batches
 SELECT curr.customer_id, curr.name AS current_name, prev.name AS previous_name
-FROM spark_catalog.default.customers curr
-FULL OUTER JOIN spark_catalog.default.customers VERSION AS OF 'batch_20260217_150000' prev
+FROM floe.default.customers curr
+FULL OUTER JOIN floe.default.customers VERSION AS OF 'batch_20260217_150000_f47f453593154f168ef7594432acada1' prev
   ON curr.customer_id = prev.customer_id
 WHERE NOT (curr.name <=> prev.name)
    OR curr.customer_id IS NULL OR prev.customer_id IS NULL
@@ -662,6 +655,10 @@ Schema evolution only adds columns, never removes them. If a column is removed f
 
 If a maintenance operation fails mid-way (e.g., compaction fails on one table), subsequent maintenance operations for other tables may still run. There is no all-or-nothing guarantee for maintenance across tables. Each operation is independent.
 
+### Orphan cascades are not durable operations
+
+An `onOrphan: delete` statement is atomic for its table, but a cascade across tables is not represented as a durable per-FK worklist. If the process fails after deleting a child but before processing its descendants, stop new runs and follow the [orphan recovery runbook](orphan-detection.md#recovery-after-a-partial-batch-or-cascade).
+
 ## Related
 
 - [Global Configuration — iceberg](../configuration/global.md#iceberg) — configuration reference
@@ -670,3 +667,4 @@ If a maintenance operation fails mid-way (e.g., compaction fails on one table), 
 - [Architecture: Design Decisions](../architecture/design-decisions.md) — why Iceberg, why MERGE INTO
 - [Pipeline Builder](pipeline-builder.md) — custom catalog providers
 - [Quality Metrics](quality-metrics.md) — per-flow quality metrics table
+- [Recovery and Production Operations](recovery.md) — `RunStore`, resume/replay, and release reads

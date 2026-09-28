@@ -28,6 +28,14 @@ schema:
       type: integer
       nullable: false
       description: "Unique order identifier"
+    - name: customer_id
+      type: integer
+      nullable: false
+      description: "Owning customer"
+    - name: email
+      type: string
+      nullable: true
+      description: "Contact email"
     - name: total_amount
       type: "decimal(10, 2)"
       nullable: false
@@ -95,7 +103,9 @@ Defines where data is read from.
 | `type` | no | `file` | Source type: `file` or `jdbc` |
 | `path` | yes | — | For `file`: path to data (file, directory, or glob). For `jdbc`: table name (e.g. `public.customers`), ignored when `query` is provided in options. |
 | `format` | for `file` | — | File format: `csv`, `parquet`, `json`, `avro`, `orc`. Not used for `jdbc`. |
-| `options` | no | `{}` | Options passed to the Spark reader |
+| `options` | no | `{}` | Connector options plus Floe-owned metadata such as `replayToken`; built-in readers do not forward Floe-owned keys to Spark |
+
+`options.replayToken` is interpreted by Floe rather than Spark. For JDBC and custom readers it is required for `resume`/`replay` and must identify an immutable extract or source snapshot. It is optional for files, where Floe can derive an inventory fingerprint; use it there too if path, length, and modification time are not a strong enough identity.
 
 ### File source
 
@@ -109,7 +119,7 @@ source:
     delimiter: ";"
 ```
 
-These are standard [Spark CSV reader options](https://spark.apache.org/docs/latest/sql-data-sources-csv.html). For Parquet and JSON, options are rarely needed.
+These are standard [Spark 3.5.8 CSV reader options](https://spark.apache.org/docs/3.5.8/sql-data-sources-csv.html). For Parquet and JSON, options are rarely needed.
 
 !!!note "Quote boolean values in options"
     YAML interprets `true` and `false` without quotes as booleans. Spark reader options are strings, so always quote them: `header: "true"`, not `header: true`.
@@ -126,6 +136,7 @@ source:
     password: "${DB_PASSWORD}"
     driver: "org.postgresql.Driver"
     fetchSize: "10000"
+    replayToken: "customers/extract/2026-09-24T00:00:00Z/v1"
 ```
 
 To read a custom query instead of a full table:
@@ -280,7 +291,7 @@ validation:
       onFailure: reject
 ```
 
-The entire `validation` section is optional. If omitted, no validation is performed. `primaryKey` is required for delta and SCD2 modes (used for MERGE INTO matching). For full load, `primaryKey` is optional — if empty, PK uniqueness validation is skipped. For SCD2, all PK columns must also be non-nullable.
+The entire `validation` section is optional. If omitted, no validation is performed. `primaryKey` is required for SCD2 and all of its columns must be non-nullable. For Full it is optional. For Delta it selects the upsert key; without one, Delta is deliberately append-only and replaying the same input can duplicate rows.
 
 ### Foreign key fields
 
@@ -365,4 +376,4 @@ output:
 ```
 
 !!!note "commit.retry vs framework retry"
-    `commit.retry.num-retries` is an Iceberg property that retries the atomic commit if another writer modified the table concurrently (optimistic concurrency conflict). This is different from the framework's `maxRetries` in `processing`, which retries the entire flow on any failure. They operate at different levels and do not conflict.
+    `commit.retry.num-retries` is an Iceberg property for catalog commit conflicts. `processing.maxRetries` retries only a flow failure known to have occurred before a target write was attempted. If a commit outcome is uncertain, Floe blocks blind retry and reconciles the deterministic operation ID instead.

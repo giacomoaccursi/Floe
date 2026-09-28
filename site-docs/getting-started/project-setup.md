@@ -32,10 +32,10 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided"
 )
 
-run / fork := true    // Run in a separate JVM (required for Java 17+ --add-opens flags)
+run / fork := true    // Apply application JVM options to a separate process
 run / javaOptions += "-Xmx2G"
-// Add --add-opens flags required by Spark on Java 17+
-// See: https://spark.apache.org/docs/latest/
+// If local Java 17 execution needs module access, copy the tested --add-opens
+// set from Floe's build.sbt. Spark 3.5 supports Java 8, 11, and 17.
 ```
 
 ## Entry point
@@ -80,6 +80,20 @@ IngestionPipeline.builder()
   .executeOrThrow()
 ```
 
+For production, build the pipeline once with a shared coordinator and an immutable deployment revision:
+
+```scala
+val pipeline = IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .withRunStore(new JdbcRunStore(() => dataSource.getConnection))
+  .withPipelineVersion(sys.env("APP_RELEASE_SHA"))
+  .build()
+
+pipeline.executeOrThrow()
+```
+
+The application supplies `dataSource` and its JDBC driver. See [Recovery and Production Operations](../guides/recovery.md) before enabling scheduled production runs.
+
 ## Running locally
 
 ```bash
@@ -108,3 +122,4 @@ val result = IngestionPipeline.builder()
 - [Configuration Overview](../configuration/overview.md) — understand the YAML files
 - [Pipeline Builder](../guides/pipeline-builder.md) — full builder API
 - [Cloud Deployment](../guides/cloud-deployment.md) — deploy on Glue, EMR, Databricks
+- [Recovery and Production Operations](../guides/recovery.md) — durable coordinator and runbooks

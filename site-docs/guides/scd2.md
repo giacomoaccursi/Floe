@@ -96,7 +96,7 @@ When a modification is detected:
 1. The current version is **closed**: `valid_to = now`, `is_current = false`
 2. A new version is **inserted**: `valid_from = now`, `valid_to = NULL`, `is_current = true`
 
-Both operations happen in a single atomic transaction.
+Both row changes are committed by one atomic Iceberg `MERGE` on that table.
 
 ### Unchanged record
 
@@ -354,7 +354,7 @@ ORDER BY versions DESC
 ```sql
 SELECT curr.customer_id, curr.tier AS tier_now, prev.tier AS tier_before
 FROM catalog.default.customers_scd2 curr
-JOIN catalog.default.customers_scd2 VERSION AS OF 'batch_20260326_100000' prev
+JOIN catalog.default.customers_scd2 VERSION AS OF 'batch_20260326_100000_2b58c1d40ee84aa5a67a891f174e0f47' prev
   ON curr.customer_id = prev.customer_id
   AND curr.is_current = true AND prev.is_current = true
 WHERE curr.tier != prev.tier
@@ -391,7 +391,7 @@ The `is_current` predicate is semantically necessary, but it does **not** guaran
 
 For a valid single-writer input and a clean target, one MERGE atomically closes the old version and inserts the new version. This does not create a database PK constraint: duplicate target rows, concurrent writers or historical corruption can still violate "at most one current row per key". Add a post-write quality check, and remember that a soft-deleted key intentionally has no current row.
 
-If the batch fails mid-way, Iceberg performs automatic rollback and the table remains in the previous state — no row with `is_current` in an inconsistent state.
+If the single SCD2 `MERGE` fails before its Iceberg commit completes, no partial row-level state is published: the table remains at the previous snapshot. A later failure elsewhere in the multi-table batch does not roll this successful table commit back.
 
 ## SCD2 history vs Iceberg time travel
 
@@ -402,7 +402,7 @@ Both mechanisms allow viewing historical data, but they answer different questio
 | **What it tracks** | Business changes (tier, status, price) | Technical changes (batch, write operations) |
 | **Granularity** | Per-record: each change has valid_from/valid_to | Per-snapshot: entire table state at a given batch |
 | **Retention** | Historical rows remain until an explicit data-retention/deletion operation removes them | Snapshot availability depends on expiration rules and live tags/branches |
-| **Query** | `WHERE customer_id = 1 ORDER BY valid_from` | `VERSION AS OF 'batch_20260326'` |
+| **Query** | `WHERE customer_id = 1 ORDER BY valid_from` | `VERSION AS OF 'batch_20260326_100000_2b58c1d40ee84aa5a67a891f174e0f47'` |
 | **Typical use** | Audit, trend analysis, dimensional reporting | Debug, rollback, batch comparison |
 
 The two features are complementary. SCD2 lives in the data, time travel lives in Iceberg metadata.
@@ -430,13 +430,13 @@ The staging view is constructed as:
 ```sql
 -- Part 1: all source records (merge key = real PK)
 SELECT src.*, src.customer_id AS _mk_customer_id
-FROM _iceberg_scd2_src_customers_scd2_<uuid> src
+FROM _iceberg_scd2_src_customers_scd2_2b58c1d40ee84aa5a67a891f174e0f47 src
 
 UNION ALL
 
 -- Part 2: only MODIFIED records (merge key = NULL)
 SELECT src.*, CAST(NULL AS INT) AS _mk_customer_id
-FROM _iceberg_scd2_src_customers_scd2_<uuid> src
+FROM _iceberg_scd2_src_customers_scd2_2b58c1d40ee84aa5a67a891f174e0f47 src
 JOIN target tgt
   ON src.customer_id = tgt.customer_id AND tgt.is_current = true
 WHERE NOT (src.tier <=> tgt.tier)
@@ -447,7 +447,7 @@ The final MERGE operates on this staging view with three clauses:
 
 ```sql
 MERGE INTO catalog.default.customers_scd2 AS target
-USING _iceberg_scd2_stg_customers_scd2_<uuid> AS source
+USING _iceberg_scd2_stg_customers_scd2_2b58c1d40ee84aa5a67a891f174e0f47 AS source
 ON target.customer_id = source._mk_customer_id
    AND target.is_current = true
 
@@ -478,7 +478,7 @@ WHEN NOT MATCHED BY SOURCE AND target.is_current = true THEN UPDATE SET
 - An unchanged record appears once with the real PK, matches clause 1, but the change condition is `false` → no action
 - A record absent from the source is only present in the table → clause 3 (if enabled), soft-delete
 
-Everything happens in a single atomic SQL statement. On error, Iceberg performs automatic rollback and the table remains in the previous state.
+Everything happens in a single atomic SQL statement. If that statement does not commit, Iceberg does not expose a half-applied row state and the table remains at its previous snapshot. This per-table guarantee does not roll back earlier or later commits in the wider Floe batch.
 
 ## Temporal continuity
 

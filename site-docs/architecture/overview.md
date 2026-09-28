@@ -16,14 +16,19 @@ graph TD
     VAL["Validate<br/>Schema · Not-null · PK · FK · Custom rules"]
     POST["Post-validation transform"]
     WRITE["Write to Iceberg<br/>Full · Delta · SCD2"]
-    DERIVED["Derived Tables<br/>Compute and write to Iceberg"]
     ORPHAN["Orphan Detection<br/>Post-batch FK integrity"]
-    MAINT["Table Maintenance<br/>Snapshot expiration · Compaction · Orphan cleanup"]
+    DERIVED["Derived Tables<br/>Compute and write to Iceberg"]
+    QUEUE["Queue Maintenance<br/>Durable asynchronous tasks"]
+    DIAG["Write Diagnostics<br/>JSON · quality metrics"]
+    RELEASE["Publish Release Manifest<br/>Pinned target state"]
+    WORKER["Maintenance Worker<br/>Expiration · Compaction · Cleanup"]
     DAG["DAG Aggregation<br/>Join · Nest · Flatten · Aggregate"]
 
     YAML --> BUILD --> ORDER --> EXEC
-    EXEC --> READ --> RENAME --> PRE --> VAL --> POST --> WRITE    WRITE --> DERIVED --> ORPHAN --> MAINT
-    MAINT -.-> DAG
+    EXEC --> READ --> RENAME --> PRE --> VAL --> POST --> WRITE
+    WRITE --> ORPHAN --> DERIVED --> QUEUE --> DIAG --> RELEASE
+    RELEASE -.-> WORKER
+    RELEASE -.-> DAG
 ```
 
 ## End-to-end data flow
@@ -43,24 +48,28 @@ A batch execution follows this sequence:
 4. Flow execution (per flow, in dependency order)
    Read → Rename columns → Pre-transform → Validate → Post-transform → Write to Iceberg
 
-5. Derived tables (if registered)
-   Read from Iceberg (full history) → Compute → Write to Iceberg
+5. Correctness and derived outputs
+   Orphan detection → Read current Iceberg inputs → Compute/write derived tables
 
-6. Post-batch
-   Orphan detection → Derived tables → Table maintenance → Batch metadata and quality metrics
+6. Finalization and publication
+   Queue maintenance → Diagnostic metadata → Persist release manifest and final run status
 
 7. DAG aggregation (if configured, separate execution)
    Load DAG config → Resolve join dependencies → Execute nodes → Produce output
+
+8. Maintenance (separate worker)
+   After publication: claim durable tasks → Expire snapshots → Compact data files → Remove old orphan files → Rewrite manifests
 ```
 
 ## Design principles
 
 - **YAML-first**: pipeline behavior is defined declaratively. Code is only needed for transformations, custom validators, and derived tables.
-- **Iceberg-required**: all writes go through Iceberg for ACID guarantees, time travel, and schema evolution.
+- **Iceberg-required**: every managed flow and derived target is written through Iceberg for per-table ACID guarantees, time travel, and schema evolution.
 - **Fail-fast**: configuration errors are caught at startup, not at runtime. Missing fields, invalid references, and type mismatches all fail before any data is processed.
 - **Immutable context**: `TransformationContext` is immutable. Every modification returns a new instance, preventing side effects between transformations.
 - **Bounded parallelism**: parallel execution uses explicitly sized thread pools, never the global execution context.
-- **Observable best-effort maintenance**: maintenance does not change data success, but per-table status is returned in `IngestionResult` and persisted in batch metadata.
+- **Durable recovery**: run and operation state, leases, release manifests, and maintenance tasks live in `RunStore`; Iceberg snapshots remain the proof of table commits.
+- **Asynchronous maintenance**: ingestion queues per-table work. Current task state is read from `RunStore`, not from the publication-time JSON summary.
 
 ## Modules
 

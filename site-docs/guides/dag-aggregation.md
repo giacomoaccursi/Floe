@@ -92,7 +92,7 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 
 Supported aggregation functions: `sum`, `count`, `avg` (alias: `average`), `min`, `max`, `first`, `last`, `collect_list`, `collect_set`.
 
-`first` and `last` are rejected without `orderBy`; relying on Spark's post-shuffle row order is not deterministic. `collect_list` is returned in value order. `collect_set` expresses a set and its array order is unspecified. Output aliases cannot duplicate one another or a parent column.
+`first` and `last` are rejected without `orderBy`; relying on Spark's post-shuffle row order is not deterministic. Make `orderBy` a total order (usually ending with a unique key), because ties may select either tied row. `collect_list` is returned in value order. `collect_set` expresses a set and its array order is unspecified. Output aliases cannot duplicate one another or a parent column.
 
 ## sourceTable — reading from external Iceberg tables
 
@@ -201,7 +201,7 @@ At least one aggregation is required — an empty `aggregations` list throws `Va
 The child is grouped by the join key columns, aggregated, then joined to the parent. Only the parent columns and the aggregation aliases appear in the output.
 
 !!!note "Data skew on aggregate and nest joins"
-    Aggregate and Nest strategies use `groupBy` on the join key columns. If a key value is heavily skewed (e.g. one customer has 90% of all orders), the executor handling that key becomes a bottleneck. Spark's Adaptive Query Execution (AQE) handles skew automatically for regular joins (Flatten strategy) but not for `groupBy` aggregations.
+    Aggregate and Nest strategies use `groupBy` on the join key columns. If a key value is heavily skewed (e.g. one customer has 90% of all orders), the executor handling that key becomes a bottleneck. AQE can mitigate eligible skewed shuffle joins in Flatten plans, subject to Spark settings and thresholds, but it does not make a hot-key `groupBy` cheap. Inspect the physical plan and partition-size metrics.
 
 ## Filters and select
 
@@ -248,7 +248,7 @@ If `parallelNodes` is `false`, all groups execute sequentially regardless of ind
 
 ### Root node
 
-The root node is the node that no other node depends on — it produces the final output DataFrame. A DAG must have exactly one root node. If multiple root nodes are found, the framework throws an error. If no root node exists (all nodes are dependencies of others), an error is thrown.
+The root node is the terminal node that no other node depends on—it produces the final output DataFrame. A DAG must have exactly one root node. Multiple terminal nodes are rejected. In a valid acyclic graph at least one terminal node exists; cycles are detected by topological sorting before the defensive “no root” check can be reached.
 
 ## Complete DAG example
 
@@ -325,7 +325,7 @@ In this DAG:
 | Circular dependency | Topological sort | `CircularDependencyException` (includes cycle path) |
 | Missing parent result | Node execution | `IllegalStateException` |
 | Empty aggregations on Aggregate strategy | Join execution | `ValidationConfigException` |
-| No root node found | Graph build | `IllegalStateException` |
+| No root node found | Defensive graph invariant check | `IllegalStateException` |
 
 ## Related
 

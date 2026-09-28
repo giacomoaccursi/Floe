@@ -94,8 +94,8 @@ Explicit variables take priority over environment variables with the same name.
 To produce a literal dollar sign in YAML values, double it. The framework treats two consecutive dollar signs as an escape sequence and replaces them with a single dollar sign before variable substitution:
 
 ```yaml
-description: "Price in USD: 100"     # no variable reference, left as-is
-query: "SELECT * WHERE price > 0"    # no dollar sign, no substitution
+description: "Amount in $$USD"       # becomes: Amount in $USD
+command: "echo $$HOME"               # becomes: echo $HOME
 ```
 
 If you need a literal dollar sign followed by a valid variable name pattern (e.g. a regex), double the dollar sign to prevent substitution.

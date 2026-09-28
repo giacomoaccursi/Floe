@@ -6,7 +6,7 @@ Key architectural decisions and the reasoning behind them.
 
 Parquet with `SaveMode.Overwrite` silently loses data on delta and SCD2 loads — a failed write mid-batch destroys the previous version with no recovery path. Without Iceberg there are no atomicity guarantees, no time travel, and no schema evolution.
 
-Enterprise pipelines need ACID semantics, and the Iceberg hadoop catalog provides them with zero additional infrastructure (just 3 lines of YAML). Keeping a Parquet fallback would add complexity to every code path and create a false sense of safety for a mode that cannot support the framework's core load modes reliably.
+Enterprise pipelines need per-table ACID semantics. Iceberg provides them, while the Hadoop catalog keeps local and HDFS deployments small. Object-store deployments still need the catalog-specific concurrency controls documented by Iceberg—for example a lock manager for HadoopCatalog on S3. Keeping a Parquet fallback would add complexity to every code path and create a false sense of safety for a mode that cannot support the framework's core load modes reliably.
 
 ## Why MERGE INTO
 
@@ -30,7 +30,7 @@ The NULL merge key forces Iceberg to treat changed records as both a match (to c
 
 Iceberg format v2 supports row-level deletes (position deletes and equality deletes), which are required for merge-on-read mode. Format v1 only supports file-level operations, making it impossible to implement efficient delta writes without full file rewrites.
 
-Format v2 is the default in Iceberg 1.x and is required for the framework's MERGE INTO operations.
+Floe explicitly creates format-v2 tables. Iceberg has defaulted new tables to v2 since release 1.4.0, but the explicit property keeps the contract visible and enables merge-on-read delete files.
 
 ## Why copy-on-write is the default
 
@@ -46,13 +46,17 @@ Running orphan detection first guarantees the previous snapshot is still availab
 
 ## Why multi-table publication uses a manifest
 
-Iceberg commits are atomic per table, not across a set of tables. FLOe therefore treats table writes as preparation and publishes one application-level release manifest only after every required flow and derived target succeeds. The manifest pins each target to an exact snapshot ID. Consumers that require batch consistency must read through that manifest; querying mutable table heads cannot provide a cross-table atomic view.
+Iceberg commits are atomic per table, not across a set of tables. FLOe therefore treats table writes as preparation and publishes one application-level release manifest only after every required flow and derived target succeeds. The manifest pins each target to an exact snapshot ID when one exists and explicitly represents a never-committed empty target otherwise. Consumers that require batch consistency must read through that manifest; querying mutable table heads cannot provide a cross-table atomic view.
+
+The current manifest tracks flow and derived writes. A subsequent `onOrphan: delete` cleanup is not yet modeled as its own durable release operation, so that destructive mode retains the explicit limitation documented in the recovery guide.
 
 ## Why resume requires reconciliation and immutable input
 
 A client-side exception can occur after a catalog accepted an Iceberg commit. Blind retry can duplicate append data or create a second logical operation. FLOe writes a deterministic operation ID into every snapshot summary and reconciles that identity before resuming.
 
-Resume is allowed only for operations proven absent and only when the source fingerprint still matches the original run. JDBC and custom sources cannot be inferred safely, so they require an explicit immutable `replayToken`. A deliberate replay creates a new batch and new operation IDs instead of pretending to be a continuation of the old run.
+Resume is allowed only for operations proven absent and only when the source fingerprint still matches the original run. A file fingerprint is an inventory check (path, length, modification time, format, and options), not a hash of every byte. JDBC and custom sources cannot be inferred safely, so they require an explicit `replayToken` that identifies an immutable extract. A deliberate replay creates a new batch and new operation IDs instead of pretending to be a continuation of the old run.
+
+This guarantee currently covers managed flow and derived-table writes. Cascading `onOrphan: delete` operations do not yet have an independent durable worklist, so a partially failed multi-table cascade follows a manual recovery runbook.
 
 ## Why partition spec changes do not rewrite existing data
 

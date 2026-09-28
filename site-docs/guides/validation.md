@@ -75,6 +75,8 @@ When `schema.enforceSchema` is `true`, the validator checks two things:
 
 2. If `schema.allowExtraColumns` is `false`, columns present in the DataFrame but not defined in `schema.columns` are flagged. Internal columns (prefixed with `_`) are excluded from this check. Same behavior: the entire DataFrame is rejected with code `SCHEMA_EXTRA_COLUMNS`.
 
+For built-in file readers with `enforceSchema: true`, Spark may project away undeclared source fields while applying the read schema, before this validator sees the DataFrame. Therefore `allowExtraColumns: false` checks the post-read DataFrame; it is not a raw-file contract check. See [Data Sources — Schema enforcement](data-sources.md#schema-enforcement).
+
 ```yaml
 schema:
   enforceSchema: true
@@ -108,7 +110,7 @@ validation:
 Duplicate detection uses `groupBy` + `count > 1`. All rows sharing a duplicated key combination are rejected — not just the second occurrence, but every row with that key value. Rejection code: `PK_DUPLICATE`.
 
 !!!note
-    A primary key is required for `delta` and `scd2` load modes (used for MERGE INTO matching). For `full` load mode, if `primaryKey` is empty, PK uniqueness validation is skipped.
+    A primary key is required for `scd2`. In `delta` it enables keyed MERGE; without one, Delta appends and replay can duplicate rows. For `full`, an empty `primaryKey` skips PK uniqueness validation.
 
 ## Foreign key integrity
 
@@ -240,10 +242,7 @@ IngestionPipeline.builder()
 
 The registry has priority: if the `class` value matches a registered name, the registry is used; otherwise it falls back to reflection.
 
-The validator class must:
-
-1. Have a no-argument constructor
-2. Implement the `com.etl.framework.validation.Validator` trait
+The validator class must implement `com.etl.framework.validation.Validator` and be available on the runtime classpath. A no-argument constructor is required only for reflection loading; a registered factory may construct a validator with dependencies.
 
 Configuration from the YAML `config` map is available via `rule.config` inside the `validate` method:
 
@@ -272,7 +271,7 @@ The `skipNull` property controls how NULL values are treated during rule validat
 | `skipNull` | Behavior |
 |-----------|----------|
 | `true` (default) | NULL values pass validation. Only non-NULL values are checked against the rule. |
-| `false` | NULL values are treated as validation failures and rejected/warned. |
+| `false` | Built-in rules treat NULL as a validation failure. Custom validators receive the NULL row and decide whether it passes. |
 
 This applies to regex, range, domain, and custom rules. Schema validation and not-null validation have their own NULL handling (not-null explicitly checks for NULLs; schema validation does not inspect values).
 

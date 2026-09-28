@@ -23,7 +23,7 @@ performance:
 
 iceberg:
   catalogType: "hadoop"
-  catalogName: "spark_catalog"
+  catalogName: "floe"
   namespace: "default"
   warehouse: "output/warehouse"
   fileFormat: "parquet"
@@ -92,13 +92,15 @@ When `maxRetries` is greater than 0, the framework retries failed flows using ex
 
 Jitter is a random value between 0 and `retryBackoffMs`, added to prevent thundering herd when multiple flows retry simultaneously.
 
-A flow is retried only when it throws an exception (e.g. network timeout, Iceberg commit conflict). Validation failures (rejected records) are not retried — they produce a `FlowResult` with `success = true` and the rejected records are written normally.
+A flow is retried only when it fails before a target write is attempted. Once a write may have reached Iceberg, Floe records the outcome as committed, unknown, or inconsistent and requires reconciliation instead of replaying the whole flow. Validation rejections are not retried; a rejection-threshold breach fails before the table mutation.
 
 For the full validation pipeline, see [Validation Engine](../guides/validation.md).
 
 ## performance
 
 Controls parallel execution of flows.
+
+The section is optional. If omitted, `parallelFlows` remains `false`.
 
 | Field | Default | Description |
 |-------|---------|-------------|
@@ -117,7 +119,7 @@ For the complete Iceberg integration guide, see [Iceberg Integration](../guides/
 | Field | Default | Description |
 |-------|---------|-------------|
 | `catalogType` | `hadoop` | Catalog implementation: `hadoop`, `glue`, or a custom type registered via the [Pipeline Builder](../guides/pipeline-builder.md#custom-catalog-providers) |
-| `catalogName` | `spark_catalog` | Catalog name used in SQL queries |
+| `catalogName` | `floe` | Catalog name used in SQL queries. The built-in providers use `SparkCatalog`, so `spark_catalog` is rejected because Spark reserves it for the session catalog. |
 | `namespace` | `default` | Iceberg namespace (database) for tables. Tables are named `{catalogName}.{namespace}.{flowName}`. |
 | `warehouse` | — (required) | Path to the Iceberg warehouse directory |
 | `fileFormat` | `parquet` | Default data file format for Iceberg tables: `parquet`, `orc`, `avro`. Sets the `write.format.default` table property. If a flow specifies `write.format.default` in its `tableProperties`, that takes priority. |
@@ -126,7 +128,7 @@ For the complete Iceberg integration guide, see [Iceberg Integration](../guides/
 
 ### Catalog types
 
-A catalog is the component that keeps track of which Iceberg tables exist and where their data files are stored. Think of it as a registry: when the framework writes to `spark_catalog.default.orders`, the catalog knows where to find (or create) that table.
+A catalog is the component that keeps track of which Iceberg tables exist and where their data files are stored. Think of it as a registry: when the framework writes to `floe.default.orders`, the catalog knows where to find (or create) that table.
 
 The framework ships with two built-in catalog providers:
 
@@ -148,7 +150,7 @@ For AWS production deployments with Glue:
 ```yaml
 iceberg:
   catalogType: "glue"
-  catalogName: "spark_catalog"
+  catalogName: "floe"
   warehouse: "s3://my-bucket/warehouse"
   catalogProperties:
     glue.skip-name-validation: "true"
@@ -160,7 +162,7 @@ Custom catalog providers (Hive, REST, Nessie) can be registered via the [Pipelin
 
 ### maintenance
 
-Post-batch table maintenance settings. Maintenance runs after all flows execute successfully and after [orphan detection](../guides/orphan-detection.md).
+Asynchronous table-maintenance settings. Floe stores one `QUEUED` task per managed target while finalizing a successful run. A separate `MaintenanceWorker` applies these settings only after the run reaches `PUBLISHED` or `SUCCEEDED_WITH_WARNINGS`; ingestion does not wait for it.
 
 | Field | Default | Description |
 |-------|---------|-------------|
@@ -172,5 +174,5 @@ Post-batch table maintenance settings. Maintenance runs after all flows execute 
 !!!warning "Orphan cleanup minimum retention"
     FLOe clamps the configured threshold to **at least 24 hours** (1440 minutes). That is not universally safe: set it above the longest running write, backup or migration, or concurrent operations may lose in-flight files.
 
-!!!note "Maintenance is best-effort"
-    A maintenance failure does not change the data-success flag. Inspect `IngestionResult.maintenanceResults` or the batch summary's `maintenance_status`/`maintenance_results`, alert on failed targets, and retry only maintenance. A failure can skip later operations for that table; maintenance for other tables is still attempted.
+!!!note "Maintenance state is durable"
+    `IngestionResult.maintenanceResults` and `summary.json` normally report `QUEUED`, because they are produced before the worker runs. Query `RunStore.getMaintenanceTasks` for current state. A worker failure changes the durable run status to `SUCCEEDED_WITH_WARNINGS`; retry only maintenance, never ingestion. See [Recovery and Production Operations](../guides/recovery.md#asynchronous-maintenance).

@@ -39,7 +39,7 @@ The validation engine runs a deterministic pipeline on every incoming DataFrame:
 
 Each step separates valid from rejected records. Rejected records carry metadata columns (`_rejection_code`, `_rejection_reason`, `_validation_step`, `_rejected_at`).
 
-Includes a plugin system for custom validators loaded via reflection.
+Includes custom validators registered by name through the builder (recommended), with reflection loading as a fallback.
 
 See [Validation Engine](../guides/validation.md).
 
@@ -49,7 +49,7 @@ Handles all Iceberg table operations:
 
 - **Table management**: CREATE TABLE IF NOT EXISTS, schema evolution (ADD COLUMN), partition spec updates, table property updates
 - **Write strategies**: full load (overwrite), delta (MERGE INTO with value-based change detection), SCD2 (NULL merge-key trick)
-- **Snapshot management**: tagging, metadata capture, rollback
+- **Snapshot management**: tagging, metadata capture, operation-identity lookup
 - **Maintenance**: snapshot expiration, data compaction, orphan file cleanup, manifest rewrite
 - **Orphan detection**: post-batch FK integrity using time travel
 - **Catalog providers**: pluggable catalog system (Hadoop, Glue, custom)
@@ -83,15 +83,18 @@ See [DAG Aggregation](../guides/dag-aggregation.md).
 
 Coordinates batch and flow execution:
 
-- **FlowOrchestrator** — manages the batch lifecycle: builds execution plan, executes flow groups, runs post-batch operations (orphan detection, metadata, maintenance)
+- **FlowOrchestrator** — manages the durable batch lifecycle: execution, reconciliation, orphan detection, derived targets, release publication, and maintenance enqueue
 - **FlowGroupExecutor** — executes a group of flows sequentially or in parallel
 - **FlowExecutor** — executes a single flow: read → rename → transform → validate → transform → write
 - **ExecutionPlanBuilder** — analyzes FK dependencies, topological sort, groups independent flows
-- **BatchMetadataWriter** — writes batch and flow metadata JSON files
+- **FlowMetadataWriter** — writes per-flow metadata JSON and reports side-output failures as warnings
+- **BatchMetadataWriter** — writes the batch summary JSON
 - **ExecutionLogger** — structured logging for batch and flow execution
 - **Batch listeners** — pluggable notification hooks for batch completion or failure
 - **Quality metrics** — writes per-flow quality metrics to an Iceberg table
 - **Retry with exponential backoff** — configurable per-flow retry with jitter to handle transient failures
+- **RunStore** — versioned run/operation state, leases, release manifests, and maintenance tasks (`JdbcRunStore` for production)
+- **MaintenanceWorker** — claims and retries maintenance outside the ingestion critical path
 
 See [Execution Model](execution-model.md).
 
@@ -99,7 +102,7 @@ See [Execution Model](execution-model.md).
 
 Public API entry point:
 
-- **IngestionPipeline** — fluent builder for configuring and executing pipelines
+- **IngestionPipeline** — fluent builder plus `execute`, `resume`, `replay`, and `executeOrThrow`
 - **TransformationContext** — immutable context passed to transformation functions
 - **DerivedTableExecutor** — computes and writes derived tables to Iceberg
 
@@ -114,11 +117,11 @@ Domain-specific exception hierarchy rooted at `FrameworkException`:
 - `DataProcessingException` — source errors, write errors, merge errors
 - `TransformationException` — pre/post-validation transformation failures
 - `AggregationException` — DAG node execution, join failures
-- `PluginException` — custom validator loading/execution failures
+- `PluginException` — public extension-error types (the current custom-validator path uses `ValidationConfigException` for loading/configuration failures)
 - `OrchestrationException` — flow execution failures
 - `BatchFailedException` — thrown by `executeOrThrow()` on batch failure
 
-Every exception carries an error code and a context map for debugging.
+Every `FrameworkException` carries an error code and a context map for debugging. Commit reconciliation also has operational runtime exceptions outside that hierarchy.
 
 See [Reference: Exceptions](../reference/exceptions.md).
 
@@ -136,3 +139,4 @@ Shared utilities used across modules:
 
 - [Architecture Overview](overview.md) — module diagram and interactions
 - [Data Flow](data-flow.md) — how data moves through modules
+- [Recovery and Production Operations](../guides/recovery.md) — durable coordination and runbooks

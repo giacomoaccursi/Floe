@@ -24,7 +24,7 @@ performance:
 
 iceberg:
   catalogType: "hadoop"
-  catalogName: "spark_catalog"
+  catalogName: "floe"
   warehouse: "output/warehouse"
 ```
 
@@ -97,7 +97,7 @@ object QuickstartApp extends App {
     .build()
     .execute()
 
-  println(s"Batch: ${result.batchId}, Success: ${result.success}")
+  println(s"Batch: ${result.batchId}, Success: ${result.success}, Status: ${result.status.name}")
   result.flowResults.foreach { fr =>
     println(s"  ${fr.flowName}: ${fr.validRecords} valid, ${fr.rejectedRecords} rejected")
   }
@@ -111,8 +111,12 @@ object QuickstartApp extends App {
 1. The framework reads `customers.csv` and applies the schema
 2. Validates: PK uniqueness on `customer_id`, regex on `email`
 3. Charlie's row is rejected (invalid email) and written to `output/rejected/`
-4. The 3 valid rows are written to the Iceberg table `spark_catalog.default.customers`
+4. The 3 valid rows are written to the Iceberg table `floe.default.customers`
 5. The snapshot is tagged with the batch ID for time travel
+6. A release manifest is stored and maintenance tasks are queued in the process-local development `RunStore`
+
+!!! note "Production setup"
+    This quickstart uses the default `InMemoryRunStore`; its state and queued maintenance disappear when the JVM stops. Production jobs must configure a shared `JdbcRunStore`, set `withPipelineVersion(...)`, and schedule a `MaintenanceWorker`. See [Recovery and Production Operations](../guides/recovery.md).
 
 ## Next steps
 
@@ -120,3 +124,4 @@ object QuickstartApp extends App {
 - [Configuration Overview](../configuration/overview.md) — all config options
 - [Validation Engine](../guides/validation.md) — all validation rule types
 - [Domains Configuration](../configuration/domains.md) — validate values against predefined lists
+- [Recovery and Production Operations](../guides/recovery.md) — make runs restart-safe

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The framework can write per-flow quality metrics to a dedicated Iceberg table after each batch. This gives you a queryable history of data quality over time — rejection rates, orphan counts, execution times — without parsing JSON metadata files.
+The framework can write per-flow quality metrics to a dedicated Iceberg table during batch finalization. This gives you a queryable history of data quality over time — rejection rates, orphan counts, execution times — without parsing JSON metadata files.
 
 The feature is opt-in. Set `qualityMetricsTable` in the global config to enable it:
 
@@ -74,14 +74,17 @@ The quality metrics table does not replace the JSON metadata written to `metadat
 
 | | JSON metadata | Quality metrics table |
 |---|---|---|
-| Format | JSON file per batch | Iceberg table (append) |
+| Format | Per-flow JSON files plus one batch summary | Iceberg table (append) |
 | Access | File system, any editor | SQL via Spark |
 | Content | Full batch detail (Iceberg snapshots, manifest locations, rejection reasons) | Aggregated per-flow metrics |
 | Use case | Debugging, audit trail | Trend analysis, dashboards, alerting |
 | Requires Spark | No | Yes |
+
+Neither output is the workflow source of truth. JSON and quality metrics are best-effort diagnostics and may fail independently. Use `RunStore` for current run/maintenance state and Iceberg snapshot history for commit evidence. `batch_success` is evaluated before the asynchronous maintenance worker runs, so a later maintenance failure does not update existing metric rows.
 
 ## Related
 
 - [Global Configuration — processing](../configuration/global.md#processing) — `qualityMetricsTable` setting
 - [Validation Engine](validation.md) — how records are validated and rejected
 - [Orphan Detection](orphan-detection.md) — how orphan counts are computed
+- [Recovery and Production Operations](recovery.md) — authoritative state and maintenance monitoring

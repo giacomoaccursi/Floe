@@ -66,12 +66,12 @@ sbt compile
 sbt test
 ```
 
-Requires Java 17+ and SBT 1.9+.
+The project CI uses Java 17 and SBT 1.9+. Spark 3.5 supports Java 8, 11, and 17; use Java 17 for the same runtime tested by this repository.
 
 ### Workflow
 
 1. Create a branch from `develop` (`feat/my-feature`, `fix/my-fix`)
-2. Write your code following the [code quality rules](https://giacomoaccursi.github.io/Floe/contributing/code-quality/)
+2. Follow the [code style](#code-style) and keep the change focused
 3. Add tests for new functionality or bug fixes
 4. Run `sbt scalafmtAll` before committing
 5. Run `sbt test` and make sure all tests pass
@@ -95,7 +95,7 @@ A bug fix without a covering test will not be accepted.
 - Minimize Spark actions (`count()`, `collect()`, `save()`)
 - Do not add features, refactoring, or improvements beyond what the PR addresses
 
-See the full [Code Quality Rules](https://giacomoaccursi.github.io/Floe/contributing/code-quality/) for details.
+Treat these rules, the existing tests, and the compiler warnings in `build.sbt` as the executable contribution standard.
 
 ## Improving the Documentation
 

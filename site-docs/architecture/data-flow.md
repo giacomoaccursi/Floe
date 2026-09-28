@@ -14,7 +14,7 @@ graph TD
     Rejected["Rejected DataFrame<br/>→ written to rejectedPath"]
     PostTransform["PostTransform<br/>User-defined: derived fields, cross-flow lookups"]
     Write["Write<br/>MERGE INTO (delta) / overwrite (full) / SCD2"]
-    IcebergTable["Iceberg Table (snapshot tagged)"]
+    IcebergTable["Iceberg Table<br/>(snapshot optionally tagged)"]
 
     Source -->|"Raw DataFrame"| Read
     Read -->|"Raw DataFrame"| Rename
@@ -30,8 +30,9 @@ graph TD
 
 The `DataReaderFactory` creates a reader based on the flow's `source.type` config:
 
-- **File** (`FileDataReader`): validates the format (csv, parquet, json), optionally applies the schema, and loads from the configured path.
-- **JDBC** (`JDBCDataReader`): connects to a database via JDBC URL, reads a table or custom query, and passes through all connection options.
+- **File** (`FileDataReader`): validates CSV, Parquet, JSON, Avro, or ORC, optionally applies the schema, and loads from the configured path.
+- **JDBC** (`JDBCDataReader`): connects through a JDBC URL and reads a table or wrapped query. Spark connector options are passed through, while Floe-owned keys such as `replayToken` are removed.
+- **Custom**: a factory registered with `withDataReader` handles any other `source.type`.
 
 The result is a raw DataFrame with the source data.
 
@@ -133,13 +134,17 @@ After writing, the snapshot is tagged with the batch ID if `enableSnapshotTaggin
 
 See [Iceberg Integration](../guides/iceberg.md) and [SCD2 Guide](../guides/scd2.md).
 
-## Post-batch operations
+## Publication and post-batch operations
 
 After all flows complete:
 
 1. **Orphan detection** — uses time travel to find removed parent keys, resolves orphaned children. See [Orphan Detection](../guides/orphan-detection.md).
-2. **Batch metadata write** — JSON with Iceberg snapshot details and orphan reports.
-3. **Table maintenance** — snapshot expiration, compaction, orphan cleanup, manifest rewrite.
+2. **Derived tables** — computes registered outputs from the complete current state of their Iceberg inputs.
+3. **Maintenance enqueue** — persists one asynchronous task per managed table. Workers ignore it until the run is published.
+4. **Diagnostic outputs** — writes per-flow JSON, the batch summary, and optional quality metrics. These aid operations but do not replace `RunStore` or Iceberg history as authoritative state.
+5. **Release publication** — stores the manifest and final run status only after all required work succeeds. The manifest records a pinned snapshot where one exists, or an explicit empty state for a target with no snapshot. An `onOrphan: delete` cleanup commit is a documented current exception; it is not yet a separately pinned operation.
+
+A separate `MaintenanceWorker` later claims queued tasks and runs snapshot expiration, compaction, orphan-file cleanup, and optional manifest rewriting. See [Recovery and Production Operations](../guides/recovery.md).
 
 ## Related
 

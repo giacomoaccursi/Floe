@@ -15,10 +15,10 @@ trait BatchListener {
 }
 ```
 
-- `onBatchCompleted` is called when the batch finishes successfully (all flows executed, even if some records were rejected)
-- `onBatchFailed` is called when the batch fails (a flow threw an exception, or the rejection threshold was exceeded)
+- `onBatchCompleted` is called when synchronous publication succeeds (rejected records are allowed unless a threshold is exceeded)
+- `onBatchFailed` is called when synchronous publication fails—for example a flow error, rejection-threshold breach, orphan-handling failure, or derived-table failure
 
-Both receive the full `IngestionResult` with batch ID, flow results, error details, and derived table results.
+Both receive the publication-time `IngestionResult` with batch ID, durable status, flow/derived results, and queued maintenance tasks. A later asynchronous maintenance failure does not invoke the listener again; monitor `RunStore` for that lifecycle.
 
 If a listener throws an exception, it is caught and logged as a warning. The batch result is not affected — other listeners still run.
 
@@ -99,11 +99,13 @@ class LoggingListener extends BatchListener {
 | `success` | `Boolean` | Whether the batch completed successfully |
 | `error` | `Option[String]` | Error message if the batch failed |
 | `derivedTableResults` | `Seq[DerivedTableResult]` | Results of derived table execution |
-| `maintenanceResults` | `Seq[MaintenanceResult]` | Independent maintenance outcome for every attempted flow or derived table |
+| `maintenanceResults` | `Seq[MaintenanceResult]` | Publication-time maintenance state, normally `QUEUED` for every managed target |
+| `status` | `RunStatus` | Durable publication state (`PUBLISHED`, `FAILED_PARTIAL`, `UNKNOWN`, and others) |
 
-Each `FlowResult` contains `flowName`, `batchId`, `success`, `inputRecords`, `validRecords`, `rejectedRecords`, `mergedRecords`, `rejectionRate`, `executionTimeMs`, `rejectionReasons`, `error`, and optional `icebergMetadata`.
+Each `FlowResult` also exposes optional `icebergMetadata`, operational `warnings`, `writeAttempted`, and `retryable`. Use these fields when deciding whether an alert means “retry pre-write work,” “resume after reconciliation,” or merely “repair a diagnostic side output.”
 
 ## Related
 
 - [Pipeline Builder](pipeline-builder.md) — full builder API reference
 - [Architecture: Execution Model](../architecture/execution-model.md) — batch lifecycle
+- [Recovery and Production Operations](recovery.md) — durable status and asynchronous operations

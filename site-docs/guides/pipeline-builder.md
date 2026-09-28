@@ -82,7 +82,7 @@ if (!result.success) {
 
 ### Configuration validation
 
-`validate()` checks your YAML configuration without starting Spark or reading data:
+`validate()` checks configuration without reading source data or executing Spark jobs. The builder still requires the application's implicit `SparkSession` because that is part of the public builder API.
 
 ```scala
 val issues = IngestionPipeline.builder()
@@ -147,15 +147,15 @@ case class IngestionResult(
   error: Option[String] = None,
   derivedTableResults: Seq[DerivedTableResult] = Seq.empty,
   maintenanceResults: Seq[MaintenanceResult] = Seq.empty,
-  status: RunStatus
+  status: RunStatus = RunStatus.Unknown
 )
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `batchId` | `String` | Batch identifier (formatted according to `processing.batchIdFormat`) |
+| `batchId` | `String` | Formatted timestamp prefix plus a UUID suffix |
 | `flowResults` | `Seq[FlowResult]` | Results for each executed flow |
-| `success` | `Boolean` | `true` if all flows and all registered derived tables completed successfully |
+| `success` | `Boolean` | `true` if synchronous flow execution, orphan handling, derived tables, and publication completed successfully |
 | `error` | `Option[String]` | Error message if the batch failed |
 | `derivedTableResults` | `Seq[DerivedTableResult]` | Results for each derived table (empty if none registered) |
 | `maintenanceResults` | `Seq[MaintenanceResult]` | Per-target asynchronous maintenance status; successful ingestion normally returns `QUEUED` |
@@ -175,11 +175,11 @@ val pipeline = IngestionPipeline.builder()
 
 val first = pipeline.execute()
 
-// Same batch and effectiveAt; committed operations are never written again.
-val resumed = pipeline.resume(first.batchId)
+// On an interrupted/failed run: same batch and effectiveAt; proven commits are not written again.
+val recovered = if (!first.success) pipeline.resume(first.batchId) else first
 
-// New linked batch and operation IDs over the same immutable input.
-val replayed = pipeline.replay(first.batchId)
+// Separately, a deliberate replay of a terminal run creates a linked new batch.
+val replayed = pipeline.replay(recovered.batchId)
 ```
 
 For JDBC or custom sources, configure an immutable source version:
@@ -187,10 +187,13 @@ For JDBC or custom sources, configure an immutable source version:
 ```yaml
 source:
   type: jdbc
-  path: "jdbc:postgresql://db/app"
+  path: public.orders
   options:
-    replayToken: "orders-watermark-2026-09-24T00:00:00Z"
+    url: "jdbc:postgresql://db/app"
+    replayToken: "orders/extract/2026-09-24T00:00:00Z/v1"
 ```
+
+The token must identify immutable source contents; a constant token only disables the guard. File fingerprints use path, length, modification time, format, and options rather than hashing file bytes. See [Recovery and Production Operations](recovery.md).
 
 ### FlowResult
 
@@ -205,12 +208,14 @@ Each flow produces a `FlowResult`:
 | `validRecords` | `Long` | Records that passed validation |
 | `rejectedRecords` | `Long` | Records that failed validation |
 | `rejectionRate` | `Double` | `rejectedRecords / inputRecords` |
-| `mergedRecords` | `Long` | Records after merge (equals inputRecords in current implementation) |
+| `mergedRecords` | `Long` | Rows emitted by the post-validation transformation and submitted to the target write; not the rows physically changed by MERGE |
 | `executionTimeMs` | `Long` | Flow execution time in milliseconds |
 | `rejectionReasons` | `Map[String, Long]` | Count of rejections per validation step |
 | `error` | `Option[String]` | Error message if the flow failed |
 | `icebergMetadata` | `Option[IcebergFlowMetadata]` | Iceberg snapshot metadata (see [Iceberg Integration](iceberg.md)) |
 | `warnings` | `Seq[String]` | Operational side-output failures that did not invalidate the committed target data |
+| `writeAttempted` | `Boolean` | Whether target mutation may have started; used to prevent unsafe whole-flow retry |
+| `retryable` | `Boolean` | Whether the failure is known to have occurred before the target write |
 
 ## Transformations
 
@@ -328,7 +333,7 @@ Flow availability depends on execution order. The framework orders flows by FK d
 
 ## Derived tables
 
-Derived tables are Iceberg tables computed after all flows have been written. They read from the Iceberg catalog (full history, not just the current batch delta) and write the result as a full-load Iceberg table.
+Derived tables are Iceberg tables computed after all flows and orphan checks complete. They read the complete current state of their Iceberg inputs, not merely the incoming batch DataFrame, and write the result as a full-load table. Historical snapshots remain available separately through Iceberg time travel while retained.
 
 This is the recommended way to produce aggregations, splits, denormalizations, or any other output derived from your ingested data. Derived tables are first-class Iceberg tables — they have snapshots, time travel, schema evolution, and can be referenced by the DAG or queried directly.
 
@@ -337,17 +342,17 @@ This is the recommended way to produce aggregations, splits, denormalizations, o
 ```scala
 IngestionPipeline.builder()
   .withConfigDirectory("config")
-  .withDerivedTable("order_summary") { ctx =>
+  .withDerivedTable("order_summary", ctx =>
     ctx.table("orders")
       .groupBy("category")
       .agg(
         sum("total_amount").as("total_revenue"),
         count("*").as("order_count")
       )
-  }
-  .withDerivedTable("orders_domestic") { ctx =>
+  )
+  .withDerivedTable("orders_domestic", ctx =>
     ctx.table("orders").filter(col("country") === "IT")
-  }
+  )
   .build()
 ```
 
@@ -364,25 +369,26 @@ Each derived table must have a unique name. Registering two derived tables with 
 
 ### ctx.table(name)
 
-Reads a table from the Iceberg catalog. Returns the full table content (all historical data), not just the records from the current batch. This is the key difference from transformations, where `ctx.currentData` contains only the current batch's data.
+Reads the current state of a table from the Iceberg catalog. This is the key difference from transformations, where `ctx.currentData` contains only the current batch's data. It does not union old snapshots; use Iceberg time travel explicitly for a historical snapshot.
 
 ```scala
-ctx.table("orders")     // reads spark_catalog.default.orders
-ctx.table("customers")  // reads spark_catalog.default.customers
+ctx.table("orders")     // reads floe.default.orders
+ctx.table("customers")  // reads floe.default.customers
 ```
 
 You can also use `ctx.spark` for arbitrary Spark operations (reading external data, SQL queries, etc.).
 
 !!!note "No validation on derived tables"
-    Derived tables are not validated by the framework's validation engine. Their input data comes from Iceberg tables that have already been validated during ingestion, so the source data is clean. If your derived table function introduces logic that could produce unexpected results (e.g. NULLs from left joins), handle it in the function itself.
+    Derived tables are not validated by the framework's validation engine. Their inputs may contain accepted warning rows, legacy data, or values produced by custom transformations. Enforce output invariants inside the function or in a downstream quality check.
 
 ### Execution order
 
 1. All flows execute (read → validate → transform → write to Iceberg)
-2. Derived tables execute in registration order
-3. Each derived table writes to `{catalogName}.{namespace}.{tableName}` as a full-load overwrite
-4. Each successful write is tagged with the batch ID (if `enableSnapshotTagging` is `true` in `global.yaml`)
-5. Iceberg maintenance runs on all successfully written derived tables (same settings as flow tables — see [Iceberg maintenance](../configuration/global.md#maintenance))
+2. Orphan detection completes successfully
+3. Derived tables execute in registration order
+4. Each derived table writes to `{catalogName}.{namespace}.{tableName}` as a full-load overwrite
+5. A successful snapshot is tagged when `enableSnapshotTagging` is enabled
+6. The release manifest is published and maintenance is queued for a separate worker
 
 If a derived table fails, the remaining derived tables still execute, but the final batch result has `success = false`. `executeOrThrow()` throws, batch listeners receive `onBatchFailed`, and the batch summary and quality metrics record a failed batch. `IngestionResult.derivedTableResults` contains each derived table's outcome; already committed tables are not rolled back.
 
@@ -398,6 +404,9 @@ If a derived table fails, the remaining derived tables still execute, but the fi
 | `success` | `Boolean` | Whether the table was written successfully |
 | `recordsWritten` | `Long` | Number of records written (0 on failure) |
 | `error` | `Option[String]` | Error message on failure |
+| `snapshotId` | `Option[Long]` | Exact committed snapshot when a snapshot was created |
+| `operationId` | `Option[String]` | Deterministic commit identity used for reconciliation |
+| `reconciled` | `Boolean` | Whether success was recovered from Iceberg history after an uncertain client outcome |
 
 ### Using derived tables in the DAG
 
@@ -406,7 +415,7 @@ Once written, derived tables are regular Iceberg tables. Reference them in a DAG
 ```yaml
 nodes:
   - id: summary_node
-    sourceFlow: order_summary    # reads from the derived table
+    sourceFlow: order_summary    # resolves catalog.namespace.order_summary
 
 ```
 
@@ -425,13 +434,13 @@ To use a built-in provider, set `catalogType` in `global.yaml`:
 # Hadoop (default)
 iceberg:
   catalogType: "hadoop"
-  catalogName: "spark_catalog"
+  catalogName: "floe"
   warehouse: "output/warehouse"
 
 # Glue
 iceberg:
   catalogType: "glue"
-  catalogName: "spark_catalog"
+  catalogName: "floe"
   warehouse: "s3://my-bucket/warehouse"
   catalogProperties:
     glue.skip-name-validation: "true"

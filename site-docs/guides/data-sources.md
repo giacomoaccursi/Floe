@@ -1,6 +1,6 @@
 # Data Sources
 
-The framework reads data through pluggable readers based on the `source.type` in the flow configuration. Two source types are supported: `file` and `jdbc`.
+The framework reads data through pluggable readers based on `source.type`. It ships with two built-in types, `file` and `jdbc`; applications can register additional types.
 
 ## File sources
 
@@ -32,7 +32,7 @@ source:
 
 ### Common CSV options
 
-All options are passed directly to Spark's CSV reader via `spark.read.options()`:
+Connector options are passed to Spark's CSV reader via `spark.read.options()`. Floe-owned metadata such as `replayToken` is removed first.
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -75,7 +75,7 @@ source:
   format: parquet
 ```
 
-Parquet options are rarely needed since the format is self-describing. If `enforceSchema` is `true`, the framework applies the configured schema during read, which can cast types or reorder columns.
+Parquet options are rarely needed since the format is self-describing. If `enforceSchema` is `true`, the framework supplies the configured schema during read. Validate this against representative files: incompatible physical/logical types can fail or produce NULLs according to Spark's datasource behavior and read mode.
 
 ## JSON
 
@@ -133,10 +133,12 @@ schema:
       description: "Order total"
 ```
 
-This has two effects:
+This has two effects for built-in file sources:
 
 1. **Type casting** — columns are read with the specified Spark types instead of being inferred. For CSV, this prevents everything from being read as strings.
-2. **Column selection** — only the declared columns are read. Extra columns in the source file are ignored at the reader level (but may still be caught by `allowExtraColumns` validation).
+2. **Column projection** — only declared physical names (`sourceColumn` when present, otherwise `name`) are materialized, then renamed to logical names before validation.
+
+Because extra file fields can be discarded by Spark while applying the supplied read schema, `allowExtraColumns: false` is not a reliable detector of undeclared columns in schema-enforced CSV/JSON/Parquet input. It validates the DataFrame visible after reading (and can still catch columns introduced by readers/transformations). If source-contract drift must fail closed, inspect the raw file schema/header before projection in a custom reader or a separate landing check.
 
 ### Type mapping
 
@@ -169,7 +171,7 @@ The framework uses `DataReaderFactory` to create the appropriate reader based on
 
 | Source type | Reader | Description |
 |-------------|--------|-------------|
-| `file` | `FileDataReader` | CSV, Parquet, JSON from local or cloud storage |
+| `file` | `FileDataReader` | CSV, Parquet, JSON, Avro, and ORC from local or cloud storage |
 | `jdbc` | `JDBCDataReader` | Any database with a JDBC driver |
 
 ```scala
@@ -209,9 +211,25 @@ Key options:
 | `lowerBound` / `upperBound` | Range for partition column |
 | `numPartitions` | Number of parallel JDBC connections |
 
-All options are passed through to the Spark JDBC datasource. The framework does not bundle database drivers — add the appropriate driver JAR to your classpath.
+Reader options are passed through to the Spark JDBC datasource except Floe-owned recovery metadata such as `replayToken`. The framework does not bundle database drivers — add the appropriate driver JAR to your classpath.
 
 Credentials should not be hardcoded in YAML. Use variable substitution (`${DB_PASSWORD}`) and resolve them at runtime via `withVariables()` in the pipeline builder, sourcing values from your secret manager.
+
+### Recovery identity
+
+JDBC queries are not inherently replayable. To enable safe resume/replay checks, bind the query to an immutable source version and identify it explicitly:
+
+```yaml
+source:
+  type: jdbc
+  path: public.orders
+  options:
+    url: "jdbc:postgresql://db/app"
+    query: "SELECT * FROM orders_extract WHERE extract_id = '2026-09-24T00:00:00Z'"
+    replayToken: "orders/extract/2026-09-24T00:00:00Z/v1"
+```
+
+A token is an assertion by the application, not a snapshot mechanism. A constant token cannot make a changing query deterministic. See [Recovery and Production Operations](recovery.md#input-fingerprints).
 
 ## Custom readers
 
@@ -227,7 +245,7 @@ val s3SelectReader: DataReaderFactory.ReaderFactory = (config, schema, spark) =>
     override def read(): DataFrame = {
       spark.read
         .format("s3selectCSV")
-        .options(config.options)
+        .options(config.options - "replayToken")
         .load(config.path)
     }
   }
@@ -250,7 +268,7 @@ source:
     compression: "GZIP"
 ```
 
-The factory receives the full `SourceConfig`, optional `SchemaConfig`, and the `SparkSession`. Custom readers override built-in readers if the same type name is used.
+The factory receives the full `SourceConfig`, optional `SchemaConfig`, and the `SparkSession`. Custom readers override built-in readers if the same type name is used. They must ignore or consume Floe-owned options such as `replayToken` instead of forwarding them blindly to an external connector.
 
 ## Related
 

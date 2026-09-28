@@ -35,11 +35,17 @@ class JDBCDataReader(
     }
 
     // Pass through all other options (user, password, driver, fetchSize, etc.)
-    val reservedKeys = Set("url", "query")
-    options.filterKeys(!reservedKeys.contains(_)).foreach { case (k, v) =>
+    JDBCDataReader.connectorOptions(options).foreach { case (k, v) =>
       reader = reader.option(k, v)
     }
 
     reader.load()
   }
+}
+
+object JDBCDataReader {
+  private val floeOwnedOptions = Set("url", "query", "replayToken")
+
+  private[readers] def connectorOptions(options: Map[String, String]): Map[String, String] =
+    options.filterNot { case (key, _) => floeOwnedOptions.contains(key) }
 }

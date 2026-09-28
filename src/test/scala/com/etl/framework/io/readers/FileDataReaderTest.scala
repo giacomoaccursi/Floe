@@ -139,6 +139,12 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
     }
   }
 
+  it should "keep Floe recovery metadata out of file datasource options" in {
+    FileDataReader.connectorOptions(
+      Map("header" -> "true", "replayToken" -> "orders/files/v1")
+    ) shouldBe Map("header" -> "true")
+  }
+
   it should "handle file pattern in source config" in {
     val tempDir = Files.createTempDirectory("file_reader_pattern_test")
     try {

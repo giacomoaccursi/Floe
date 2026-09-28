@@ -41,7 +41,7 @@ class FileDataReader(
     }
 
     // Apply options
-    reader = reader.options(sourceConfig.options)
+    reader = reader.options(FileDataReader.connectorOptions(sourceConfig.options))
 
     // Load data
     reader.load(sourceConfig.path)
@@ -109,4 +109,11 @@ class FileDataReader(
       )
     }
   }
+}
+
+object FileDataReader {
+  private val floeOwnedOptions = Set("replayToken")
+
+  private[readers] def connectorOptions(options: Map[String, String]): Map[String, String] =
+    options.filterNot { case (key, _) => floeOwnedOptions.contains(key) }
 }

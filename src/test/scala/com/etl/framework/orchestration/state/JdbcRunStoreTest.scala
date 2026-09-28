@@ -80,7 +80,7 @@ class JdbcRunStoreTest extends AnyFlatSpec with Matchers with BeforeAndAfterEach
       "batch-maintenance",
       "customers",
       "flow",
-      "spark_catalog.default.customers"
+      "floe.default.customers"
     )
 
     store.enqueueMaintenance(task)

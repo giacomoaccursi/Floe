@@ -2,7 +2,7 @@ package com.etl.framework.config
 
 case class IcebergConfig(
     catalogType: String = "hadoop",
-    catalogName: String = "spark_catalog",
+    catalogName: String = "floe",
     namespace: String = "default",
     warehouse: String,
     catalogProperties: Map[String, String] = Map.empty,

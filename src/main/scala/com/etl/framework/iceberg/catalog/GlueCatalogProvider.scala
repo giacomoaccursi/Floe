@@ -48,8 +48,13 @@ class GlueCatalogProvider extends CatalogProvider {
   override def validateConfig(
       config: IcebergConfig
   ): Either[String, Unit] = {
-    if (config.catalogName.isEmpty) {
+    if (config.catalogName.trim.isEmpty) {
       Left("catalogName is required for glue catalog")
+    } else if (config.catalogName.equalsIgnoreCase("spark_catalog")) {
+      Left(
+        "catalogName 'spark_catalog' is reserved for Spark's session catalog; " +
+          "use a dedicated name (for example 'floe') with Iceberg SparkCatalog"
+      )
     } else {
       Right(())
     }

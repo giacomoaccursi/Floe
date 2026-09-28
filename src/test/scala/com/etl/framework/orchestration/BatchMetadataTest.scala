@@ -8,8 +8,10 @@ import com.etl.framework.orchestration.batch.BatchIdGenerator
 import com.etl.framework.orchestration.maintenance.MaintenanceWorker
 import com.etl.framework.orchestration.state.{
   InMemoryRunStore,
+  MaintenanceTaskRecord,
   OperationStatus,
   ReleaseManifest,
+  RunRecord,
   RunStatus,
   SnapshotPinnedReader
 }
@@ -18,6 +20,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.{Files, Paths}
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.util.Try
 
@@ -33,10 +36,9 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     .config("spark.driver.bindAddress", "127.0.0.1")
     .config("spark.sql.shuffle.partitions", "2")
     .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-    .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog")
-    .config("spark.sql.catalog.spark_catalog.type", "hadoop")
-    .config("spark.sql.catalog.spark_catalog.warehouse", warehousePath)
-    .config("spark.sql.defaultCatalog", "spark_catalog")
+    .config("spark.sql.catalog.floe", "org.apache.iceberg.spark.SparkCatalog")
+    .config("spark.sql.catalog.floe.type", "hadoop")
+    .config("spark.sql.catalog.floe.warehouse", warehousePath)
     .getOrCreate()
 
   import spark.implicits._
@@ -87,7 +89,7 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     )
 
   private def cleanupTempDir(tempDir: String): Unit = {
-    Try {
+    val _ = Try {
       import scala.collection.JavaConverters._
       val dirPath = Paths.get(tempDir)
       if (Files.exists(dirPath)) {
@@ -316,6 +318,33 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     } finally {
       cleanupTempDir(tempDir)
     }
+  }
+
+  it should "not run maintenance before its batch is published" in {
+    val store = new InMemoryRunStore()
+    val now = Instant.now()
+    val run = RunRecord.planned("maintenance-publication-gate", "pipeline", now)
+    store.createRun(run)
+    store.transitionRun(run.batchId, run.version, RunStatus.Running) shouldBe true
+    store.enqueueMaintenance(
+      MaintenanceTaskRecord.queued(run.batchId, "customers", "flow", "floe.default.customers")
+    )
+
+    val executed = new AtomicBoolean(false)
+    val worker = new MaintenanceWorker(
+      createGlobalConfig(warehousePath).iceberg,
+      store,
+      executor = Some(_ => executed.set(true))
+    )
+
+    worker.runPending() shouldBe empty
+    executed.get() shouldBe false
+    store.getMaintenanceTasks(Some(run.batchId)).head.status shouldBe MaintenanceStatus.Queued
+
+    val running = store.getRun(run.batchId).get
+    store.transitionRun(run.batchId, running.version, RunStatus.Published) shouldBe true
+    worker.runPending() should have size 1
+    executed.get() shouldBe true
   }
 
   it should "publish an atomic release manifest and durable operation state" in {

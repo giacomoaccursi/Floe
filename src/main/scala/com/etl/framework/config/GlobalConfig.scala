@@ -3,7 +3,7 @@ package com.etl.framework.config
 case class GlobalConfig(
     paths: PathsConfig,
     processing: ProcessingConfig = ProcessingConfig(),
-    performance: PerformanceConfig,
+    performance: PerformanceConfig = PerformanceConfig(),
     iceberg: IcebergConfig
 )
 

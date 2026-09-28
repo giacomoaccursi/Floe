@@ -32,10 +32,9 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
       .config("spark.driver.bindAddress", "127.0.0.1")
       .config("spark.sql.shuffle.partitions", "1")
       .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-      .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog")
-      .config("spark.sql.catalog.spark_catalog.type", "hadoop")
-      .config("spark.sql.catalog.spark_catalog.warehouse", warehousePath)
-      .config("spark.sql.defaultCatalog", "spark_catalog")
+      .config("spark.sql.catalog.floe", "org.apache.iceberg.spark.SparkCatalog")
+      .config("spark.sql.catalog.floe.type", "hadoop")
+      .config("spark.sql.catalog.floe.warehouse", warehousePath)
       .getOrCreate()
   }
 
@@ -190,10 +189,10 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     ordResult.success shouldBe true
 
     // Verify Iceberg tables exist and have data
-    val customers = spark.sql("SELECT * FROM spark_catalog.default.customers")
+    val customers = spark.sql("SELECT * FROM floe.default.customers")
     customers.count() shouldBe 2
 
-    val orders = spark.sql("SELECT * FROM spark_catalog.default.orders")
+    val orders = spark.sql("SELECT * FROM floe.default.orders")
     orders.count() should be >= 2L
 
     // Verify metadata JSON was written
@@ -257,7 +256,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     result2.success shouldBe true
 
     // Customers table should have 1 record
-    spark.sql("SELECT * FROM spark_catalog.default.customers").count() shouldBe 1
+    spark.sql("SELECT * FROM floe.default.customers").count() shouldBe 1
   }
 
   it should "call batch listeners" in {
@@ -359,15 +358,20 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
          |""".stripMargin
     )
     import spark.implicits._
-    Seq(("1", "Alice")).toDF("id", "name").write.mode("overwrite").format("csv")
-      .option("header", "true").save(dataDir.resolve("parent").toString)
+    Seq(("1", "Alice"))
+      .toDF("id", "name")
+      .write
+      .mode("overwrite")
+      .format("csv")
+      .option("header", "true")
+      .save(dataDir.resolve("parent").toString)
 
     val result = IngestionPipeline.builder().withConfigDirectory(configDir.toString).build().execute()
 
     result.success shouldBe false
     result.flowResults.map(_.flowName) shouldBe Seq("partial_parent", "partial_child")
     result.flowResults.head.icebergMetadata shouldBe defined
-    spark.table("spark_catalog.default.partial_parent").count() shouldBe 1L
+    spark.table("floe.default.partial_parent").count() shouldBe 1L
   }
 
   it should "rename columns using sourceColumn mapping" in {
@@ -423,7 +427,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     result.success shouldBe true
 
     // Verify columns were renamed in Iceberg
-    val df = spark.sql("SELECT * FROM spark_catalog.default.renamed_customers")
+    val df = spark.sql("SELECT * FROM floe.default.renamed_customers")
     df.columns should contain allOf ("customer_id", "full_name")
     df.columns should not contain "CustID"
     df.count() shouldBe 2
@@ -475,13 +479,13 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     Files.exists(tempDir.resolve("metadata").resolve(failed.batchId).resolve("summary.json")) shouldBe true
     spark
       .sql(
-        s"SELECT batch_success FROM spark_catalog.default.quality_metrics_threshold_failure " +
+        s"SELECT batch_success FROM floe.default.quality_metrics_threshold_failure " +
           s"WHERE batch_id = '${failed.batchId}' AND flow_name = 'threshold_guard'"
       )
       .head()
       .getBoolean(0) shouldBe false
     val ids = spark
-      .sql("SELECT customer_id FROM spark_catalog.default.threshold_guard")
+      .sql("SELECT customer_id FROM floe.default.threshold_guard")
       .collect()
       .map(_.getString(0))
       .toSeq
@@ -513,7 +517,10 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     import spark.implicits._
     Seq(("1", "original"))
       .toDF("id", "value")
-      .write.mode("overwrite").format("csv").option("header", "true")
+      .write
+      .mode("overwrite")
+      .format("csv")
+      .option("header", "true")
       .save(dataDir.resolve("rows").toString)
 
     val result = IngestionPipeline.builder().withConfigDirectory(configDir.toString).build().execute()
@@ -521,7 +528,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     result.success shouldBe true
     result.status shouldBe RunStatus.SucceededWithWarnings
     result.flowResults.head.warnings.mkString(" ") should include("Flow metadata write failed")
-    spark.sql("SELECT * FROM spark_catalog.default.retry_append").count() shouldBe 1L
+    spark.sql("SELECT * FROM floe.default.retry_append").count() shouldBe 1L
   }
 
   it should "protect a full-load table when input is below minInputRecords" in {
@@ -547,19 +554,28 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
          |""".stripMargin
     )
     import spark.implicits._
-    Seq(("1", "kept")).toDF("id", "value").write.mode("overwrite").option("header", "true")
+    Seq(("1", "kept"))
+      .toDF("id", "value")
+      .write
+      .mode("overwrite")
+      .option("header", "true")
       .csv(dataDir.resolve("input").toString)
 
     val pipeline = IngestionPipeline.builder().withConfigDirectory(configDir.toString).build()
     pipeline.execute().success shouldBe true
 
-    Seq.empty[(String, String)].toDF("id", "value").write.mode("overwrite").option("header", "true")
+    Seq
+      .empty[(String, String)]
+      .toDF("id", "value")
+      .write
+      .mode("overwrite")
+      .option("header", "true")
       .csv(dataDir.resolve("input").toString)
     val failed = pipeline.execute()
 
     failed.success shouldBe false
     failed.error.getOrElse("") should include("minInputRecords=1")
-    spark.table("spark_catalog.default.min_input_guard").count() shouldBe 1L
+    spark.table("floe.default.min_input_guard").count() shouldBe 1L
   }
 
   it should "report the records produced by a post-validation transformation" in {
@@ -584,8 +600,12 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
          |""".stripMargin
     )
     import spark.implicits._
-    Seq(("1", "keep"), ("2", "drop")).toDF("id", "action").write.mode("overwrite")
-      .option("header", "true").csv(dataDir.resolve("input").toString)
+    Seq(("1", "keep"), ("2", "drop"))
+      .toDF("id", "action")
+      .write
+      .mode("overwrite")
+      .option("header", "true")
+      .csv(dataDir.resolve("input").toString)
 
     val result = IngestionPipeline
       .builder()
@@ -598,7 +618,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     result.flowResults.head.inputRecords shouldBe 2L
     result.flowResults.head.validRecords shouldBe 2L
     result.flowResults.head.mergedRecords shouldBe 1L
-    spark.table("spark_catalog.default.post_metrics").count() shouldBe 1L
+    spark.table("floe.default.post_metrics").count() shouldBe 1L
   }
 
   it should "report a failed derived table as a failed batch to listeners and monitoring" in {
@@ -632,10 +652,12 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
     val summary = Files.readString(tempDir.resolve("metadata").resolve(result.batchId).resolve("summary.json"))
     summary should include("\"success\":false")
-    val metric = spark.sql(
-      s"SELECT batch_success FROM spark_catalog.default.quality_metrics_derived_failure " +
-        s"WHERE batch_id = '${result.batchId}' AND flow_name = 'customers'"
-    ).first()
+    val metric = spark
+      .sql(
+        s"SELECT batch_success FROM floe.default.quality_metrics_derived_failure " +
+          s"WHERE batch_id = '${result.batchId}' AND flow_name = 'customers'"
+      )
+      .first()
     metric.getBoolean(0) shouldBe false
   }
 
@@ -687,11 +709,20 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
     import spark.implicits._
     def writeParents(ids: Seq[Int]): Unit =
-      ids.toDF("id").write.mode("overwrite").format("csv").option("header", "true")
+      ids
+        .toDF("id")
+        .write
+        .mode("overwrite")
+        .format("csv")
+        .option("header", "true")
         .save(dataDir.resolve("parents").toString)
     def writeChildren(): Unit =
-      Seq((10, 1), (11, 2)).toDF("child_id", "parent_id")
-        .write.mode("overwrite").format("csv").option("header", "true")
+      Seq((10, 1), (11, 2))
+        .toDF("child_id", "parent_id")
+        .write
+        .mode("overwrite")
+        .format("csv")
+        .option("header", "true")
         .save(dataDir.resolve("children").toString)
 
     val pipeline = IngestionPipeline
@@ -715,10 +746,12 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     result.error.getOrElse("").toLowerCase should include("orphan")
     val summary = Files.readString(tempDir.resolve("metadata").resolve(result.batchId).resolve("summary.json"))
     summary should include("\"success\":false")
-    val metric = spark.sql(
-      s"SELECT batch_success FROM spark_catalog.default.quality_metrics_orphan_failure " +
-        s"WHERE batch_id = '${result.batchId}' AND flow_name = 'orphan_parent_fail'"
-    ).first()
+    val metric = spark
+      .sql(
+        s"SELECT batch_success FROM floe.default.quality_metrics_orphan_failure " +
+          s"WHERE batch_id = '${result.batchId}' AND flow_name = 'orphan_parent_fail'"
+      )
+      .first()
     metric.getBoolean(0) shouldBe false
   }
 
@@ -779,11 +812,20 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
     import spark.implicits._
     def writeParents(rows: Seq[(String, String)]): Unit =
-      rows.toDF("id", "name").write.mode("overwrite").format("csv").option("header", "true")
+      rows
+        .toDF("id", "name")
+        .write
+        .mode("overwrite")
+        .format("csv")
+        .option("header", "true")
         .save(dataDir.resolve("parents").toString)
     def writeChild(): Unit =
-      Seq(("10", "1")).toDF("child_id", "parent_id")
-        .write.mode("overwrite").format("csv").option("header", "true")
+      Seq(("10", "1"))
+        .toDF("child_id", "parent_id")
+        .write
+        .mode("overwrite")
+        .format("csv")
+        .option("header", "true")
         .save(dataDir.resolve("children").toString)
 
     val pipeline = IngestionPipeline.builder().withConfigDirectory(configDir.toString).build()
@@ -797,16 +839,31 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
     result.success shouldBe true
     result.flowResults.find(_.flowName == "scd2_fk_child").get.rejectedRecords shouldBe 1L
-    spark.sql("SELECT * FROM spark_catalog.default.scd2_fk_child").count() shouldBe 0L
+    spark.sql("SELECT * FROM floe.default.scd2_fk_child").count() shouldBe 0L
   }
 
   override def afterAll(): Unit = {
-    Seq("customers", "orders", "renamed_customers", "threshold_guard", "retry_append", "quality_metrics_derived_failure",
-      "orphan_parent_fail", "orphan_child_fail", "quality_metrics_orphan_failure", "scd2_fk_parent", "scd2_fk_child",
-      "partial_parent", "partial_child", "quality_metrics_threshold_failure", "min_input_guard", "post_metrics")
+    Seq(
+      "customers",
+      "orders",
+      "renamed_customers",
+      "threshold_guard",
+      "retry_append",
+      "quality_metrics_derived_failure",
+      "orphan_parent_fail",
+      "orphan_child_fail",
+      "quality_metrics_orphan_failure",
+      "scd2_fk_parent",
+      "scd2_fk_child",
+      "partial_parent",
+      "partial_child",
+      "quality_metrics_threshold_failure",
+      "min_input_guard",
+      "post_metrics"
+    )
       .foreach { t =>
-      spark.sql(s"DROP TABLE IF EXISTS spark_catalog.default.$t")
-    }
+        spark.sql(s"DROP TABLE IF EXISTS floe.default.$t")
+      }
     super.afterAll()
   }
 }

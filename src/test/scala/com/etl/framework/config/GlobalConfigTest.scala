@@ -32,6 +32,24 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
     c.paths.outputPath shouldBe "/data/output"
     c.processing.maxRejectionRate shouldBe Some(0.05)
     c.performance.parallelFlows shouldBe true
+    c.iceberg.catalogName shouldBe "floe"
+  }
+
+  it should "default the optional performance section" in {
+    val yaml =
+      """
+        |paths:
+        |  outputPath: "/data/output"
+        |  rejectedPath: "/data/rejected"
+        |  metadataPath: "/data/metadata"
+        |iceberg:
+        |  warehouse: "/tmp/test-warehouse"
+      """.stripMargin
+
+    import ConfigHints._
+    val config = YamlConfigSource.string(yaml).load[GlobalConfig]
+
+    config.toOption.get.performance.parallelFlows shouldBe false
   }
 }
 

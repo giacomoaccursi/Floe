@@ -26,7 +26,10 @@ class MaintenanceWorker(
       .getMaintenanceTasks()
       .filter(task =>
         (task.status == MaintenanceStatus.Queued || task.status == MaintenanceStatus.Failed) &&
-          task.attempts < maxAttempts
+          task.attempts < maxAttempts &&
+          runStore
+            .getRun(task.batchId)
+            .exists(run => run.status == RunStatus.Published || run.status == RunStatus.SucceededWithWarnings)
       )
       .take(limit)
 

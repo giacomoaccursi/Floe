@@ -21,10 +21,9 @@ class BatchListenerTest extends AnyFlatSpec with Matchers {
     .config("spark.driver.bindAddress", "127.0.0.1")
     .config("spark.sql.shuffle.partitions", "1")
     .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-    .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog")
-    .config("spark.sql.catalog.spark_catalog.type", "hadoop")
-    .config("spark.sql.catalog.spark_catalog.warehouse", warehousePath)
-    .config("spark.sql.defaultCatalog", "spark_catalog")
+    .config("spark.sql.catalog.floe", "org.apache.iceberg.spark.SparkCatalog")
+    .config("spark.sql.catalog.floe.type", "hadoop")
+    .config("spark.sql.catalog.floe.warehouse", warehousePath)
     .getOrCreate()
 
   import spark.implicits._

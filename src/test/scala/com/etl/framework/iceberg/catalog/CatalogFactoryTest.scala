@@ -72,6 +72,13 @@ class CatalogFactoryTest extends AnyFlatSpec with Matchers {
     result.left.toOption.get should include("catalogName")
   }
 
+  it should "reject the reserved Spark session catalog name" in {
+    val provider = new GlueCatalogProvider()
+    val config = IcebergConfig(catalogName = "spark_catalog", warehouse = "s3://bucket/warehouse")
+    val result = provider.validateConfig(config)
+    result.left.toOption.get should include("reserved")
+  }
+
   "HadoopCatalogProvider.validateConfig" should "reject S3 without a lock manager" in {
     val provider = new HadoopCatalogProvider()
     val config = IcebergConfig(warehouse = "s3://bucket/warehouse")
@@ -79,6 +86,12 @@ class CatalogFactoryTest extends AnyFlatSpec with Matchers {
     provider.validateConfig(config.copy(warehouse = "s3a://bucket/warehouse")).left.toOption.get should include(
       "lock-impl"
     )
+  }
+
+  it should "reject the reserved Spark session catalog name" in {
+    val config = IcebergConfig(catalogName = "spark_catalog", warehouse = "/tmp/warehouse")
+    val result = new HadoopCatalogProvider().validateConfig(config)
+    result.left.toOption.get should include("reserved")
   }
 
   it should "accept S3 with an explicit lock manager" in {

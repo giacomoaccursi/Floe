@@ -40,13 +40,24 @@ class HadoopCatalogProvider extends CatalogProvider {
   ): Either[String, Unit] = {
     val objectStore = config.warehouse.matches("(?i)^s3(a|n)?://.*")
     val lockImpl = config.catalogProperties.get("lock-impl").filter(_.nonEmpty)
-    if (config.warehouse.isEmpty) {
+    if (config.catalogName.trim.isEmpty) {
+      Left("catalogName is required for hadoop catalog")
+    } else if (config.catalogName.equalsIgnoreCase("spark_catalog")) {
+      Left(
+        "catalogName 'spark_catalog' is reserved for Spark's session catalog; " +
+          "use a dedicated name (for example 'floe') with Iceberg SparkCatalog"
+      )
+    } else if (config.warehouse.isEmpty) {
       Left("warehouse path is required for hadoop catalog")
     } else if (objectStore && lockImpl.isEmpty) {
-      Left("Hadoop catalog on S3 requires a catalog lock-impl (for example DynamoDbLockManager); " +
-        "consider GlueCatalog with optimistic locking instead")
-    } else if (objectStore && lockImpl.exists(_.endsWith("DynamoDbLockManager")) &&
-      !config.catalogProperties.get("lock.table").exists(_.nonEmpty)) {
+      Left(
+        "Hadoop catalog on S3 requires a catalog lock-impl (for example DynamoDbLockManager); " +
+          "consider GlueCatalog with optimistic locking instead"
+      )
+    } else if (
+      objectStore && lockImpl.exists(_.endsWith("DynamoDbLockManager")) &&
+      !config.catalogProperties.get("lock.table").exists(_.nonEmpty)
+    ) {
       Left("DynamoDbLockManager requires catalogProperties.lock.table")
     } else {
       Right(())

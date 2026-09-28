@@ -20,10 +20,10 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     .config("spark.driver.bindAddress", "127.0.0.1")
     .config("spark.sql.shuffle.partitions", "1")
     .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-    .config("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog")
-    .config("spark.sql.catalog.spark_catalog.type", "hadoop")
+    .config("spark.sql.catalog.floe", "org.apache.iceberg.spark.SparkCatalog")
+    .config("spark.sql.catalog.floe.type", "hadoop")
     .config(
-      "spark.sql.catalog.spark_catalog.warehouse", {
+      "spark.sql.catalog.floe.warehouse", {
         Files.createTempDirectory("derived_table_test_warehouse").toString
       }
     )
@@ -42,7 +42,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     IcebergConfig(warehouse = tempWarehouse)
 
   private def seedIcebergTable(tableName: String, df: DataFrame): Unit = {
-    val fullName = s"spark_catalog.default.$tableName"
+    val fullName = s"floe.default.$tableName"
     val cols = df.schema.fields.map(f => s"${f.name} ${f.dataType.sql}").mkString(", ")
     try { spark.sql(s"DROP TABLE IF EXISTS $fullName") }
     catch { case _: Exception => }
@@ -51,7 +51,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
   }
 
   private def dropTable(name: String): Unit =
-    try { spark.sql(s"DROP TABLE IF EXISTS spark_catalog.default.`${name.replace("`", "``")}`") }
+    try { val _ = spark.sql(s"DROP TABLE IF EXISTS floe.default.`${name.replace("`", "``")}`") }
     catch { case _: Exception => }
 
   override def afterEach(): Unit = {
@@ -93,7 +93,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     results.head.tableName shouldBe "order_summary"
     results.head.recordsWritten shouldBe 2L
 
-    val written = spark.table("spark_catalog.default.order_summary")
+    val written = spark.table("floe.default.order_summary")
     written.count() shouldBe 2L
     written.filter(col("category") === "electronics").select("total").first().getDouble(0) shouldBe 300.0
   }
@@ -121,8 +121,8 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     results should have size 2
     results.foreach(_.success shouldBe true)
 
-    spark.table("spark_catalog.default.orders_domestic").count() shouldBe 2L
-    spark.table("spark_catalog.default.orders_intl").count() shouldBe 1L
+    spark.table("floe.default.orders_domestic").count() shouldBe 2L
+    spark.table("floe.default.orders_intl").count() shouldBe 1L
   }
 
   it should "overwrite existing data on re-execution (full load)" in {
@@ -137,7 +137,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     )
 
     executor.execute(derivedTables, "batch_001")
-    spark.table("spark_catalog.default.order_summary").count() shouldBe 1L
+    spark.table("floe.default.order_summary").count() shouldBe 1L
 
     // Seed new data and re-execute
     dropTable("orders")
@@ -145,7 +145,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     seedIcebergTable("orders", orders2)
 
     executor.execute(derivedTables, "batch_002")
-    spark.table("spark_catalog.default.order_summary").count() shouldBe 2L
+    spark.table("floe.default.order_summary").count() shouldBe 2L
   }
 
   it should "handle empty source table" in {
@@ -182,7 +182,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     val result = executor.execute(derivedTables, "batch_quoted_identifiers").head
 
     result.success shouldBe true
-    val written = spark.table("spark_catalog.default.`daily orders`")
+    val written = spark.table("floe.default.`daily orders`")
     written.columns should contain allOf ("select", "customer name")
     written.count() shouldBe 2L
   }
@@ -257,7 +257,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     val results = executor.execute(v2, "batch_v2")
 
     results.head.success shouldBe true
-    val written = spark.table("spark_catalog.default.order_summary")
+    val written = spark.table("floe.default.order_summary")
     written.columns should contain("cnt")
   }
 
@@ -274,7 +274,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
 
     executor.execute(derivedTables, "batch_tag_test")
 
-    val refs = spark.sql("SELECT * FROM spark_catalog.default.order_summary.refs")
+    val refs = spark.sql("SELECT * FROM floe.default.order_summary.refs")
     val tags = refs.filter(col("type") === "TAG").select("name").collect().map(_.getString(0))
     tags should contain("batch_batch_tag_test")
   }
@@ -293,7 +293,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
 
     executor.execute(derivedTables, "batch_no_tag")
 
-    val refs = spark.sql("SELECT * FROM spark_catalog.default.order_summary.refs")
+    val refs = spark.sql("SELECT * FROM floe.default.order_summary.refs")
     val tags = refs.filter(col("type") === "TAG").select("name").collect().map(_.getString(0))
     tags should not contain "batch_batch_no_tag"
   }

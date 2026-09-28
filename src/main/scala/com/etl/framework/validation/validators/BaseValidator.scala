@@ -19,7 +19,7 @@ abstract class BaseValidator(flowName: Option[String] = None) extends Validator 
     val column = extractColumn(rule)
 
     // 2. Build validation condition
-    val validationCondition = buildValidationCondition(df, rule, column)
+    val validationCondition = coalesce(buildValidationCondition(df, rule, column), lit(false))
 
     // 3. Split into valid and invalid
     val validDf = df.filter(validationCondition)

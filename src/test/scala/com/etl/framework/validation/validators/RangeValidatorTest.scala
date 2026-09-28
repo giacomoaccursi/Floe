@@ -82,7 +82,7 @@ class RangeValidatorTest extends AnyFlatSpec with Matchers {
     rejected.select("value").as[Int].collect() should contain allOf (4, 16)
   }
 
-  it should "lose null rows when called directly (skipNull is handled by CustomRulesValidator)" in {
+  it should "classify null conditions as invalid instead of dropping rows" in {
     val schema = StructType(Seq(StructField("value", IntegerType, true)))
     val data = Seq(Row(null), Row(10))
     val df = spark.createDataFrame(data.asJava, schema)
@@ -90,9 +90,8 @@ class RangeValidatorTest extends AnyFlatSpec with Matchers {
     val rule = createRule(Some("5"), Some("15"))
     val result = new RangeValidator().validate(df, rule)
 
-    // When called directly, NULL values produce null for both condition and !condition.
-    // Spark treats null as false in filter, so NULL rows end up in neither valid nor rejected.
-    // This is expected — skipNull is handled by CustomRulesValidator, not by individual validators.
-    result.valid.count() shouldBe 1 // only the non-null row (10) passes
+    result.valid.count() shouldBe 1
+    result.rejected.get.count() shouldBe 1
+    result.rejected.get.filter("value IS NULL").count() shouldBe 1
   }
 }

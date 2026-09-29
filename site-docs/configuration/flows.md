@@ -375,5 +375,5 @@ output:
     commit.retry.num-retries: "4"
 ```
 
-!!!note "commit.retry vs framework retry"
-    `commit.retry.num-retries` is an Iceberg property for catalog commit conflicts. `processing.maxRetries` retries only a flow failure known to have occurred before a target write was attempted. If a commit outcome is uncertain, Floe blocks blind retry and reconciles the deterministic operation ID instead.
+!!!note "Commit retry scope"
+    `commit.retry.num-retries` configures Iceberg's validated catalog-commit retry. Floe does not retry a flow or pipeline. If a commit outcome is uncertain, do not start another writer until the outcome and any in-flight request have been reconciled.

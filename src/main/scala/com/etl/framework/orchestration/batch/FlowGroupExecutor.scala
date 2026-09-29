@@ -4,7 +4,6 @@ import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.flow.{FlowExecutor, FlowResult}
 import com.etl.framework.orchestration.RejectionThresholdPolicy
-import com.etl.framework.util.RetryExecutor
 import com.etl.framework.validation.Validator
 import com.etl.framework.orchestration.ExecutionGroup
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -81,28 +80,9 @@ class FlowGroupExecutor(
       effectiveAt: Instant
   ): FlowResult = {
     logger.debug(s"Starting flow ${flowConfig.name} - batchId: $batchId")
-
-    val maxRetries = globalConfig.processing.maxRetries
-    val backoffMs = globalConfig.processing.retryBackoffMs
-
-    if (maxRetries > 0) {
-      RetryExecutor.withRetry(
-        maxRetries = maxRetries,
-        baseDelayMs = backoffMs,
-        operationName = s"Flow ${flowConfig.name}"
-      ) {
-        val executor =
-          new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig, customValidators, customReaders)
-        val result = executor.execute(batchId, effectiveAt)
-        if (!result.success && result.retryable)
-          throw new RuntimeException(result.error.getOrElse("Flow failed"))
-        result
-      }
-    } else {
-      val executor =
-        new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig, customValidators, customReaders)
-      executor.execute(batchId, effectiveAt)
-    }
+    val executor =
+      new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig, customValidators, customReaders)
+    executor.execute(batchId, effectiveAt)
   }
 
   /** Determines if execution should stop based on result. Per-flow maxRejectionRate overrides the global setting.

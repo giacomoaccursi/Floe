@@ -48,12 +48,10 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
   private def setupConfig(
       configDir: Path,
       maxRejectionRate: Option[Double] = None,
-      maxRetries: Int = 0,
       metadataPath: Option[Path] = None,
       qualityMetricsTable: Option[String] = None
   ): Unit = {
     val thresholdSetting = maxRejectionRate.map(rate => s"  maxRejectionRate: $rate").getOrElse("")
-    val retrySetting = if (maxRetries > 0) s"  maxRetries: $maxRetries\n  retryBackoffMs: 1" else ""
     val qualityMetricsSetting = qualityMetricsTable.map(name => s"  qualityMetricsTable: $name").getOrElse("")
     writeFile(
       configDir.resolve("global.yaml"),
@@ -65,7 +63,6 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
          |processing:
          |  batchIdFormat: "timestamp"
          |$thresholdSetting
-         |$retrySetting
          |$qualityMetricsSetting
          |performance:
          |  parallelFlows: false
@@ -492,12 +489,12 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     ids shouldBe Seq("1")
   }
 
-  it should "publish a delta append with warnings after post-commit metadata failure" in {
+  it should "publish a delta append once with warnings after post-commit metadata failure" in {
     val configDir = tempDir.resolve("e2e_post_commit_retry").resolve("config")
     val dataDir = tempDir.resolve("e2e_post_commit_retry").resolve("data")
     val blockedMetadataPath = tempDir.resolve("e2e_post_commit_retry").resolve("blocked-metadata")
     writeFile(blockedMetadataPath, "This is a file, not a directory")
-    setupConfig(configDir, maxRetries = 1, metadataPath = Some(blockedMetadataPath))
+    setupConfig(configDir, metadataPath = Some(blockedMetadataPath))
     writeFile(
       configDir.resolve("flows").resolve("retry_append.yaml"),
       s"""

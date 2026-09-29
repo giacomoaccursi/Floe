@@ -14,8 +14,6 @@ paths:
 processing:
   batchIdFormat: "yyyyMMdd"
   maxRejectionRate: 0.1
-  maxRetries: 3
-  retryBackoffMs: 2000
   qualityMetricsTable: "quality_metrics"
 
 performance:
@@ -65,8 +63,6 @@ Controls batch execution and validation behavior. This entire section is optiona
 |-------|---------|-------------|
 | `batchIdFormat` | `yyyyMMdd_HHmmss` | Java `DateTimeFormatter` pattern for the readable prefix of a batch ID. Use `timestamp` for epoch millis. A random UUID suffix is always appended to avoid collisions. |
 | `maxRejectionRate` | — (disabled) | If set, the batch stops when any flow's rejection rate exceeds this threshold (0.1 = 10%). |
-| `maxRetries` | `0` | Maximum number of retries per flow on failure. `0` means no retry. |
-| `retryBackoffMs` | `1000` | Base delay in milliseconds for exponential backoff between retries. |
 | `qualityMetricsTable` | — (disabled) | If set, writes per-flow quality metrics to this Iceberg table after each batch. See [Quality Metrics](../guides/quality-metrics.md). |
 
 !!!warning "Batch ID collisions"
@@ -82,17 +78,9 @@ Individual flows can override the global threshold with their own `maxRejectionR
 
 ### Retry behavior
 
-When `maxRetries` is greater than 0, the framework retries failed flows using exponential backoff with jitter:
+Floe does not retry a flow or the whole pipeline. A previous flow may already have committed, so retrying a later failure in isolation is not a safe default for the pipeline. Configure the external orchestrator with retries disabled unless the complete application and deployment have been qualified as repeatable. Iceberg and storage clients may still perform their own bounded, validated transport or commit retries.
 
-| Attempt | Delay |
-|---------|-------|
-| 1st retry | `retryBackoffMs` + jitter |
-| 2nd retry | `retryBackoffMs × 2` + jitter |
-| 3rd retry | `retryBackoffMs × 4` + jitter |
-
-Jitter is a random value between 0 and `retryBackoffMs`, added to prevent thundering herd when multiple flows retry simultaneously.
-
-A flow is retried only when it fails before a target write is attempted. Once a write may have reached Iceberg, Floe records the outcome as committed, unknown, or inconsistent and requires reconciliation instead of replaying the whole flow. Validation rejections are not retried; a rejection-threshold breach fails before the table mutation.
+Validation rejections are not transient. A rejection-threshold breach fails before the target-table mutation.
 
 For the full validation pipeline, see [Validation Engine](../guides/validation.md).
 

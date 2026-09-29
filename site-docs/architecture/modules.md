@@ -130,7 +130,6 @@ See [Reference: Exceptions](../reference/exceptions.md).
 Shared utilities used across modules:
 
 - **TopologicalSorter** — generic graph sorting with cycle detection, used by both flow dependency resolution and DAG node ordering
-- **RetryExecutor** — exponential backoff with jitter for retrying failed operations
 - **JsonFileWriter** — writes Scala maps as formatted JSON files
 - **IcebergMetadataSerializer** — converts `IcebergFlowMetadata` to JSON-compatible maps
 - **TimingUtil** — measures and logs execution time of code blocks

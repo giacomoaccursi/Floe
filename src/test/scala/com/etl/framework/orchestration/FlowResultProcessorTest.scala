@@ -109,11 +109,10 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     )
 
     processingResult match {
-      case StopExecution(ingestionResult) =>
-        ingestionResult.success shouldBe false
-        ingestionResult.error shouldBe defined
-        ingestionResult.error.get should include("flow_a")
-        ingestionResult.error.get should include("failed")
+      case StopExecution(stoppedState, error) =>
+        stoppedState.flowResults should have size 1
+        error should include("flow_a")
+        error should include("failed")
       case _ => fail("Expected StopExecution")
     }
   }
@@ -134,8 +133,8 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     )
 
     processingResult match {
-      case StopExecution(ingestionResult) =>
-        ingestionResult.flowResults.map(_.flowName) shouldBe Seq("flow_a", "flow_b")
+      case StopExecution(stoppedState, _) =>
+        stoppedState.flowResults.map(_.flowName) shouldBe Seq("flow_a", "flow_b")
       case _ => fail("Expected StopExecution")
     }
   }
@@ -163,10 +162,8 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     )
 
     processingResult match {
-      case StopExecution(ingestionResult) =>
-        ingestionResult.success shouldBe false
-        ingestionResult.error shouldBe defined
-        ingestionResult.error.get should include("rejection threshold")
+      case StopExecution(_, error) =>
+        error should include("rejection threshold")
       case _ => fail("Expected StopExecution")
     }
   }
@@ -235,10 +232,9 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     )
 
     processingResult match {
-      case StopExecution(ingestionResult) =>
-        ingestionResult.success shouldBe false
-        ingestionResult.flowResults.map(_.flowName) shouldBe Seq("flow_a", "flow_b", "flow_c")
-        ingestionResult.error.get should include("flow_b")
+      case StopExecution(stoppedState, error) =>
+        stoppedState.flowResults.map(_.flowName) shouldBe Seq("flow_a", "flow_b", "flow_c")
+        error should include("flow_b")
       case _ => fail("Expected StopExecution")
     }
   }
@@ -266,7 +262,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     }
   }
 
-  it should "create IngestionResult with correct batch ID and flow results" in {
+  it should "retain the failed flow result and error" in {
     val globalConfig = createGlobalConfig()
     val flowConfigs = Seq(createFlowConfig("flow_a"))
     val groupExecutor = new MockFlowGroupExecutor()
@@ -284,10 +280,11 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     )
 
     processingResult match {
-      case StopExecution(ingestionResult) =>
-        ingestionResult.batchId shouldBe "batch123"
-        ingestionResult.flowResults should have size 1
-        ingestionResult.flowResults.head.flowName shouldBe "flow_a"
+      case StopExecution(stoppedState, error) =>
+        stoppedState.flowResults should have size 1
+        stoppedState.flowResults.head.batchId shouldBe "batch123"
+        stoppedState.flowResults.head.flowName shouldBe "flow_a"
+        error should include("Error")
       case _ => fail("Expected StopExecution")
     }
   }

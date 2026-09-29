@@ -30,8 +30,7 @@ class FlowMetadataWriter(
       "rejection_reasons" -> result.rejectionReasons,
       "error" -> result.error.getOrElse(""),
       "warnings" -> result.warnings,
-      "write_attempted" -> result.writeAttempted,
-      "retryable" -> result.retryable
+      "data_outcome" -> result.dataOutcome.name
     )
 
     val metadata = result.icebergMetadata match {

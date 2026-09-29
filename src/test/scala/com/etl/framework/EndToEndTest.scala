@@ -1,7 +1,7 @@
 package com.etl.framework
 
 import com.etl.framework.orchestration.{BatchListener, IngestionResult}
-import com.etl.framework.orchestration.state.RunStatus
+import com.etl.framework.orchestration.ExecutionStatus
 import com.etl.framework.pipeline.IngestionPipeline
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfterAll
@@ -523,7 +523,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     val result = IngestionPipeline.builder().withConfigDirectory(configDir.toString).build().execute()
 
     result.success shouldBe true
-    result.status shouldBe RunStatus.SucceededWithWarnings
+    result.status shouldBe ExecutionStatus.SucceededWithWarnings
     result.flowResults.head.warnings.mkString(" ") should include("Flow metadata write failed")
     spark.sql("SELECT * FROM floe.default.retry_append").count() shouldBe 1L
   }

@@ -3,25 +3,14 @@ package com.etl.framework.orchestration
 import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.io.readers.{DataReader, DataReaderFactory}
-import com.etl.framework.iceberg.MaintenanceStatus
 import com.etl.framework.orchestration.batch.BatchIdGenerator
-import com.etl.framework.orchestration.maintenance.MaintenanceWorker
-import com.etl.framework.orchestration.state.{
-  InMemoryRunStore,
-  MaintenanceTaskRecord,
-  OperationStatus,
-  ReleaseManifest,
-  RunRecord,
-  RunStatus,
-  SnapshotPinnedReader
-}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.{Files, Paths}
 import java.time.Instant
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import scala.util.Try
 
 class BatchMetadataTest extends AnyFlatSpec with Matchers {
@@ -46,18 +35,11 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
   private def createFlow(flowName: String, tempDir: String): FlowConfig = {
     val inputPath = s"$tempDir/input/$flowName"
     Files.createDirectories(Paths.get(inputPath))
-
-    val testData = Seq(
+    Seq(
       (s"${flowName}_1", "value_1"),
       (s"${flowName}_2", "value_2"),
       (s"${flowName}_3", "value_3")
-    ).toDF("id", "value")
-
-    testData.write
-      .mode("overwrite")
-      .format("csv")
-      .option("header", "true")
-      .save(inputPath)
+    ).toDF("id", "value").write.mode("overwrite").format("csv").option("header", "true").save(inputPath)
 
     TestFixtures
       .flowConfig(
@@ -69,17 +51,12 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
           ColumnConfig("id", "string", nullable = false, "Primary key"),
           ColumnConfig("value", "string", nullable = true, "Value")
         ),
-        output = OutputConfig(
-          rejectedPath = Some(s"$tempDir/rejected/$flowName")
-        )
+        output = OutputConfig(rejectedPath = Some(s"$tempDir/rejected/$flowName"))
       )
       .copy(source = SourceConfig(path = inputPath, format = Some(FileFormat.CSV), options = Map("header" -> "true")))
   }
 
-  private def createGlobalConfig(
-      tempDir: String,
-      batchIdFormat: String = "yyyyMMdd_HHmmss"
-  ): GlobalConfig =
+  private def createGlobalConfig(tempDir: String, batchIdFormat: String = "yyyyMMdd_HHmmss"): GlobalConfig =
     TestFixtures.globalConfig(
       outputPath = s"$tempDir/output",
       rejectedPath = s"$tempDir/rejected",
@@ -88,374 +65,148 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
       iceberg = IcebergConfig(warehouse = warehousePath)
     )
 
+  private def reportPath(tempDir: String, result: IngestionResult) =
+    Paths.get(
+      tempDir,
+      "metadata",
+      result.pipelineId,
+      result.logicalRunId,
+      result.attemptId,
+      "summary.json"
+    )
+
   private def cleanupTempDir(tempDir: String): Unit = {
     val _ = Try {
       import scala.collection.JavaConverters._
       val dirPath = Paths.get(tempDir)
-      if (Files.exists(dirPath)) {
-        Files
-          .walk(dirPath)
-          .iterator()
-          .asScala
-          .toSeq
-          .reverse
-          .foreach(p => Files.deleteIfExists(p))
-      }
+      if (Files.exists(dirPath))
+        Files.walk(dirPath).iterator().asScala.toSeq.reverse.foreach(path => Files.deleteIfExists(path))
     }
   }
 
-  "Batch metadata" should "generate unique batch IDs across executions" in {
-    val tempDir = Files.createTempDirectory("batch-id-test").toString
+  "Batch metadata" should "generate a distinct logical run and attempt for every local execution" in {
+    val tempDir = Files.createTempDirectory("execution-id-test").toString
     try {
-      val flow = createFlow("test_flow", tempDir)
-      val globalConfig = createGlobalConfig(tempDir, "timestamp")
+      val flow = createFlow("unique_execution", tempDir)
+      val orchestratorResults = (1 to 3).map(_ => FlowOrchestrator(createGlobalConfig(tempDir), Seq(flow)).execute())
 
-      val batchIds = (1 to 3).map { _ =>
-        val orchestrator = FlowOrchestrator(globalConfig, Seq(flow))
-        val result = orchestrator.execute()
-        Thread.sleep(10)
-        result.batchId
-      }
-
-      batchIds.distinct.size shouldBe batchIds.size
-    } finally {
-      cleanupTempDir(tempDir)
-    }
+      orchestratorResults.map(_.logicalRunId).distinct should have size 3
+      orchestratorResults.map(_.attemptId).distinct should have size 3
+      all(orchestratorResults.map(_.pipelineId)) shouldBe "local"
+    } finally cleanupTempDir(tempDir)
   }
 
-  it should "derive a stable pipeline identity from config and an explicit code version" in {
-    val base = TestFixtures.flowConfig("pipeline_identity")
-    val first = base.copy(preValidationTransformation = Some(context => context))
-    val second = base.copy(preValidationTransformation = Some(context => context))
-    val config = createGlobalConfig(Files.createTempDirectory("pipeline-id-test").toString)
-
-    ReleaseManifest.pipelineId(config, Seq(first), Seq("derived"), "release-a") shouldBe
-      ReleaseManifest.pipelineId(config, Seq(second), Seq("derived"), "release-a")
-    ReleaseManifest.pipelineId(config, Seq(first), Seq("derived"), "release-a") should not be
-      ReleaseManifest.pipelineId(config, Seq(first), Seq("derived"), "release-b")
-  }
-
-  it should "generate distinct IDs even within one timestamp second" in {
+  it should "generate distinct formatted logical IDs even within one timestamp second" in {
     val ids = (1 to 100).map(_ => BatchIdGenerator.generate("yyyyMMdd_HHmmss"))
     ids.distinct.size shouldBe ids.size
+    all(ids) should fullyMatch regex """\d{8}_\d{6}_[0-9a-f]{32}"""
   }
 
-  it should "follow configured format for timestamp" in {
-    val tempDir = Files.createTempDirectory("batch-format-test").toString
+  it should "honor an explicit immutable execution request" in {
+    val tempDir = Files.createTempDirectory("explicit-request-test").toString
     try {
-      val flow = createFlow("test_flow", tempDir)
-      val globalConfig = createGlobalConfig(tempDir, "timestamp")
-
-      val orchestrator = FlowOrchestrator(globalConfig, Seq(flow))
-      val result = orchestrator.execute()
-
-      result.batchId should fullyMatch regex """\d{13,}_[0-9a-f]{32}"""
-    } finally {
-      cleanupTempDir(tempDir)
-    }
-  }
-
-  it should "follow configured format for datetime" in {
-    val tempDir = Files.createTempDirectory("batch-format-test").toString
-    try {
-      val flow = createFlow("test_flow", tempDir)
-      val globalConfig = createGlobalConfig(tempDir, "yyyyMMdd_HHmmss")
-
-      val orchestrator = FlowOrchestrator(globalConfig, Seq(flow))
-      val result = orchestrator.execute()
-
-      result.batchId should fullyMatch regex """\d{8}_\d{6}_[0-9a-f]{32}"""
-    } finally {
-      cleanupTempDir(tempDir)
-    }
-  }
-
-  it should "contain all required fields in summary metadata" in {
-    val tempDir =
-      Files.createTempDirectory("metadata-completeness-test").toString
-    try {
-      val flows = (1 to 2).map(i => createFlow(s"flow_$i", tempDir))
-      val globalConfig = createGlobalConfig(tempDir)
-
-      val orchestrator = FlowOrchestrator(globalConfig, flows)
-      val result = orchestrator.execute()
-
-      val metadataPath =
-        Paths.get(s"$tempDir/metadata/${result.batchId}/summary.json")
-      Files.exists(metadataPath) shouldBe true
-
-      val metadataContent = new String(Files.readAllBytes(metadataPath))
-
-      metadataContent should include("batch_id")
-      metadataContent should include("total_input_records")
-      metadataContent should include("total_valid_records")
-      metadataContent should include("total_rejected_records")
-      metadataContent should include("overall_rejection_rate")
-      metadataContent should include("flows_processed")
-      metadataContent should include("success")
-
-      flows.foreach { flow =>
-        metadataContent should (
-          include(s""""flow_name":"${flow.name}"""") or
-            include(s""""flow_name" : "${flow.name}"""")
-        )
-      }
-    } finally {
-      cleanupTempDir(tempDir)
-    }
-  }
-
-  it should "contain required fields in per-flow metadata" in {
-    val tempDir =
-      Files.createTempDirectory("per-flow-metadata-test").toString
-    try {
-      val flow = createFlow("test_flow", tempDir)
-      val globalConfig = createGlobalConfig(tempDir)
-
-      val orchestrator = FlowOrchestrator(globalConfig, Seq(flow))
-      val result = orchestrator.execute()
-
-      val flowMetadataPath = Paths.get(
-        s"$tempDir/metadata/${result.batchId}/flows/${flow.name}.json"
+      val request = ExecutionRequest(
+        pipelineId = "orders-prod",
+        logicalRunId = "scheduled-2026-09-29",
+        attemptId = "attempt-01",
+        effectiveAt = Instant.parse("2026-09-29T08:00:00Z")
       )
-      Files.exists(flowMetadataPath) shouldBe true
-
-      val metadataContent =
-        new String(Files.readAllBytes(flowMetadataPath))
-
-      metadataContent should include("flow_name")
-      metadataContent should include("batch_id")
-      metadataContent should include("success")
-      metadataContent should include("input_records")
-      metadataContent should include("valid_records")
-      metadataContent should include("rejected_records")
-      metadataContent should include("rejection_rate")
-      metadataContent should include("execution_time_ms")
-    } finally {
-      cleanupTempDir(tempDir)
-    }
-  }
-
-  it should "serialize load_mode as string in per-flow metadata" in {
-    val tempDir = Files.createTempDirectory("load-mode-metadata-test").toString
-    try {
-      val flow = createFlow("test_flow", tempDir)
-      val globalConfig = createGlobalConfig(tempDir)
-
-      val orchestrator = FlowOrchestrator(globalConfig, Seq(flow))
-      val result = orchestrator.execute()
-
-      val flowMetadataPath = Paths.get(
-        s"$tempDir/metadata/${result.batchId}/flows/${flow.name}.json"
-      )
-      val metadataContent = new String(Files.readAllBytes(flowMetadataPath))
-
-      // load_mode should be the string "full", not an object like {} or {"name":"full"}
-      metadataContent should include(""""load_mode":"full"""")
-    } finally {
-      cleanupTempDir(tempDir)
-    }
-  }
-
-  it should "produce valid metadata for empty flow list" in {
-    val tempDir =
-      Files.createTempDirectory("empty-metadata-test").toString
-    try {
-      val globalConfig = createGlobalConfig(tempDir)
-
-      val orchestrator = FlowOrchestrator(globalConfig, Seq.empty)
-      val result = orchestrator.execute()
-
-      val metadataPath =
-        Paths.get(s"$tempDir/metadata/${result.batchId}/summary.json")
-      Files.exists(metadataPath) shouldBe true
-
-      val metadataContent = new String(Files.readAllBytes(metadataPath))
-
-      metadataContent should (
-        include(""""flows_processed":0""") or
-          include(""""flows_processed" : 0""")
-      )
-    } finally {
-      cleanupTempDir(tempDir)
-    }
-  }
-
-  it should "queue maintenance outside ingestion and persist worker failures as warnings" in {
-    val tempDir = Files.createTempDirectory("maintenance-status-test").toString
-    try {
-      val flow = createFlow("maintenance_flow", tempDir)
-      val globalConfig = createGlobalConfig(tempDir)
-      val runStore = new InMemoryRunStore()
-
       val result = FlowOrchestrator(
-        globalConfig,
-        Seq(flow),
-        runStore = runStore
-      ).execute()
+        createGlobalConfig(tempDir),
+        Seq.empty,
+        pipelineId = request.pipelineId
+      ).execute(request)
 
-      result.success shouldBe true
-      result.status shouldBe RunStatus.Published
-      result.maintenanceResults should have size 1
-      result.maintenanceResults.head.targetName shouldBe flow.name
-      result.maintenanceResults.head.targetType shouldBe "flow"
-      result.maintenanceResults.head.status shouldBe MaintenanceStatus.Queued
-
-      val worker = new MaintenanceWorker(
-        globalConfig.iceberg,
-        runStore,
-        executor = Some(_ => throw new RuntimeException("compaction unavailable"))
-      )
-      val workerResults = worker.runPending()
-      workerResults.head.status shouldBe MaintenanceStatus.Failed
-      workerResults.head.error should contain("compaction unavailable")
-      runStore.getRun(result.batchId).get.status shouldBe RunStatus.SucceededWithWarnings
-      runStore.getMaintenanceTasks(Some(result.batchId)).head.status shouldBe MaintenanceStatus.Failed
-
-      val metadataPath = Paths.get(s"$tempDir/metadata/${result.batchId}/summary.json")
-      val metadataContent = new String(Files.readAllBytes(metadataPath))
-      metadataContent should include("queued")
-    } finally {
-      cleanupTempDir(tempDir)
-    }
+      result.request shouldBe request
+      result.status shouldBe ExecutionStatus.Succeeded
+      Files.exists(reportPath(tempDir, result)) shouldBe true
+    } finally cleanupTempDir(tempDir)
   }
 
-  it should "not run maintenance before its batch is published" in {
-    val store = new InMemoryRunStore()
-    val now = Instant.now()
-    val run = RunRecord.planned("maintenance-publication-gate", "pipeline", now)
-    store.createRun(run)
-    store.transitionRun(run.batchId, run.version, RunStatus.Running) shouldBe true
-    store.enqueueMaintenance(
-      MaintenanceTaskRecord.queued(run.batchId, "customers", "flow", "floe.default.customers")
-    )
-
-    val executed = new AtomicBoolean(false)
-    val worker = new MaintenanceWorker(
-      createGlobalConfig(warehousePath).iceberg,
-      store,
-      executor = Some(_ => executed.set(true))
-    )
-
-    worker.runPending() shouldBe empty
-    executed.get() shouldBe false
-    store.getMaintenanceTasks(Some(run.batchId)).head.status shouldBe MaintenanceStatus.Queued
-
-    val running = store.getRun(run.batchId).get
-    store.transitionRun(run.batchId, running.version, RunStatus.Published) shouldBe true
-    worker.runPending() should have size 1
-    executed.get() shouldBe true
-  }
-
-  it should "publish an atomic release manifest and durable operation state" in {
-    val tempDir = Files.createTempDirectory("release-manifest-test").toString
+  it should "reject a request for a different pipeline before executing a flow" in {
+    val tempDir = Files.createTempDirectory("pipeline-mismatch-test").toString
     try {
-      val flow = createFlow("published_flow", tempDir)
-      val globalConfig = createGlobalConfig(tempDir)
-      val runStore = new InMemoryRunStore()
+      val request = ExecutionRequest.create("different", "run-1", Instant.parse("2026-09-29T08:00:00Z"))
+      val orchestrator = FlowOrchestrator(createGlobalConfig(tempDir), Seq.empty, pipelineId = "expected")
 
-      val result = FlowOrchestrator(globalConfig, Seq(flow), runStore = runStore).execute()
-
-      result.status shouldBe RunStatus.Published
-      val persisted = runStore.getRun(result.batchId).get
-      persisted.status shouldBe RunStatus.Published
-      persisted.lease shouldBe None
-      val operation = runStore.getOperations(result.batchId).head
-      operation.status shouldBe OperationStatus.Committed
-      operation.snapshotId shouldBe defined
-
-      val manifest = ReleaseManifest.fromJson(persisted.releaseManifest.get)
-      manifest.batchId shouldBe result.batchId
-      manifest.targets.map(_.targetName) should contain only "published_flow"
-      new SnapshotPinnedReader(manifest).table("published_flow").count() shouldBe 3L
-    } finally {
-      cleanupTempDir(tempDir)
-    }
+      val error = the[IllegalArgumentException] thrownBy orchestrator.execute(request)
+      error.getMessage should include("does not match")
+    } finally cleanupTempDir(tempDir)
   }
 
-  it should "resume a partial batch without rewriting an already committed target" in {
-    val tempDir = Files.createTempDirectory("batch-resume-test").toString
+  it should "write a versioned report with execution identity and typed outcomes" in {
+    val tempDir = Files.createTempDirectory("report-completeness-test").toString
     try {
-      val stable = createFlow("resume_stable", tempDir).copy(
-        source = SourceConfig(
-          `type` = SourceType.Custom("resumable"),
-          path = "stable",
-          options = Map("replayToken" -> "immutable-input-v1")
-        )
-      )
-      val unstable = createFlow("resume_unstable", tempDir).copy(
-        source = SourceConfig(
-          `type` = SourceType.Custom("resumable"),
-          path = "unstable",
-          options = Map("replayToken" -> "immutable-input-v1")
-        )
-      )
-      val failOnce = new AtomicBoolean(true)
+      val flows = (1 to 2).map(i => createFlow(s"report_flow_$i", tempDir))
+      val result = FlowOrchestrator(createGlobalConfig(tempDir), flows, pipelineId = "report-pipeline").execute()
+
+      val path = reportPath(tempDir, result)
+      Files.exists(path) shouldBe true
+      val content = Files.readString(path)
+      Seq(
+        "contract_version",
+        "pipeline_id",
+        "logical_run_id",
+        "attempt_id",
+        "effective_at",
+        "status",
+        "data_outcome",
+        "total_input_records",
+        "total_valid_records",
+        "total_rejected_records"
+      ).foreach(content should include(_))
+      flows.foreach(flow => content should include(flow.name))
+    } finally cleanupTempDir(tempDir)
+  }
+
+  it should "write per-flow diagnostics under the attempt identifier" in {
+    val tempDir = Files.createTempDirectory("per-flow-metadata-test").toString
+    try {
+      val flow = createFlow("per_flow_diagnostics", tempDir)
+      val result = FlowOrchestrator(createGlobalConfig(tempDir), Seq(flow)).execute()
+      val path = Paths.get(tempDir, "metadata", result.attemptId, "flows", s"${flow.name}.json")
+
+      Files.exists(path) shouldBe true
+      val content = Files.readString(path)
+      Seq("flow_name", "batch_id", "success", "load_mode", "data_outcome").foreach(content should include(_))
+    } finally cleanupTempDir(tempDir)
+  }
+
+  it should "report a partial failure without retrying either flow" in {
+    val tempDir = Files.createTempDirectory("partial-failure-test").toString
+    try {
+      val reads = new AtomicInteger(0)
       val readerFactory: DataReaderFactory.ReaderFactory = (source, _, session) =>
         new DataReader {
           override def read() = {
-            if (source.path == "unstable" && failOnce.compareAndSet(true, false))
-              throw new RuntimeException("transient source outage")
+            reads.incrementAndGet()
+            if (source.path == "failing") throw new RuntimeException("source unavailable")
             import session.implicits._
-            Seq((source.path + "_1", "value")).toDF("id", "value")
+            Seq(("id-1", "value")).toDF("id", "value")
           }
         }
-      val globalConfig = createGlobalConfig(tempDir)
-      val runStore = new InMemoryRunStore()
+      val stable = createFlow("partial_stable", tempDir).copy(
+        source = SourceConfig(SourceType.Custom("controlled"), path = "stable")
+      )
+      val failing = createFlow("partial_failing", tempDir).copy(
+        source = SourceConfig(SourceType.Custom("controlled"), path = "failing"),
+        dependsOn = Seq(stable.name)
+      )
 
-      val first = FlowOrchestrator(
-        globalConfig,
-        Seq(stable, unstable),
-        customReaders = Map("resumable" -> readerFactory),
-        runStore = runStore
+      val result = FlowOrchestrator(
+        createGlobalConfig(tempDir),
+        Seq(stable, failing),
+        customReaders = Map("controlled" -> readerFactory)
       ).execute()
 
-      first.status shouldBe RunStatus.FailedPartial
-      val stableBefore = runStore.getOperations(first.batchId).find(_.targetName == stable.name).get.snapshotId
-      stableBefore shouldBe defined
-
-      val resumed = FlowOrchestrator(
-        globalConfig,
-        Seq(stable, unstable),
-        customReaders = Map("resumable" -> readerFactory),
-        runStore = runStore
-      ).resume(first.batchId)
-
-      resumed.status shouldBe RunStatus.Published
-      resumed.success shouldBe true
-      val operations = runStore.getOperations(first.batchId).map(operation => operation.targetName -> operation).toMap
-      operations(stable.name).snapshotId shouldBe stableBefore
-      operations(stable.name).status shouldBe OperationStatus.ReconciledCommitted
-      operations(unstable.name).status shouldBe OperationStatus.Committed
-      spark.table(globalConfig.iceberg.fullTableName(stable.name)).count() shouldBe 1L
-      spark.table(globalConfig.iceberg.fullTableName(unstable.name)).count() shouldBe 1L
-    } finally {
-      cleanupTempDir(tempDir)
-    }
+      result.success shouldBe false
+      result.status shouldBe ExecutionStatus.FailedPartial
+      result.flowResults.map(_.dataOutcome) should contain(DataOutcome.Committed)
+      reads.get() shouldBe 2
+    } finally cleanupTempDir(tempDir)
   }
 
-  it should "replay immutable inputs under a new linked batch" in {
-    val tempDir = Files.createTempDirectory("batch-replay-test").toString
-    try {
-      val flow = createFlow("replay_flow", tempDir)
-      val globalConfig = createGlobalConfig(tempDir)
-      val runStore = new InMemoryRunStore()
-
-      val first = FlowOrchestrator(globalConfig, Seq(flow), runStore = runStore).execute()
-      val replayed = FlowOrchestrator(globalConfig, Seq(flow), runStore = runStore).replay(first.batchId)
-
-      replayed.success shouldBe true
-      replayed.status shouldBe RunStatus.Published
-      replayed.batchId should not be first.batchId
-      runStore.getRun(replayed.batchId).get.replayOf should contain(first.batchId)
-      runStore.getOperations(replayed.batchId).head.operationId should not be
-        runStore.getOperations(first.batchId).head.operationId
-    } finally {
-      cleanupTempDir(tempDir)
-    }
-  }
-
-  it should "publish committed data with warnings when a diagnostic side output fails" in {
+  it should "keep committed data successful with warnings when a diagnostic output fails" in {
     val tempDir = Files.createTempDirectory("diagnostic-warning-test").toString
     try {
       val base = createFlow("diagnostic_warning_flow", tempDir)
@@ -472,18 +223,13 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
         ),
         output = base.output.copy(rejectedPath = Some("unsupported-fs://bucket/rejected"))
       )
-      val globalConfig = createGlobalConfig(tempDir)
-      val runStore = new InMemoryRunStore()
 
-      val result = FlowOrchestrator(globalConfig, Seq(flow), runStore = runStore).execute()
+      val result = FlowOrchestrator(createGlobalConfig(tempDir), Seq(flow)).execute()
 
       result.success shouldBe true
-      result.status shouldBe RunStatus.SucceededWithWarnings
+      result.status shouldBe ExecutionStatus.SucceededWithWarnings
       result.flowResults.head.warnings.mkString(" ") should include("Failed to write rejected records")
-      runStore.getOperations(result.batchId).head.status shouldBe OperationStatus.Committed
-      spark.table(globalConfig.iceberg.fullTableName(flow.name)).count() shouldBe 0L
-    } finally {
-      cleanupTempDir(tempDir)
-    }
+      result.flowResults.head.dataOutcome shouldBe DataOutcome.Committed
+    } finally cleanupTempDir(tempDir)
   }
 }

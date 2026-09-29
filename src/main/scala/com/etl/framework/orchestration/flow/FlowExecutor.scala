@@ -3,7 +3,7 @@ package com.etl.framework.orchestration.flow
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
 import com.etl.framework.iceberg.{IcebergFlowMetadata, IcebergTableManager, IcebergTableWriter, WriteResult}
 import com.etl.framework.io.readers.DataReaderFactory
-import com.etl.framework.orchestration.RejectionThresholdPolicy
+import com.etl.framework.orchestration.{DataOutcome, RejectionThresholdPolicy}
 import com.etl.framework.exceptions.MaxRejectionRateExceededException
 import com.etl.framework.util.TimingUtil
 import com.etl.framework.validation.{ValidationEngine, ValidationResult, Validator}
@@ -37,13 +37,13 @@ class FlowExecutor(
     new FlowDataWriter(flowConfig, globalConfig, icebergTableWriter)
   private val metadataWriter = new FlowMetadataWriter(flowConfig, globalConfig)
   private val transformer = new FlowTransformer(flowConfig)
-  private var writeAttempted = false
+  private var dataOutcome: DataOutcome = DataOutcome.NotAttempted
   private var operationalWarnings = Vector.empty[String]
 
   /** Executes the complete flow
     */
   def execute(batchId: String, effectiveAt: Instant = Instant.now()): FlowResult = {
-    writeAttempted = false
+    dataOutcome = DataOutcome.NotAttempted
     operationalWarnings = Vector.empty
     val (result, executionTimeMs) =
       TimingUtil.timedWithDuration(logger, s"Execute flow ${flowConfig.name}") {
@@ -57,7 +57,7 @@ class FlowExecutor(
 
     val finalResult = result.copy(
       executionTimeMs = executionTimeMs,
-      writeAttempted = writeAttempted,
+      dataOutcome = dataOutcome,
       warnings = result.warnings ++ operationalWarnings
     )
 
@@ -231,8 +231,9 @@ class FlowExecutor(
       rejectedCount: Long
   ): WriteResult = {
     // A failed target write may already have committed; never replay the whole flow automatically.
-    writeAttempted = true
+    dataOutcome = DataOutcome.Unknown
     val writeResult = dataWriter.writeValidated(validatedData, batchId, effectiveAt)
+    dataOutcome = if (writeResult.snapshotId.isDefined) DataOutcome.Committed else DataOutcome.NoChange
 
     if (rejectedCount > 0) {
       validationResult.rejected.foreach(rejDf =>
@@ -293,10 +294,7 @@ class FlowExecutor(
     logger.error(s"Flow ${flowConfig.name} failed: ${error.getMessage}", error)
     FlowResult
       .failure(flowConfig.name, batchId, error.getMessage)
-      .copy(
-        writeAttempted = writeAttempted,
-        retryable = !writeAttempted
-      )
+      .copy(dataOutcome = dataOutcome)
   }
 
   private def logFlowSummary(result: FlowResult): Unit = {

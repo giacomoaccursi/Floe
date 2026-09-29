@@ -8,6 +8,7 @@ import com.etl.framework.iceberg.{
   IcebergTableManager
 }
 import com.etl.framework.util.SqlIdentifier
+import com.etl.framework.orchestration.DataOutcome
 import org.apache.iceberg.exceptions.CommitStateUnknownException
 import org.apache.iceberg.spark.CommitMetadata
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -49,11 +50,13 @@ class DerivedTableExecutor(
       effectiveAt: Instant
   ): DerivedTableResult = {
     val fullTableName = resolveTableName(tableName)
+    var dataOutcome: DataOutcome = DataOutcome.NotAttempted
     logger.info(s"Computing derived table: $tableName")
     try {
       val df = fn(ctx)
       val commitContext = CommitContext.forFlow(batchId, tableName, "derived-full", effectiveAt)
-      val write = writeToIceberg(fullTableName, df, commitContext)
+      val write = writeToIceberg(fullTableName, df, commitContext, () => dataOutcome = DataOutcome.Unknown)
+      dataOutcome = if (write.snapshotId.isDefined) DataOutcome.Committed else DataOutcome.NoChange
       write.snapshotId.foreach(tagSnapshot(fullTableName, _, batchId))
       logger.info(s"Derived table $tableName written: ${write.recordsWritten} records")
       DerivedTableResult(
@@ -62,12 +65,13 @@ class DerivedTableExecutor(
         recordsWritten = write.recordsWritten,
         snapshotId = write.snapshotId,
         operationId = Some(commitContext.operationId),
-        reconciled = write.reconciled
+        reconciled = write.reconciled,
+        dataOutcome = dataOutcome
       )
     } catch {
       case e: Exception =>
         logger.error(s"Derived table $tableName failed: ${e.getMessage}", e)
-        DerivedTableResult(tableName, success = false, error = Some(e.getMessage))
+        DerivedTableResult(tableName, success = false, error = Some(e.getMessage), dataOutcome = dataOutcome)
     }
   }
 
@@ -79,13 +83,15 @@ class DerivedTableExecutor(
   private def writeToIceberg(
       fullTableName: String,
       df: DataFrame,
-      context: CommitContext
+      context: CommitContext,
+      beforeDataCommit: () => Unit
   ): DerivedWrite = {
     createOrUpdateTable(fullTableName, df.schema)
     val cachedDf = df.cache()
     try {
       val recordsWritten = cachedDf.count()
       var reconciled = false
+      beforeDataCommit()
       try {
         CommitMetadata.withCommitProperties(
           context.snapshotProperties.asJava,
@@ -188,5 +194,6 @@ case class DerivedTableResult(
     error: Option[String] = None,
     snapshotId: Option[Long] = None,
     operationId: Option[String] = None,
-    reconciled: Boolean = false
+    reconciled: Boolean = false,
+    dataOutcome: DataOutcome = DataOutcome.NotAttempted
 )

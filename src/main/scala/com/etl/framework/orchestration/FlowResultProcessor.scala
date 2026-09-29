@@ -25,7 +25,7 @@ class FlowResultProcessor(
 
   sealed trait ProcessingResult
   case class ContinueWith(state: BatchState) extends ProcessingResult
-  case class StopExecution(result: IngestionResult) extends ProcessingResult
+  case class StopExecution(state: BatchState, error: String) extends ProcessingResult
 
   /** Processes results from a group of flows. Returns StopExecution if any flow failed or exceeded rejection threshold,
     * ContinueWith if all flows succeeded.
@@ -33,33 +33,26 @@ class FlowResultProcessor(
   def processGroupResults(
       groupResults: Seq[FlowResult],
       currentState: BatchState,
-      batchId: String
+      _attemptId: String
   ): ProcessingResult = {
     groupResults.foldLeft[ProcessingResult](ContinueWith(currentState)) {
-      case (StopExecution(stopped), result) =>
-        StopExecution(stopped.copy(flowResults = stopped.flowResults :+ result))
+      case (StopExecution(state, error), result) =>
+        StopExecution(state.copy(flowResults = state.flowResults :+ result), error)
       case (ContinueWith(state), result) =>
         val newResults = state.flowResults :+ result
-        processResult(result, state.validatedFlows, newResults, batchId)
+        processResult(result, state.validatedFlows, newResults)
     }
   }
 
   private def processResult(
       result: FlowResult,
       validatedFlows: Map[String, DataFrame],
-      allResults: Seq[FlowResult],
-      batchId: String
+      allResults: Seq[FlowResult]
   ): ProcessingResult = {
     if (!result.success) {
-      logger.error(s"Flow ${result.flowName} failed: ${result.error.getOrElse("Unknown error")}")
-      StopExecution(
-        IngestionResult(
-          batchId = batchId,
-          flowResults = allResults,
-          success = false,
-          error = Some(s"Flow ${result.flowName} failed: ${result.error.getOrElse("Unknown error")}")
-        )
-      )
+      val error = s"Flow ${result.flowName} failed: ${result.error.getOrElse("Unknown error")}"
+      logger.error(error)
+      StopExecution(BatchState(allResults, validatedFlows), error)
     } else if (
       flowConfigs.find(_.name == result.flowName).exists(fc => groupExecutor.shouldStopExecution(result, fc))
     ) {
@@ -68,12 +61,8 @@ class FlowResultProcessor(
           f"rejection rate: ${result.rejectionRate}%.2f%%, rejected: ${result.rejectedRecords}"
       )
       StopExecution(
-        IngestionResult(
-          batchId = batchId,
-          flowResults = allResults,
-          success = false,
-          error = Some(s"Flow ${result.flowName} exceeded rejection threshold or has validation errors")
-        )
+        BatchState(allResults, validatedFlows),
+        s"Flow ${result.flowName} exceeded rejection threshold or has validation errors"
       )
     } else {
       val newValidated = loadValidatedData(result) match {

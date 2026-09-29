@@ -13,8 +13,7 @@ import com.etl.framework.config.{
 import com.etl.framework.exceptions.{BatchFailedException, ConfigFileException, MissingConfigFieldException}
 import com.etl.framework.iceberg.catalog.{CatalogFactory, CatalogProvider}
 import com.etl.framework.io.readers.DataReaderFactory
-import com.etl.framework.orchestration.{FlowOrchestrator, IngestionResult, BatchListener}
-import com.etl.framework.orchestration.state.{InMemoryRunStore, RunStore}
+import com.etl.framework.orchestration.{BatchListener, ExecutionRequest, FlowOrchestrator, IngestionResult}
 import com.etl.framework.validation.Validator
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
@@ -34,8 +33,7 @@ class IngestionPipeline private (
     customValidators: Map[String, () => Validator],
     derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
     batchListeners: Seq[BatchListener],
-    pipelineVersion: String,
-    runStore: RunStore,
+    pipelineId: String,
     customReaders: Map[String, DataReaderFactory.ReaderFactory]
 )(implicit spark: SparkSession) {
 
@@ -48,18 +46,10 @@ class IngestionPipeline private (
     createOrchestrator().execute()
   }
 
-  /** Resumes a previously failed batch after reconciling every Iceberg commit. The original effective timestamp and
-    * input fingerprints are preserved; already committed targets are read back and never written twice.
-    */
-  def resume(batchId: String): IngestionResult = {
-    logger.info(s"Resuming Ingestion batch $batchId")
-    createOrchestrator().resume(batchId)
-  }
-
-  /** Reprocesses the immutable inputs of a terminal batch under a new batch ID. */
-  def replay(batchId: String): IngestionResult = {
-    logger.info(s"Replaying Ingestion batch $batchId")
-    createOrchestrator().replay(batchId)
+  /** Executes the immutable request supplied by the hosting platform. */
+  def execute(request: ExecutionRequest): IngestionResult = {
+    logger.info(s"Executing ingestion attempt ${request.attemptId} for logical run ${request.logicalRunId}")
+    createOrchestrator().execute(request)
   }
 
   /** Executes the pipeline and throws BatchFailedException when synchronous batch publication fails. Use this on
@@ -69,6 +59,14 @@ class IngestionPipeline private (
     val result = execute()
     if (!result.success)
       throw BatchFailedException(result.batchId, result.error.getOrElse("unknown error"))
+    result
+  }
+
+  /** Executes an explicit request and throws when its functional outcome is not successful. */
+  def executeOrThrow(request: ExecutionRequest): IngestionResult = {
+    val result = execute(request)
+    if (!result.success)
+      throw BatchFailedException(result.attemptId, result.error.getOrElse("unknown error"))
     result
   }
 
@@ -92,8 +90,7 @@ class IngestionPipeline private (
       batchListeners,
       customReaders.toMap,
       derivedTables,
-      pipelineVersion = pipelineVersion,
-      runStore = runStore
+      pipelineId = pipelineId
     )
   }
 
@@ -147,8 +144,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private val derivedTables = mutable.ListBuffer[(String, DerivedTableContext => DataFrame)]()
   private val batchListeners = mutable.ListBuffer[BatchListener]()
   private val customReaders = mutable.Map[String, DataReaderFactory.ReaderFactory]()
-  private var pipelineVersion: String = "unversioned"
-  private var runStore: RunStore = new InMemoryRunStore()
+  private var pipelineId: String = "local"
   private var configVariables: scala.collection.immutable.Map[String, String] = scala.collection.immutable.Map.empty
 
   /** Sets the configuration directory path Loads global.yaml, domains.yaml, and flows/ *.yaml from this directory
@@ -340,18 +336,10 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     this
   }
 
-  /** Sets the durable coordinator used for run state, CAS transitions, leases, and recovery. */
-  def withRunStore(store: RunStore): IngestionPipelineBuilder = {
-    this.runStore = store
-    this
-  }
-
-  /** Sets the deployment/config revision used to reject recovery across code changes that cannot be serialized, such as
-    * transformation and derived-table functions.
-    */
-  def withPipelineVersion(version: String): IngestionPipelineBuilder = {
-    require(version.trim.nonEmpty, "pipelineVersion must not be blank")
-    this.pipelineVersion = version.trim
+  /** Sets the stable pipeline identity used by platform-managed execution requests. */
+  def withPipelineId(id: String): IngestionPipelineBuilder = {
+    com.etl.framework.orchestration.ExecutionRequest.validateIdentifier("pipelineId", id)
+    this.pipelineId = id
     this
   }
 
@@ -396,8 +384,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       customValidators.toMap,
       derivedTables.toSeq,
       batchListeners.toSeq,
-      pipelineVersion,
-      runStore,
+      pipelineId,
       customReaders.toMap
     )
   }
@@ -590,8 +577,7 @@ object IngestionPipeline {
       customValidators: Map[String, () => Validator],
       derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
       batchListeners: Seq[BatchListener] = Seq.empty,
-      pipelineVersion: String = "unversioned",
-      runStore: RunStore = new InMemoryRunStore(),
+      pipelineId: String = "local",
       customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty
   )(implicit spark: SparkSession): IngestionPipeline = {
     new IngestionPipeline(
@@ -603,8 +589,7 @@ object IngestionPipeline {
       customValidators,
       derivedTables,
       batchListeners,
-      pipelineVersion,
-      runStore,
+      pipelineId,
       customReaders
     )
   }

@@ -1,14 +1,10 @@
 package com.etl.framework.orchestration.batch
 
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
-import com.etl.framework.iceberg.{MaintenanceResult, OrphanReport}
-import com.etl.framework.orchestration.flow.FlowResult
-import com.etl.framework.pipeline.DerivedTableResult
+import com.etl.framework.orchestration.{ExecutionRequest, IngestionResult}
 import com.etl.framework.util.{IcebergMetadataSerializer, JsonFileWriter}
 import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
-
-import java.time.Instant
 
 class BatchMetadataWriter(
     globalConfig: GlobalConfig,
@@ -20,24 +16,20 @@ class BatchMetadataWriter(
   /** Writes batch metadata
     */
   def writeBatchMetadata(
-      batchId: String,
-      flowResults: Seq[FlowResult],
-      executionTimeMs: Long,
-      success: Boolean,
-      rolledBack: Boolean = false,
-      orphanReports: Seq[OrphanReport] = Seq.empty,
-      orphanDetectionError: Option[String] = None,
-      derivedTableResults: Seq[DerivedTableResult] = Seq.empty,
-      maintenanceResults: Seq[MaintenanceResult] = Seq.empty
+      request: ExecutionRequest,
+      result: IngestionResult,
+      executionTimeMs: Long
   ): Unit = {
-    val metadataPath = s"${globalConfig.paths.metadataPath}/$batchId/summary.json"
+    val metadataPath =
+      s"${globalConfig.paths.metadataPath}/${request.pipelineId}/${request.logicalRunId}/${request.attemptId}/summary.json"
+    val flowResults = result.flowResults
 
     val totalInput = flowResults.map(_.inputRecords).sum
     val totalValid = flowResults.map(_.validRecords).sum
     val totalRejected = flowResults.map(_.rejectedRecords).sum
     val overallRejectionRate = if (totalInput > 0) totalRejected.toDouble / totalInput else 0.0
 
-    val orphanReportsData = orphanReports.map { report =>
+    val orphanReportsData = result.orphanReports.map { report =>
       val base = Map[String, Any](
         "flow_name" -> report.flowName,
         "fk_name" -> report.fkName,
@@ -54,39 +46,32 @@ class BatchMetadataWriter(
     }
 
     val metadata = Map(
-      "batch_id" -> batchId,
-      "execution_start" -> Instant.now().toString,
+      "contract_version" -> request.contractVersion,
+      "pipeline_id" -> request.pipelineId,
+      "logical_run_id" -> request.logicalRunId,
+      "attempt_id" -> request.attemptId,
+      "effective_at" -> request.effectiveAt.toString,
       "execution_time_ms" -> executionTimeMs,
-      "success" -> success,
-      "rolled_back" -> rolledBack,
+      "success" -> result.success,
+      "status" -> result.status.name,
+      "error" -> result.error.getOrElse(""),
+      "warnings" -> result.warnings,
       "flows_processed" -> flowResults.size,
       "total_input_records" -> totalInput,
       "total_valid_records" -> totalValid,
       "total_rejected_records" -> totalRejected,
       "overall_rejection_rate" -> overallRejectionRate,
       "orphan_reports" -> orphanReportsData,
-      "orphan_detection_error" -> orphanDetectionError.getOrElse(""),
-      "derived_tables_processed" -> derivedTableResults.size,
-      "derived_tables" -> derivedTableResults.map { result =>
+      "derived_tables_processed" -> result.derivedTableResults.size,
+      "derived_tables" -> result.derivedTableResults.map { derived =>
         Map[String, Any](
-          "table_name" -> result.tableName,
-          "success" -> result.success,
-          "records_written" -> result.recordsWritten,
-          "error" -> result.error.getOrElse("")
-        )
-      },
-      "maintenance_status" -> (if (maintenanceResults.isEmpty) "skipped"
-                               else if (maintenanceResults.forall(_.status.name == "QUEUED")) "queued"
-                               else if (maintenanceResults.forall(_.success)) "succeeded"
-                               else "failed"),
-      "maintenance_success" -> (maintenanceResults.nonEmpty && maintenanceResults.forall(_.success)),
-      "maintenance_results" -> maintenanceResults.map { result =>
-        Map[String, Any](
-          "target_name" -> result.targetName,
-          "target_type" -> result.targetType,
-          "status" -> result.status.name,
-          "success" -> result.success,
-          "error" -> result.error.getOrElse("")
+          "table_name" -> derived.tableName,
+          "success" -> derived.success,
+          "records_written" -> derived.recordsWritten,
+          "snapshot_id" -> derived.snapshotId.map(_.toString).getOrElse(""),
+          "operation_id" -> derived.operationId.getOrElse(""),
+          "data_outcome" -> derived.dataOutcome.name,
+          "error" -> derived.error.getOrElse("")
         )
       },
       "flows" -> flowResults.map { result =>
@@ -103,8 +88,7 @@ class BatchMetadataWriter(
           "rejection_reasons" -> result.rejectionReasons,
           "error" -> result.error.getOrElse(""),
           "warnings" -> result.warnings,
-          "write_attempted" -> result.writeAttempted,
-          "retryable" -> result.retryable
+          "data_outcome" -> result.dataOutcome.name
         )
 
         result.icebergMetadata match {
@@ -117,6 +101,6 @@ class BatchMetadataWriter(
 
     JsonFileWriter.write(metadata, metadataPath, spark.sparkContext.hadoopConfiguration)
 
-    logger.debug(s"Batch metadata written - batchId: $batchId, path: $metadataPath")
+    logger.debug(s"Batch report written - attemptId: ${request.attemptId}, path: $metadataPath")
   }
 }

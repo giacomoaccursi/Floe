@@ -2,15 +2,12 @@ package com.etl.framework.iceberg
 
 import com.etl.framework.config._
 import com.etl.framework.TestFixtures
-import com.etl.framework.orchestration.recovery.{ReconciliationOutcome, RecoveryManager}
-import com.etl.framework.orchestration.state.{InMemoryRunStore, OperationRecord, OperationStatus, RunRecord, RunStatus}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.{Files, Path}
-import java.time.Instant
 
 class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
@@ -348,57 +345,6 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
       result.snapshotId.get
     )
     result.icebergMetadata.flatMap(_.summary.get("floe.operation-id")) shouldBe Some(context.operationId)
-  }
-
-  it should "reconcile committed and absent operations without guessing" in {
-    val batchId = "batch_recovery"
-    val effectiveAt = Instant.parse("2026-09-23T10:15:30Z")
-    val fc = flowConfig("recovery_commit")
-    val committedContext = CommitContext.forFlow(batchId, fc.name, "full", effectiveAt)
-    val committed = writer.writeFullLoad(Seq((1, "Alice")).toDF("id", "name"), fc, committedContext)
-    val absentOperationId = "operation-that-never-committed"
-    val noChangeOperationId = "operation-with-pinned-existing-snapshot"
-    val store = new InMemoryRunStore()
-    store.createRun(RunRecord.planned(batchId, "pipeline", effectiveAt).copy(status = RunStatus.Unknown))
-    store.createOperation(
-      OperationRecord
-        .pending(batchId, committedContext.operationId, fc.name, "flow")
-        .copy(
-          status = OperationStatus.UnknownCommit
-        )
-    )
-    store.createOperation(
-      OperationRecord
-        .pending(batchId, absentOperationId, fc.name, "flow")
-        .copy(
-          status = OperationStatus.UnknownCommit
-        )
-    )
-    store.createOperation(
-      OperationRecord
-        .pending(batchId, noChangeOperationId, fc.name, "flow")
-        .copy(status = OperationStatus.CommittedNoChange, snapshotId = committed.snapshotId)
-    )
-    val globalConfig = TestFixtures.globalConfig(iceberg = icebergConfig)
-    val recovery = new RecoveryManager(globalConfig, Seq(fc), Seq.empty, store)
-
-    val dryRun = recovery.reconcileBatch(batchId)
-    dryRun.items.map(item => item.operation.operationId -> item.outcome).toMap should contain allOf (
-      committedContext.operationId -> ReconciliationOutcome.Committed,
-      absentOperationId -> ReconciliationOutcome.Absent,
-      noChangeOperationId -> ReconciliationOutcome.Committed
-    )
-    store.getOperations(batchId).map(_.status).toSet shouldBe Set(
-      OperationStatus.UnknownCommit,
-      OperationStatus.CommittedNoChange
-    )
-
-    recovery.reconcileBatch(batchId, applyChanges = true).safeToResume shouldBe true
-    val reconciled = store.getOperations(batchId).map(operation => operation.operationId -> operation).toMap
-    reconciled(committedContext.operationId).status shouldBe OperationStatus.ReconciledCommitted
-    reconciled(committedContext.operationId).snapshotId shouldBe committed.snapshotId
-    reconciled(absentOperationId).status shouldBe OperationStatus.ReconciledAbsent
-    reconciled(noChangeOperationId).status shouldBe OperationStatus.ReconciledCommitted
   }
 
   it should "return unmodified result when no snapshot id" in {

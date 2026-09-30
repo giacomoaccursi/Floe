@@ -1,6 +1,7 @@
 package com.etl.framework.pipeline
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import java.time.Instant
 
 /** Immutable context available during transformations (both pre- and post-validation)
   */
@@ -8,9 +9,14 @@ final case class TransformationContext private (
     currentFlow: String,
     currentData: DataFrame,
     validatedFlows: Map[String, DataFrame],
-    batchId: String,
+    logicalRunId: String,
+    attemptId: String,
+    effectiveAt: Instant,
     spark: SparkSession
 ) {
+
+  /** Deprecated vocabulary retained as a read-only alias: batchId is the physical attempt ID. */
+  def batchId: String = attemptId
 
   /** Get DataFrame of another already validated flow
     */
@@ -29,13 +35,17 @@ object TransformationContext {
       currentFlow: String,
       currentData: DataFrame,
       validatedFlows: Map[String, DataFrame],
-      batchId: String,
+      logicalRunId: String,
+      attemptId: String,
+      effectiveAt: Instant,
       spark: SparkSession
   ): TransformationContext = new TransformationContext(
     currentFlow = currentFlow,
     currentData = currentData,
     validatedFlows = validatedFlows,
-    batchId = batchId,
+    logicalRunId = logicalRunId,
+    attemptId = attemptId,
+    effectiveAt = effectiveAt,
     spark = spark
   )
 }

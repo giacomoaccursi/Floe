@@ -3,7 +3,12 @@ package com.etl.framework.orchestration
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig, OrphanAction}
 import com.etl.framework.iceberg.{OrphanDetectionResult, OrphanDetector, OrphanReport}
 import com.etl.framework.io.readers.DataReaderFactory
-import com.etl.framework.orchestration.batch.{BatchIdGenerator, BatchMetadataWriter, FlowGroupExecutor, QualityMetricsWriter}
+import com.etl.framework.orchestration.batch.{
+  BatchIdGenerator,
+  BatchMetadataWriter,
+  FlowGroupExecutor,
+  QualityMetricsWriter
+}
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.ExecutionPlanBuilder
 import com.etl.framework.pipeline.{DerivedTableContext, DerivedTableExecutor, DerivedTableResult}
@@ -31,13 +36,15 @@ class FlowOrchestrator(
     resultProcessor: FlowResultProcessor,
     metadataWriter: BatchMetadataWriter,
     executionLogger: ExecutionLogger,
-    pipelineId: String,
+    pipelineDefinition: PipelineDefinition,
     threadPool: Option[java.util.concurrent.ExecutorService] = None,
     batchListeners: Seq[BatchListener] = Seq.empty,
     derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq.empty
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
+
+  def executionDefinition: PipelineDefinition = pipelineDefinition
 
   def buildExecutionPlan(): ExecutionPlan = planBuilder.build()
 
@@ -46,111 +53,122 @@ class FlowOrchestrator(
     */
   def execute(): IngestionResult = {
     val request = ExecutionRequest(
-      pipelineId = pipelineId,
+      pipelineId = pipelineDefinition.pipelineId,
       logicalRunId = BatchIdGenerator.generate(globalConfig.processing.batchIdFormat),
       attemptId = UUID.randomUUID().toString,
-      effectiveAt = Instant.now()
+      effectiveAt = Instant.now(),
+      codeVersion = pipelineDefinition.codeVersion,
+      configDigest = pipelineDefinition.configDigest
     )
     execute(request)
   }
 
   /** Executes exactly one attempt. No automatic retry is performed at flow or job level. */
   def execute(request: ExecutionRequest): IngestionResult = {
-    require(
-      request.pipelineId == pipelineId,
-      s"Execution request pipelineId '${request.pipelineId}' does not match configured pipeline '$pipelineId'"
-    )
+    try {
+      require(
+        request.pipelineId == pipelineDefinition.pipelineId,
+        s"Execution request pipelineId '${request.pipelineId}' does not match configured pipeline '${pipelineDefinition.pipelineId}'"
+      )
+      require(
+        request.codeVersion == pipelineDefinition.codeVersion,
+        s"Execution request codeVersion '${request.codeVersion}' does not match configured code '${pipelineDefinition.codeVersion}'"
+      )
+      require(
+        request.configDigest == pipelineDefinition.configDigest,
+        "Execution request configDigest does not match the resolved pipeline configuration"
+      )
 
-    val startedAtNanos = System.nanoTime()
-    val attemptId = request.attemptId
-    executionLogger.logBatchStart(attemptId, flowConfigs.size)
+      val startedAtNanos = System.nanoTime()
+      val attemptId = request.attemptId
+      executionLogger.logBatchStart(attemptId, flowConfigs.size)
 
-    var state = BatchState(Seq.empty, Map.empty)
-    var derivedResults = Seq.empty[DerivedTableResult]
-    var orphanReports = Seq.empty[OrphanReport]
+      var state = BatchState(Seq.empty, Map.empty)
+      var derivedResults = Seq.empty[DerivedTableResult]
+      var orphanReports = Seq.empty[OrphanReport]
 
-    val initialResult =
-      try {
-        val plan = buildExecutionPlan()
-        var stopError = Option.empty[String]
+      val initialResult =
+        try {
+          val plan = buildExecutionPlan()
+          var stopError = Option.empty[String]
 
-        plan.groups.foreach { group =>
-          if (stopError.isEmpty) {
-            executionLogger.logGroupStart(group)
-            val groupResults = executeGroup(group, attemptId, state.validatedFlows, request.effectiveAt)
-            resultProcessor.processGroupResults(groupResults, state, attemptId) match {
-              case resultProcessor.ContinueWith(nextState) => state = nextState
-              case resultProcessor.StopExecution(nextState, error) =>
-                state = nextState
-                stopError = Some(error)
+          plan.groups.foreach { group =>
+            if (stopError.isEmpty) {
+              executionLogger.logGroupStart(group)
+              val groupResults = executeGroup(group, request, state.validatedFlows)
+              resultProcessor.processGroupResults(groupResults, state, attemptId) match {
+                case resultProcessor.ContinueWith(nextState) => state = nextState
+                case resultProcessor.StopExecution(nextState, error) =>
+                  state = nextState
+                  stopError = Some(error)
+              }
             }
           }
+
+          stopError match {
+            case Some(error) => failedResult(request, state.flowResults, error)
+            case None =>
+              val orphanResult = runPostBatchOrphanDetection(state.flowResults, plan)
+              orphanReports = orphanResult.reports
+              val orphanError = orphanResult match {
+                case OrphanDetectionResult.Failed(error, _) => Some(s"Orphan detection failed: $error")
+                case _                                      => None
+              }
+
+              if (orphanError.isEmpty && derivedTables.nonEmpty) {
+                logger.info(s"Executing ${derivedTables.size} derived tables for attempt $attemptId")
+                derivedResults = new DerivedTableExecutor(globalConfig.iceberg)
+                  .execute(derivedTables, request)
+              }
+
+              val derivedFailures = derivedResults.filterNot(_.success)
+              val errors = orphanError.toSeq ++
+                (if (derivedFailures.nonEmpty)
+                   Seq(s"Derived tables failed: ${derivedFailures.map(_.tableName).mkString(", ")}")
+                 else Seq.empty)
+
+              if (errors.isEmpty)
+                successfulResult(request, state.flowResults, derivedResults, orphanReports)
+              else
+                failedResult(
+                  request,
+                  state.flowResults,
+                  errors.mkString("; "),
+                  derivedResults,
+                  orphanReports,
+                  forceUnknown = orphanError.isDefined
+                )
+          }
+        } catch {
+          case error: Exception =>
+            executionLogger.logExecutionFailure(attemptId, elapsedMillis(startedAtNanos), error)
+            failedResult(request, state.flowResults, Option(error.getMessage).getOrElse(error.getClass.getName))
         }
 
-        stopError match {
-          case Some(error) => failedResult(request, state.flowResults, error)
-          case None =>
-            val orphanResult = runPostBatchOrphanDetection(state.flowResults, plan)
-            orphanReports = orphanResult.reports
-            val orphanError = orphanResult match {
-              case OrphanDetectionResult.Failed(error, _) => Some(s"Orphan detection failed: $error")
-              case _                                      => None
-            }
+      val executionTimeMs = elapsedMillis(startedAtNanos)
+      val observedWarnings = writeObservability(
+        request,
+        initialResult,
+        orphanReports,
+        executionTimeMs
+      )
+      val result = withWarnings(initialResult, observedWarnings, executionTimeMs)
 
-            if (orphanError.isEmpty && derivedTables.nonEmpty) {
-              logger.info(s"Executing ${derivedTables.size} derived tables for attempt $attemptId")
-              derivedResults =
-                new DerivedTableExecutor(globalConfig.iceberg)
-                  .execute(derivedTables, attemptId, request.effectiveAt)
-            }
-
-            val derivedFailures = derivedResults.filterNot(_.success)
-            val errors = orphanError.toSeq ++
-              (if (derivedFailures.nonEmpty)
-                 Seq(s"Derived tables failed: ${derivedFailures.map(_.tableName).mkString(", ")}")
-               else Seq.empty)
-
-            if (errors.isEmpty)
-              successfulResult(request, state.flowResults, derivedResults, orphanReports)
-            else
-              failedResult(
-                request,
-                state.flowResults,
-                errors.mkString("; "),
-                derivedResults,
-                orphanReports,
-                forceUnknown = orphanError.isDefined
-              )
-        }
-      } catch {
-        case error: Exception =>
-          executionLogger.logExecutionFailure(attemptId, elapsedMillis(startedAtNanos), error)
-          failedResult(request, state.flowResults, Option(error.getMessage).getOrElse(error.getClass.getName))
-      }
-
-    val executionTimeMs = elapsedMillis(startedAtNanos)
-    val observedWarnings = writeObservability(
-      request,
-      initialResult,
-      orphanReports,
-      executionTimeMs
-    )
-    val result = withWarnings(initialResult, observedWarnings, executionTimeMs)
-
-    executionLogger.logBatchSummary(attemptId, result.flowResults, executionTimeMs)
-    notifyListeners(result)
-    threadPool.foreach(_.shutdown())
-    result
+      executionLogger.logBatchSummary(attemptId, result.flowResults, executionTimeMs)
+      notifyListeners(result)
+      result
+    } finally {
+      threadPool.foreach(_.shutdown())
+    }
   }
 
   private def executeGroup(
       group: ExecutionGroup,
-      attemptId: String,
-      validatedFlows: Map[String, DataFrame],
-      effectiveAt: Instant
+      request: ExecutionRequest,
+      validatedFlows: Map[String, DataFrame]
   ): Seq[FlowResult] =
-    if (group.parallel) groupExecutor.executeParallel(group, attemptId, validatedFlows, effectiveAt)
-    else groupExecutor.executeSequential(group, attemptId, validatedFlows, effectiveAt)
+    if (group.parallel) groupExecutor.executeParallel(group, request, validatedFlows)
+    else groupExecutor.executeSequential(group, request, validatedFlows)
 
   private def successfulResult(
       request: ExecutionRequest,
@@ -263,12 +281,29 @@ object FlowOrchestrator {
       batchListeners: Seq[BatchListener] = Seq.empty,
       customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty,
       derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq.empty,
-      pipelineId: String = "local"
+      pipelineId: String = "local",
+      codeVersion: String = "unversioned"
   )(implicit spark: SparkSession): FlowOrchestrator = {
     val pool = Executors.newFixedThreadPool(math.max(1, Runtime.getRuntime.availableProcessors() * 2))
     val executionContext = ExecutionContext.fromExecutorService(pool)
     val groupExecutor =
       new FlowGroupExecutor(globalConfig, domainsConfig, executionContext, customValidators, customReaders)
+
+    val semanticSparkConfig = Seq(
+      "spark.sql.session.timeZone",
+      "spark.sql.ansi.enabled",
+      "spark.sql.caseSensitive",
+      "spark.sql.legacy.timeParserPolicy"
+    ).flatMap(key => spark.conf.getOption(key).map(key -> _)).toMap
+    val definition = PipelineDefinitionBuilder.build(
+      pipelineId,
+      codeVersion,
+      globalConfig,
+      flowConfigs,
+      domainsConfig,
+      derivedTables.map(_._1),
+      semanticSparkConfig
+    )
 
     new FlowOrchestrator(
       globalConfig = globalConfig,
@@ -279,7 +314,7 @@ object FlowOrchestrator {
       resultProcessor = new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor),
       metadataWriter = new BatchMetadataWriter(globalConfig, flowConfigs),
       executionLogger = new ExecutionLogger(),
-      pipelineId = pipelineId,
+      pipelineDefinition = definition,
       threadPool = Some(pool),
       batchListeners = batchListeners,
       derivedTables = derivedTables

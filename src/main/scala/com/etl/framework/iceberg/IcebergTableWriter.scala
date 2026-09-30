@@ -18,6 +18,8 @@ import scala.collection.JavaConverters._
 case class WriteResult(
     recordsProcessed: Long,
     snapshotId: Option[Long],
+    resultingSnapshotId: Option[Long] = None,
+    resultingSchemaJson: Option[String] = None,
     icebergMetadata: Option[IcebergFlowMetadata] = None,
     operationId: String = "",
     reconciled: Boolean = false
@@ -73,7 +75,8 @@ class IcebergTableWriter(
   def writeFullLoad(
       df: DataFrame,
       flowConfig: FlowConfig,
-      commitContext: CommitContext
+      commitContext: CommitContext,
+      beforeDataCommit: () => Unit = () => ()
   ): WriteResult = {
     val tableName = tableManager.resolveTableName(flowConfig)
     val sqlTableName = SqlIdentifier.quoteMultipart(tableName)
@@ -88,7 +91,7 @@ class IcebergTableWriter(
       // which is the correct semantic for a full load — even an empty source clears the table.
       // overwritePartitions() would be a no-op with an empty DataFrame (no partitions to replace).
       val recordCount = cachedDf.count()
-      val result = executeTrackedCommit(flowConfig, tableName, commitContext, recordCount) {
+      val result = executeTrackedCommit(flowConfig, tableName, commitContext, recordCount, beforeDataCommit) {
         cachedDf.writeTo(sqlTableName).overwrite(lit(true))
       }
       result.snapshotId.foreach { sid =>
@@ -110,58 +113,57 @@ class IcebergTableWriter(
   def writeDeltaLoad(
       df: DataFrame,
       flowConfig: FlowConfig,
-      commitContext: CommitContext
+      commitContext: CommitContext,
+      beforeDataCommit: () => Unit = () => ()
   ): WriteResult = {
+    val pkColumns = flowConfig.validation.primaryKey
+    require(
+      pkColumns.nonEmpty,
+      s"Delta flow '${flowConfig.name}' requires a primary key; implicit append is unsupported"
+    )
     val tableName = tableManager.resolveTableName(flowConfig)
     val sqlTableName = SqlIdentifier.quoteMultipart(tableName)
-    tableManager.createOrUpdateTable(flowConfig, df.schema)
-
-    val pkColumns = flowConfig.validation.primaryKey
 
     // Cache df before write: write populates the cache, count() reuses it
     val cachedDf = df.cache()
     try {
+      validateMergeKeys(cachedDf, pkColumns)
       val recordCount = cachedDf.count()
-      val result = executeTrackedCommit(flowConfig, tableName, commitContext, recordCount) {
-        if (pkColumns.isEmpty) {
-          logger.warn(s"No primary key defined for $tableName, falling back to append")
-          cachedDf.writeTo(sqlTableName).append()
-        } else {
-          validateMergeKeys(cachedDf, pkColumns)
-          val mergeCondition = pkColumns
-            .map(c => s"${SqlIdentifier.qualified("target", c)} = ${SqlIdentifier.qualified("source", c)}")
-            .mkString(" AND ")
+      tableManager.createOrUpdateTable(flowConfig, df.schema)
+      val result = executeTrackedCommit(flowConfig, tableName, commitContext, recordCount, beforeDataCommit) {
+        val mergeCondition = pkColumns
+          .map(c => s"${SqlIdentifier.qualified("target", c)} = ${SqlIdentifier.qualified("source", c)}")
+          .mkString(" AND ")
 
-          val updateCols = cachedDf.columns.filterNot(pkColumns.contains)
-          val matchedClause = if (updateCols.nonEmpty) {
-            val changeCondition = updateCols
-              .map(c => s"NOT (${SqlIdentifier.qualified("source", c)} <=> ${SqlIdentifier.qualified("target", c)})")
-              .mkString(" OR ")
-            s"WHEN MATCHED AND ($changeCondition) THEN UPDATE SET " +
-              updateCols
-                .map(c => s"${SqlIdentifier.qualified("target", c)} = ${SqlIdentifier.qualified("source", c)}")
-                .mkString(", ")
-          } else ""
+        val updateCols = cachedDf.columns.filterNot(pkColumns.contains)
+        val matchedClause = if (updateCols.nonEmpty) {
+          val changeCondition = updateCols
+            .map(c => s"NOT (${SqlIdentifier.qualified("source", c)} <=> ${SqlIdentifier.qualified("target", c)})")
+            .mkString(" OR ")
+          s"WHEN MATCHED AND ($changeCondition) THEN UPDATE SET " +
+            updateCols
+              .map(c => s"${SqlIdentifier.qualified("target", c)} = ${SqlIdentifier.qualified("source", c)}")
+              .mkString(", ")
+        } else ""
 
-          val insertCols = cachedDf.columns.map(SqlIdentifier.quote).mkString(", ")
-          val insertVals = cachedDf.columns.map(c => SqlIdentifier.qualified("source", c)).mkString(", ")
-          val insertClause = s"WHEN NOT MATCHED THEN INSERT ($insertCols) VALUES ($insertVals)"
-          val allClauses = Seq(matchedClause, insertClause).filter(_.nonEmpty).mkString("\n")
-          val mergeView = uniqueViewName("_iceberg_merge", flowConfig.name)
-          val mergeSql =
-            s"""MERGE INTO $sqlTableName AS ${SqlIdentifier.quote("target")}
+        val insertCols = cachedDf.columns.map(SqlIdentifier.quote).mkString(", ")
+        val insertVals = cachedDf.columns.map(c => SqlIdentifier.qualified("source", c)).mkString(", ")
+        val insertClause = s"WHEN NOT MATCHED THEN INSERT ($insertCols) VALUES ($insertVals)"
+        val allClauses = Seq(matchedClause, insertClause).filter(_.nonEmpty).mkString("\n")
+        val mergeView = uniqueViewName("_iceberg_merge", flowConfig.name)
+        val mergeSql =
+          s"""MERGE INTO $sqlTableName AS ${SqlIdentifier.quote("target")}
                |USING ${SqlIdentifier.quote(mergeView)} AS ${SqlIdentifier.quote("source")}
                |ON $mergeCondition
                |$allClauses""".stripMargin
 
-          logger.info(s"Executing MERGE INTO on $tableName")
-          logger.debug(s"Merge SQL: $mergeSql")
-          try {
-            cachedDf.createOrReplaceTempView(mergeView)
-            val _ = spark.sql(mergeSql)
-          } finally {
-            val _ = spark.catalog.dropTempView(mergeView)
-          }
+        logger.info(s"Executing MERGE INTO on $tableName")
+        logger.debug(s"Merge SQL: $mergeSql")
+        try {
+          cachedDf.createOrReplaceTempView(mergeView)
+          val _ = spark.sql(mergeSql)
+        } finally {
+          val _ = spark.catalog.dropTempView(mergeView)
         }
       }
       result.snapshotId.foreach { sid =>
@@ -187,21 +189,20 @@ class IcebergTableWriter(
   def writeSCD2Load(
       df: DataFrame,
       flowConfig: FlowConfig,
-      commitContext: CommitContext
+      commitContext: CommitContext,
+      beforeDataCommit: () => Unit = () => ()
   ): WriteResult = {
     val tableName = tableManager.resolveTableName(flowConfig)
     val cfg = SCD2Config.from(flowConfig)
 
     val scd2Schema = buildSCD2Schema(df, cfg)
-    tableManager.createOrUpdateTable(flowConfig, scd2Schema)
-
-    val isInitialLoad = tableManager.getCurrentSnapshotId(flowConfig).isEmpty
-
     val cachedDf = df.cache()
     try {
       validateMergeKeys(cachedDf, cfg.pkColumns)
       val recordCount = cachedDf.count()
-      val result = executeTrackedCommit(flowConfig, tableName, commitContext, recordCount) {
+      tableManager.createOrUpdateTable(flowConfig, scd2Schema)
+      val isInitialLoad = tableManager.getCurrentSnapshotId(flowConfig).isEmpty
+      val result = executeTrackedCommit(flowConfig, tableName, commitContext, recordCount, beforeDataCommit) {
         if (isInitialLoad)
           executeSCD2InitialLoad(cachedDf, tableName, flowConfig.name, cfg, commitContext)
         else
@@ -403,10 +404,12 @@ class IcebergTableWriter(
       flowConfig: FlowConfig,
       tableName: String,
       context: CommitContext,
-      recordsProcessed: Long
+      recordsProcessed: Long,
+      beforeDataCommit: () => Unit
   )(commit: => Unit): WriteResult = {
     var reconciled = false
     try {
+      beforeDataCommit()
       val properties: JMap[String, String] = context.snapshotProperties.asJava
       CommitMetadata.withCommitProperties(
         properties,
@@ -434,13 +437,22 @@ class IcebergTableWriter(
         WriteResult(
           recordsProcessed = recordsProcessed,
           snapshotId = Some(snapshot.snapshotId),
+          resultingSnapshotId = Some(snapshot.snapshotId),
+          resultingSchemaJson = Some(spark.table(SqlIdentifier.quoteMultipart(tableName)).schema.json),
           icebergMetadata = metadata,
           operationId = context.operationId,
           reconciled = reconciled
         )
       case None =>
         // A deterministic MERGE with no changes may legitimately create no snapshot.
-        WriteResult(recordsProcessed, None, operationId = context.operationId, reconciled = reconciled)
+        WriteResult(
+          recordsProcessed,
+          snapshotId = None,
+          resultingSnapshotId = tableManager.getCurrentSnapshotId(flowConfig),
+          resultingSchemaJson = Some(spark.table(SqlIdentifier.quoteMultipart(tableName)).schema.json),
+          operationId = context.operationId,
+          reconciled = reconciled
+        )
     }
   }
 
@@ -488,7 +500,7 @@ class IcebergTableWriter(
           batchId,
           tagCreated = tagged
         )
-        writeResult.copy(icebergMetadata = metadata)
+        writeResult.copy(icebergMetadata = metadata, resultingSnapshotId = Some(sid))
       case None =>
         writeResult
     }

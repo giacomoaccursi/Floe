@@ -18,6 +18,8 @@ case class FlowResult(
     rejectionReasons: Map[String, Long] = Map.empty,
     error: Option[String] = None,
     icebergMetadata: Option[IcebergFlowMetadata] = None,
+    resultingSnapshotId: Option[Long] = None,
+    resultingSchemaJson: Option[String] = None,
     dataOutcome: DataOutcome = DataOutcome.NotAttempted,
     warnings: Seq[String] = Seq.empty
 )
@@ -36,7 +38,9 @@ object FlowResult {
       validRecords: Long,
       rejectedRecords: Long,
       rejectionReasons: Map[String, Long],
-      icebergMetadata: Option[IcebergFlowMetadata] = None
+      icebergMetadata: Option[IcebergFlowMetadata] = None,
+      resultingSnapshotId: Option[Long] = None,
+      resultingSchemaJson: Option[String] = None
   ): FlowResult = {
     FlowResult(
       flowName = flowName,
@@ -50,6 +54,8 @@ object FlowResult {
       executionTimeMs = 0L, // Will be set by caller
       rejectionReasons = rejectionReasons,
       icebergMetadata = icebergMetadata,
+      resultingSnapshotId = resultingSnapshotId.orElse(icebergMetadata.map(_.snapshotId)),
+      resultingSchemaJson = resultingSchemaJson,
       dataOutcome = if (icebergMetadata.isDefined) DataOutcome.Committed else DataOutcome.NoChange
     )
   }

@@ -9,13 +9,16 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.io.PrintWriter
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Files, Path}
 import scala.collection.mutable
 
 class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
   private var tempDir: Path = _
   private var warehousePath: String = _
+
+  private def reportPath(result: IngestionResult): Path =
+    tempDir.resolve("metadata").resolve(result.request.artifactKey).resolve("summary.json")
 
   implicit val spark: SparkSession = {
     val tmp = Files.createTempDirectory("e2e-test")
@@ -193,8 +196,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     orders.count() should be >= 2L
 
     // Verify metadata JSON was written
-    val metadataDir = Paths.get(s"${tempDir.resolve("metadata")}/${result.batchId}")
-    Files.exists(metadataDir.resolve("summary.json")) shouldBe true
+    Files.exists(reportPath(result)) shouldBe true
   }
 
   it should "detect orphans when parent removes records" in {
@@ -473,7 +475,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     failed.error.getOrElse("").toLowerCase should include("rejection rate exceeded")
     failed.flowResults.head.rejectedRecords shouldBe 1L
     failed.flowResults.head.mergedRecords shouldBe 0L
-    Files.exists(tempDir.resolve("metadata").resolve(failed.batchId).resolve("summary.json")) shouldBe true
+    Files.exists(reportPath(failed)) shouldBe true
     spark
       .sql(
         s"SELECT batch_success FROM floe.default.quality_metrics_threshold_failure " +
@@ -489,7 +491,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     ids shouldBe Seq("1")
   }
 
-  it should "publish a delta append once with warnings after post-commit metadata failure" in {
+  it should "preserve a committed keyed delta with warnings after post-commit metadata failure" in {
     val configDir = tempDir.resolve("e2e_post_commit_retry").resolve("config")
     val dataDir = tempDir.resolve("e2e_post_commit_retry").resolve("data")
     val blockedMetadataPath = tempDir.resolve("e2e_post_commit_retry").resolve("blocked-metadata")
@@ -508,6 +510,8 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
          |  enforceSchema: false
          |loadMode:
          |  type: delta
+         |validation:
+         |  primaryKey: [id]
          |""".stripMargin
     )
 
@@ -647,7 +651,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     failed should have size 1
     failed.head.derivedTableResults should have size 1
 
-    val summary = Files.readString(tempDir.resolve("metadata").resolve(result.batchId).resolve("summary.json"))
+    val summary = Files.readString(reportPath(result))
     summary should include("\"success\":false")
     val metric = spark
       .sql(
@@ -741,7 +745,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
     result.success shouldBe false
     result.error.getOrElse("").toLowerCase should include("orphan")
-    val summary = Files.readString(tempDir.resolve("metadata").resolve(result.batchId).resolve("summary.json"))
+    val summary = Files.readString(reportPath(result))
     summary should include("\"success\":false")
     val metric = spark
       .sql(

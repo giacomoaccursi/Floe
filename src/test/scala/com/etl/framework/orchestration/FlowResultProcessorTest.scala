@@ -7,6 +7,7 @@ import com.etl.framework.orchestration.flow.FlowResult
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
 class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
 
@@ -86,6 +87,22 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     processingResult match {
       case ContinueWith(newState) =>
         newState.flowResults should have size 1
+      case _ => fail("Expected ContinueWith")
+    }
+  }
+
+  it should "materialize a snapshotless result from its frozen schema without reading table HEAD" in {
+    val flowConfigs = Seq(createFlowConfig("never_created"))
+    val processor = new FlowResultProcessor(createGlobalConfig(), flowConfigs, new MockFlowGroupExecutor())
+    import processor.ContinueWith
+    val schema = StructType(Seq(StructField("id", StringType, nullable = false)))
+    val result = FlowResult
+      .success("never_created", "batch1", 0, 0, 0, 0, Map.empty, resultingSchemaJson = Some(schema.json))
+
+    processor.processGroupResults(Seq(result), BatchState(Seq.empty, Map.empty), "batch1") match {
+      case ContinueWith(state) =>
+        state.validatedFlows("never_created").schema shouldBe schema
+        state.validatedFlows("never_created").count() shouldBe 0L
       case _ => fail("Expected ContinueWith")
     }
   }

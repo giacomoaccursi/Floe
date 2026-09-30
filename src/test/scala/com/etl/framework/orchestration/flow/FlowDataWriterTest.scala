@@ -3,12 +3,14 @@ package com.etl.framework.orchestration.flow
 import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.iceberg.{IcebergTableManager, IcebergTableWriter}
+import com.etl.framework.orchestration.ExecutionRequest
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.Files
+import java.time.Instant
 
 class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
@@ -61,6 +63,16 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     new FlowDataWriter(flowConfig, globalConfig, icebergWriter)
   }
 
+  private def request(attemptId: String): ExecutionRequest =
+    ExecutionRequest(
+      "test-pipeline",
+      s"logical-$attemptId",
+      attemptId,
+      Instant.parse("2026-09-30T08:00:00Z"),
+      "test-code",
+      "0" * 64
+    )
+
   "FlowDataWriter.writeRejected" should "write rejected records to the configured rejectedPath" in {
     val rejectedPath = tempDir.resolve("custom_rejected").toString
     val flowConfig = createFlowConfig("test_flow", rejectedPath = Some(rejectedPath))
@@ -68,7 +80,7 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     val writer = createWriter(flowConfig, globalConfig)
 
     val rejectedDF = Seq(("id1", "bad value"), ("id2", "another bad value")).toDF("id", "data")
-    writer.writeRejected(rejectedDF, "batch_001")
+    writer.writeRejected(rejectedDF, request("batch_001"))
 
     val written = spark.read.parquet(rejectedPath)
     written.count() shouldBe 2L
@@ -81,7 +93,7 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     val writer = createWriter(flowConfig, globalConfig)
 
     val rejectedDF = Seq(("id1", "bad")).toDF("id", "reason")
-    writer.writeRejected(rejectedDF, "batch_42")
+    writer.writeRejected(rejectedDF, request("batch_42"))
 
     val written = spark.read.parquet(rejectedPath)
     written.columns should contain("_batch_id")
@@ -103,7 +115,7 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       )
     )
 
-    noException should be thrownBy writer.writeRejected(emptyDF, "batch_000")
+    noException should be thrownBy writer.writeRejected(emptyDF, request("batch_000"))
 
     val written = spark.read.parquet(rejectedPath)
     written.count() shouldBe 0L
@@ -114,8 +126,8 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     val flowConfig = createFlowConfig("history_flow", rejectedPath = Some(rejectedPath))
     val writer = createWriter(flowConfig, createGlobalConfig())
 
-    writer.writeRejected(Seq(("id1", "old")).toDF("id", "reason"), "batch_old")
-    writer.writeRejected(Seq(("id2", "new")).toDF("id", "reason"), "batch_new")
+    writer.writeRejected(Seq(("id1", "old")).toDF("id", "reason"), request("batch_old"))
+    writer.writeRejected(Seq(("id2", "new")).toDF("id", "reason"), request("batch_new"))
 
     spark.read.parquet(rejectedPath).select("_batch_id").collect().map(_.getString(0)).toSet shouldBe
       Set("batch_old", "batch_new")
@@ -127,7 +139,7 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     val writer = createWriter(flowConfig, globalConfig)
 
     val warnedDF = Seq(("id1", "rule1", "msg1")).toDF("pk", "_warning_rule", "_warning_message")
-    writer.writeWarnings(warnedDF, "batch_w1")
+    writer.writeWarnings(warnedDF, request("batch_w1"))
 
     val expectedPath = s"${globalConfig.paths.outputPath}/warnings/warn_flow"
     val written = spark.read.parquet(expectedPath)
@@ -144,7 +156,7 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     val writer = createWriter(flowConfig, globalConfig)
 
     val warnedDF = Seq(("id1", "rule1", "msg1")).toDF("pk", "_warning_rule", "_warning_message")
-    writer.writeWarnings(warnedDF, "batch_w2")
+    writer.writeWarnings(warnedDF, request("batch_w2"))
 
     val expectedPath = s"$customWarningsPath/warn_flow2"
     val written = spark.read.parquet(expectedPath)
@@ -160,8 +172,14 @@ class FlowDataWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     )
     val writer = createWriter(flowConfig, globalConfig)
 
-    writer.writeWarnings(Seq(("id1", "rule", "old")).toDF("pk", "_warning_rule", "_warning_message"), "batch_old")
-    writer.writeWarnings(Seq(("id2", "rule", "new")).toDF("pk", "_warning_rule", "_warning_message"), "batch_new")
+    writer.writeWarnings(
+      Seq(("id1", "rule", "old")).toDF("pk", "_warning_rule", "_warning_message"),
+      request("batch_old")
+    )
+    writer.writeWarnings(
+      Seq(("id2", "rule", "new")).toDF("pk", "_warning_rule", "_warning_message"),
+      request("batch_new")
+    )
 
     spark.read
       .parquet(s"$warningsBase/${flowConfig.name}")

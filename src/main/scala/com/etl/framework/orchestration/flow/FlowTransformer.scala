@@ -2,6 +2,7 @@ package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config.FlowConfig
 import com.etl.framework.pipeline.TransformationContext
+import com.etl.framework.orchestration.ExecutionRequest
 import com.etl.framework.util.TimingUtil
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
@@ -14,7 +15,7 @@ class FlowTransformer(flowConfig: FlowConfig)(implicit spark: SparkSession) {
 
   /** Applies pre-validation transformations
     */
-  def applyPreValidationTransformation(data: DataFrame, batchId: String): DataFrame = {
+  def applyPreValidationTransformation(data: DataFrame, request: ExecutionRequest): DataFrame = {
     flowConfig.preValidationTransformation match {
       case Some(transformation) =>
         TimingUtil.timed(logger, "Pre-validation transformation") {
@@ -22,7 +23,9 @@ class FlowTransformer(flowConfig: FlowConfig)(implicit spark: SparkSession) {
             currentFlow = flowConfig.name,
             currentData = data,
             validatedFlows = Map.empty,
-            batchId = batchId,
+            logicalRunId = request.logicalRunId,
+            attemptId = request.attemptId,
+            effectiveAt = request.effectiveAt,
             spark = spark
           )
           transformation(context).currentData
@@ -35,7 +38,7 @@ class FlowTransformer(flowConfig: FlowConfig)(implicit spark: SparkSession) {
     */
   def applyPostValidationTransformation(
       data: DataFrame,
-      batchId: String,
+      request: ExecutionRequest,
       validatedFlows: Map[String, DataFrame]
   ): DataFrame = {
     flowConfig.postValidationTransformation match {
@@ -45,7 +48,9 @@ class FlowTransformer(flowConfig: FlowConfig)(implicit spark: SparkSession) {
             currentFlow = flowConfig.name,
             currentData = data,
             validatedFlows = validatedFlows,
-            batchId = batchId,
+            logicalRunId = request.logicalRunId,
+            attemptId = request.attemptId,
+            effectiveAt = request.effectiveAt,
             spark = spark
           )
           transformation(context).currentData

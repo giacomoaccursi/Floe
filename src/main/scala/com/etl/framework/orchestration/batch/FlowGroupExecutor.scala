@@ -3,7 +3,7 @@ package com.etl.framework.orchestration.batch
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.flow.{FlowExecutor, FlowResult}
-import com.etl.framework.orchestration.RejectionThresholdPolicy
+import com.etl.framework.orchestration.{ExecutionRequest, RejectionThresholdPolicy}
 import com.etl.framework.validation.Validator
 import com.etl.framework.orchestration.ExecutionGroup
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -13,7 +13,6 @@ import scala.collection.mutable
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.control.NonFatal
-import java.time.Instant
 
 /** Executes groups of flows sequentially or in parallel
   */
@@ -30,14 +29,13 @@ class FlowGroupExecutor(
   /** Executes a group of flows sequentially. Stops on first failure or rejection threshold breach. */
   def executeSequential(
       group: ExecutionGroup,
-      batchId: String,
-      validatedFlows: Map[String, DataFrame],
-      effectiveAt: Instant = Instant.now()
+      request: ExecutionRequest,
+      validatedFlows: Map[String, DataFrame]
   ): Seq[FlowResult] = {
     val results = mutable.ArrayBuffer[FlowResult]()
 
     for (flowConfig <- group.flows) {
-      val result = executeFlow(flowConfig, batchId, validatedFlows, effectiveAt)
+      val result = executeFlow(flowConfig, request, validatedFlows)
       results.append(result)
 
       // Check if we should stop execution immediately on failure
@@ -54,16 +52,15 @@ class FlowGroupExecutor(
     */
   def executeParallel(
       group: ExecutionGroup,
-      batchId: String,
-      validatedFlows: Map[String, DataFrame],
-      effectiveAt: Instant = Instant.now()
+      request: ExecutionRequest,
+      validatedFlows: Map[String, DataFrame]
   ): Seq[FlowResult] = {
     val futures = group.flows.map { flowConfig =>
       Future {
-        executeFlow(flowConfig, batchId, validatedFlows, effectiveAt)
+        executeFlow(flowConfig, request, validatedFlows)
       }(parallelEc).recover { case NonFatal(error) =>
         logger.error(s"Parallel flow ${flowConfig.name} terminated unexpectedly: ${error.getMessage}", error)
-        FlowResult.failure(flowConfig.name, batchId, error.getMessage)
+        FlowResult.failure(flowConfig.name, request.attemptId, error.getMessage)
       }(parallelEc)
     }
 
@@ -75,14 +72,13 @@ class FlowGroupExecutor(
     */
   private def executeFlow(
       flowConfig: FlowConfig,
-      batchId: String,
-      validatedFlows: Map[String, DataFrame],
-      effectiveAt: Instant
+      request: ExecutionRequest,
+      validatedFlows: Map[String, DataFrame]
   ): FlowResult = {
-    logger.debug(s"Starting flow ${flowConfig.name} - batchId: $batchId")
+    logger.debug(s"Starting flow ${flowConfig.name} - attemptId: ${request.attemptId}")
     val executor =
       new FlowExecutor(flowConfig, globalConfig, validatedFlows, domainsConfig, customValidators, customReaders)
-    executor.execute(batchId, effectiveAt)
+    executor.execute(request)
   }
 
   /** Determines if execution should stop based on result. Per-flow maxRejectionRate overrides the global setting.

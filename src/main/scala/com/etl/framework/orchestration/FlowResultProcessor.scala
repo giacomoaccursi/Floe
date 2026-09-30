@@ -3,7 +3,8 @@ package com.etl.framework.orchestration
 import com.etl.framework.config.{FlowConfig, GlobalConfig, LoadMode}
 import com.etl.framework.orchestration.batch.FlowGroupExecutor
 import com.etl.framework.orchestration.flow.FlowResult
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.functions.col
 import org.slf4j.LoggerFactory
 
@@ -77,7 +78,14 @@ class FlowResultProcessor(
   private def loadValidatedData(result: FlowResult): Option[DataFrame] = {
     val tableName = globalConfig.iceberg.fullTableName(result.flowName)
     scala.util.Try {
-      val table = spark.table(tableName)
+      val table = result.resultingSnapshotId match {
+        case Some(snapshotId) => spark.read.option("snapshot-id", snapshotId).table(tableName)
+        case None =>
+          val schema = result.resultingSchemaJson
+            .map(json => DataType.fromJson(json).asInstanceOf[StructType])
+            .getOrElse(throw new IllegalStateException(s"Missing resulting schema for snapshotless table $tableName"))
+          spark.createDataFrame(spark.sparkContext.emptyRDD[Row], schema)
+      }
       flowConfigs.find(_.name == result.flowName) match {
         case Some(config) if config.loadMode.`type` == LoadMode.SCD2 =>
           table.filter(col(config.loadMode.isCurrentColumn.getOrElse("is_current")) === true)

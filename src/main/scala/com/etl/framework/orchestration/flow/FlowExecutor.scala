@@ -3,15 +3,13 @@ package com.etl.framework.orchestration.flow
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig}
 import com.etl.framework.iceberg.{IcebergFlowMetadata, IcebergTableManager, IcebergTableWriter, WriteResult}
 import com.etl.framework.io.readers.DataReaderFactory
-import com.etl.framework.orchestration.{DataOutcome, RejectionThresholdPolicy}
+import com.etl.framework.orchestration.{DataOutcome, ExecutionRequest, RejectionThresholdPolicy}
 import com.etl.framework.exceptions.MaxRejectionRateExceededException
 import com.etl.framework.util.TimingUtil
 import com.etl.framework.validation.{ValidationEngine, ValidationResult, Validator}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.col
 import org.slf4j.LoggerFactory
-
-import java.time.Instant
 
 import scala.util.{Failure, Success, Try}
 
@@ -42,16 +40,16 @@ class FlowExecutor(
 
   /** Executes the complete flow
     */
-  def execute(batchId: String, effectiveAt: Instant = Instant.now()): FlowResult = {
+  def execute(request: ExecutionRequest): FlowResult = {
     dataOutcome = DataOutcome.NotAttempted
     operationalWarnings = Vector.empty
     val (result, executionTimeMs) =
       TimingUtil.timedWithDuration(logger, s"Execute flow ${flowConfig.name}") {
-        executeFlow(batchId, effectiveAt) match {
+        executeFlow(request) match {
           case Success(metrics) if metrics.thresholdError.isDefined =>
-            createThresholdFailureResult(batchId, metrics)
-          case Success(metrics) => createSuccessResult(batchId, metrics)
-          case Failure(error)   => createFailureResult(batchId, error)
+            createThresholdFailureResult(request.attemptId, metrics)
+          case Success(metrics) => createSuccessResult(request.attemptId, metrics)
+          case Failure(error)   => createFailureResult(request.attemptId, error)
         }
       }
 
@@ -63,7 +61,7 @@ class FlowExecutor(
 
     val reportedResult =
       try {
-        metadataWriter.writeFlowMetadata(finalResult, batchId)
+        metadataWriter.writeFlowMetadata(finalResult, request)
         finalResult
       } catch {
         case e: Exception =>
@@ -77,9 +75,9 @@ class FlowExecutor(
 
   /** Core flow execution logic
     */
-  private def executeFlow(batchId: String, effectiveAt: Instant): Try[FlowMetrics] = Try {
+  private def executeFlow(request: ExecutionRequest): Try[FlowMetrics] = Try {
     logger.info(
-      s"Starting flow ${flowConfig.name} - batchId: $batchId, " +
+      s"Starting flow ${flowConfig.name} - attemptId: ${request.attemptId}, " +
         s"loadMode: ${flowConfig.loadMode.`type`.name}"
     )
 
@@ -96,7 +94,7 @@ class FlowExecutor(
 
     // 2. Apply pre-validation transformations
     val preTransformedData =
-      transformer.applyPreValidationTransformation(renamedData, batchId)
+      transformer.applyPreValidationTransformation(renamedData, request)
 
     val cachedInput = preTransformedData.cache()
     try {
@@ -122,10 +120,10 @@ class FlowExecutor(
       if (RejectionThresholdPolicy.exceeded(rejectionRate, rejectedCount, flowConfig, globalConfig)) {
         // Keep the diagnostic side outputs, but never mutate the target table.
         validationResult.rejected.foreach(df =>
-          writeDiagnostic("rejected records")(dataWriter.writeRejected(df, batchId))
+          writeDiagnostic("rejected records")(dataWriter.writeRejected(df, request))
         )
         validationResult.warned.foreach(df =>
-          writeDiagnostic("validation warnings")(dataWriter.writeWarnings(df, batchId))
+          writeDiagnostic("validation warnings")(dataWriter.writeWarnings(df, request))
         )
         val maxRate = RejectionThresholdPolicy.threshold(flowConfig, globalConfig).get
         FlowMetrics(
@@ -148,7 +146,7 @@ class FlowExecutor(
         // 4. Apply post-validation transformations
         val postTransformedData = transformer.applyPostValidationTransformation(
           validationResult.valid,
-          batchId,
+          request,
           validatedFlows
         )
 
@@ -157,7 +155,7 @@ class FlowExecutor(
           val outputCount = cachedOutput.count()
 
           // 5. Write to Iceberg
-          val writeResult = writeAllData(cachedOutput, validationResult, batchId, effectiveAt, rejectedCount)
+          val writeResult = writeAllData(cachedOutput, validationResult, request, rejectedCount)
 
           FlowMetrics(
             inputCount = inputCount,
@@ -165,7 +163,9 @@ class FlowExecutor(
             validCount = validCount,
             rejectedCount = rejectedCount,
             rejectionReasons = validationResult.rejectionReasons,
-            icebergMetadata = writeResult.icebergMetadata
+            icebergMetadata = writeResult.icebergMetadata,
+            resultingSnapshotId = writeResult.resultingSnapshotId,
+            resultingSchemaJson = writeResult.resultingSchemaJson
           )
         } finally {
           cachedOutput.unpersist()
@@ -226,23 +226,24 @@ class FlowExecutor(
   private def writeAllData(
       validatedData: DataFrame,
       validationResult: ValidationResult,
-      batchId: String,
-      effectiveAt: Instant,
+      request: ExecutionRequest,
       rejectedCount: Long
   ): WriteResult = {
-    // A failed target write may already have committed; never replay the whole flow automatically.
-    dataOutcome = DataOutcome.Unknown
-    val writeResult = dataWriter.writeValidated(validatedData, batchId, effectiveAt)
+    val writeResult = dataWriter.writeValidated(
+      validatedData,
+      request,
+      () => dataOutcome = DataOutcome.Unknown
+    )
     dataOutcome = if (writeResult.snapshotId.isDefined) DataOutcome.Committed else DataOutcome.NoChange
 
     if (rejectedCount > 0) {
       validationResult.rejected.foreach(rejDf =>
-        writeDiagnostic("rejected records")(dataWriter.writeRejected(rejDf, batchId))
+        writeDiagnostic("rejected records")(dataWriter.writeRejected(rejDf, request))
       )
     }
 
     validationResult.warned.foreach { warnedDf =>
-      writeDiagnostic("validation warnings")(dataWriter.writeWarnings(warnedDf, batchId))
+      writeDiagnostic("validation warnings")(dataWriter.writeWarnings(warnedDf, request))
     }
 
     writeResult
@@ -269,7 +270,9 @@ class FlowExecutor(
       metrics.validCount,
       metrics.rejectedCount,
       metrics.rejectionReasons,
-      metrics.icebergMetadata
+      metrics.icebergMetadata,
+      metrics.resultingSnapshotId,
+      metrics.resultingSchemaJson
     )
   }
 
@@ -318,5 +321,7 @@ private case class FlowMetrics(
     rejectedCount: Long,
     rejectionReasons: Map[String, Long],
     icebergMetadata: Option[IcebergFlowMetadata] = None,
+    resultingSnapshotId: Option[Long] = None,
+    resultingSchemaJson: Option[String] = None,
     thresholdError: Option[String] = None
 )

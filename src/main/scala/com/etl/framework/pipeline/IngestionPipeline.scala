@@ -13,7 +13,14 @@ import com.etl.framework.config.{
 import com.etl.framework.exceptions.{BatchFailedException, ConfigFileException, MissingConfigFieldException}
 import com.etl.framework.iceberg.catalog.{CatalogFactory, CatalogProvider}
 import com.etl.framework.io.readers.DataReaderFactory
-import com.etl.framework.orchestration.{BatchListener, ExecutionRequest, FlowOrchestrator, IngestionResult}
+import com.etl.framework.orchestration.{
+  BatchListener,
+  ExecutionRequest,
+  FlowOrchestrator,
+  IngestionResult,
+  PipelineDefinition,
+  PipelineDefinitionBuilder
+}
 import com.etl.framework.validation.Validator
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
@@ -34,10 +41,39 @@ class IngestionPipeline private (
     derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
     batchListeners: Seq[BatchListener],
     pipelineId: String,
+    codeVersion: String,
     customReaders: Map[String, DataReaderFactory.ReaderFactory]
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
+  private lazy val resolvedFlowConfigs = flowConfigs.map { flowConfig =>
+    flowTransformations.get(flowConfig.name) match {
+      case Some(transformations) =>
+        flowConfig.copy(
+          preValidationTransformation = transformations.preValidation,
+          postValidationTransformation = transformations.postValidation
+        )
+      case None => flowConfig
+    }
+  }
+
+  lazy val executionDefinition: PipelineDefinition = {
+    val semanticSparkConfig = Seq(
+      "spark.sql.session.timeZone",
+      "spark.sql.ansi.enabled",
+      "spark.sql.caseSensitive",
+      "spark.sql.legacy.timeParserPolicy"
+    ).flatMap(key => spark.conf.getOption(key).map(key -> _)).toMap
+    PipelineDefinitionBuilder.build(
+      pipelineId,
+      codeVersion,
+      globalConfig,
+      resolvedFlowConfigs,
+      domainsConfig,
+      derivedTables.map(_._1),
+      semanticSparkConfig
+    )
+  }
 
   /** Executes Ingestion pipeline Returns IngestionResult with batch ID and flow results
     */
@@ -72,25 +108,16 @@ class IngestionPipeline private (
 
   private def createOrchestrator(): FlowOrchestrator = {
     configureSparkForIceberg(globalConfig.iceberg, extraCatalogProviders)
-    val enrichedFlowConfigs = flowConfigs.map { flowConfig =>
-      flowTransformations.get(flowConfig.name) match {
-        case Some(transformations) =>
-          flowConfig.copy(
-            preValidationTransformation = transformations.preValidation,
-            postValidationTransformation = transformations.postValidation
-          )
-        case None => flowConfig
-      }
-    }
     FlowOrchestrator(
       globalConfig,
-      enrichedFlowConfigs,
+      resolvedFlowConfigs,
       domainsConfig,
       customValidators.toMap,
       batchListeners,
       customReaders.toMap,
       derivedTables,
-      pipelineId = pipelineId
+      pipelineId = pipelineId,
+      codeVersion = codeVersion
     )
   }
 
@@ -145,6 +172,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private val batchListeners = mutable.ListBuffer[BatchListener]()
   private val customReaders = mutable.Map[String, DataReaderFactory.ReaderFactory]()
   private var pipelineId: String = "local"
+  private var codeVersion: String = "unversioned"
   private var configVariables: scala.collection.immutable.Map[String, String] = scala.collection.immutable.Map.empty
 
   /** Sets the configuration directory path Loads global.yaml, domains.yaml, and flows/ *.yaml from this directory
@@ -343,6 +371,13 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     this
   }
 
+  /** Identifies the immutable application artifact, including custom transformations, readers and validators. */
+  def withCodeVersion(version: String): IngestionPipelineBuilder = {
+    require(version != null && version.trim.nonEmpty, "codeVersion must not be blank")
+    this.codeVersion = version.trim
+    this
+  }
+
   /** Registers a custom DataReader factory for a given source type name. Use this to read from sources not supported by
     * the built-in readers (file, jdbc).
     */
@@ -385,6 +420,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       derivedTables.toSeq,
       batchListeners.toSeq,
       pipelineId,
+      codeVersion,
       customReaders.toMap
     )
   }
@@ -578,6 +614,7 @@ object IngestionPipeline {
       derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
       batchListeners: Seq[BatchListener] = Seq.empty,
       pipelineId: String = "local",
+      codeVersion: String = "unversioned",
       customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty
   )(implicit spark: SparkSession): IngestionPipeline = {
     new IngestionPipeline(
@@ -590,6 +627,7 @@ object IngestionPipeline {
       derivedTables,
       batchListeners,
       pipelineId,
+      codeVersion,
       customReaders
     )
   }

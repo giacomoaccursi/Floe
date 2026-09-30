@@ -5,6 +5,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.{functions => f}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import java.time.Instant
 
 class PostValidationTransformationTest extends AnyFlatSpec with Matchers {
 
@@ -45,7 +46,9 @@ class PostValidationTransformationTest extends AnyFlatSpec with Matchers {
     currentFlow = flowName,
     currentData = df,
     validatedFlows = validatedFlows,
-    batchId = batchId,
+    logicalRunId = "logical-run",
+    attemptId = batchId,
+    effectiveAt = Instant.parse("2026-09-30T08:00:00Z"),
     spark = spark
   )
 

@@ -37,6 +37,9 @@ object FlowConfigValidator {
           s"foreign key ${fk.displayName} has different local/reference arity (${fk.columns.size} != ${fk.references.columns.size})"
     }
 
+    if (config.loadMode.`type` == LoadMode.Delta && config.validation.primaryKey.isEmpty)
+      errors += "Delta requires non-empty primaryKey; implicit append is unsupported"
+
     if (config.loadMode.`type` == LoadMode.SCD2) {
       if (config.loadMode.compareColumns.isEmpty) errors += "SCD2 requires compareColumns to be non-empty"
       if (config.validation.primaryKey.isEmpty) errors += "SCD2 requires non-empty primaryKey for record identification"

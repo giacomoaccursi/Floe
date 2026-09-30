@@ -8,7 +8,7 @@ import com.etl.framework.iceberg.{
   IcebergTableManager
 }
 import com.etl.framework.util.SqlIdentifier
-import com.etl.framework.orchestration.DataOutcome
+import com.etl.framework.orchestration.{DataOutcome, ExecutionRequest}
 import org.apache.iceberg.exceptions.CommitStateUnknownException
 import org.apache.iceberg.spark.CommitMetadata
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -28,16 +28,40 @@ class DerivedTableExecutor(
   private val logger = LoggerFactory.getLogger(getClass)
   private val tableManager = new IcebergTableManager(spark, icebergConfig)
 
-  /** Executes all derived table functions and writes results to Iceberg. */
+  /** Ad-hoc convenience API. Platform-managed execution should pass a complete ExecutionRequest. */
   def execute(
       derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
       batchId: String,
       effectiveAt: Instant = Instant.now()
+  ): Seq[DerivedTableResult] =
+    execute(
+      derivedTables,
+      ExecutionRequest(
+        pipelineId = "adhoc",
+        logicalRunId = batchId,
+        attemptId = batchId,
+        effectiveAt = effectiveAt,
+        codeVersion = "unversioned",
+        configDigest = "0" * 64
+      )
+    )
+
+  /** Executes all derived table functions and writes results to Iceberg. */
+  def execute(
+      derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
+      request: ExecutionRequest
   ): Seq[DerivedTableResult] = {
-    val ctx = DerivedTableContext(spark, batchId, icebergConfig.catalogName, icebergConfig.namespace)
+    val ctx = DerivedTableContext(
+      spark,
+      request.logicalRunId,
+      request.attemptId,
+      request.effectiveAt,
+      icebergConfig.catalogName,
+      icebergConfig.namespace
+    )
 
     derivedTables.map { case (tableName, fn) =>
-      executeSingle(tableName, fn, ctx, batchId, effectiveAt)
+      executeSingle(tableName, fn, ctx, request)
     }
   }
 
@@ -46,24 +70,24 @@ class DerivedTableExecutor(
       tableName: String,
       fn: DerivedTableContext => DataFrame,
       ctx: DerivedTableContext,
-      batchId: String,
-      effectiveAt: Instant
+      request: ExecutionRequest
   ): DerivedTableResult = {
     val fullTableName = resolveTableName(tableName)
     var dataOutcome: DataOutcome = DataOutcome.NotAttempted
     logger.info(s"Computing derived table: $tableName")
     try {
       val df = fn(ctx)
-      val commitContext = CommitContext.forFlow(batchId, tableName, "derived-full", effectiveAt)
+      val commitContext = CommitContext.forFlow(request, tableName, "derived-full")
       val write = writeToIceberg(fullTableName, df, commitContext, () => dataOutcome = DataOutcome.Unknown)
       dataOutcome = if (write.snapshotId.isDefined) DataOutcome.Committed else DataOutcome.NoChange
-      write.snapshotId.foreach(tagSnapshot(fullTableName, _, batchId))
+      write.snapshotId.foreach(tagSnapshot(fullTableName, _, request.attemptId))
       logger.info(s"Derived table $tableName written: ${write.recordsWritten} records")
       DerivedTableResult(
         tableName,
         success = true,
         recordsWritten = write.recordsWritten,
         snapshotId = write.snapshotId,
+        resultingSnapshotId = write.resultingSnapshotId,
         operationId = Some(commitContext.operationId),
         reconciled = write.reconciled,
         dataOutcome = dataOutcome
@@ -78,7 +102,12 @@ class DerivedTableExecutor(
   private def resolveTableName(tableName: String): String =
     icebergConfig.fullTableName(tableName)
 
-  private case class DerivedWrite(recordsWritten: Long, snapshotId: Option[Long], reconciled: Boolean)
+  private case class DerivedWrite(
+      recordsWritten: Long,
+      snapshotId: Option[Long],
+      resultingSnapshotId: Option[Long],
+      reconciled: Boolean
+  )
 
   private def writeToIceberg(
       fullTableName: String,
@@ -108,7 +137,9 @@ class DerivedTableExecutor(
           if (matches.nonEmpty) reconciled = true else throw error
       }
       val matches = reconcileSnapshots(fullTableName, context, None)
-      DerivedWrite(recordsWritten, matches.headOption.map(_.snapshotId), reconciled)
+      val committedSnapshot = matches.headOption.map(_.snapshotId)
+      val resultingSnapshot = committedSnapshot.orElse(tableManager.getCurrentSnapshotId(fullTableName))
+      DerivedWrite(recordsWritten, committedSnapshot, resultingSnapshot, reconciled)
     } finally {
       cachedDf.unpersist()
     }
@@ -193,6 +224,7 @@ case class DerivedTableResult(
     recordsWritten: Long = 0,
     error: Option[String] = None,
     snapshotId: Option[Long] = None,
+    resultingSnapshotId: Option[Long] = None,
     operationId: Option[String] = None,
     reconciled: Boolean = false,
     dataOutcome: DataOutcome = DataOutcome.NotAttempted

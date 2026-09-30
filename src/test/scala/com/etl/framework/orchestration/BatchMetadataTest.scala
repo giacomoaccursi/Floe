@@ -3,7 +3,9 @@ package com.etl.framework.orchestration
 import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.io.readers.{DataReader, DataReaderFactory}
-import com.etl.framework.orchestration.batch.BatchIdGenerator
+import com.etl.framework.iceberg.{IcebergTableManager, IcebergTableWriter}
+import com.etl.framework.orchestration.batch.{BatchIdGenerator, FlowGroupExecutor}
+import com.etl.framework.orchestration.flow.FlowResult
 import org.apache.spark.sql.SparkSession
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -12,6 +14,7 @@ import java.nio.file.{Files, Paths}
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
 import scala.util.Try
+import scala.concurrent.ExecutionContext
 
 class BatchMetadataTest extends AnyFlatSpec with Matchers {
 
@@ -105,17 +108,17 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
   it should "honor an explicit immutable execution request" in {
     val tempDir = Files.createTempDirectory("explicit-request-test").toString
     try {
+      val orchestrator = FlowOrchestrator(createGlobalConfig(tempDir), Seq.empty, pipelineId = "orders-prod")
+      val definition = orchestrator.executionDefinition
       val request = ExecutionRequest(
-        pipelineId = "orders-prod",
+        pipelineId = definition.pipelineId,
         logicalRunId = "scheduled-2026-09-29",
         attemptId = "attempt-01",
-        effectiveAt = Instant.parse("2026-09-29T08:00:00Z")
+        effectiveAt = Instant.parse("2026-09-29T08:00:00Z"),
+        codeVersion = definition.codeVersion,
+        configDigest = definition.configDigest
       )
-      val result = FlowOrchestrator(
-        createGlobalConfig(tempDir),
-        Seq.empty,
-        pipelineId = request.pipelineId
-      ).execute(request)
+      val result = orchestrator.execute(request)
 
       result.request shouldBe request
       result.status shouldBe ExecutionStatus.Succeeded
@@ -126,8 +129,10 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
   it should "reject a request for a different pipeline before executing a flow" in {
     val tempDir = Files.createTempDirectory("pipeline-mismatch-test").toString
     try {
-      val request = ExecutionRequest.create("different", "run-1", Instant.parse("2026-09-29T08:00:00Z"))
       val orchestrator = FlowOrchestrator(createGlobalConfig(tempDir), Seq.empty, pipelineId = "expected")
+      val expected = orchestrator.executionDefinition
+      val request = PipelineDefinition("different", expected.codeVersion, expected.configDigest)
+        .newRequest("run-1", Instant.parse("2026-09-29T08:00:00Z"))
 
       val error = the[IllegalArgumentException] thrownBy orchestrator.execute(request)
       error.getMessage should include("does not match")
@@ -164,11 +169,20 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     try {
       val flow = createFlow("per_flow_diagnostics", tempDir)
       val result = FlowOrchestrator(createGlobalConfig(tempDir), Seq(flow)).execute()
-      val path = Paths.get(tempDir, "metadata", result.attemptId, "flows", s"${flow.name}.json")
+      val path = Paths.get(
+        tempDir,
+        "metadata",
+        result.pipelineId,
+        result.logicalRunId,
+        result.attemptId,
+        "flows",
+        s"${flow.name}.json"
+      )
 
       Files.exists(path) shouldBe true
       val content = Files.readString(path)
-      Seq("flow_name", "batch_id", "success", "load_mode", "data_outcome").foreach(content should include(_))
+      Seq("flow_name", "logical_run_id", "attempt_id", "success", "load_mode", "data_outcome")
+        .foreach(content should include(_))
     } finally cleanupTempDir(tempDir)
   }
 
@@ -203,6 +217,38 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
       result.status shouldBe ExecutionStatus.FailedPartial
       result.flowResults.map(_.dataOutcome) should contain(DataOutcome.Committed)
       reads.get() shouldBe 2
+    } finally cleanupTempDir(tempDir)
+  }
+
+  it should "load a dependency at the snapshot produced by its flow instead of mutable HEAD" in {
+    val tempDir = Files.createTempDirectory("pinned-dependency-test").toString
+    try {
+      val flow = createFlow("pinned_dependency", tempDir)
+      val config = createGlobalConfig(tempDir)
+      val manager = new IcebergTableManager(spark, config.iceberg)
+      val writer = new IcebergTableWriter(spark, config.iceberg, manager)
+      val first = writer.writeFullLoad(Seq(("old", "v1")).toDF("id", "value"), flow)
+      writer.writeFullLoad(Seq(("new", "v2")).toDF("id", "value"), flow)
+
+      val groupExecutor = new FlowGroupExecutor(config, None, ExecutionContext.global)
+      val processor = new FlowResultProcessor(config, Seq(flow), groupExecutor)
+      val produced = FlowResult.success(
+        flow.name,
+        "attempt-pinned",
+        1L,
+        1L,
+        1L,
+        0L,
+        Map.empty,
+        first.icebergMetadata,
+        first.resultingSnapshotId
+      )
+
+      processor.processGroupResults(Seq(produced), BatchState(Seq.empty, Map.empty), "attempt-pinned") match {
+        case processor.ContinueWith(state) =>
+          state.validatedFlows(flow.name).select("id").as[String].collect().toSeq shouldBe Seq("old")
+        case _ => fail("Expected the successful dependency to be available")
+      }
     } finally cleanupTempDir(tempDir)
   }
 

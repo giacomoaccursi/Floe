@@ -163,7 +163,7 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
       writer.writeDeltaLoad(duplicates, fc)
     }
     error.getMessage should include("duplicate primary keys")
-    spark.sql("SELECT * FROM writer_catalog.default.delta_duplicate_source").count() shouldBe 0L
+    spark.catalog.tableExists("writer_catalog.default.delta_duplicate_source") shouldBe false
   }
 
   it should "be idempotent: re-writing unchanged data leaves table content unchanged" in {
@@ -240,7 +240,7 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
       writer.writeSCD2Load(duplicates, fc)
     }
     error.getMessage should include("duplicate primary keys")
-    spark.sql("SELECT * FROM writer_catalog.default.scd2_duplicate_source").count() shouldBe 0L
+    spark.catalog.tableExists("writer_catalog.default.scd2_duplicate_source") shouldBe false
   }
 
   // --- SCD2 Detect Deletes Tests ---
@@ -357,17 +357,13 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
 
   // --- Delta Load without Primary Key ---
 
-  "IcebergTableWriter.writeDeltaLoad" should "append records when no primary key is defined" in {
-    // no PK means fallback to append, not upsert
+  "IcebergTableWriter.writeDeltaLoad" should "reject a missing primary key before creating the target" in {
     val fc = flowConfig("delta_no_pk", loadMode = LoadMode.Delta, primaryKey = Seq.empty)
-    val batch1 = Seq((1, "Alice"), (2, "Bob")).toDF("id", "name")
-    writer.writeDeltaLoad(batch1, fc)
+    val data = Seq((1, "Alice")).toDF("id", "name")
 
-    val batch2 = Seq((1, "Alice_dup"), (3, "Charlie")).toDF("id", "name")
-    writer.writeDeltaLoad(batch2, fc)
-
-    // With append semantics all records stack up — no deduplication
-    spark.sql("SELECT * FROM writer_catalog.default.delta_no_pk").count() shouldBe 4L
+    val error = the[IllegalArgumentException] thrownBy writer.writeDeltaLoad(data, fc)
+    error.getMessage should include("requires a primary key")
+    spark.catalog.tableExists("writer_catalog.default.delta_no_pk") shouldBe false
   }
 
   // --- SCD2 NULL handling ---

@@ -20,8 +20,7 @@ class BatchMetadataWriter(
       result: IngestionResult,
       executionTimeMs: Long
   ): Unit = {
-    val metadataPath =
-      s"${globalConfig.paths.metadataPath}/${request.pipelineId}/${request.logicalRunId}/${request.attemptId}/summary.json"
+    val metadataPath = s"${globalConfig.paths.metadataPath}/${request.artifactKey}/summary.json"
     val flowResults = result.flowResults
 
     val totalInput = flowResults.map(_.inputRecords).sum
@@ -51,6 +50,25 @@ class BatchMetadataWriter(
       "logical_run_id" -> request.logicalRunId,
       "attempt_id" -> request.attemptId,
       "effective_at" -> request.effectiveAt.toString,
+      "code_version" -> request.codeVersion,
+      "config_digest" -> request.configDigest,
+      "retry_profile" -> request.retryProfile.name,
+      "data_interval" -> request.dataInterval
+        .map(interval =>
+          Map(
+            "start_inclusive" -> interval.startInclusive.toString,
+            "end_exclusive" -> interval.endExclusive.toString
+          )
+        )
+        .getOrElse(Map.empty[String, String]),
+      "input_references" -> request.inputReferences.map(reference =>
+        Map(
+          "dataset_id" -> reference.datasetId,
+          "version" -> reference.version,
+          "read_mode" -> reference.readMode
+        )
+      ),
+      "platform_references" -> request.platformReferences,
       "execution_time_ms" -> executionTimeMs,
       "success" -> result.success,
       "status" -> result.status.name,
@@ -69,6 +87,7 @@ class BatchMetadataWriter(
           "success" -> derived.success,
           "records_written" -> derived.recordsWritten,
           "snapshot_id" -> derived.snapshotId.map(_.toString).getOrElse(""),
+          "resulting_snapshot_id" -> derived.resultingSnapshotId.map(_.toString).getOrElse(""),
           "operation_id" -> derived.operationId.getOrElse(""),
           "data_outcome" -> derived.dataOutcome.name,
           "error" -> derived.error.getOrElse("")
@@ -88,7 +107,9 @@ class BatchMetadataWriter(
           "rejection_reasons" -> result.rejectionReasons,
           "error" -> result.error.getOrElse(""),
           "warnings" -> result.warnings,
-          "data_outcome" -> result.dataOutcome.name
+          "data_outcome" -> result.dataOutcome.name,
+          "resulting_snapshot_id" -> result.resultingSnapshotId.map(_.toString).getOrElse(""),
+          "resulting_schema_json" -> result.resultingSchemaJson.getOrElse("")
         )
 
         result.icebergMetadata match {

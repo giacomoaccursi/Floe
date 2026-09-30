@@ -5,6 +5,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.{functions => f}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import java.time.Instant
 
 class PreValidationTransformationTest extends AnyFlatSpec with Matchers {
 
@@ -35,7 +36,9 @@ class PreValidationTransformationTest extends AnyFlatSpec with Matchers {
     currentFlow = flowName,
     currentData = df,
     validatedFlows = Map.empty,
-    batchId = batchId,
+    logicalRunId = "logical-run",
+    attemptId = batchId,
+    effectiveAt = Instant.parse("2026-09-30T08:00:00Z"),
     spark = spark
   )
 
@@ -71,6 +74,8 @@ class PreValidationTransformationTest extends AnyFlatSpec with Matchers {
     receivedContext shouldBe defined
     receivedContext.get.currentFlow shouldBe "my_flow"
     receivedContext.get.batchId shouldBe "batch_002"
+    receivedContext.get.logicalRunId shouldBe "logical-run"
+    receivedContext.get.effectiveAt shouldBe Instant.parse("2026-09-30T08:00:00Z")
     receivedContext.get.validatedFlows shouldBe empty
   }
 

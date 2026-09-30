@@ -4,12 +4,14 @@ import com.etl.framework.config._
 import com.etl.framework.TestFixtures
 import com.etl.framework.orchestration.{ExecutionGroup, ExecutionPlan}
 import com.etl.framework.orchestration.flow.FlowResult
+import com.etl.framework.util.SqlIdentifier
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.{Files, Path}
+import scala.util.Try
 
 class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
@@ -87,9 +89,10 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       parentSnapshotId: Option[Long],
       tableName: Option[String] = None
   ): FlowResult = {
+    val resolvedTableName = tableName.getOrElse(s"orphan_catalog.default.$flowName")
     val meta = snapshotId.map { sid =>
       IcebergFlowMetadata(
-        tableName = tableName.getOrElse(s"orphan_catalog.default.$flowName"),
+        tableName = resolvedTableName,
         snapshotId = sid,
         snapshotTag = None,
         parentSnapshotId = parentSnapshotId,
@@ -99,12 +102,23 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
         summary = Map.empty
       )
     }
-    FlowResult(flowName = flowName, batchId = "test", success = true, icebergMetadata = meta)
+    val resultingSnapshotId =
+      snapshotId.orElse(Try(tableManager.getCurrentSnapshotId(resolvedTableName)).toOption.flatten)
+    val resultingSchemaJson =
+      Try(spark.table(SqlIdentifier.quoteMultipart(resolvedTableName)).schema.json).toOption
+    FlowResult(
+      flowName = flowName,
+      batchId = "test",
+      success = true,
+      icebergMetadata = meta,
+      resultingSnapshotId = resultingSnapshotId,
+      resultingSchemaJson = resultingSchemaJson
+    )
   }
 
   // ── Existing tests ──────────────────────────────────────────────────
 
-  "OrphanDetector" should "detect orphans when parent Full load removes records" in {
+  "OrphanDetector" should "use attempt-pinned parent and child states when catalog HEAD advances" in {
     val customersConfig = makeFlowConfig("od_customers")
     val ordersConfig = makeFlowConfig(
       "od_orders",
@@ -135,6 +149,8 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       ),
       makeFlowResult("od_orders", None, None)
     )
+    Seq((3, "restored-later")).toDF("id", "name").writeTo(tableManager.resolveTableName(customersConfig)).append()
+    Seq((103, 3)).toDF("id", "customer_id").writeTo(tableManager.resolveTableName(ordersConfig)).append()
     val flowConfigs = Seq(customersConfig, ordersConfig)
     val plan = ExecutionPlan(
       Seq(
@@ -153,7 +169,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     reports.head.actionTaken shouldBe "warn"
     reports.head.cascadeSource shouldBe None
 
-    spark.sql("SELECT * FROM orphan_catalog.default.od_orders").count() shouldBe 3
+    spark.sql("SELECT * FROM orphan_catalog.default.od_orders").count() shouldBe 4
   }
 
   it should "delete orphaned records when onOrphan=Delete" in {

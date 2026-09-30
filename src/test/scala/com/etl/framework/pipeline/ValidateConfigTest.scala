@@ -216,6 +216,27 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
     error.getMessage should include("different local/reference arity")
   }
 
+  it should "reject destructive orphan deletion before building a pipeline" in {
+    val parent = TestFixtures.flowConfig("parent")
+    val child = TestFixtures.flowConfig(
+      "child",
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          Seq("parent_id"),
+          ReferenceConfig("parent", Seq("id")),
+          onOrphan = OrphanAction.Delete
+        )
+      )
+    )
+    val builder = IngestionPipeline
+      .builder()
+      .withGlobalConfig(TestFixtures.globalConfig())
+      .withFlowConfigs(Seq(parent, child))
+
+    builder.validate().mkString(" ") should include("unsupported onOrphan=delete")
+    intercept[IllegalArgumentException](builder.build()).getMessage should include("unsupported onOrphan=delete")
+  }
+
   it should "report missing SCD2 columns in a programmatic schema" in {
     val flow = TestFixtures
       .flowConfig(

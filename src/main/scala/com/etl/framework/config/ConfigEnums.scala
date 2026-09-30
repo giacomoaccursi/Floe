@@ -258,10 +258,10 @@ sealed trait OrphanAction extends Product with Serializable {
 
 object OrphanAction {
   case object Warn extends OrphanAction { val name = "warn" }
-  case object Delete extends OrphanAction { val name = "delete" }
+  private[framework] case object Delete extends OrphanAction { val name = "delete" }
   case object Ignore extends OrphanAction { val name = "ignore" }
 
-  val values: Seq[OrphanAction] = Seq(Warn, Delete, Ignore)
+  val values: Seq[OrphanAction] = Seq(Warn, Ignore)
 
   def fromString(s: String): Either[String, OrphanAction] =
     values

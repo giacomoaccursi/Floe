@@ -84,6 +84,14 @@ class ConfigEnumsTest extends AnyFlatSpec with Matchers {
     OnFailureAction.fromString("skip") shouldBe Right(OnFailureAction.Skip)
   }
 
+  "OrphanAction.fromString" should "accept only non-destructive actions" in {
+    OrphanAction.fromString("warn") shouldBe Right(OrphanAction.Warn)
+    OrphanAction.fromString("ignore") shouldBe Right(OrphanAction.Ignore)
+    val rejected = OrphanAction.fromString("delete")
+    rejected.isLeft shouldBe true
+    rejected.left.getOrElse("") should include("Valid values: warn, ignore")
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // AGGREGATION FUNCTION
   // ═══════════════════════════════════════════════════════════════════════════

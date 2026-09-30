@@ -30,6 +30,9 @@ object FlowConfigValidator {
     }
 
     config.validation.foreignKeys.foreach { fk =>
+      if (fk.onOrphan == OrphanAction.Delete)
+        errors +=
+          s"foreign key ${fk.displayName} uses unsupported onOrphan=delete; use warn or ignore and remediate explicitly"
       if (fk.columns.isEmpty || fk.references.columns.isEmpty)
         errors += s"foreign key ${fk.displayName} must contain at least one local and referenced column"
       else if (fk.columns.size != fk.references.columns.size)

@@ -4,7 +4,8 @@ import com.etl.framework.config._
 import com.etl.framework.util.SqlIdentifier
 import com.etl.framework.orchestration.ExecutionPlan
 import com.etl.framework.orchestration.flow.FlowResult
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.functions.col
 import org.slf4j.LoggerFactory
 
@@ -163,14 +164,16 @@ class OrphanDetector(
             .sql(s"SELECT $selectExpr FROM $sqlTableName VERSION AS OF $prevSnapshotId$previousCurrentFilter")
             .distinct()
 
+          val resultingParent = readResultState(parentCfg, parentResult)
           val currentPKs = parentCfg.loadMode.`type` match {
             case LoadMode.SCD2 =>
               val isCurrentCol = parentCfg.loadMode.isCurrentColumn.getOrElse("is_current")
-              spark
-                .sql(s"SELECT $selectExpr FROM $sqlTableName WHERE ${SqlIdentifier.quote(isCurrentCol)} = true")
+              resultingParent
+                .filter(col(isCurrentCol) === true)
+                .select(refCols.map(col): _*)
                 .distinct()
             case _ =>
-              spark.sql(s"SELECT $selectExpr FROM $sqlTableName").distinct()
+              resultingParent.select(refCols.map(col): _*).distinct()
           }
 
           val removed = previousPKs.join(currentPKs, refCols, "left_anti")
@@ -213,7 +216,16 @@ class OrphanDetector(
 
     // Select only FK + PK columns from child table instead of SELECT *
     val childPkCols = childFlow.validation.primaryKey
-    val childTable = spark.table(SqlIdentifier.quoteMultipart(childTableName))
+    val childTable = fk.onOrphan match {
+      // Delete is unreachable through validated public configuration and remains only for package-internal legacy tests.
+      case OrphanAction.Delete => spark.table(SqlIdentifier.quoteMultipart(childTableName))
+      case _ =>
+        val childResult = flowResultMap.getOrElse(
+          childFlow.name,
+          throw new IllegalStateException(s"Missing successful flow result for orphan child '${childFlow.name}'")
+        )
+        readResultState(childFlow, childResult)
+    }
     val currentChild = childFlow.loadMode.`type` match {
       case LoadMode.SCD2 =>
         childTable.filter(col(childFlow.loadMode.isCurrentColumn.getOrElse("is_current")) === true)
@@ -316,6 +328,25 @@ class OrphanDetector(
         )
 
       case OrphanAction.Ignore => None
+    }
+  }
+
+  /** Resolves the exact table state recorded by a completed flow. Mutable catalog HEAD is never a fallback. */
+  private def readResultState(flowConfig: FlowConfig, result: FlowResult): DataFrame = {
+    val tableName = tableManager.resolveTableName(flowConfig)
+    result.resultingSnapshotId.orElse(result.icebergMetadata.map(_.snapshotId)) match {
+      case Some(snapshotId) =>
+        spark.read.option("snapshot-id", snapshotId).table(SqlIdentifier.quoteMultipart(tableName))
+      case None =>
+        result.resultingSchemaJson match {
+          case Some(schemaJson) =>
+            val schema = DataType.fromJson(schemaJson).asInstanceOf[StructType]
+            spark.createDataFrame(spark.sparkContext.emptyRDD[Row], schema)
+          case None =>
+            throw new IllegalStateException(
+              s"Flow '${flowConfig.name}' has no resulting snapshot or frozen schema for orphan detection"
+            )
+        }
     }
   }
 }

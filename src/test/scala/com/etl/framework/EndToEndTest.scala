@@ -1,5 +1,6 @@
 package com.etl.framework
 
+import com.etl.framework.exceptions.ConfigFileException
 import com.etl.framework.orchestration.{BatchListener, IngestionResult}
 import com.etl.framework.orchestration.ExecutionStatus
 import com.etl.framework.pipeline.IngestionPipeline
@@ -662,7 +663,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     metric.getBoolean(0) shouldBe false
   }
 
-  it should "fail the batch when orphan cleanup cannot inspect the child table" in {
+  it should "reject destructive orphan cleanup before executing the pipeline" in {
     val configDir = tempDir.resolve("e2e_orphan_failure").resolve("config")
     val dataDir = tempDir.resolve("e2e_orphan_failure").resolve("data")
     setupConfig(configDir, qualityMetricsTable = Some("quality_metrics_orphan_failure"))
@@ -708,52 +709,9 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
          |""".stripMargin
     )
 
-    import spark.implicits._
-    def writeParents(ids: Seq[Int]): Unit =
-      ids
-        .toDF("id")
-        .write
-        .mode("overwrite")
-        .format("csv")
-        .option("header", "true")
-        .save(dataDir.resolve("parents").toString)
-    def writeChildren(): Unit =
-      Seq((10, 1), (11, 2))
-        .toDF("child_id", "parent_id")
-        .write
-        .mode("overwrite")
-        .format("csv")
-        .option("header", "true")
-        .save(dataDir.resolve("children").toString)
-
-    val pipeline = IngestionPipeline
-      .builder()
-      .withConfigDirectory(configDir.toString)
-      .withPostValidationTransformation(
-        "orphan_child_fail",
-        ctx => ctx.withData(ctx.currentData.drop("parent_id"))
-      )
-      .build()
-
-    writeParents(Seq(1, 2))
-    writeChildren()
-    pipeline.execute().success shouldBe true
-
-    writeParents(Seq(1))
-    writeChildren()
-    val result = pipeline.execute()
-
-    result.success shouldBe false
-    result.error.getOrElse("").toLowerCase should include("orphan")
-    val summary = Files.readString(reportPath(result))
-    summary should include("\"success\":false")
-    val metric = spark
-      .sql(
-        s"SELECT batch_success FROM floe.default.quality_metrics_orphan_failure " +
-          s"WHERE batch_id = '${result.batchId}' AND flow_name = 'orphan_parent_fail'"
-      )
-      .first()
-    metric.getBoolean(0) shouldBe false
+    val builder = IngestionPipeline.builder().withConfigDirectory(configDir.toString)
+    builder.validate().mkString(" ") should include("Unknown orphan action: 'delete'")
+    intercept[ConfigFileException](builder.build()).getMessage should include("Unknown orphan action: 'delete'")
   }
 
   it should "reject a child FK when the referenced SCD2 key is no longer current" in {

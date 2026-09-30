@@ -30,12 +30,13 @@ paths:
   metadataPath: "output/metadata"
 
 iceberg:
+  catalogMode: configure
   catalogType: hadoop
   catalogName: floe
   warehouse: "output/warehouse"
 ```
 
-`floe` is the logical Spark catalog name, not an external service. Floe registers it as an Iceberg `SparkCatalog` and resolves tables such as `floe.default.orders` inside the configured warehouse.
+`floe` is the logical Spark catalog name, not an external service. This local example opts into `catalogMode: configure`, so Floe registers an Iceberg `SparkCatalog`. Enterprise deployments normally keep the default `existing` mode and configure the catalog in `spark-submit` or the managed platform before the session starts.
 
 **`config/flows/orders.yaml`:**
 

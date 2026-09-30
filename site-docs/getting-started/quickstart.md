@@ -23,6 +23,7 @@ performance:
   parallelFlows: false
 
 iceberg:
+  catalogMode: "configure"
   catalogType: "hadoop"
   catalogName: "floe"
   warehouse: "output/warehouse"

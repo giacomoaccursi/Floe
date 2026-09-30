@@ -20,6 +20,7 @@ performance:
   parallelFlows: true
 
 iceberg:
+  catalogMode: "configure"
   catalogType: "hadoop"
   catalogName: "floe"
   namespace: "default"
@@ -106,10 +107,11 @@ For the complete Iceberg integration guide, see [Iceberg Integration](../guides/
 
 | Field | Default | Description |
 |-------|---------|-------------|
+| `catalogMode` | `existing` | Catalog ownership: `existing` validates a platform-configured Spark catalog without mutating session settings; `configure` explicitly invokes a FLOe catalog provider. |
 | `catalogType` | `hadoop` | Catalog implementation: `hadoop`, `glue`, or a custom type registered via the [Pipeline Builder](../guides/pipeline-builder.md#custom-catalog-providers) |
 | `catalogName` | `floe` | Catalog name used in SQL queries. The built-in providers use `SparkCatalog`, so `spark_catalog` is rejected because Spark reserves it for the session catalog. |
 | `namespace` | `default` | Iceberg namespace (database) for tables. Tables are named `{catalogName}.{namespace}.{flowName}`. |
-| `warehouse` | — (required) | Path to the Iceberg warehouse directory |
+| `warehouse` | `""` | Warehouse path used only by `catalogMode: configure`; required by the built-in Hadoop provider. In `existing` mode it belongs to the platform's Spark catalog configuration and should be omitted here. |
 | `fileFormat` | `parquet` | Default data file format for Iceberg tables: `parquet`, `orc`, `avro`. Sets the `write.format.default` table property. If a flow specifies `write.format.default` in its `tableProperties`, that takes priority. |
 | `enableSnapshotTagging` | `true` | Create a batch tag for the table's current snapshot after a write; a concurrent writer on the same table can invalidate attribution to this batch. |
 | `catalogProperties` | `{}` | Additional key-value properties passed to the catalog provider |
@@ -129,6 +131,7 @@ For local development, `hadoop` is the simplest choice — it works out of the b
 
 ```yaml
 iceberg:
+  catalogMode: "configure"
   catalogType: "hadoop"
   warehouse: "output/warehouse"
 ```
@@ -137,6 +140,7 @@ For AWS production deployments with Glue:
 
 ```yaml
 iceberg:
+  catalogMode: "configure"
   catalogType: "glue"
   catalogName: "floe"
   warehouse: "s3://my-bucket/warehouse"
@@ -144,7 +148,7 @@ iceberg:
     glue.skip-name-validation: "true"
 ```
 
-`catalogProperties` is a pass-through map — any key-value pair you add is set as a Spark configuration property on the catalog (`spark.sql.catalog.{catalogName}.{key}`). Use it for catalog-specific settings that the framework doesn't expose directly.
+`catalogProperties` is applied only in `catalogMode: configure`. In the default `existing` mode the platform owns every `spark.sql.catalog.*` setting; FLOe verifies that the named catalog and Iceberg extensions exist and does not overwrite them.
 
 Custom catalog providers (Hive, REST, Nessie) can be registered via the [Pipeline Builder API](../guides/pipeline-builder.md#custom-catalog-providers).
 

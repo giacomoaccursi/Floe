@@ -425,17 +425,19 @@ The framework ships with two built-in catalog providers:
 | `hadoop` | `HadoopCatalogProvider` | Local/HDFS filesystem catalog. Zero infrastructure. |
 | `glue` | `GlueCatalogProvider` | AWS Glue Data Catalog. Requires S3 and Glue permissions. |
 
-To use a built-in provider, set `catalogType` in `global.yaml`:
+Providers are invoked only when `catalogMode: configure` is explicit:
 
 ```yaml
 # Hadoop (default)
 iceberg:
+  catalogMode: "configure"
   catalogType: "hadoop"
   catalogName: "floe"
   warehouse: "output/warehouse"
 
 # Glue
 iceberg:
+  catalogMode: "configure"
   catalogType: "glue"
   catalogName: "floe"
   warehouse: "s3://my-bucket/warehouse"
@@ -476,6 +478,8 @@ IngestionPipeline.builder()
   .withCatalogProvider("nessie", () => new NessieCatalogProvider())
   .build()
 ```
+
+The corresponding `global.yaml` must set `catalogMode: configure`. In the default `existing` mode the platform configures the named catalog before creating the session, and no provider—built-in or custom—is invoked.
 
 The `CatalogProvider` trait has three methods:
 

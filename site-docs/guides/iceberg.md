@@ -4,13 +4,13 @@
 
 The framework uses Apache Iceberg as its table format. Each table write commits atomically; a pipeline attempt that writes several tables is **not** one Iceberg transaction. Delta and SCD2 use `MERGE INTO`, while full loads overwrite table contents. FLOe returns per-target snapshot evidence and a typed attempt result. Maintenance is a separate application owned and scheduled by the hosting platform.
 
-The `iceberg` section is required in `global.yaml`. At startup, the pipeline validates the config and configures the SparkSession with the Iceberg catalog. If the section is missing or invalid, execution stops immediately (fail-fast).
+The `iceberg` section is required in `global.yaml`. By default FLOe validates an Iceberg catalog already configured by the hosting platform and does not mutate Spark catalog settings. Local applications can explicitly opt into provider-based bootstrap. Missing extensions or catalog configuration fail before flow execution.
 
 ## Prerequisites
 
 ### SparkSession configuration
 
-The Iceberg Spark extensions **must** be configured before the SparkSession is created. Spark does not allow changing `spark.sql.extensions` after session creation. The framework configures the catalog settings automatically from `global.yaml`, but the extensions must be set by the application entry point:
+The Iceberg Spark extensions **must** be configured before the SparkSession is created. Spark does not allow changing `spark.sql.extensions` after session creation. In the default `existing` mode, configure both extensions and catalog in the application, `spark-submit`, or managed platform:
 
 ```scala
 implicit val spark: SparkSession = SparkSession.builder()
@@ -18,10 +18,13 @@ implicit val spark: SparkSession = SparkSession.builder()
   .master("local[*]")
   .config("spark.sql.extensions",
     "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+  .config("spark.sql.catalog.floe", "org.apache.iceberg.spark.SparkCatalog")
+  .config("spark.sql.catalog.floe.type", "hadoop")
+  .config("spark.sql.catalog.floe.warehouse", "output/warehouse")
   .getOrCreate()
 ```
 
-All other Iceberg catalog settings (warehouse path, catalog type, catalog class) are applied automatically by the framework at pipeline startup.
+FLOe validates these settings but never replaces them in `existing` mode. Use `catalogMode: configure` only when the application deliberately delegates catalog bootstrap to a built-in or custom provider.
 
 !!!tip "Keep Adaptive Query Execution enabled"
     Spark 3.5 enables AQE by default (`spark.sql.adaptive.enabled = true`). It can improve MERGE and DAG joins through runtime partition coalescing, join conversion, and skew handling. Treat it as a workload-tuned Spark feature rather than a correctness requirement, and benchmark before changing its settings.
@@ -34,10 +37,9 @@ The `iceberg` block in `global.yaml` is required:
 
 ```yaml
 iceberg:
-  catalogType: "hadoop"
+  catalogMode: "existing"
   catalogName: "floe"
   namespace: "default"
-  warehouse: "output/warehouse"
   fileFormat: "parquet"
   enableSnapshotTagging: true
   maintenance:
@@ -53,10 +55,11 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 
 | Field | Default | Description |
 |-------|---------|-------------|
+| `catalogMode` | `existing` | `existing` validates a platform-owned catalog without mutation; `configure` explicitly runs a FLOe provider. |
 | `catalogType` | `hadoop` | Iceberg catalog implementation: `hadoop`, `glue`, or a custom type registered via the [Pipeline Builder](pipeline-builder.md#custom-catalog-providers) |
 | `catalogName` | `floe` | Name used in SQL queries (`catalog.namespace.table`). The built-in providers reject Spark's reserved `spark_catalog` name because they install `SparkCatalog`, not `SparkSessionCatalog`. |
 | `namespace` | `default` | Iceberg namespace for tables |
-| `warehouse` | *required* | Path to the Iceberg warehouse directory |
+| `warehouse` | `""` | Warehouse path used only by `configure`; required by the built-in Hadoop provider. Omit it in `existing` mode. |
 | `fileFormat` | `parquet` | Default data file format |
 | `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel by batch ID |
 | `catalogProperties` | `{}` | Additional key-value properties passed to the catalog provider |
@@ -79,9 +82,11 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 
 ## Architecture
 
-### Catalog provider
+### Catalog ownership and providers
 
-The catalog system is pluggable. The `CatalogProvider` trait defines three methods: `catalogType`, `configureCatalog`, and `validateConfig`. The built-in hadoop provider verifies that Iceberg extensions are registered on the SparkSession and configures the catalog with:
+In `existing` mode, FLOe requires `spark.sql.extensions` and `spark.sql.catalog.{catalogName}` to be present. It does not compare or overwrite warehouse, credentials, implementation classes, or provider properties: those belong to the platform configuration.
+
+In `configure` mode, the catalog system is pluggable. The `CatalogProvider` trait defines three methods: `catalogType`, `configureCatalog`, and `validateConfig`. The built-in Hadoop provider configures:
 
 ```
 spark.sql.catalog.{name}          = org.apache.iceberg.spark.SparkCatalog
@@ -91,7 +96,7 @@ spark.sql.catalog.{name}.warehouse = {path}
 
 The extensions (`spark.sql.extensions`) must be set by the user before creating the SparkSession — the provider validates their presence and throws an error if missing.
 
-The framework maps the `catalogType` string to the right provider. Adding a new catalog type (Hive, REST, Nessie) means implementing the `CatalogProvider` trait and registering it on the builder. See [Pipeline Builder — Custom catalog providers](pipeline-builder.md#custom-catalog-providers) for details.
+Only `configure` mode resolves `catalogType` and invokes a provider. Adding a new bootstrapped catalog type means implementing `CatalogProvider` and registering it on the builder. A platform-managed REST, Hive, Nessie, Glue, or other Iceberg catalog generally needs no FLOe provider in `existing` mode.
 
 ### Table naming
 

@@ -100,6 +100,7 @@ processing:
   maxRejectionRate: ${MAX_REJECTION_RATE}
 
 iceberg:
+  catalogMode: "${CATALOG_MODE}"
   catalogType: "${CATALOG_TYPE}"
   warehouse: "${WAREHOUSE_PATH}"
 ```
@@ -205,6 +206,7 @@ Configure the catalog through Floe's Glue provider:
 
 ```yaml
 iceberg:
+  catalogMode: "configure"
   catalogType: "glue"
   catalogName: "floe"
   warehouse: "s3://${BUCKET}/warehouse"
@@ -257,6 +259,7 @@ The recommended AWS configuration uses the Glue catalog in `global.yaml`, not Ha
 
 ```yaml
 iceberg:
+  catalogMode: "configure"
   catalogType: "glue"
   catalogName: "floe"
   warehouse: "s3://my-bucket/warehouse"
@@ -335,7 +338,7 @@ Common `--conf` properties for all platforms:
 | `spark.sql.catalog.{name}.catalog-impl` | Catalog implementation class | For Glue/Nessie (instead of `.type`) |
 
 !!!note
-    The spark-submit `--conf` properties configure the Spark catalog directly. When using the framework's `global.yaml` with `catalogType: hadoop` or `catalogType: glue`, Floe sets the catalog properties at startup—you only need the `spark.sql.extensions` line before session creation. Do not configure the same catalog in both places with conflicting values.
+    The spark-submit `--conf` properties configure the Spark catalog directly. Keep the default `catalogMode: existing`: FLOe validates the named catalog and does not overwrite platform settings. Use `catalogMode: configure` only when no catalog is supplied externally, and never configure the same catalog through both paths.
 
 !!!note
     The `spark.sql.extensions` property **must** be set before the SparkSession is created. On managed platforms, set it in the cluster/job configuration rather than in code.

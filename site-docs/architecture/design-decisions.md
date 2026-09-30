@@ -18,7 +18,7 @@ A single MERGE INTO statement handles insert, update, and (for SCD2) close opera
 
 An `update-timestamp-column` approach is fragile — it assumes the source always provides a reliable, monotonically increasing timestamp, and silently overwrites data when the timestamp is missing or stale.
 
-Value-based change detection using the null-safe `<=>` operator makes no assumptions about the source: for keyed Delta loads, a row is updated only when at least one compared non-key column differs. Replaying unchanged keyed input is therefore content-idempotent. Delta without a primary key is append-only and replay duplicates rows; post-commit failures also require snapshot inspection before retry.
+Value-based change detection using the null-safe `<=>` operator makes no assumptions about the source: for keyed Delta loads, a row is updated only when at least one compared non-key column differs. A Delta flow without a primary key is rejected before target creation; implicit append is too easy to duplicate during recovery.
 
 ## Why the NULL merge-key trick for SCD2
 
@@ -38,25 +38,19 @@ Copy-on-write has no read-time overhead — queries scan data files directly wit
 
 Merge-on-read should be opted into explicitly via `tableProperties` for write-heavy flows or flows with frequent idempotent runs. The choice is per-flow, not global, because different flows have different read/write patterns.
 
-## Why maintenance is queued after orphan detection
+## Why maintenance is a separate job
 
 Snapshot expiration removes old snapshots. Orphan detection needs the previous snapshot for time travel comparison (to find which parent keys were removed). If maintenance ran first, it could expire the snapshot that orphan detection needs.
 
-Running orphan detection first guarantees the previous snapshot is still available. FLOe then persists maintenance tasks for an independent worker. Compaction, snapshot expiration, manifest rewriting, and orphan-file deletion are operational work: they must not lengthen the ingestion critical path or force data replay when they fail.
+Running orphan detection before returning the ingestion result preserves the previous snapshot during that attempt. Compaction, snapshot expiration, manifest rewriting, and orphan-file deletion are independently scheduled operational work: they must not lengthen ingestion or cause data replay when they fail.
 
-## Why multi-table publication uses a manifest
+## Why Floe does not claim multi-table publication
 
-Iceberg commits are atomic per table, not across a set of tables. FLOe therefore treats table writes as preparation and publishes one application-level release manifest only after every required flow and derived target succeeds. The manifest pins each target to an exact snapshot ID when one exists and explicitly represents a never-committed empty target otherwise. Consumers that require batch consistency must read through that manifest; querying mutable table heads cannot provide a cross-table atomic view.
+Iceberg commits are atomic per table, not across a set of tables. Floe therefore returns per-target snapshot evidence and an explicit partial/unknown status; it does not label a set of independent commits as an atomic release. Consumers needing an atomic multi-table publication protocol must implement and qualify that separate contract instead of reading mutable HEADs.
 
-The current manifest tracks flow and derived writes. A subsequent `onOrphan: delete` cleanup is not yet modeled as its own durable release operation, so that destructive mode retains the explicit limitation documented in the recovery guide.
+## Why retry belongs to the platform but remains constrained
 
-## Why resume requires reconciliation and immutable input
-
-A client-side exception can occur after a catalog accepted an Iceberg commit. Blind retry can duplicate append data or create a second logical operation. FLOe writes a deterministic operation ID into every snapshot summary and reconciles that identity before resuming.
-
-Resume is allowed only for operations proven absent and only when the source fingerprint still matches the original run. A file fingerprint is an inventory check (path, length, modification time, format, and options), not a hash of every byte. JDBC and custom sources cannot be inferred safely, so they require an explicit `replayToken` that identifies an immutable extract. A deliberate replay creates a new batch and new operation IDs instead of pretending to be a continuation of the old run.
-
-This guarantee currently covers managed flow and derived-table writes. Cascading `onOrphan: delete` operations do not yet have an independent durable worklist, so a partially failed multi-table cascade follows a manual recovery runbook.
+A client-side exception can occur after a catalog accepted an Iceberg commit. Floe writes logical and attempt operation identities into snapshot summaries and reports uncertainty instead of retrying internally. The host may resubmit only a fully qualified repeatable application using the same immutable logical request and a new attempt ID. Ordinary JDBC queries, mutable globs, custom code, and multi-table cascades are not repeatable merely because their configuration text is unchanged.
 
 ## Why partition spec changes do not rewrite existing data
 

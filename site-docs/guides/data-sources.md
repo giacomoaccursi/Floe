@@ -217,7 +217,7 @@ Credentials should not be hardcoded in YAML. Use variable substitution (`${DB_PA
 
 ### Recovery identity
 
-JDBC queries are not inherently replayable. To enable safe resume/replay checks, bind the query to an immutable source version and identify it explicitly:
+JDBC queries are not inherently repeatable. For an operator-approved retry, materialize a stable extract or bind the query to a database mechanism that truly preserves the same source version, then record that version in the execution request:
 
 ```yaml
 source:

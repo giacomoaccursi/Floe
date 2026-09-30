@@ -4,27 +4,25 @@ Guide to deploying Floe on managed cloud platforms: AWS Glue, Amazon EMR, and Da
 
 ## Production baseline
 
-Every production deployment needs infrastructure beyond the Spark job itself:
+Every production deployment needs a platform contract around the Spark job:
 
-- a shared `JdbcRunStore` reachable by all retries/replicas;
-- an immutable `pipelineVersion` such as the application Git SHA or image digest;
-- an independently scheduled `MaintenanceWorker` using the same coordinator;
-- durable, versioned source inputs (or a meaningful `source.options.replayToken` for JDBC/custom sources);
+- a persisted immutable `ExecutionRequest` and an immutable application artifact version;
+- independently scheduled Iceberg maintenance;
+- durable, versioned source inputs (ordinary JDBC queries and mutable globs are not repeatable inputs);
 - one controlled writer per target table unless explicit external coordination is in place.
 
 ```scala
-val runStore = new JdbcRunStore(() => coordinatorDataSource.getConnection)
-
 val pipeline = IngestionPipeline.builder()
   .withConfigDirectory(configUri)
-  .withRunStore(runStore)
-  .withPipelineVersion(deploymentSha)
+  .withPipelineId("orders-prod")
+  .withCodeVersion(deploymentDigest)
   .build()
 
-pipeline.executeOrThrow()
+val request = pipeline.executionDefinition.newRequest(logicalRunId, effectiveAt)
+pipeline.executeOrThrow(request)
 ```
 
-The coordinator database is not the Iceberg catalog. It stores workflow state, leases, release manifests, and maintenance tasks. See [Recovery and Production Operations](recovery.md) before configuring scheduler retries.
+Floe adds no coordinator database. The cloud platform retains the request, serializes writers, observes the application exit, and records incident decisions. See [Failure Handling and Production Operations](recovery.md) before configuring scheduler retries.
 
 ## withVariables for parameter injection
 
@@ -222,7 +220,7 @@ Floe is compiled against Spark 3.5.8, Scala 2.12, and Iceberg 1.10.1. AWS Glue b
 
 For the pinned Floe build, construct one controlled dependency closure containing the matching `iceberg-spark-runtime-3.5_2.12` and `iceberg-aws-bundle` 1.10.1 artifacts. That can be one correctly assembled application JAR or a thin application/Floe JAR plus those dependencies—never both. Supply the resulting custom JAR set through `--extra-jars`, omit `iceberg` from `--datalake-formats`, and on Glue 5.0 or later set `--user-jars-first true`, as required by AWS. Do not also load Glue's bundled Iceberg runtime: duplicate versions on the driver/executor classpath can cause linkage errors or different commit semantics.
 
-Treat each Glue runtime upgrade as a compatibility change. Run at least create, append, `MERGE INTO`, snapshot tagging, metadata-table reads, release recovery, and every enabled maintenance procedure against the exact runtime and IAM/Lake Formation policy before promotion.
+Treat each Glue runtime upgrade as a compatibility change. Run at least create, overwrite, `MERGE INTO`, snapshot tagging, metadata-table reads, uncertain-commit inspection, and every enabled maintenance procedure against the exact runtime and IAM/Lake Formation policy before promotion.
 
 ## Amazon EMR
 
@@ -318,7 +316,7 @@ If you deliberately test Floe with a separate external Iceberg catalog, add only
 spark.sql.extensions org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
 ```
 
-Using Unity Catalog is not automatic. Its Iceberg REST endpoint has an operation matrix, and Databricks documents that external clients cannot run table-maintenance operations on managed Iceberg tables. A Unity Catalog integration therefore needs a dedicated Floe `CatalogProvider` plus an explicit maintenance ownership decision; merely supplying REST properties is insufficient. Validate create, overwrite, append, `MERGE INTO`, tags, metadata tables, release-manifest snapshot reads, and maintenance on the exact Databricks Runtime. See [Access Databricks tables from Apache Iceberg clients](https://docs.databricks.com/aws/en/external-access/iceberg).
+Using Unity Catalog is not automatic. Its Iceberg REST endpoint has an operation matrix, and Databricks documents that external clients cannot run table-maintenance operations on managed Iceberg tables. A Unity Catalog integration therefore needs a dedicated Floe `CatalogProvider` plus an explicit maintenance ownership decision; merely supplying REST properties is insufficient. Validate create, overwrite, `MERGE INTO`, tags, metadata tables, snapshot-ID reads, and maintenance on the exact Databricks Runtime. See [Access Databricks tables from Apache Iceberg clients](https://docs.databricks.com/aws/en/external-access/iceberg).
 
 ### Packaging
 
@@ -347,4 +345,4 @@ Common `--conf` properties for all platforms:
 - [Configuration Overview — withVariables](../configuration/overview.md#variable-substitution) — variable substitution
 - [Pipeline Builder](pipeline-builder.md) — builder API and custom catalog providers
 - [Installation](../getting-started/installation.md) — local setup and dependencies
-- [Recovery and Production Operations](recovery.md) — coordinator, release manifests, and incident runbooks
+- [Failure Handling and Production Operations](recovery.md) — partial commits, retry rules, and incident runbook

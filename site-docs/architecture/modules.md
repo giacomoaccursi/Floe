@@ -83,7 +83,7 @@ See [DAG Aggregation](../guides/dag-aggregation.md).
 
 Coordinates batch and flow execution:
 
-- **FlowOrchestrator** — manages the durable batch lifecycle: execution, reconciliation, orphan detection, derived targets, release publication, and maintenance enqueue
+- **FlowOrchestrator** — executes one immutable attempt, preserving partial/unknown outcomes and snapshot evidence
 - **FlowGroupExecutor** — executes a group of flows sequentially or in parallel
 - **FlowExecutor** — executes a single flow: read → rename → transform → validate → transform → write
 - **ExecutionPlanBuilder** — analyzes FK dependencies, topological sort, groups independent flows
@@ -92,9 +92,8 @@ Coordinates batch and flow execution:
 - **ExecutionLogger** — structured logging for batch and flow execution
 - **Batch listeners** — pluggable notification hooks for batch completion or failure
 - **Quality metrics** — writes per-flow quality metrics to an Iceberg table
-- **Retry with exponential backoff** — configurable per-flow retry with jitter to handle transient failures
-- **RunStore** — versioned run/operation state, leases, release manifests, and maintenance tasks (`JdbcRunStore` for production)
-- **MaintenanceWorker** — claims and retries maintenance outside the ingestion critical path
+- **ExecutionRequest** — separates pipeline/logical identity, physical attempt, effective time, code version, and config digest
+- **No internal retry** — each flow runs once; the external platform decides whether a complete request may be resubmitted
 
 See [Execution Model](execution-model.md).
 
@@ -102,7 +101,7 @@ See [Execution Model](execution-model.md).
 
 Public API entry point:
 
-- **IngestionPipeline** — fluent builder plus `execute`, `resume`, `replay`, and `executeOrThrow`
+- **IngestionPipeline** — fluent builder plus local or explicit-request `execute`/`executeOrThrow`
 - **TransformationContext** — immutable context passed to transformation functions
 - **DerivedTableExecutor** — computes and writes derived tables to Iceberg
 

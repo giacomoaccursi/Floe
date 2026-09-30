@@ -291,7 +291,7 @@ validation:
       onFailure: reject
 ```
 
-The entire `validation` section is optional. If omitted, no validation is performed. `primaryKey` is required for SCD2 and all of its columns must be non-nullable. For Full it is optional. For Delta it selects the upsert key; without one, Delta is deliberately append-only and replaying the same input can duplicate rows.
+The entire `validation` section is optional only for Full loads. `primaryKey` is required for Delta and SCD2; all SCD2 key columns must be non-nullable. FLOe rejects Delta without a key instead of silently degrading to append semantics. For Full, an empty key skips primary-key uniqueness validation.
 
 ### Foreign key fields
 

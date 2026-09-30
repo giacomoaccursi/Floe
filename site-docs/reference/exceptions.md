@@ -116,10 +116,10 @@ Commit reconciliation also uses two runtime exceptions outside the `FrameworkExc
 
 | Exception | Meaning | Operator response |
 |-----------|---------|-------------------|
-| `AmbiguousCommitException` | The catalog could not prove whether an operation committed | Do not retry the write blindly. Restore catalog/history access and call `resume(batchId)` so reconciliation can run. |
+| `AmbiguousCommitException` | The catalog could not prove whether an operation committed | Do not retry blindly. Stop overlapping writers and inspect the original attempt's catalog/snapshot evidence. |
 | `DuplicateOperationCommitException` | The same deterministic operation ID appears in multiple snapshots | Stop the pipeline and investigate writers/history; automatic resume is blocked because the invariant is broken. |
 
-Recovery APIs can also throw `IllegalArgumentException`, `IllegalStateException`, or `NoSuchElementException` for a changed pipeline identity, changed/unfingerprinted input, a concurrent state transition, a held lease, or an unknown batch. See [Recovery and Production Operations](../guides/recovery.md).
+Explicit execution can also throw `IllegalArgumentException` when identifiers are unsafe or the request's pipeline, code version, config digest, interval, or input identities do not match the built contract. See [Failure Handling and Production Operations](../guides/recovery.md).
 
 ## Context keys
 

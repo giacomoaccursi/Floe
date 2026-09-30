@@ -240,7 +240,7 @@ Orphaned data remains in the tables but the team receives notification in the ba
 
 ## Limitations and considerations
 
-- **Time travel and retention**: if the previous snapshot is unavailable, the orphan check fails the batch; it is not treated as an empty set of removed keys. Derived tables are skipped and maintenance tasks are not queued, preserving recovery evidence. This is why orphan detection runs before maintenance scheduling.
+- **Time travel and retention**: if the previous snapshot is unavailable, the orphan check fails the attempt; it is not treated as an empty set of removed keys. Derived tables are skipped. Independently scheduled maintenance must preserve the snapshots required by the pipeline and incident runbook.
 
 - **First execution**: on the very first batch there is no previous snapshot. The check is skipped because there's no baseline to compare against.
 
@@ -254,12 +254,12 @@ Orphaned data remains in the tables but the team receives notification in the ba
 
 ### Recovery after a partial batch or cascade
 
-1. Pause scheduled runs for the affected pipeline and retain the source input, `RunStore` rows, batch metadata, Iceberg snapshots, and tags. Stop the maintenance worker for these tables. Do not expire snapshots or start a fresh batch blindly: append-only Delta can duplicate rows and a new run loses the original cascade context.
-2. Read the run and operation records, then reconcile their deterministic operation IDs with Iceberg history. Use `pipeline.resume(batchId)` for managed flow/derived operations only after the pipeline ID and input fingerprints match. Do not infer commit failure from a client exception.
+1. Pause scheduled runs and maintenance for every affected target. Retain the immutable execution request, resolved configuration, input versions, attempt diagnostics, Iceberg snapshots, tags, and platform job/application logs. Do not expire snapshots or start a fresh attempt blindly: a new run loses the original cascade worklist context.
+2. Reconcile the attempt and logical operation IDs in Iceberg snapshot history with the external job state. Confirm that no earlier writer can still complete. Do not infer commit failure from a client exception or from a missing final report.
 3. For an orphan cascade, compute the removed keys from the parent's **pre-batch current** state versus the intended post-batch current state. Compare each child and grandchild against that key set, including FKs renamed between levels. The detector's ordinary next-batch diff is not a durable worklist.
 4. Choose a table-specific repair: complete the missing delete with a reviewed predicate, or restore affected tables from retained snapshots and reprocess under an approved plan. Validate row counts, current SCD2 versions, FK violations, derived outputs, and the snapshots exposed to consumers before resuming schedules. Record the repair's own snapshot IDs and operator approval.
 
-This is an operational runbook, not automatic rollback. Floe now persists run/target state and release manifests, but it does not persist the per-FK orphan-key worklist or track each cascade delete as a recoverable operation. Exactly-once recovery for an arbitrary crash inside a multi-table delete cascade is therefore not guaranteed.
+This is an operational runbook, not automatic rollback. FLOe does not persist a per-FK orphan-key worklist or track each cascade delete as a recoverable workflow step. Exactly-once recovery for an arbitrary crash inside a multi-table delete cascade is therefore not guaranteed.
 
 ## Related
 
@@ -268,4 +268,4 @@ This is an operational runbook, not automatic rollback. Floe now persists run/ta
 - [Iceberg Integration — Post-batch lifecycle](iceberg.md#post-batch-lifecycle) — where orphan detection fits
 - [SCD2 Guide](scd2.md) — SCD2 with detectDeletes and orphan implications
 - [Architecture: Execution Model](../architecture/execution-model.md) — topological ordering
-- [Recovery and Production Operations](recovery.md) — durable target reconciliation and incident handling
+- [Failure Handling and Production Operations](recovery.md) — target reconciliation and incident handling

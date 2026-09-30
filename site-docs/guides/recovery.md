@@ -1,149 +1,116 @@
-# Recovery and Production Operations
+# Failure Handling and Production Operations
 
-Floe separates three concerns that are often conflated in batch pipelines:
+Floe does not contain a workflow database, lease service, or general-purpose resume engine. That is intentional: Airflow, Step Functions, Argo, Databricks Jobs, Glue, and similar platforms already own job state and scheduling. Floe owns data-plane execution and reports the evidence it observed.
 
-- an Iceberg commit proves the state of one table;
-- `RunStore` records the durable state of the application workflow;
-- a release manifest pins the table snapshots published by one successful run.
+## The boundary of the guarantee
 
-These layers make recovery explicit. They do not turn a multi-table pipeline into an Iceberg transaction.
+An Iceberg commit is atomic for one table. A pipeline that writes several tables is not one transaction. If `customers` commits and `orders` then fails, Floe returns `FAILED_PARTIAL`; it does not roll `customers` back and does not retry `orders` internally.
 
-## Production baseline
+Likewise, a client exception does not prove that a remote catalog rejected a commit. When Floe entered the data-commit path but cannot establish the result, the target outcome remains `UNKNOWN` and the aggregate status is `UNKNOWN`. Do not start another incompatible writer until the original request and any in-flight backend operation have been investigated.
 
-`InMemoryRunStore` is the default so local examples remain small. Its state disappears with the JVM and it must not be used when restart recovery matters. Production jobs should share a `JdbcRunStore` between the ingestion job, recovery tooling, and maintenance worker:
+## Execution identity
+
+Production callers should build a stable pipeline definition and persist the immutable request before job submission:
 
 ```scala
-import com.etl.framework.orchestration.state.JdbcRunStore
-import com.etl.framework.pipeline.IngestionPipeline
-
-val runStore = new JdbcRunStore(
-  connectionFactory = () => dataSource.getConnection,
-  tablePrefix = "floe_"
-)
-
 val pipeline = IngestionPipeline.builder()
   .withConfigDirectory("config")
-  .withRunStore(runStore)
-  .withPipelineVersion(sys.env("APP_RELEASE_SHA"))
+  .withPipelineId("orders-prod-eu")
+  .withCodeVersion(sys.env("APP_IMAGE_DIGEST"))
   .build()
-```
 
-`JdbcRunStore.initialize()` creates three tables when they do not exist: runs, target operations, and maintenance tasks. Its SQL uses primitives supported by PostgreSQL and H2; the automated suite exercises H2, so validate the chosen production database in deployment tests. Add the database driver and connection pool in the application; Floe does not bundle a production JDBC driver for the coordinator.
-
-Use a dedicated schema/user, TLS, secret-managed credentials, backups, and database monitoring. All replicas of the same logical pipeline must use the same store and table prefix. Schema migration of an already existing coordinator database is an operator responsibility; `CREATE TABLE IF NOT EXISTS` is initialization, not a migration framework.
-
-`withPipelineVersion` must identify deployed transformation code as well as configuration. A Git commit or immutable image digest is a good value. The default, `unversioned`, cannot detect changes to Scala transformation functions and is unsuitable for controlled production recovery.
-
-## Run states
-
-| State | Meaning | Normal operator action |
-|-------|---------|------------------------|
-| `PLANNED` | Run and target operations were registered | Start or resume execution |
-| `RUNNING` | An executor owns the renewable lease | Monitor; do not start a second executor |
-| `RECONCILING` | Durable state is being compared with Iceberg history | Wait for reconciliation to finish |
-| `PUBLISHED` | Required targets succeeded and a release manifest was stored | Serve consumers; run queued maintenance separately |
-| `SUCCEEDED_WITH_WARNINGS` | Data was published, but a per-flow diagnostic output or maintenance task failed | Repair/retry the side operation; do not replay ingestion |
-| `FAILED` | Run failed before any managed target was proven committed | Fix the cause, then resume when reconciliation permits |
-| `FAILED_PARTIAL` | At least one target committed before the run failed | Resume; never blindly rerun the whole batch |
-| `UNKNOWN` | At least one commit outcome could not be proven | Restore catalog access and reconcile; do not guess |
-
-`IngestionResult.success` describes the synchronous ingestion result. `IngestionResult.status` is the more precise durable state returned at publication time. A later maintenance failure can change the stored run from `PUBLISHED` to `SUCCEEDED_WITH_WARNINGS`; an earlier `IngestionResult` object and JSON summary are not retroactively updated.
-
-## Execute, resume, or replay?
-
-| Operation | Batch identity | Intended use | Safety condition |
-|-----------|----------------|--------------|------------------|
-| `execute()` | New batch ID and `effectiveAt` | Normal scheduled run | New input |
-| `resume(batchId)` | Preserves original batch ID and `effectiveAt` | Continue an interrupted/partial run | Pipeline ID matches, commits reconcile, pending inputs have the same fingerprint |
-| `replay(batchId)` | Creates a new batch linked through `replayOf` | Deliberate business reprocessing | Original run is terminal, pipeline ID matches, all source fingerprints still match |
-
-Resume first classifies each managed flow and derived-table operation from its deterministic `floe.operation-id` in Iceberg snapshot summaries:
-
-- exactly one matching snapshot proves the commit;
-- no matching snapshot allows re-execution only if the input fingerprint still matches;
-- multiple matches are inconsistent and block resume;
-- catalog/history lookup failure remains unknown and blocks resume.
-
-Do not wrap `execute()` in an external retry that starts a fresh run after a timeout. Capture the returned or logged batch ID and call `resume(batchId)` after the underlying catalog problem is resolved.
-
-Replay is intentionally a new logical run. In particular, append-only Delta flows can append the same business rows again. Use replay only when that outcome is intended or when downstream deduplication is part of the design.
-
-## Input fingerprints
-
-File sources are fingerprinted from the expanded file inventory: path, length, modification time, format, and reader options. This detects normal replacement/addition/removal, but it is not a cryptographic hash of file contents. Object stores or ingestion systems that can replace bytes while preserving those attributes should provide their own immutable version in `source.options.replayToken`.
-
-JDBC and custom readers always need an explicit token because Floe cannot infer whether a query will return the same rows:
-
-```yaml
-source:
-  type: jdbc
-  path: public.orders
-  options:
-    url: "jdbc:postgresql://db/app"
-    query: "SELECT * FROM orders WHERE extract_id = '2026-09-24T00:00:00Z'"
-    replayToken: "orders/extract/2026-09-24T00:00:00Z/v1"
-```
-
-The token must identify an immutable extract, snapshot, watermark interval, or source-system version. A constant token defeats the protection.
-
-## Published reads
-
-Iceberg commits are atomic per table. A successful Floe run stores a JSON `ReleaseManifest` in its `RunRecord`; it is not the diagnostic `summary.json`. Read it from the same `RunStore`, deserialize it, and pin every target:
-
-```scala
-import com.etl.framework.orchestration.state.{ReleaseManifest, SnapshotPinnedReader}
-
-val run = runStore.getRun(batchId).getOrElse(sys.error("unknown batch"))
-val manifest = ReleaseManifest.fromJson(
-  run.releaseManifest.getOrElse(sys.error("batch is not published"))
-)
-val published = new SnapshotPinnedReader(manifest)
-
-val orders = published.table("orders")
-val customers = published.table("customers")
-```
-
-Reading mutable table heads can mix snapshots from different runs. `SnapshotPinnedReader` provides an application-level publication boundary, not a distributed transaction or isolation from code that ignores the manifest.
-
-A target with no snapshot yet—for example a newly created table after a no-op empty write—is represented by `snapshotId = None`; `SnapshotPinnedReader` returns that table's empty schema-preserving view.
-
-!!! warning "Orphan delete caveat"
-    Flow and derived-table writes are tracked as durable operations. Individual `onOrphan: delete` commits in a multi-level cascade are not currently separate `RunStore` operations or a durable orphan-key worklist. The release target for an affected child therefore pins its tracked flow-write snapshot, not a later cleanup snapshot. If a cascade fails part-way through, stop later runs and follow the [orphan recovery runbook](orphan-detection.md#recovery-after-a-partial-batch-or-cascade). Do not claim automatic exactly-once recovery or a post-cleanup release view for that path.
-
-## Asynchronous maintenance
-
-Successful run finalization queues one maintenance task for every managed target. Run workers independently from ingestion; they will ignore the tasks until publication completes:
-
-```scala
-import com.etl.framework.orchestration.maintenance.MaintenanceWorker
-
-val worker = new MaintenanceWorker(
-  icebergConfig = globalConfig.iceberg,
-  runStore = runStore,
-  maxAttempts = 3
+val request = pipeline.executionDefinition.newRequest(
+  logicalRunId = "orders/2026-09-30",
+  effectiveAt = Instant.parse("2026-09-30T00:00:00Z"),
+  dataInterval = Some(DataInterval(
+    Instant.parse("2026-09-29T00:00:00Z"),
+    Instant.parse("2026-09-30T00:00:00Z")
+  )),
+  platformReferences = Map("airflowTask" -> "orders_daily")
 )
 
-val results = worker.runPending(limit = 50)
+val result = pipeline.execute(request)
+if (!result.success) throw BatchFailedException(result.attemptId, result.error.getOrElse("failed"))
 ```
 
-Only tasks whose run is already `PUBLISHED` or `SUCCEEDED_WITH_WARNINGS` are eligible. This publication gate prevents a concurrently scheduled worker from maintaining a target while its release is still being finalized. Only one worker wins a task's compare-and-set transition. A failed task remains retryable until `maxAttempts`; retry the worker, not the pipeline. Schedule maintenance according to table size and workload instead of assuming it must run immediately after every ingestion.
+The identifiers have different meanings:
 
-Batch-summary and quality-metric write failures are currently logged but are not copied into `RunStatus`; alert on those logs separately. Per-flow rejected/warning/metadata write failures are recorded in `FlowResult.warnings` and do produce `SUCCEEDED_WITH_WARNINGS` after publication.
+| Field | Meaning |
+|---|---|
+| `pipelineId` | Stable identity of the pipeline in one environment |
+| `logicalRunId` | Stable identity of the business execution; keep it across an approved retry |
+| `attemptId` | Unique driver invocation; every resubmission gets a new value |
+| `effectiveAt` | Functional timestamp used by SCD2 and exposed to transformations |
+| `codeVersion` | Immutable application artifact identity, including custom Scala code |
+| `configDigest` | Canonical digest of the resolved semantic Floe/Spark configuration |
 
-The batch JSON records only that tasks were queued. Query `RunStore.getMaintenanceTasks(...)` for their current authoritative state.
+Floe rejects a request when its pipeline, code version, or config digest differs from the built pipeline. Secret values are not included in the digest; store logical secret references and their externally managed versions in the platform request if rotation affects reproducibility.
+
+## Outcome model
+
+`IngestionResult.success` is the functional outcome. `status` adds the data-effect classification:
+
+| Status | Interpretation |
+|---|---|
+| `SUCCEEDED` | All required synchronous work completed |
+| `SUCCEEDED_WITH_WARNINGS` | Functional data succeeded; a diagnostic side output failed |
+| `FAILED` | Failure occurred before any known completed target operation |
+| `FAILED_PARTIAL` | At least one target completed, but the pipeline did not |
+| `UNKNOWN` | At least one mutation may have committed but the evidence is inconclusive |
+
+Each flow and derived target exposes a `DataOutcome`:
+
+- `NOT_ATTEMPTED`: Floe did not enter the data mutation;
+- `NOT_COMMITTED`: the backend supplied positive proof that the attempt did not commit;
+- `NO_CHANGE`: the mutation completed without creating a new data snapshot;
+- `COMMITTED`: a new snapshot was identified;
+- `UNKNOWN`: commit outcome cannot be established safely.
+
+`resultingSnapshotId` is the snapshot used for downstream dependencies. Dependencies are read at that snapshot rather than mutable table HEAD. Snapshot IDs in JSON reports are decimal strings, avoiding precision loss in JavaScript consumers.
+
+## Retry policy
+
+Floe performs no automatic flow or whole-pipeline retry. The default contract is `manual-recovery`.
+
+Do not configure scheduler retries merely because the failed flow says `NOT_ATTEMPTED`: an earlier target may already be committed. A whole-job retry is allowed only after the complete application recipe has been proven repeatable for its real inputs, transformations, write modes, catalog, storage, cancellation behavior, and concurrency policy. `UNKNOWN` always blocks automatic retry.
+
+At minimum, a repeatability assessment must establish:
+
+1. the same immutable input versions are read again;
+2. `effectiveAt` and semantic configuration are unchanged;
+3. transformations are deterministic and side-effect free;
+4. each target write mode is content-idempotent for the tested failure points;
+5. the previous driver and remote requests have terminated;
+6. writers for overlapping targets are externally serialized;
+7. the final table contents and invariants match a clean execution.
+
+A mutable directory/glob, ordinary JDBC query, or opaque custom reader is not automatically repeatable. Materialize an immutable extract upstream or qualify a connector-specific snapshot mechanism.
 
 ## Incident runbook
 
-1. Stop new executions of the affected logical pipeline. Preserve source objects, catalog metadata, snapshots, coordinator rows, and logs.
-2. Read the `RunRecord` and its operation records. Treat `UNKNOWN` and `UNKNOWN_COMMIT` as uncertainty, not failure.
-3. Restore catalog/warehouse connectivity, then run `RecoveryManager.reconcileBatch(batchId)` in read-only mode if an operator needs the report before applying changes.
-4. Use `pipeline.resume(batchId)` only when the same deployment/config and immutable inputs are available. It performs and applies reconciliation again under a lease.
-5. After success, read consumers through the stored release manifest and run any queued maintenance independently.
-6. For a partial orphan cascade, use the dedicated manual runbook; ordinary target reconciliation does not reconstruct the transient cascade key set.
+1. Record `pipelineId`, `logicalRunId`, `attemptId`, platform job/application ID, report path, and original request.
+2. Stop later writers and maintenance for the affected targets. A canceled scheduler task does not by itself prove a remote request stopped.
+3. Retain the application artifact, resolved configuration, input references, logs, report, and Iceberg history.
+4. Inspect the current table identity, snapshot history, snapshot summaries, and refs. Operation metadata is evidence, not a lock.
+5. Classify every target. Absence of a matching snapshot is not universal proof that no delayed effect can appear.
+6. Correct data with a separately reviewed operation when needed. Floe does not perform an automatic multi-table rollback.
+7. Resubmit the whole job only if the repeatability conditions above are satisfied; keep the same `logicalRunId` and use a new `attemptId`.
+8. Validate content and business invariants after recovery, not only the scheduler state.
 
-## Related
+## Reports and diagnostics
 
-- [Execution Model](../architecture/execution-model.md) — lifecycle and failure semantics
-- [Iceberg Integration](iceberg.md) — commit identity, snapshots, and maintenance
-- [Pipeline Builder](pipeline-builder.md) — public builder and result API
-- [Orphan Detection](orphan-detection.md) — cascade behavior and manual recovery
+The attempt report is written below:
+
+```
+{metadataPath}/{pipelineId}/{logicalRunId}/{attemptId}/summary.json
+```
+
+Per-flow metadata uses the sibling `flows/` directory. Rejected rows and validation warnings use the same three-part identity under their configured roots. Identifiers are validated to prevent path traversal.
+
+These files are diagnostic by default. A report-write failure adds a warning and does not reinterpret a known Iceberg commit. If consumers require the report as the delivery mechanism for pinned snapshots, that is a stricter application contract: treat report publication as a functional output in the surrounding application and never rerun data writers merely to recreate the report.
+
+## Maintenance
+
+Run `IcebergMaintenanceRunner` from a separate scheduled job. Compaction, snapshot expiration, orphan-file cleanup, and manifest rewrite must not be coupled to ingestion retries. Establish retention and concurrency policy for the actual catalog/storage deployment before enabling deletion procedures.
+
+Do not confuse Iceberg orphan files with child rows that violate a configured foreign key. They have different causes and recovery procedures.

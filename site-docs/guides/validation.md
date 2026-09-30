@@ -110,7 +110,7 @@ validation:
 Duplicate detection uses `groupBy` + `count > 1`. All rows sharing a duplicated key combination are rejected — not just the second occurrence, but every row with that key value. Rejection code: `PK_DUPLICATE`.
 
 !!!note
-    A primary key is required for `scd2`. In `delta` it enables keyed MERGE; without one, Delta appends and replay can duplicate rows. For `full`, an empty `primaryKey` skips PK uniqueness validation.
+    A primary key is required for `delta` and `scd2`. Delta without one is rejected before table creation; there is no implicit append fallback. For `full`, an empty `primaryKey` skips PK uniqueness validation.
 
 ## Foreign key integrity
 

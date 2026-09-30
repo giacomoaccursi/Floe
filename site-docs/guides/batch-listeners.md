@@ -18,7 +18,7 @@ trait BatchListener {
 - `onBatchCompleted` is called when synchronous publication succeeds (rejected records are allowed unless a threshold is exceeded)
 - `onBatchFailed` is called when synchronous publication fails—for example a flow error, rejection-threshold breach, orphan-handling failure, or derived-table failure
 
-Both receive the publication-time `IngestionResult` with batch ID, durable status, flow/derived results, and queued maintenance tasks. A later asynchronous maintenance failure does not invoke the listener again; monitor `RunStore` for that lifecycle.
+Both receive the attempt's `IngestionResult` with request identity, typed status, and flow/derived results. Listeners are best-effort notifications, not transactional publication or workflow state.
 
 If a listener throws an exception, it is caught and logged as a warning. The batch result is not affected — other listeners still run.
 
@@ -99,13 +99,14 @@ class LoggingListener extends BatchListener {
 | `success` | `Boolean` | Whether the batch completed successfully |
 | `error` | `Option[String]` | Error message if the batch failed |
 | `derivedTableResults` | `Seq[DerivedTableResult]` | Results of derived table execution |
-| `maintenanceResults` | `Seq[MaintenanceResult]` | Publication-time maintenance state, normally `QUEUED` for every managed target |
-| `status` | `RunStatus` | Durable publication state (`PUBLISHED`, `FAILED_PARTIAL`, `UNKNOWN`, and others) |
+| `orphanReports` | `Seq[OrphanReport]` | Completed post-write FK/orphan checks |
+| `status` | `ExecutionStatus` | Observed attempt state (`SUCCEEDED`, `FAILED_PARTIAL`, `UNKNOWN`, and others) |
+| `warnings` | `Seq[String]` | Best-effort diagnostic failures that did not erase known data outcomes |
 
-Each `FlowResult` also exposes optional `icebergMetadata`, operational `warnings`, `writeAttempted`, and `retryable`. Use these fields when deciding whether an alert means “retry pre-write work,” “resume after reconciliation,” or merely “repair a diagnostic side output.”
+Each `FlowResult` also exposes optional `icebergMetadata`, `resultingSnapshotId`, operational `warnings`, and a typed `dataOutcome`. No single per-flow field authorizes a whole-job retry; earlier targets may already have committed.
 
 ## Related
 
 - [Pipeline Builder](pipeline-builder.md) — full builder API reference
 - [Architecture: Execution Model](../architecture/execution-model.md) — batch lifecycle
-- [Recovery and Production Operations](recovery.md) — durable status and asynchronous operations
+- [Failure Handling and Production Operations](recovery.md) — partial commits, unknown outcomes, and incident handling

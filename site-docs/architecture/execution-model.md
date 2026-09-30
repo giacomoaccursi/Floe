@@ -1,163 +1,107 @@
 # Execution Model
 
-How flows are ordered, executed in parallel, and how the batch lifecycle works.
+## Planning and ordering
 
-## Flow ordering from FK dependencies
-
-Flows are not executed in the order they appear in YAML files. The framework builds an execution plan based on foreign key dependencies:
-
-1. **Dependency analysis** — FK references and explicit `dependsOn` declarations between flows are extracted. If `orders` has a FK referencing `customers.customer_id` (or declares `dependsOn: [customers]`), then `customers` is a dependency of `orders`.
-
-2. **Topological sort** — flows are sorted so that every parent executes before its children. If a circular dependency is detected, a `CircularDependencyException` is thrown with the full cycle path.
-
-3. **Grouping** — flows at the same level (no dependency between them) are grouped together. Each group can potentially execute in parallel.
-
-Example with three flows:
+Floe builds one in-process DAG from foreign-key references and explicit `dependsOn` declarations. It validates references, rejects cycles, topologically sorts flows, and groups independent flows.
 
 ```
-customers (no FK)          ← Group 1
-orders (FK → customers)    ← Group 2
-order_items (FK → orders)  ← Group 3
+Group 1: customers, products
+Group 2: orders            (depends on customers)
+Group 3: order_items       (depends on orders)
 ```
 
-If `products` has no FK to any other flow, it joins Group 1:
+Groups execute in order. With `performance.parallelFlows: true`, flows in the same group run concurrently on a bounded execution context; otherwise they run sequentially. Floe does not distribute individual flows as external Airflow/Step Functions tasks and cannot resume at an arbitrary group after the driver exits.
 
-```
-Group 1: customers, products  (independent, can run in parallel)
-Group 2: orders               (depends on customers)
-Group 3: order_items          (depends on orders)
-```
+## One immutable attempt
 
-## Parallel execution
-
-### Flow parallelism
-
-When `performance.parallelFlows` is `true` in `global.yaml`, independent flows within the same group run concurrently:
-
-```yaml
-performance:
-  parallelFlows: true
-```
-
-The thread pool is explicitly sized — the framework does **not** use `ExecutionContext.Implicits.global`. This prevents unbounded parallelism from saturating the Spark driver.
-
-Groups execute sequentially: Group 2 starts only after all flows in Group 1 complete. Within a group, flows run in parallel.
-
-If `parallelFlows` is `false`, all flows execute sequentially in topological order.
-
-### DAG node parallelism
-
-When `parallelNodes` is `true` in the DAG YAML, independent DAG nodes within the same execution group run concurrently:
-
-```yaml
-# In the DAG YAML file
-parallelNodes: true
-```
-
-The thread pool is sized at `availableProcessors * 2`.
-
-If `parallelNodes` is `false` (default), all DAG nodes execute sequentially regardless of independence.
-
-### Thread pool management
-
-Both flow and DAG parallelism use bounded, explicitly sized thread pools:
-
-- Flow parallelism: pool sized at `Runtime.getRuntime.availableProcessors * 2`
-- DAG parallelism: pool sized at `Runtime.getRuntime.availableProcessors * 2`
-
-This follows the Spark best practice of never using the global execution context for parallel Spark operations. Each thread submits Spark jobs independently, and Spark's internal scheduler handles resource allocation.
-
-## Batch lifecycle
-
-A complete batch execution follows this sequence:
+The platform submits an `ExecutionRequest` containing stable logical identity and a unique physical attempt:
 
 ```mermaid
-graph TD
-    subgraph Phase1["1. Build phase"]
-        B1["Load configuration<br/>(YAML or programmatic)"]
-        B2["Validate all configs"]
-        B3["Configure Iceberg catalog<br/>on SparkSession"]
-        B4["Register transformations<br/>and catalog providers"]
-        B1 --> B2 --> B3 --> B4
-    end
-
-    subgraph Phase2["2. Execution phase"]
-        E1["Generate batch ID<br/>(from batchIdFormat)"]
-        E2["Analyze FK dependencies<br/>→ topological sort → group flows"]
-        E3["For each group (sequential)"]
-        E4["For each flow in group<br/>(parallel if enabled)"]
-        E5["Read source data"]
-        E6["Apply column renames"]
-        E7["Run pre-validation transformation"]
-        E8["Run validation pipeline"]
-        E9["Check rejection rate<br/>against threshold"]
-        E10["Run post-validation transformation"]
-        E11["Write to Iceberg<br/>(MERGE INTO / overwrite / SCD2)"]
-        E1 --> E2 --> E3 --> E4
-        E4 --> E5 --> E6 --> E7 --> E8 --> E9 --> E10 --> E11
-    end
-
-    subgraph Phase3["3. Post-batch phase"]
-        P1["Orphan detection<br/>(time travel, cascade)"]
-        P2["Derived tables"]
-        P3["Queue table maintenance<br/>(worker gated on publication)"]
-        P4["Write diagnostic metadata<br/>and quality metrics"]
-        P5["Persist release manifest<br/>and final run status"]
-        P1 --> P2 --> P3 --> P4 --> P5
-    end
-
-    subgraph Phase4["4. DAG phase (separate execution)"]
-        D1["Load DAG config"]
-        D3["Build dependency graph<br/>→ topological sort → group nodes"]
-        D4["Execute nodes group by group"]
-        D1 --> D3 --> D4
-    end
-
-    Phase1 --> Phase2 --> Phase3
-    Phase3 -.->|"if configured,<br/>invoked separately"| Phase4
+flowchart LR
+    REQUEST["ExecutionRequest<br/>pipeline · logical run · attempt<br/>effectiveAt · code · config digest"]
+    PLAN["Validate identity<br/>Build flow DAG"]
+    FLOWS["Read · Transform · Validate<br/>Commit each flow once"]
+    FK["Post-flow FK/orphan handling"]
+    DERIVED["Derived targets"]
+    REPORT["Typed result<br/>Attempt report"]
+    REQUEST --> PLAN --> FLOWS --> FK --> DERIVED --> REPORT
 ```
 
-### Batch ID
+`execute()` is an ad-hoc convenience that creates a new logical run, attempt, and time. Managed platforms should call `execute(request)` or `executeOrThrow(request)` after persisting the request outside Floe.
 
-The batch ID is generated from `processing.batchIdFormat` using Java's `DateTimeFormatter`:
+The orchestrator is single-use. It closes its own worker pool but never stops the caller-owned `SparkSession` and never calls `System.exit`.
 
-```yaml
-processing:
-  batchIdFormat: "yyyyMMdd_HHmmss"
+## Flow path
+
+Each flow runs:
+
+```
+read
+  → source-column rename
+  → pre-validation transformation
+  → input count/minimum check
+  → validation
+  → rejection-threshold gate
+  → post-validation transformation
+  → target write
+  → best-effort diagnostics
 ```
 
-Example: `20260328_150000_2b58c1d40ee84aa5a67a891f174e0f47`. The formatted timestamp is followed by a 32-character UUID suffix so concurrent starts do not collide. The batch ID is used for:
+`effectiveAt`, `logicalRunId`, and `attemptId` are available in `TransformationContext`. SCD2 timestamps use `effectiveAt`, not wall-clock time.
 
-- Snapshot tagging (`batch_20260328_150000_2b58c1d40ee84aa5a67a891f174e0f47`)
-- Metadata directory naming (`{metadataPath}/20260328_150000_2b58c1d40ee84aa5a67a891f174e0f47/`)
-- Logging and tracing
+After a successful parent flow, downstream validation reads the exact `resultingSnapshotId`. It does not silently read mutable HEAD. A successful snapshotless empty table is represented by an empty DataFrame with the table schema.
 
-### Failure handling
+## Atomicity and partial results
 
-- **Flow failure**: if a flow fails, the batch stops. The failed flow is reported in `IngestionResult`.
-- **Rejection threshold**: if `maxRejectionRate` is configured (globally or per-flow) and any flow's rejection rate exceeds the threshold, the batch stops. In sequential execution, remaining flows in the current group are not executed. In parallel execution, flows already running complete but subsequent groups are not started.
-- **Orphan/derived failure**: orphan-detection and derived-table failures make `IngestionResult.success = false`; already committed tables are not rolled back.
-- **Per-flow diagnostic-output failure**: rejected-row, warning, and per-flow metadata failures do not reinterpret an already committed Iceberg write as failed. They are exposed in `FlowResult.warnings`, and the run is published as `SUCCEEDED_WITH_WARNINGS`. Batch-summary and quality-metric failures are currently log-only.
-- **Maintenance failure**: ingestion only persists `QUEUED` maintenance tasks. A separate `MaintenanceWorker` claims and retries them; a failure changes the durable run status to `SUCCEEDED_WITH_WARNINGS` without replaying ingestion.
-- **Iceberg commit uncertainty**: a failed client call does not prove that an Iceberg commit failed. Every managed flow and derived-table write carries a deterministic operation ID in the snapshot summary. Recovery searches Iceberg history for that ID and classifies the operation as committed, absent, unknown, or inconsistent before any resume.
+The atomic unit is one Iceberg table commit. There is no transaction across flows, derived tables, FK cleanup, metrics, or diagnostics.
 
-## Durable run states, resume, and replay
+Floe executes no automatic flow retry. If a target write has entered the commit path, an unclassified exception remains `DataOutcome.UNKNOWN`; a client error is not evidence that a remote commit failed. Known earlier commits are preserved in the result even when a later target fails.
 
-Production deployments should configure a `JdbcRunStore`. It stores versioned run and operation states, pinned snapshot IDs where present, input fingerprints, leases with fencing tokens, release manifests, and maintenance tasks. `InMemoryRunStore` has the same state model but is only suitable for tests and single-process development.
+Aggregate statuses are:
 
-`pipeline.resume(batchId)` keeps the original batch ID and `effectiveAt`. It acquires the run lease, reconciles operation IDs against Iceberg, validates that pending inputs have not changed, and executes only operations proven absent. Already committed targets are loaded at their recorded snapshots for downstream dependency checks.
+| Status | Meaning |
+|---|---|
+| `SUCCEEDED` | Required synchronous operations completed |
+| `SUCCEEDED_WITH_WARNINGS` | Data succeeded; diagnostic output failed |
+| `FAILED` | No target is known to have completed |
+| `FAILED_PARTIAL` | Some targets completed before failure |
+| `UNKNOWN` | At least one mutation has an uncertain outcome |
 
-`pipeline.replay(batchId)` is different: it requires a terminal source batch and matching input fingerprints, then creates a new linked batch with new operation IDs. File fingerprints cover path, length, modification time, format, and reader options; they are not content hashes. JDBC and custom readers must provide `source.options.replayToken` identifying an immutable extract.
+Parallel flows already running are allowed to finish and all their results are retained. Subsequent groups are not started after a failure.
 
-A successful run is visible to consumers through one release manifest containing the exact tracked snapshot for every flow and derived table that has one; a target with no snapshot is explicitly represented as empty. Per-table commits remain independent—Iceberg has no cross-table transaction—but consumers using `SnapshotPinnedReader` see the application-level release boundary instead of a mixture of table heads. Current limitation: a later `onOrphan: delete` cleanup snapshot is not yet a tracked release operation; see the [recovery guide](../guides/recovery.md#published-reads).
+## Commit identity
 
-## Related
+Every managed flow and derived commit writes snapshot summary properties for:
 
-- [Architecture Overview](overview.md) — module diagram
-- [Data Flow](data-flow.md) — step-by-step pipeline
-- [Global Configuration — performance](../configuration/global.md#performance) — parallelism settings
-- [DAG Aggregation](../guides/dag-aggregation.md) — DAG execution details
-- [Orphan Detection](../guides/orphan-detection.md) — post-batch FK integrity
-- [Batch Listeners](../guides/batch-listeners.md) — notifications on batch completion/failure
-- [Quality Metrics](../guides/quality-metrics.md) — per-flow metrics Iceberg table
-- [Recovery and Production Operations](../guides/recovery.md) — state model, production setup, and incident runbook
+- pipeline, logical run, and attempt;
+- target and operation type;
+- logical operation ID and attempt operation ID;
+- contract version, code version, config digest, and effective time.
+
+The attempt operation ID identifies one commit attempt. The logical operation ID is stable across attempts of the same logical run. These values aid inspection; they are not uniqueness constraints, locks, or proof that retry is safe.
+
+`resultingSnapshotId` records the state used downstream. For a new commit it equals the committed snapshot. For a verified no-change operation it can point to the existing snapshot. JSON serializes snapshot IDs as strings.
+
+## Diagnostics
+
+Attempt artifacts use:
+
+```
+{root}/{pipelineId}/{logicalRunId}/{attemptId}/...
+```
+
+Per-flow metadata, rejected rows, validation warnings, the batch report, and optional quality metrics are observability outputs. Per-flow diagnostic failures produce warnings after a known data commit. The default report is also diagnostic; applications that use it to publish snapshots to consumers must elevate publication to a required application-level output.
+
+## External orchestration
+
+Airflow, Step Functions, Argo, Glue, EMR, or another platform owns:
+
+- request retention and scheduling;
+- writer mutual exclusion for overlapping targets;
+- job/application lifecycle and cancellation;
+- retry decisions and incident records;
+- maintenance scheduling.
+
+Scheduler retry must be disabled by default. A whole-job retry is allowed only for an application/deployment recipe that has passed repeatability tests. `UNKNOWN` blocks automatic retry.
+
+See [Failure Handling and Production Operations](../guides/recovery.md) for the operational contract.

@@ -2,7 +2,7 @@
 
 Declarative ETL framework — built on Spark and Iceberg.
 
-Floe lets you define data ingestion pipelines in YAML. You describe your sources, schemas, validation rules, and load modes — the framework handles reading, validating, writing to Iceberg, schema evolution, snapshot tagging, durable run state, and asynchronous maintenance tasks. Code is only needed where you want custom transformation logic.
+Floe lets you define data ingestion pipelines in YAML. You describe your sources, schemas, validation rules, and load modes — the framework handles reading, validating, writing to Iceberg, schema evolution, snapshot tagging, and typed execution evidence. Scheduling, durable workflow state, writer coordination, and maintenance scheduling remain responsibilities of the hosting platform. Code is only needed where you want custom transformation logic.
 
 ## What it does
 
@@ -42,7 +42,7 @@ val result = IngestionPipeline.builder()
 
 - **Write YAML, not code** — describe your data sources, schemas, and rules in config files. The framework reads, validates, and writes the data for you.
 - **Atomic table commits** — each Iceberg write is atomic for one table and successful batch tags support time travel. A multi-table batch is not a distributed transaction: if a later flow fails, earlier table commits remain and require reconciliation.
-- **Durable recovery** — a JDBC-backed coordinator records commit identities, leases, input fingerprints, release manifests, and maintenance tasks so interrupted runs can be reconciled before resume.
+- **Orchestrator-neutral execution** — immutable requests, typed partial/unknown outcomes, and snapshot evidence integrate without a Floe workflow database.
 - **Data quality built in** — check for nulls, duplicates, invalid formats, value ranges, and referential integrity between tables. Bad records are separated and saved for review.
 - **Keep history** — track how records change over time with SCD2 (Slowly Changing Dimensions). The framework handles versioning, timestamps, and soft deletes automatically.
 - **Combine tables** — join data from multiple flows into aggregated views using a DAG. Nest child records, flatten columns, or compute summaries.

@@ -80,19 +80,23 @@ IngestionPipeline.builder()
   .executeOrThrow()
 ```
 
-For production, build the pipeline once with a shared coordinator and an immutable deployment revision:
+For production, give the pipeline and application artifact stable identities, then submit an explicit request:
 
 ```scala
 val pipeline = IngestionPipeline.builder()
   .withConfigDirectory("config")
-  .withRunStore(new JdbcRunStore(() => dataSource.getConnection))
-  .withPipelineVersion(sys.env("APP_RELEASE_SHA"))
+  .withPipelineId("orders-prod")
+  .withCodeVersion(sys.env("APP_IMAGE_DIGEST"))
   .build()
 
-pipeline.executeOrThrow()
+val request = pipeline.executionDefinition.newRequest(
+  logicalRunId = sys.env("LOGICAL_RUN_ID"),
+  effectiveAt = java.time.Instant.parse(sys.env("EFFECTIVE_AT"))
+)
+pipeline.executeOrThrow(request)
 ```
 
-The application supplies `dataSource` and its JDBC driver. See [Recovery and Production Operations](../guides/recovery.md) before enabling scheduled production runs.
+Persist the request before submission and disable automatic scheduler retries until the full application is qualified as repeatable. See [Failure Handling and Production Operations](../guides/recovery.md).
 
 ## Running locally
 

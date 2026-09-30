@@ -43,13 +43,13 @@ val result = pipeline.execute()
 | `withDerivedTable(name, fn)` | Registers a derived table computed after all flows are written to Iceberg |
 | `withDataReader(type, factory)` | Registers a custom data reader for a source type. See [Data Sources — Custom readers](data-sources.md#custom-readers). |
 | `withBatchListener(listener)` | Registers a listener notified on batch completion or failure. See [Batch Listeners](batch-listeners.md). |
-| `withRunStore(store)` | Configures the durable coordinator used for CAS transitions, leases, recovery, release manifests, and maintenance tasks. Use `JdbcRunStore` in production. |
-| `withPipelineVersion(version)` | Sets a stable deployment revision used by resume/replay validation for transformation and derived-table code that cannot be serialized into the pipeline hash. |
+| `withPipelineId(id)` | Sets the stable environment-specific pipeline identity used by explicit execution requests. |
+| `withCodeVersion(version)` | Sets the immutable application artifact identity, including custom transformations/readers/validators. |
 | `withVariables(variables)` | Sets variables for YAML substitution (priority over env vars). See [Configuration Overview](../configuration/overview.md#variable-substitution) |
 | `build()` | Builds the pipeline (returns `IngestionPipeline`) |
 | `validate()` | Validates configuration without executing. Returns `Seq[String]` of issues (empty = valid). |
 
-The builder does not have an `execute()` method — call `build()` first, then `execute()`, `executeOrThrow()`, `resume(batchId)`, or `replay(batchId)` on the returned pipeline.
+The builder does not have an `execute()` method: call `build()` first, then `execute()`/`executeOrThrow()` for an ad-hoc run or pass an explicit `ExecutionRequest` for platform-managed execution.
 
 ### execute() vs executeOrThrow()
 
@@ -141,59 +141,48 @@ This means if flow `orders` has a FK referencing `customers` (or declares `depen
 
 ```scala
 case class IngestionResult(
-  batchId: String,
+  request: ExecutionRequest,
   flowResults: Seq[FlowResult],
   success: Boolean,
   error: Option[String] = None,
   derivedTableResults: Seq[DerivedTableResult] = Seq.empty,
-  maintenanceResults: Seq[MaintenanceResult] = Seq.empty,
-  status: RunStatus = RunStatus.Unknown
+  orphanReports: Seq[OrphanReport] = Seq.empty,
+  status: ExecutionStatus = ExecutionStatus.Unknown,
+  warnings: Seq[String] = Seq.empty,
+  executionTimeMs: Long = 0L
 )
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `batchId` | `String` | Formatted timestamp prefix plus a UUID suffix |
+| `request` | `ExecutionRequest` | Immutable logical/attempt identity and reproducibility metadata |
+| `logicalRunId` / `attemptId` | `String` | Convenience accessors for business execution and this driver invocation |
 | `flowResults` | `Seq[FlowResult]` | Results for each executed flow |
-| `success` | `Boolean` | `true` if synchronous flow execution, orphan handling, derived tables, and publication completed successfully |
+| `success` | `Boolean` | Functional result of synchronous flow, FK/orphan, and derived work |
 | `error` | `Option[String]` | Error message if the batch failed |
 | `derivedTableResults` | `Seq[DerivedTableResult]` | Results for each derived table (empty if none registered) |
-| `maintenanceResults` | `Seq[MaintenanceResult]` | Per-target asynchronous maintenance status; successful ingestion normally returns `QUEUED` |
-| `status` | `RunStatus` | Authoritative durable status such as `PUBLISHED`, `FAILED_PARTIAL`, `UNKNOWN`, or `SUCCEEDED_WITH_WARNINGS` |
+| `orphanReports` | `Seq[OrphanReport]` | Completed FK/orphan checks |
+| `status` | `ExecutionStatus` | `SUCCEEDED`, `SUCCEEDED_WITH_WARNINGS`, `FAILED`, `FAILED_PARTIAL`, or `UNKNOWN` |
+| `warnings` | `Seq[String]` | Diagnostic failures that do not invalidate known data commits |
 
-`MaintenanceResult` identifies the `targetName`, whether it is a `flow` or `derived` target, its `status`, and any `error`. Run `MaintenanceWorker` from a separate scheduled job; a maintenance failure triggers a maintenance-only retry and must not cause an ingestion replay.
-
-### Recovery example
+### Platform-managed execution
 
 ```scala
-val runStore = new JdbcRunStore(() => dataSource.getConnection)
 val pipeline = IngestionPipeline.builder()
   .withConfigDirectory("config")
-  .withRunStore(runStore)
-  .withPipelineVersion(sys.env("APP_RELEASE_SHA"))
+  .withPipelineId("orders-prod")
+  .withCodeVersion(sys.env("APP_IMAGE_DIGEST"))
   .build()
 
-val first = pipeline.execute()
+val request = pipeline.executionDefinition.newRequest(
+  logicalRunId = sys.env("LOGICAL_RUN_ID"),
+  effectiveAt = Instant.parse(sys.env("EFFECTIVE_AT"))
+)
 
-// On an interrupted/failed run: same batch and effectiveAt; proven commits are not written again.
-val recovered = if (!first.success) pipeline.resume(first.batchId) else first
-
-// Separately, a deliberate replay of a terminal run creates a linked new batch.
-val replayed = pipeline.replay(recovered.batchId)
+val result = pipeline.executeOrThrow(request)
 ```
 
-For JDBC or custom sources, configure an immutable source version:
-
-```yaml
-source:
-  type: jdbc
-  path: public.orders
-  options:
-    url: "jdbc:postgresql://db/app"
-    replayToken: "orders/extract/2026-09-24T00:00:00Z/v1"
-```
-
-The token must identify immutable source contents; a constant token only disables the guard. File fingerprints use path, length, modification time, format, and options rather than hashing file bytes. See [Recovery and Production Operations](recovery.md).
+Persist the request in the hosting platform before submission. Floe has no `resume`/`replay` API and performs no whole-job retry. See [Failure Handling and Production Operations](recovery.md).
 
 ### FlowResult
 
@@ -202,7 +191,7 @@ Each flow produces a `FlowResult`:
 | Field | Type | Description |
 |-------|------|-------------|
 | `flowName` | `String` | Name of the flow |
-| `batchId` | `String` | Batch identifier |
+| `batchId` | `String` | Compatibility alias for the attempt identifier |
 | `success` | `Boolean` | Whether the flow completed successfully |
 | `inputRecords` | `Long` | Total records read from source (after pre-validation transform) |
 | `validRecords` | `Long` | Records that passed validation |
@@ -213,9 +202,10 @@ Each flow produces a `FlowResult`:
 | `rejectionReasons` | `Map[String, Long]` | Count of rejections per validation step |
 | `error` | `Option[String]` | Error message if the flow failed |
 | `icebergMetadata` | `Option[IcebergFlowMetadata]` | Iceberg snapshot metadata (see [Iceberg Integration](iceberg.md)) |
+| `resultingSnapshotId` | `Option[Long]` | Snapshot pinned for downstream dependencies, including a verified no-change state |
+| `resultingSchemaJson` | `Option[String]` | Frozen Spark schema used when a valid empty table has no snapshot; avoids a fallback read from mutable HEAD |
 | `warnings` | `Seq[String]` | Operational side-output failures that did not invalidate the committed target data |
-| `writeAttempted` | `Boolean` | Whether target mutation may have started; used to prevent unsafe whole-flow retry |
-| `retryable` | `Boolean` | Whether the failure is known to have occurred before the target write |
+| `dataOutcome` | `DataOutcome` | `NOT_ATTEMPTED`, `NOT_COMMITTED`, `NO_CHANGE`, `COMMITTED`, or `UNKNOWN` |
 
 ## Transformations
 
@@ -297,8 +287,10 @@ The context is immutable. Every method that modifies state returns a new instanc
 |-------|------|-------------|
 | `currentFlow` | `String` | Name of the flow being processed |
 | `currentData` | `DataFrame` | The flow's DataFrame at this point in the pipeline |
-| `validatedFlows` | `Map[String, DataFrame]` | All flows validated so far in this batch |
-| `batchId` | `String` | Current batch identifier |
+| `validatedFlows` | `Map[String, DataFrame]` | Completed dependencies pinned to their resulting snapshots |
+| `logicalRunId` | `String` | Stable business execution identity |
+| `attemptId` | `String` | Current driver invocation identity (`batchId` is a compatibility alias) |
+| `effectiveAt` | `Instant` | Functional time supplied in the execution request |
 | `spark` | `SparkSession` | The active SparkSession |
 
 ### withData(newData)
@@ -333,7 +325,7 @@ Flow availability depends on execution order. The framework orders flows by FK d
 
 ## Derived tables
 
-Derived tables are Iceberg tables computed after all flows and orphan checks complete. They read the complete current state of their Iceberg inputs, not merely the incoming batch DataFrame, and write the result as a full-load table. Historical snapshots remain available separately through Iceberg time travel while retained.
+Derived tables are Iceberg tables computed after all flows and orphan checks complete. `ctx.table` currently reads catalog HEAD and writes the result as a full-load table; the application must externally serialize other writers for those inputs. Historical snapshots remain available separately through Iceberg time travel while retained.
 
 This is the recommended way to produce aggregations, splits, denormalizations, or any other output derived from your ingested data. Derived tables are first-class Iceberg tables — they have snapshots, time travel, schema evolution, and can be referenced by the DAG or queried directly.
 
@@ -361,7 +353,9 @@ Each derived table function receives a `DerivedTableContext`:
 | Field | Type | Description |
 |-------|------|-------------|
 | `spark` | `SparkSession` | The active SparkSession |
-| `batchId` | `String` | Current batch identifier |
+| `logicalRunId` | `String` | Stable business execution identity |
+| `attemptId` | `String` | Current driver invocation (`batchId` is an alias) |
+| `effectiveAt` | `Instant` | Functional time supplied in the request |
 | `catalogName` | `String` | Iceberg catalog name (from `global.yaml`) |
 | `namespace` | `String` | Iceberg namespace (from `global.yaml`, defaults to `default`) |
 
@@ -388,7 +382,7 @@ You can also use `ctx.spark` for arbitrary Spark operations (reading external da
 3. Derived tables execute in registration order
 4. Each derived table writes to `{catalogName}.{namespace}.{tableName}` as a full-load overwrite
 5. A successful snapshot is tagged when `enableSnapshotTagging` is enabled
-6. The release manifest is published and maintenance is queued for a separate worker
+6. The attempt report records typed outcomes and snapshot references
 
 If a derived table fails, the remaining derived tables still execute, but the final batch result has `success = false`. `executeOrThrow()` throws, batch listeners receive `onBatchFailed`, and the batch summary and quality metrics record a failed batch. `IngestionResult.derivedTableResults` contains each derived table's outcome; already committed tables are not rolled back.
 
@@ -405,8 +399,10 @@ If a derived table fails, the remaining derived tables still execute, but the fi
 | `recordsWritten` | `Long` | Number of records written (0 on failure) |
 | `error` | `Option[String]` | Error message on failure |
 | `snapshotId` | `Option[Long]` | Exact committed snapshot when a snapshot was created |
-| `operationId` | `Option[String]` | Deterministic commit identity used for reconciliation |
-| `reconciled` | `Boolean` | Whether success was recovered from Iceberg history after an uncertain client outcome |
+| `resultingSnapshotId` | `Option[Long]` | Resulting table reference, including a no-change operation |
+| `operationId` | `Option[String]` | Identity of this commit attempt, stored in snapshot metadata |
+| `reconciled` | `Boolean` | Whether a client exception was resolved by finding this attempt's snapshot |
+| `dataOutcome` | `DataOutcome` | Typed data effect for the target |
 
 ### Using derived tables in the DAG
 

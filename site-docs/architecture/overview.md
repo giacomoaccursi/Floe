@@ -18,17 +18,16 @@ graph TD
     WRITE["Write to Iceberg<br/>Full · Delta · SCD2"]
     ORPHAN["Orphan Detection<br/>Post-batch FK integrity"]
     DERIVED["Derived Tables<br/>Compute and write to Iceberg"]
-    QUEUE["Queue Maintenance<br/>Durable asynchronous tasks"]
-    DIAG["Write Diagnostics<br/>JSON · quality metrics"]
-    RELEASE["Publish Release Manifest<br/>Pinned target state"]
-    WORKER["Maintenance Worker<br/>Expiration · Compaction · Cleanup"]
+    DIAG["Write Attempt Evidence<br/>JSON · quality metrics"]
+    RESULT["Return Typed Result<br/>partial · unknown · snapshots"]
+    WORKER["External Maintenance Job<br/>Expiration · Compaction · Cleanup"]
     DAG["DAG Aggregation<br/>Join · Nest · Flatten · Aggregate"]
 
     YAML --> BUILD --> ORDER --> EXEC
     EXEC --> READ --> RENAME --> PRE --> VAL --> POST --> WRITE
-    WRITE --> ORPHAN --> DERIVED --> QUEUE --> DIAG --> RELEASE
-    RELEASE -.-> WORKER
-    RELEASE -.-> DAG
+    WRITE --> ORPHAN --> DERIVED --> DIAG --> RESULT
+    RESULT -.-> WORKER
+    RESULT -.-> DAG
 ```
 
 ## End-to-end data flow
@@ -51,14 +50,14 @@ A batch execution follows this sequence:
 5. Correctness and derived outputs
    Orphan detection → Read current Iceberg inputs → Compute/write derived tables
 
-6. Finalization and publication
-   Queue maintenance → Diagnostic metadata → Persist release manifest and final run status
+6. Finalization
+   Diagnostic metadata → Typed attempt result with per-target snapshot evidence
 
 7. DAG aggregation (if configured, separate execution)
    Load DAG config → Resolve join dependencies → Execute nodes → Produce output
 
-8. Maintenance (separate worker)
-   After publication: claim durable tasks → Expire snapshots → Compact data files → Remove old orphan files → Rewrite manifests
+8. Maintenance (separately scheduled job)
+   Platform selects tables → Expire snapshots → Compact data files → Remove old orphan files → Rewrite manifests
 ```
 
 ## Design principles
@@ -68,8 +67,9 @@ A batch execution follows this sequence:
 - **Fail-fast**: configuration errors are caught at startup, not at runtime. Missing fields, invalid references, and type mismatches all fail before any data is processed.
 - **Immutable context**: `TransformationContext` is immutable. Every modification returns a new instance, preventing side effects between transformations.
 - **Bounded parallelism**: parallel execution uses explicitly sized thread pools, never the global execution context.
-- **Durable recovery**: run and operation state, leases, release manifests, and maintenance tasks live in `RunStore`; Iceberg snapshots remain the proof of table commits.
-- **Asynchronous maintenance**: ingestion queues per-table work. Current task state is read from `RunStore`, not from the publication-time JSON summary.
+- **Orchestrator-neutral**: Floe has no workflow database; the platform owns scheduling, serialization, and request retention.
+- **Explicit evidence**: typed data outcomes and pinned dependency snapshots expose partial and uncertain execution honestly.
+- **Independent maintenance**: ingestion never queues or retries maintenance; schedule it as a separate operational workload.
 
 ## Modules
 

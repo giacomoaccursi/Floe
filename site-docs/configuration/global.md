@@ -150,7 +150,7 @@ Custom catalog providers (Hive, REST, Nessie) can be registered via the [Pipelin
 
 ### maintenance
 
-Asynchronous table-maintenance settings. Floe stores one `QUEUED` task per managed target while finalizing a successful run. A separate `MaintenanceWorker` applies these settings only after the run reaches `PUBLISHED` or `SUCCEEDED_WITH_WARNINGS`; ingestion does not wait for it.
+Settings consumed only when an independently scheduled application invokes `IcebergMaintenanceRunner`. Ingestion does not queue, run, or retry table maintenance.
 
 | Field | Default | Description |
 |-------|---------|-------------|
@@ -162,5 +162,5 @@ Asynchronous table-maintenance settings. Floe stores one `QUEUED` task per manag
 !!!warning "Orphan cleanup minimum retention"
     FLOe clamps the configured threshold to **at least 24 hours** (1440 minutes). That is not universally safe: set it above the longest running write, backup or migration, or concurrent operations may lose in-flight files.
 
-!!!note "Maintenance state is durable"
-    `IngestionResult.maintenanceResults` and `summary.json` normally report `QUEUED`, because they are produced before the worker runs. Query `RunStore.getMaintenanceTasks` for current state. A worker failure changes the durable run status to `SUCCEEDED_WITH_WARNINGS`; retry only maintenance, never ingestion. See [Recovery and Production Operations](../guides/recovery.md#asynchronous-maintenance).
+!!!note "Maintenance ownership"
+    The hosting platform owns the maintenance schedule, status, retries, and mutual exclusion. A maintenance failure must retry only maintenance, never ingestion. See [Failure Handling and Production Operations](../guides/recovery.md#maintenance).

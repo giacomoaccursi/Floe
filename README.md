@@ -71,24 +71,24 @@ val result = IngestionPipeline.builder()
   .executeOrThrow()
 ```
 
-Floe reads the source data, validates schema and rules, upserts into `floe.default.orders`, tags the committed snapshot, and writes operational metadata. The example uses the process-local run coordinator; production deployments require the durable setup described below.
+Floe reads the source data, validates schema and rules, upserts into `floe.default.orders`, tags the committed snapshot, and writes an attempt report. Floe does not require a coordinator database.
 
 ## Key features
 
 | Feature | What it does |
 |---------|-------------|
 | **Declarative flows** | Define sources, schemas, validation rules, and load modes in YAML |
-| **Three load modes** | Full (replace), Delta (upsert with a PK; append-only without one), SCD2 (versioned history with soft deletes) |
+| **Three load modes** | Full (replace), Delta (keyed upsert; a PK is mandatory), SCD2 (versioned history with soft deletes) |
 | **Built-in validation** | Schema, not-null, PK uniqueness, FK integrity, regex, range, domain, custom |
 | **Orphan detection** | Post-batch FK integrity check using Iceberg time travel — warn or auto-delete |
 | **Multiple sources** | CSV, Parquet, JSON, Avro, ORC files and JDBC databases. Pluggable custom readers |
 | **Schema evolution** | Auto-add columns, auto-widen types (int→long, float→double, decimal precision) |
 | **Quality metrics** | Optional Iceberg table with per-flow rejection rates, orphan counts, execution times |
 | **Batch listeners** | Pluggable notifications — Slack, SNS, email, or any custom endpoint |
-| **Retry** | Configurable exponential backoff with jitter for transient failures |
+| **Explicit execution contract** | Separates logical run, physical attempt, effective time, code version, and canonical config digest |
 | **DAG aggregation** | Join, nest, flatten, and aggregate data across flows using a declarative DAG |
 | **Derived tables** | Compute post-batch tables from the complete current state of Iceberg inputs |
-| **Durable recovery** | Reconcile uncertain commits, resume partial runs, and publish snapshot-pinned releases |
+| **Typed outcomes** | Reports success, warnings, partial failure, and unknown commit outcomes without pretending the batch is atomic |
 | **Config validation** | Lint YAML and dependency graphs without reading source data or running Spark jobs |
 
 ## Getting started
@@ -152,7 +152,24 @@ val result = IngestionPipeline.builder()
 
 The Iceberg SQL extensions must be configured before Spark creates the session. Floe then registers the catalog declared in `global.yaml`; callers do not need to duplicate catalog properties in the `SparkSession` builder.
 
-The default run coordinator is process-local and intended for development. Production deployments should configure a shared `JdbcRunStore`, set an immutable `pipelineVersion`, and run Iceberg maintenance from a separate worker. See the [Recovery and Production Operations](https://giacomoaccursi.github.io/Floe/guides/recovery/) guide.
+For a platform-managed run, build the pipeline with a stable identity and immutable artifact version, persist the request before submission, and pass it to Floe:
+
+```scala
+val pipeline = IngestionPipeline.builder()
+  .withConfigDirectory("config")
+  .withPipelineId("orders-prod")
+  .withCodeVersion(sys.env("APP_IMAGE_DIGEST"))
+  .build()
+
+val request = pipeline.executionDefinition.newRequest(
+  logicalRunId = sys.env("LOGICAL_RUN_ID"),
+  effectiveAt = java.time.Instant.parse(sys.env("EFFECTIVE_AT"))
+)
+
+pipeline.executeOrThrow(request)
+```
+
+Floe performs no automatic flow or whole-job retry. Airflow, Step Functions, or another host owns scheduling and mutual exclusion; leave platform retries disabled unless the complete application has been proven repeatable. See [Failure Handling and Production Operations](https://giacomoaccursi.github.io/Floe/guides/recovery/).
 
 ## Deployment targets
 
@@ -173,7 +190,7 @@ Full documentation at **[giacomoaccursi.github.io/Floe](https://giacomoaccursi.g
 - [Validation Engine](https://giacomoaccursi.github.io/Floe/guides/validation/) — all rule types
 - [Iceberg Integration](https://giacomoaccursi.github.io/Floe/guides/iceberg/) — write modes, snapshots, maintenance
 - [Pipeline Builder API](https://giacomoaccursi.github.io/Floe/guides/pipeline-builder/) — programmatic configuration
-- [Recovery and Production Operations](https://giacomoaccursi.github.io/Floe/guides/recovery/) — durable state, resume, replay, and release manifests
+- [Failure Handling and Production Operations](https://giacomoaccursi.github.io/Floe/guides/recovery/) — partial commits, unknown outcomes, retry policy, and incident response
 
 ## License
 

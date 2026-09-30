@@ -140,11 +140,10 @@ After all flows complete:
 
 1. **Orphan detection** — uses time travel to find removed parent keys, resolves orphaned children. See [Orphan Detection](../guides/orphan-detection.md).
 2. **Derived tables** — computes registered outputs from the complete current state of their Iceberg inputs.
-3. **Maintenance enqueue** — persists one asynchronous task per managed table. Workers ignore it until the run is published.
-4. **Diagnostic outputs** — writes per-flow JSON, the batch summary, and optional quality metrics. These aid operations but do not replace `RunStore` or Iceberg history as authoritative state.
-5. **Release publication** — stores the manifest and final run status only after all required work succeeds. The manifest records a pinned snapshot where one exists, or an explicit empty state for a target with no snapshot. An `onOrphan: delete` cleanup commit is a documented current exception; it is not yet a separately pinned operation.
+3. **Diagnostic outputs** — writes per-flow JSON, the attempt report, and optional quality metrics below the pipeline/logical-run/attempt identity.
+4. **Typed result** — returns functional success plus `SUCCEEDED`, `FAILED`, `FAILED_PARTIAL`, or `UNKNOWN` and per-target snapshot evidence.
 
-A separate `MaintenanceWorker` later claims queued tasks and runs snapshot expiration, compaction, orphan-file cleanup, and optional manifest rewriting. See [Recovery and Production Operations](../guides/recovery.md).
+A separately scheduled application may invoke `IcebergMaintenanceRunner` for snapshot expiration, compaction, orphan-file cleanup, and optional manifest rewriting. See [Failure Handling and Production Operations](../guides/recovery.md).
 
 ## Related
 

@@ -113,10 +113,10 @@ object QuickstartApp extends App {
 3. Charlie's row is rejected (invalid email) and written to `output/rejected/`
 4. The 3 valid rows are written to the Iceberg table `floe.default.customers`
 5. The snapshot is tagged with the batch ID for time travel
-6. A release manifest is stored and maintenance tasks are queued in the process-local development `RunStore`
+6. A versioned attempt report is written below `metadataPath/local/{logicalRunId}/{attemptId}/`
 
 !!! note "Production setup"
-    This quickstart uses the default `InMemoryRunStore`; its state and queued maintenance disappear when the JVM stops. Production jobs must configure a shared `JdbcRunStore`, set `withPipelineVersion(...)`, and schedule a `MaintenanceWorker`. See [Recovery and Production Operations](../guides/recovery.md).
+    Floe does not require a coordinator database. Production jobs should set `withPipelineId(...)` and `withCodeVersion(...)`, persist an explicit `ExecutionRequest` in the hosting platform, and schedule Iceberg maintenance independently. See [Failure Handling and Production Operations](../guides/recovery.md).
 
 ## Next steps
 
@@ -124,4 +124,4 @@ object QuickstartApp extends App {
 - [Configuration Overview](../configuration/overview.md) — all config options
 - [Validation Engine](../guides/validation.md) — all validation rule types
 - [Domains Configuration](../configuration/domains.md) — validate values against predefined lists
-- [Recovery and Production Operations](../guides/recovery.md) — make runs restart-safe
+- [Failure Handling and Production Operations](../guides/recovery.md) — handle partial and uncertain attempts safely

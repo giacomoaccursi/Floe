@@ -80,7 +80,7 @@ The quality metrics table does not replace the JSON metadata written to `metadat
 | Use case | Debugging, audit trail | Trend analysis, dashboards, alerting |
 | Requires Spark | No | Yes |
 
-Neither output is the workflow source of truth. JSON and quality metrics are best-effort diagnostics and may fail independently. Use `RunStore` for current run/maintenance state and Iceberg snapshot history for commit evidence. `batch_success` is evaluated before the asynchronous maintenance worker runs, so a later maintenance failure does not update existing metric rows.
+Neither output is a workflow coordinator. JSON and quality metrics are best-effort diagnostics and may fail independently; the hosting platform owns job state, while Iceberg snapshot history supplies commit evidence. Maintenance is a separate scheduled job and does not update earlier metric rows.
 
 ## Related
 

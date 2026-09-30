@@ -2,7 +2,7 @@
 
 ## Overview
 
-The framework uses Apache Iceberg as its table format. Each table write commits atomically; a batch that writes several tables is **not** one Iceberg transaction. Delta and SCD2 use `MERGE INTO`, while full loads overwrite table contents. FLOe publishes a cross-table release manifest with pinned target states and queues maintenance outside the ingestion critical path.
+The framework uses Apache Iceberg as its table format. Each table write commits atomically; a pipeline attempt that writes several tables is **not** one Iceberg transaction. Delta and SCD2 use `MERGE INTO`, while full loads overwrite table contents. FLOe returns per-target snapshot evidence and a typed attempt result. Maintenance is a separate application owned and scheduled by the hosting platform.
 
 The `iceberg` section is required in `global.yaml`. At startup, the pipeline validates the config and configures the SparkSession with the Iceberg catalog. If the section is missing or invalid, execution stops immediately (fail-fast).
 
@@ -60,7 +60,7 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 | `fileFormat` | `parquet` | Default data file format |
 | `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel by batch ID |
 | `catalogProperties` | `{}` | Additional key-value properties passed to the catalog provider |
-| `maintenance.*` | see below | Settings consumed by the asynchronous maintenance worker |
+| `maintenance.*` | see below | Settings consumed only when an independently scheduled application invokes `IcebergMaintenanceRunner` |
 
 ### Maintenance settings
 
@@ -298,13 +298,13 @@ The `WHEN MATCHED AND (...)` condition uses Spark SQL's null-safe equality opera
 
 This means rows where no column has actually changed are skipped entirely by the MERGE engine.
 
-If no primary key is defined, the write degrades to an append.
+Delta requires a non-empty primary key. FLOe rejects a Delta flow without one during configuration validation and the writer repeats the check before any table creation. This avoids an implicit append mode whose replay could duplicate rows. Use a different, explicitly designed ingestion path if append semantics are required.
 
 Before a keyed MERGE, FLOe rejects NULL or duplicate source keys. It does not choose a winner for competing source events, nor does Iceberg enforce uniqueness in the existing target table. Resolve source duplicates using a deterministic sequence before writing and monitor target-key uniqueness separately.
 
 #### Idempotency
 
-For a keyed MERGE against an unchanged target, re-running the same complete source can leave the logical rows unchanged: value-based change detection skips equal matches. This is **not** a general exactly-once guarantee. The no-PK append fallback can duplicate rows; concurrent writes, missing tombstones and replay order require their own policy.
+For a keyed MERGE against an unchanged target, re-running the same complete source can leave the logical rows unchanged: value-based change detection skips equal matches. This is **not** a general exactly-once guarantee. Concurrent writes, missing tombstones, mutable inputs and replay order still require their own policy.
 
 At the storage level, Iceberg may still create a new snapshot depending on the write mode (see copy-on-write vs merge-on-read below), but the data content is identical.
 
@@ -382,21 +382,27 @@ Each write produces an `IcebergFlowMetadata` object containing:
 - `manifestListLocation`: path to the manifest list file
 - `summary`: Iceberg summary map (added/deleted records, file counts, etc.)
 
-This metadata is written to the batch metadata JSON at `{metadataPath}/{batchId}/flows/{flowName}.json`.
+This metadata is written to the attempt diagnostics at `{metadataPath}/{pipelineId}/{logicalRunId}/{attemptId}/flows/{flowName}.json`.
 
 ### Commit identity and reconciliation
 
 Every managed flow and derived-table write that creates a snapshot adds these properties to its Iceberg snapshot summary:
 
-- `floe.batch-id`
+- `floe.pipeline-id`
+- `floe.logical-run-id`
+- `floe.attempt-id`
 - `floe.target-name`
 - `floe.operation-type`
 - `floe.operation-id`
+- `floe.logical-operation-id`
+- `floe.contract-version`
+- `floe.code-version`
+- `floe.config-digest`
 - `floe.effective-at`
 
-`floe.operation-id` is deterministic for the batch, target, and operation type. If the client loses the commit response, FLOe searches snapshot history for that identity. Exactly one match proves the commit; no match permits re-execution only when the source fingerprint is unchanged; multiple matches are an invariant violation. A lookup failure remains `UNKNOWN_COMMIT` and is never converted into a blind retry.
+`floe.operation-id` identifies the target mutation attempted by one driver invocation. `floe.logical-operation-id` remains stable for the same logical run, target and operation type across separately approved attempts. If a client loses the commit response, FLOe searches snapshot history for the attempt operation ID. Exactly one match is evidence that this attempt committed; multiple matches violate the single-commit invariant. No match is **not** proof that the write failed, and never authorizes a blind retry.
 
-Snapshot tags are useful retention and time-travel references, but the operation ID—not a mutable table head or tag naming convention—is the commit identity used for recovery.
+Snapshot tags are useful retention and time-travel references. Operation identities help incident inspection, but they are not uniqueness constraints, locks, fencing tokens, or a general resume protocol.
 
 #### Interpreting snapshot summary
 
@@ -414,37 +420,39 @@ The snapshot summary contains file-level statistics, not row-level change counts
 !!!note
     A `deleted-records = 35, added-records = 35` on a delta run does **not** mean 35 rows were updated — it means the files containing those 35 rows were rewritten (copy-on-write). The actual number of changed rows can be 0.
 
-## Post-batch lifecycle
+## Post-attempt lifecycle
 
-After all flows execute successfully, the publication path is:
+After all flows execute successfully, the remaining attempt lifecycle is:
 
 ### 1. Orphan detection
 
 Uses time travel to find parent keys removed during this batch and resolves orphaned child records according to the FK's `onOrphan` action. See [Orphan Detection](orphan-detection.md) for details.
 
-This runs **before** maintenance because maintenance may expire the snapshots needed for time travel comparison.
+This runs inside ingestion and therefore before any separately scheduled maintenance that could expire snapshots needed for the comparison.
 
-### 2. Derived tables and release manifest
+### 2. Derived tables and result assembly
 
-Derived tables are committed with the same operation-identity protocol. Only after every required target succeeds does FLOe persist one release manifest containing each flow and derived table's exact snapshot ID when present, or an explicit no-snapshot empty state. Consumers requiring a consistent multi-table view must use `SnapshotPinnedReader`; reading current table heads can observe a partially completed batch.
+Derived tables are committed with the same attempt identity properties. FLOe then returns an `IngestionResult` with a typed status and the observed snapshot references for every completed target. This is an execution report, not an atomic publication transaction. A consumer that reads mutable table heads can observe a partially completed multi-table attempt; a multi-table publication protocol must be designed separately when that guarantee is required.
 
 !!! warning "Cascading orphan deletes"
-    Managed flow and derived writes have durable operation identities. Individual `onOrphan: delete` commits are not yet separate `RunStore` operations. When such a delete changes a child after its flow write, the current release entry still pins the tracked flow-write snapshot, not that later cleanup snapshot. A partial multi-table cascade therefore requires the [manual orphan recovery runbook](orphan-detection.md#recovery-after-a-partial-batch-or-cascade); do not treat ordinary `resume` or the manifest as an exactly-once cascade worklist.
+    An `onOrphan: delete` cascade can perform additional commits after the ordinary flow write and is not a durable, exactly-once worklist. A partial multi-table cascade therefore requires the [manual orphan recovery runbook](orphan-detection.md#recovery-after-a-partial-batch-or-cascade). Do not infer that rerunning the normal pipeline will complete only the missing delete steps.
 
-### 3. Diagnostic metadata and maintenance queue
+### 3. Diagnostic metadata
 
-Per-flow diagnostic-output failures are returned in `FlowResult.warnings` and publish the run as `SUCCEEDED_WITH_WARNINGS`. Batch-summary and quality-metric failures are logged and do not negate committed targets. Maintenance tasks are durably queued with the published batch and returned as `QUEUED` in `maintenanceResults`.
+Per-flow diagnostic-output failures are returned in `FlowResult.warnings` and produce `SUCCEEDED_WITH_WARNINGS` when the functional work succeeded. Batch-summary and quality-metric failures do not negate commits already observed. Because these artifacts are best effort, they must not be used as the only durable evidence that a write did or did not occur.
 
-Run maintenance from a separate scheduled process:
+### 4. Independently scheduled maintenance
+
+Run maintenance from a separate application and schedule it with the external platform:
 
 ```scala
-val worker = new MaintenanceWorker(globalConfig.iceberg, runStore, maxAttempts = 3)
-val results = worker.runPending(limit = 50)
+val runner = new IcebergMaintenanceRunner(spark, globalConfig.iceberg)
+runner.run("floe.default.orders", globalConfig.iceberg.maintenance)
 ```
 
-The worker considers tasks only after their run reaches `PUBLISHED` or `SUCCEEDED_WITH_WARNINGS`, claims each task with a versioned compare-and-set, runs the configured operations, and persists `SUCCEEDED` or `FAILED`. Failed tasks are retryable up to `maxAttempts`; a worker failure changes a published run to `SUCCEEDED_WITH_WARNINGS` but never replays ingestion.
+FLOe does not queue, claim, persist, or retry maintenance tasks. The hosting platform owns the table inventory, schedule, mutual exclusion, status, alerting, and retry policy. In particular, it must not run maintenance while a writer or incident investigation still needs the affected snapshots and files. Retrying maintenance must never rerun ingestion.
 
-For each queued flow or derived table, the worker runs the enabled maintenance operations:
+For each explicitly selected table, the runner executes the enabled maintenance operations:
 
 | Operation | SQL | Purpose |
 |-----------|-----|---------|
@@ -453,8 +461,8 @@ For each queued flow or derived table, the worker runs the enabled maintenance o
 | Orphan file cleanup | `CALL system.remove_orphan_files(table, older_than)` | Removes data files not referenced by any snapshot. Cleans up after failed writes. |
 | Manifest rewrite | `CALL system.rewrite_manifests(table)` | Consolidates manifest files for faster metadata operations. Disabled by default. |
 
-!!!note "Maintenance is asynchronous"
-    `summary.json` records that maintenance was queued at publication time. The authoritative later task state is in `RunStore`, because a worker may finish after the batch metadata file was written. Alert on durable `FAILED` tasks and retry the worker without rerunning ingestion. The default `InMemoryRunStore` loses queued tasks at JVM exit; use `JdbcRunStore` in production.
+!!!note "Maintenance state is external"
+    The ingestion result contains no queued maintenance state. Record the maintenance application's status in the hosting platform and alert there. A maintenance failure says nothing about whether ingestion should be retried.
 
 !!!tip "Metadata file cleanup"
     Every commit creates a new metadata JSON file in the table's `metadata/` directory (e.g. `v1.metadata.json`, `v2.metadata.json`). These files are small (KB) but accumulate over time. To enable automatic cleanup, add these table properties:
@@ -501,7 +509,7 @@ Read -> Rename columns -> PreTransform -> Validate (new data only) -> PostTransf
 
 - Validation runs only on incoming data, not on data already in the table
 - Merge happens atomically during the write phase via SQL
-- Each Iceberg table write has ACID commit semantics; a multi-table batch relies on FLOe's release manifest, not a distributed Iceberg transaction
+- Each Iceberg table write has ACID commit semantics; there is no distributed transaction or implicit atomic publication across the pipeline's tables
 
 ## Flow configuration examples
 
@@ -645,7 +653,7 @@ WHERE NOT (curr.name <=> prev.name)
 
 ### Writer coordination
 
-The run lease prevents two FLOe executors from driving the same batch concurrently and is renewed with a fencing token. It does not serialize unrelated pipelines that target the same table. Iceberg optimistic concurrency detects many conflicts, but external table-level coordination is still required when separate pipelines can write the same target—especially for append operations.
+FLOe has no lease or fencing service. The hosting platform must serialize every incompatible writer to the same targets, including other pipelines, manual jobs, orphan cleanup, maintenance, and administrative changes. Iceberg optimistic concurrency can reject conflicting commits, but it does not establish the business ordering of two valid writers and is not a substitute for ownership controls.
 
 ### No automatic column removal
 
@@ -667,4 +675,4 @@ An `onOrphan: delete` statement is atomic for its table, but a cascade across ta
 - [Architecture: Design Decisions](../architecture/design-decisions.md) — why Iceberg, why MERGE INTO
 - [Pipeline Builder](pipeline-builder.md) — custom catalog providers
 - [Quality Metrics](quality-metrics.md) — per-flow quality metrics table
-- [Recovery and Production Operations](recovery.md) — `RunStore`, resume/replay, and release reads
+- [Failure Handling and Production Operations](recovery.md) — partial commits, unknown outcomes, retry policy, and incident response

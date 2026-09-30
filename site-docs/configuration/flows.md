@@ -300,7 +300,7 @@ The entire `validation` section is optional only for Full loads. `primaryKey` is
 | `columns` | list | yes | — | Column(s) in the current flow |
 | `references.flow` | string | yes | — | Name of the parent flow |
 | `references.columns` | list | yes | — | Column(s) in the parent flow (same order as `columns`) |
-| `onOrphan` | string | — | `warn` | Post-batch orphan action: `warn`, `delete`, `ignore`. See [Orphan Detection](../guides/orphan-detection.md). |
+| `onOrphan` | string | — | `warn` | Post-batch orphan action: `warn` or `ignore`. Destructive `delete` is unsupported. See [Orphan Detection](../guides/orphan-detection.md). |
 
 The FK is identified by an auto-generated display name (e.g. `(customer_id) -> customers.(customer_id)`).
 

@@ -80,7 +80,7 @@ Floe reads the source data, validates schema and rules, upserts into `floe.defau
 | **Declarative flows** | Define sources, schemas, validation rules, and load modes in YAML |
 | **Three load modes** | Full (replace), Delta (keyed upsert; a PK is mandatory), SCD2 (versioned history with soft deletes) |
 | **Built-in validation** | Schema, not-null, PK uniqueness, FK integrity, regex, range, domain, custom |
-| **Orphan detection** | Post-batch FK integrity check using Iceberg time travel — warn or auto-delete |
+| **Orphan detection** | Post-batch FK integrity check using pinned Iceberg snapshots — warn or ignore, never implicit deletion |
 | **Multiple sources** | CSV, Parquet, JSON, Avro, ORC files and JDBC databases. Pluggable custom readers |
 | **Schema evolution** | Auto-add columns, auto-widen types (int→long, float→double, decimal precision) |
 | **Quality metrics** | Optional Iceberg table with per-flow rejection rates, orphan counts, execution times |

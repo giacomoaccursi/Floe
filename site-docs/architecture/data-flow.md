@@ -138,7 +138,7 @@ See [Iceberg Integration](../guides/iceberg.md) and [SCD2 Guide](../guides/scd2.
 
 After all flows complete:
 
-1. **Orphan detection** — uses time travel to find removed parent keys, resolves orphaned children. See [Orphan Detection](../guides/orphan-detection.md).
+1. **Orphan detection** — uses pinned snapshots and time travel to find removed parent keys and report orphaned children without mutating them. See [Orphan Detection](../guides/orphan-detection.md).
 2. **Derived tables** — validates declared dependencies, orders them topologically, and computes outputs from attempt-pinned input states.
 3. **Diagnostic outputs** — writes per-flow JSON, the attempt report, and optional quality metrics below the pipeline/logical-run/attempt identity.
 4. **Typed result** — returns functional success plus `SUCCEEDED`, `FAILED`, `FAILED_PARTIAL`, or `UNKNOWN` and per-target snapshot evidence.

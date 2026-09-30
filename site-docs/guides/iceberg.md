@@ -426,7 +426,7 @@ After all flows execute successfully, the remaining attempt lifecycle is:
 
 ### 1. Orphan detection
 
-Uses time travel to find parent keys removed during this batch and resolves orphaned child records according to the FK's `onOrphan` action. See [Orphan Detection](orphan-detection.md) for details.
+Uses time travel to find parent keys removed during this attempt and reports child records that became orphaned. `warn` and `ignore` are supported; automatic deletion is rejected during configuration validation. See [Orphan Detection](orphan-detection.md) for details.
 
 This runs inside ingestion and therefore before any separately scheduled maintenance that could expire snapshots needed for the comparison.
 
@@ -434,8 +434,8 @@ This runs inside ingestion and therefore before any separately scheduled mainten
 
 Derived tables are committed with the same attempt identity properties. FLOe then returns an `IngestionResult` with a typed status and the observed snapshot references for every completed target. This is an execution report, not an atomic publication transaction. A consumer that reads mutable table heads can observe a partially completed multi-table attempt; a multi-table publication protocol must be designed separately when that guarantee is required.
 
-!!! warning "Cascading orphan deletes"
-    An `onOrphan: delete` cascade can perform additional commits after the ordinary flow write and is not a durable, exactly-once worklist. A partial multi-table cascade therefore requires the [manual orphan recovery runbook](orphan-detection.md#recovery-after-a-partial-batch-or-cascade). Do not infer that rerunning the normal pipeline will complete only the missing delete steps.
+!!! note "No implicit remediation"
+    Orphan detection never mutates child tables. A domain-specific repair must run as an independently reviewed operation; do not hide destructive cleanup inside a retry of the ingestion pipeline.
 
 ### 3. Diagnostic metadata
 
@@ -663,9 +663,9 @@ Schema evolution only adds columns, never removes them. If a column is removed f
 
 If a maintenance operation fails mid-way (e.g., compaction fails on one table), subsequent maintenance operations for other tables may still run. There is no all-or-nothing guarantee for maintenance across tables. Each operation is independent.
 
-### Orphan cascades are not durable operations
+### Orphan remediation is external
 
-An `onOrphan: delete` statement is atomic for its table, but a cascade across tables is not represented as a durable per-FK worklist. If the process fails after deleting a child but before processing its descendants, stop new runs and follow the [orphan recovery runbook](orphan-detection.md#recovery-after-a-partial-batch-or-cascade).
+FLOe reports orphan violations but does not delete child data. Restoring a parent, closing or quarantining children, or deleting records are domain decisions and must use an explicit external workflow with reviewed predicates and post-action validation.
 
 ## Related
 

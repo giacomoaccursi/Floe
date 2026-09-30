@@ -2,124 +2,71 @@
 
 ## The problem
 
-An ETL framework managing multiple flows connected by foreign key relationships has a structural problem: when a parent flow removes records, child flows can end up with references to keys that no longer exist.
+When a parent table loses a key, records already stored in a child table can become orphaned. Ordinary FK validation is not sufficient: it validates the child records ingested in the current attempt, not every historical child record already present in Iceberg.
 
-This happens in two concrete scenarios:
+This can happen when the parent uses:
 
-1. **Full load**: the parent receives a new complete snapshot that replaces all previous data. If the new snapshot is missing records that existed before, every child pointing to those keys becomes orphaned.
+- **Full load**, which replaces the table state and can remove keys;
+- **SCD2 with `detectDeletes: true`**, which closes keys absent from the incoming complete snapshot.
 
-2. **SCD2 with detectDeletes**: the parent receives a snapshot and records absent from the source get closed (soft-delete: `is_current = false`, `is_active = false`). From a logical standpoint those keys are no longer active, but children keep referencing them.
+Delta loads and SCD2 loads without delete detection do not remove logical parent keys and therefore cannot trigger this check.
 
-In both cases, intra-batch FK validation does not help: FK validation runs *during* each flow's execution, comparing incoming data against what's already written. But the orphan problem arises *after* all flows have executed, because it's the parent that changes its own data and invalidates the children's references.
+## Supported behavior
 
-### Why FK validation is not enough
+FLOe performs post-flow detection and supports two actions:
 
-The framework's FK validation operates at ingestion time: when the child flow is processed, it checks that every FK value in its input has a match in the parent table. If the parent has already run in the same batch, its data is up to date and the check works for the child's *new* records.
+| Action | Behavior |
+|--------|----------|
+| `warn` | Detects and reports current child records that reference parent keys removed by this attempt. It never changes child data. |
+| `ignore` | Does not run post-batch detection for that FK. |
 
-But child records already present in the table (written in previous batches) are not re-validated. They're already in Iceberg, they don't go through the validation pipeline. If the parent has since lost some keys, those child records remain with dangling FKs.
+`warn` is the default.
 
-## The solution: post-batch orphan detection
+`onOrphan: delete` is deliberately unsupported and is rejected during configuration loading or programmatic pipeline validation. Automatic deletion would be a second functional write, potentially followed by more deletes across descendants. Iceberg makes each table commit atomic, not an arbitrary multi-table cascade. Without a durable worklist and recovery protocol, a terminated driver could leave the cascade partially applied and a later run could not prove which deletes remain. FLOe therefore reports the integrity violation and leaves remediation to an explicit, reviewed workflow.
 
-Orphan detection runs **after** all batch flows have executed successfully and **before** Iceberg table maintenance. This ordering is critical: maintenance could expire previous snapshots, making the time travel comparison impossible.
+## Detection algorithm
 
-### How it works
+### 1. Establish whether the parent can remove keys
 
-#### 1. Determine which parents can generate orphans
+| Parent load mode | Checked? | Reason |
+|------------------|----------|--------|
+| Full | Yes | The new snapshot can omit old keys. |
+| SCD2 with `detectDeletes: true` | Yes | Missing current keys are closed. |
+| SCD2 with `detectDeletes: false` | No | Missing keys remain current. |
+| Delta | No | The supported keyed merge inserts or updates; it does not delete. |
 
-Not all load modes can remove records:
+### 2. Compute the removed parent-key set
 
-| Load Mode | Can remove records? | Reason |
-|-----------|-------------------|--------|
-| **Full**  | Yes | Replaces all data with the new snapshot |
-| **SCD2 with detectDeletes** | Yes | Closes records absent from source (soft-delete) |
-| **SCD2 without detectDeletes** | No | Records absent from source are preserved as-is |
-| **Delta** | No | Insert and update only, never delete |
+For a qualifying parent, FLOe uses the parent snapshot recorded for the write:
 
-#### 2. Find removed keys via time travel
+1. project the referenced key columns from the previous snapshot;
+2. project the same columns from the resulting parent state;
+3. calculate `previous keys LEFT ANTI current keys`.
 
-Iceberg maintains snapshot history. Each flow, after writing, records the current `snapshotId` and the `parentSnapshotId` (the snapshot that existed before this execution).
+For SCD2, both sides include only current versions (`is_current = true`, or the configured equivalent). Closed history is not repeatedly classified as a new removal.
 
-To find keys removed by a parent:
+The first successful write has no previous snapshot, so there is no removal baseline and the check is skipped.
 
-1. Read PKs from the **previous snapshot** (`VERSION AS OF <parentSnapshotId>`)
-2. Read PKs from the **current state** of the table
-3. Compute the difference: `previous_PKs - current_PKs = removed_PKs`
+### 3. Match current child records
 
-For SCD2, **both** snapshots are filtered to records where `is_current = true` (or the configured current-version column). Closed historical versions are physically present but must not appear as newly removed keys in every later batch.
+FLOe joins the removed parent keys to the child FK columns and counts matching current child records. For an SCD2 child, only its current versions are considered. The result is logged and included in attempt metadata; child rows are never mutated by orphan detection.
 
-If no previous snapshot exists (first-ever execution of the parent), there's nothing to compare against and the check is skipped.
+### 4. Fail safely when evidence is unavailable
 
-#### 3. Find orphaned records in children
+If a required retained snapshot cannot be read, or the child state cannot be inspected, orphan detection fails the attempt. FLOe does not turn missing evidence into an empty orphan set. Derived tables are not run after this failure, and already committed flow tables are not rolled back.
 
-With the removed parent keys, the detector looks for child records that reference them. The comparison is on the child's FK columns against the parent's referenced columns. Any matches are orphans.
+## Execution conditions
 
-#### 4. Apply the configured action
+Detection runs after all ordinary flows have succeeded and before derived tables when both conditions hold:
 
-Each FK relationship in the child declares an `onOrphan` action that determines what to do when orphans are found:
+1. at least one FK has `onOrphan: warn`;
+2. its parent uses Full load or SCD2 with `detectDeletes: true`.
 
-| Action | Behavior | Propagates cascade? |
-|--------|----------|-------------------|
-| **Warn** | Logs the number of orphans found. Does not modify data | No |
-| **Delete** | Removes orphaned records from the child table | Yes |
-| **Ignore** | Skips the check entirely for this FK | — |
+If every FK uses `ignore`, the entire phase is skipped.
 
-#### 5. Cascade
-
-When a child flow undergoes a `Delete`, the deleted records have their own PKs and FK values. If a third flow (grandchild) has a FK towards the child, those records also become orphans.
-
-The cascade mechanism works as follows:
-
-1. After deleting orphaned records from the child, the PK and FK columns of deleted records are saved in a `removedKeysByFlow` map. Both column sets are preserved so that downstream flows can look up whichever columns they reference.
-2. When processing the grandchild, before performing time travel, the detector checks if its parent (the child) has entries in the cascade map.
-3. If the cascade map contains all the columns referenced by the grandchild's FK, those keys are used as "removed keys" instead of time travel. If the referenced columns are not present in the map (column mismatch), the cascade is skipped for that FK and the grandchild is not affected.
-4. When a child has multiple FKs and more than one triggers a `Delete`, the cascade map accumulates keys from each delete via union, so downstream flows see the combined set of removed keys.
-
-Cascade propagates only with `Delete`. With `Warn` the detector signals the issue but does not modify data, so the chain stops: there's no point propagating an alarm without having actually removed anything.
-
-#### 6. Topological order
-
-Flows are processed in topological order (the same order used for batch execution). This guarantees that:
-
-- A parent is always analyzed before its children
-- Cascade flows in the correct direction (parent → child → grandchild)
-- No race conditions occur between flows at the same level
-
-## When does orphan detection run?
-
-Orphan detection is **not** executed on every batch. Two guard conditions must both be satisfied:
-
-### Guard 1 — At least one FK must be actionable
-
-If every FK across all flows has `onOrphan: ignore`, there is nothing to do. The orchestrator checks this before instantiating the detector and returns immediately if no actionable FK exists.
-
-In practice: as long as at least one FK is configured with `onOrphan: warn` or `onOrphan: delete`, this guard passes.
-
-### Guard 2 — The parent flow must be capable of removing records
-
-At the level of each individual parent flow, the detector only processes parents whose load mode can actually remove records:
-
-| Load Mode | Analyzed as parent? |
-|-----------|-------------------|
-| **Full** | Yes — replaces data, can remove keys |
-| **SCD2 with `detectDeletes: true`** | Yes — soft-deletes absent records |
-| **SCD2 with `detectDeletes: false`** | No — absent records are preserved |
-| **Delta** | No — insert/update only, never deletes |
-
-If the parent was processed in the current batch but its load mode cannot remove records, the detector skips it without performing time travel.
-
-### Summary
-
-```
-at least one FK with onOrphan != ignore
-    AND parent load mode in {Full, SCD2 with detectDeletes}
-        → run orphan detection
-```
-
-Only when both conditions are met does the detector actually read Iceberg snapshots and look for orphaned records.
+Flows are inspected in dependency order. The detector reports direct FK violations only; because it never deletes child rows, there is no delete cascade to propagate.
 
 ## Configuration
-
-In the child flow's YAML configuration, each FK declares its own `onOrphan`:
 
 ```yaml
 validation:
@@ -129,143 +76,62 @@ validation:
       references:
         flow: customers
         columns: [customer_id]
-      onOrphan: warn      # warn | delete | ignore
+      onOrphan: warn      # warn | ignore
 ```
 
-The default is `warn`: report the problem without touching the data.
+Use `ignore` only when dangling references are explicitly acceptable or monitored elsewhere:
+
+```yaml
+validation:
+  foreignKeys:
+    - columns: [legacy_customer_id]
+      references:
+        flow: customers
+        columns: [customer_id]
+      onOrphan: ignore
+```
 
 ## Output
 
-Each detection produces an `OrphanReport` included in the batch metadata:
+Every detected relationship produces an `OrphanReport` in the attempt report:
 
-- **flowName**: the child flow containing the orphans
-- **fkName**: the FK involved
-- **parentFlowName**: the parent flow that removed the keys
-- **orphanCount**: number of orphaned records found
-- **removedParentKeyCount**: number of keys removed by the parent
-- **actionTaken**: action taken (`warn` or `delete`)
-- **deletedChildKeyCount**: records actually deleted (only for `delete`)
-- **cascadeSource**: if the orphans were caused by a cascade delete (rather than time travel), this field contains the name of the flow whose delete triggered the cascade. Absent when the orphans were detected via time travel directly.
+| Field | Meaning |
+|-------|---------|
+| `flowName` | Child flow containing the orphaned rows. |
+| `fkName` | Human-readable FK identity. |
+| `parentFlowName` | Parent flow that lost the referenced keys. |
+| `orphanCount` | Current child records referencing removed keys. |
+| `removedParentKeyCount` | Distinct removed parent keys considered. |
+| `actionTaken` | `warn`. |
+
+The warning is a functional data-quality finding, not proof that downstream data is safe. Route the attempt report to the owning team and define an external remediation process with approval, predicates, validation, and audit evidence appropriate to the domain.
 
 ## Example
 
-Consider a data warehouse with three tables:
+Suppose the previous `customers` snapshot contains `{C1, C2, C3}` and the new Full load contains `{C1, C3}`. Existing `orders` still contains two rows that reference `C2`.
 
-```
-customers (Full load)
-    |
-    v
-orders (Delta) -- FK: orders.customer_id -> customers.customer_id
-    |
-    v
-order_items (Delta) -- FK: order_items.order_id -> orders.order_id
-```
+FLOe:
 
-### Initial state
+1. reads the previous and resulting customer key sets;
+2. identifies `{C2}` as removed;
+3. finds the two current orders referencing `C2`;
+4. emits an `OrphanReport` with `orphanCount = 2` and `actionTaken = warn`;
+5. leaves `orders` unchanged.
 
-**customers**
+The data owner can then choose a domain-correct repair—for example restoring the parent, closing child records, quarantining them, or running an independently reviewed delete job. That decision cannot be inferred safely from the FK alone.
 
-| customer_id | name     |
-|-------------|----------|
-| C1          | Alice    |
-| C2          | Bob      |
-| C3          | Charlie  |
+## Operational requirements
 
-**orders**
-
-| order_id | customer_id | total |
-|----------|-------------|-------|
-| O1       | C1          | 100   |
-| O2       | C2          | 200   |
-| O3       | C2          | 150   |
-
-**order_items**
-
-| item_id | order_id | product | qty |
-|---------|----------|---------|-----|
-| I1      | O1       | Widget  | 2   |
-| I2      | O2       | Gadget  | 1   |
-| I3      | O3       | Widget  | 5   |
-
-### Batch: a new customers snapshot arrives without C2
-
-The source system sends a Full load of `customers` containing only C1 and C3. Bob (C2) has been removed.
-
-After flow execution:
-
-**customers** (updated): C1 (Alice), C3 (Charlie)
-
-**orders** (unchanged — Delta, no new data): O1→C1, O2→**C2**, O3→**C2**
-
-Orders O2 and O3 are now orphans: they reference C2 which no longer exists.
-
-### Orphan detection in action
-
-The detector processes flows in topological order: `customers → orders → order_items`.
-
-**Step 1**: `customers` is a parent with no outbound FKs. No action.
-
-**Step 2**: `orders` has FK `fk_customer` towards `customers`.
-
-- Time travel on `customers`: previous snapshot had `{C1, C2, C3}`, current state has `{C1, C3}`.
-- Removed keys: `{C2}`.
-- Orphaned records in `orders`: O2, O3 (both have `customer_id = C2`).
-
-If `onOrphan = warn`: logs "orders.fk_customer has 2 orphaned records (1 parent key removed from customers)". Done, no data modification.
-
-If `onOrphan = delete`:
-
-1. Deletes O2 and O3 from `orders`.
-2. Saves the deleted PKs `{O2, O3}` in the cascade map for `orders`.
-
-**Step 3** (only if step 2 was `delete`): `order_items` has FK `fk_order` towards `orders`.
-
-- The detector finds `orders` in the cascade map with keys `{O2, O3}`.
-- Searches `order_items` for records with `order_id IN (O2, O3)`: finds I2 and I3.
-
-If `onOrphan = delete`: deletes I2 and I3 from `order_items`.
-If `onOrphan = warn`: logs the warning, does not delete.
-
-### Final result (full delete cascade scenario)
-
-**customers**: C1, C3 · **orders**: O1 · **order_items**: I1
-
-All orphaned data has been removed through cascade, maintaining referential integrity.
-
-### Final result (warn scenario)
-
-**customers**: C1, C3 · **orders**: O1, O2, O3 (O2 and O3 reported as orphans) · **order_items**: I1, I2, I3 (not checked because warn does not propagate)
-
-Orphaned data remains in the tables but the team receives notification in the batch metadata and can decide how to intervene.
-
-## Limitations and considerations
-
-- **Time travel and retention**: if the previous snapshot is unavailable, the orphan check fails the attempt; it is not treated as an empty set of removed keys. Derived tables are skipped. Independently scheduled maintenance must preserve the snapshots required by the pipeline and incident runbook.
-
-- **First execution**: on the very first batch there is no previous snapshot. The check is skipped because there's no baseline to compare against.
-
-- **Performance**: the detector projects only required key columns, but time travel, distinct-key work, anti-joins, and child matching can still scan and shuffle substantial data. Benchmark representative cardinalities, inspect Spark plans/bytes read, and provision the orphan phase independently from ingestion estimates.
-
-- **Atomicity**: each DELETE on one Iceberg table is atomic, but a cascade across tables is not. A failure can leave an already-cleaned child beside an unprocessed grandchild. The next batch does **not** reliably retry the missing step: its parent-snapshot diff may no longer contain the original removed key. Treat the failed batch as requiring reconciliation before another normal run.
-
-- **Warn as default**: the default is `warn` intentionally. Automatic deletion is a destructive operation that requires a conscious choice. In a production environment it's preferable to signal and let the team decide, rather than silently deleting data.
-
-- **SCD2 children**: orphan matching and `delete` apply only to the child's current version (`is_current = true`, or its configured current-version column). Closed versions remain historical evidence and are neither counted as current orphans nor hard-deleted.
-
-### Recovery after a partial batch or cascade
-
-1. Pause scheduled runs and maintenance for every affected target. Retain the immutable execution request, resolved configuration, input versions, attempt diagnostics, Iceberg snapshots, tags, and platform job/application logs. Do not expire snapshots or start a fresh attempt blindly: a new run loses the original cascade worklist context.
-2. Reconcile the attempt and logical operation IDs in Iceberg snapshot history with the external job state. Confirm that no earlier writer can still complete. Do not infer commit failure from a client exception or from a missing final report.
-3. For an orphan cascade, compute the removed keys from the parent's **pre-batch current** state versus the intended post-batch current state. Compare each child and grandchild against that key set, including FKs renamed between levels. The detector's ordinary next-batch diff is not a durable worklist.
-4. Choose a table-specific repair: complete the missing delete with a reviewed predicate, or restore affected tables from retained snapshots and reprocess under an approved plan. Validate row counts, current SCD2 versions, FK violations, derived outputs, and the snapshots exposed to consumers before resuming schedules. Record the repair's own snapshot IDs and operator approval.
-
-This is an operational runbook, not automatic rollback. FLOe does not persist a per-FK orphan-key worklist or track each cascade delete as a recoverable workflow step. Exactly-once recovery for an arbitrary crash inside a multi-table delete cascade is therefore not guaranteed.
+- **Snapshot retention:** retain the previous parent snapshot and its files until the attempt and incident window have closed. An expired snapshot cannot be reconstructed from its numeric ID.
+- **Writer coordination:** the hosting platform must prevent incompatible writers from changing inspected targets during the qualified execution window. Iceberg optimistic concurrency is not a business-ordering mechanism.
+- **Scale testing:** the detector projects key columns only, but distinct operations, anti-joins, and child matching can still scan and shuffle substantial data. Benchmark representative cardinalities.
+- **First execution:** no previous snapshot means no comparison baseline; the check is skipped and this fact must not be interpreted as a proof that no legacy orphans exist.
+- **Failed attempt:** flow commits already observed remain committed. Follow the normal partial-result recovery procedure before another run.
 
 ## Related
 
-- [Flow Configuration — foreignKeys](../configuration/flows.md#foreign-key-fields) — FK and onOrphan configuration
-- [Validation Engine — Foreign key integrity](validation.md#foreign-key-integrity) — intra-batch FK validation
-- [Iceberg Integration — Post-batch lifecycle](iceberg.md#post-batch-lifecycle) — where orphan detection fits
-- [SCD2 Guide](scd2.md) — SCD2 with detectDeletes and orphan implications
-- [Architecture: Execution Model](../architecture/execution-model.md) — topological ordering
-- [Failure Handling and Production Operations](recovery.md) — target reconciliation and incident handling
+- [Flow Configuration — foreignKeys](../configuration/flows.md#foreign-key-fields)
+- [Validation Engine — Foreign key integrity](validation.md#foreign-key-integrity)
+- [Iceberg Integration — Post-attempt lifecycle](iceberg.md#post-attempt-lifecycle)
+- [SCD2 Guide](scd2.md)
+- [Failure Handling and Production Operations](recovery.md)

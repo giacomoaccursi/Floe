@@ -66,9 +66,9 @@ The framework uses explicitly sized thread pools for both flow and DAG paralleli
 
 ## Why warn is the default for orphan detection
 
-Automatic deletion (`onOrphan: delete`) is a destructive operation that removes data from Iceberg tables. In a production environment, it's preferable to signal the problem and let the team decide how to handle it, rather than silently deleting data.
+Automatic orphan deletion is not a supported pipeline action. It would add one or more functional commits after the ordinary flow writes, without an atomic multi-table transaction or durable cascade worklist. A driver failure could therefore leave descendants only partially repaired.
 
-The `warn` default ensures orphan detection is informational by default. Teams can opt into `delete` for specific FK relationships after understanding the implications and testing the cascade behavior.
+The `warn` default detects and reports the violation without mutating child tables. `ignore` is available when the relationship is intentionally outside post-batch monitoring. Destructive remediation belongs in a separate, reviewed workflow with its own ownership and evidence.
 
 ## Related
 

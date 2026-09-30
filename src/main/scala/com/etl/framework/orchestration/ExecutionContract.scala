@@ -135,7 +135,7 @@ object PipelineDefinitionBuilder {
       globalConfig: GlobalConfig,
       flowConfigs: Seq[FlowConfig],
       domainsConfig: Option[DomainsConfig],
-      derivedTableNames: Seq[String],
+      derivedTableDefinitions: Seq[(String, Seq[String])],
       sparkSemanticConfig: Map[String, String]
   ): PipelineDefinition = {
     val safeGlobal = globalConfig.copy(
@@ -164,7 +164,7 @@ object PipelineDefinitionBuilder {
       safeGlobal,
       safeFlows,
       domainsConfig.map(config => config.copy(domains = config.domains.toSeq.sortBy(_._1).toMap)),
-      derivedTableNames.sorted,
+      derivedTableDefinitions.map { case (name, dependencies) => name -> dependencies.sorted }.sortBy(_._1),
       sanitizeMap(sparkSemanticConfig)
     )
     PipelineDefinition(pipelineId, codeVersion.trim, sha256(CanonicalValue.render(identity)))

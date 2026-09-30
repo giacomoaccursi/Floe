@@ -639,7 +639,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     val result = IngestionPipeline
       .builder()
       .withConfigDirectory(configDir.toString)
-      .withDerivedTable("broken_derived", _ => throw new IllegalStateException("derived boom"))
+      .withDerivedTable("broken_derived", Seq.empty, _ => throw new IllegalStateException("derived boom"))
       .withBatchListener(listener)
       .build()
       .execute()

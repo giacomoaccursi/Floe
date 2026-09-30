@@ -38,7 +38,7 @@ class IngestionPipeline private (
     domainsConfig: Option[DomainsConfig],
     extraCatalogProviders: Map[String, () => CatalogProvider],
     customValidators: Map[String, () => Validator],
-    derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
+    derivedTables: Seq[DerivedTableDefinition],
     batchListeners: Seq[BatchListener],
     pipelineId: String,
     codeVersion: String,
@@ -70,7 +70,7 @@ class IngestionPipeline private (
       globalConfig,
       resolvedFlowConfigs,
       domainsConfig,
-      derivedTables.map(_._1),
+      derivedTables.map(definition => definition.name -> definition.dependencies),
       semanticSparkConfig
     )
   }
@@ -168,7 +168,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   private val flowTransformations = mutable.Map[String, FlowTransformations]()
   private val extraCatalogProviders = mutable.Map[String, () => CatalogProvider]()
   private val customValidators = mutable.Map[String, () => Validator]()
-  private val derivedTables = mutable.ListBuffer[(String, DerivedTableContext => DataFrame)]()
+  private val derivedTables = mutable.ListBuffer[DerivedTableDefinition]()
   private val batchListeners = mutable.ListBuffer[BatchListener]()
   private val customReaders = mutable.Map[String, DataReaderFactory.ReaderFactory]()
   private var pipelineId: String = "local"
@@ -336,12 +336,13 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     this
   }
 
-  /** Registers a derived table that will be computed after all flows are written to Iceberg. The function receives a
-    * DerivedTableContext with access to the current state of Iceberg tables. The result is written to Iceberg as a
-    * full-load table.
+  /** Registers a derived table that will be computed after all flows are written to Iceberg. Every input must be
+    * declared; the context exposes only attempt-pinned dependencies. The result is written as a full-load table.
     *
     * @param tableName
     *   Name of the derived table (becomes the Iceberg table name)
+    * @param dependencies
+    *   Primary or derived table names read by this transformation
     * @param fn
     *   Function that produces the derived DataFrame
     * @return
@@ -349,12 +350,13 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     */
   def withDerivedTable(
       tableName: String,
+      dependencies: Seq[String],
       fn: DerivedTableContext => DataFrame
   ): IngestionPipelineBuilder = {
-    if (derivedTables.exists(_._1 == tableName))
+    if (derivedTables.exists(_.name.equalsIgnoreCase(tableName)))
       throw new IllegalArgumentException(s"Derived table '$tableName' is already registered")
     logger.info(s"Registering derived table: $tableName")
-    derivedTables += ((tableName, fn))
+    derivedTables += DerivedTableDefinition(tableName, dependencies, fn)
     this
   }
 
@@ -408,6 +410,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       collisions.isEmpty,
       s"Derived table names collide with managed tables: ${collisions.mkString(", ")}"
     )
+    val derivedErrors = DerivedTableExecutor.validateDefinitions(derivedTables.toSeq, flowConfigs.map(_.name).toSet)
+    require(derivedErrors.isEmpty, s"Invalid derived table configuration: ${derivedErrors.mkString("; ")}")
 
     logger.info(s"IngestionPipeline built with ${flowConfigs.size} flows")
     IngestionPipeline.create(
@@ -443,6 +447,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     derivedTableCollisions(globalConfig, flowConfigs).foreach { name =>
       errors += s"Derived table '$name' collides with a managed table"
     }
+    errors ++= DerivedTableExecutor.validateDefinitions(derivedTables.toSeq, flowConfigs.map(_.name).toSet)
     val flowNames = flowConfigs.map(_.name).toSet
 
     flowConfigs.foreach { config =>
@@ -482,7 +487,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       (flowConfigs.map(_.name) ++ globalConfig.processing.qualityMetricsTable.toSeq)
         .map(_.toLowerCase(Locale.ROOT))
         .toSet
-    derivedTables.map(_._1).filter(name => managedNames.contains(name.toLowerCase(Locale.ROOT))).toSeq
+    derivedTables.map(_.name).filter(name => managedNames.contains(name.toLowerCase(Locale.ROOT))).toSeq
   }
 
   private def loadConfigs(): (GlobalConfig, Seq[FlowConfig]) = {
@@ -611,7 +616,7 @@ object IngestionPipeline {
       domainsConfig: Option[DomainsConfig],
       extraCatalogProviders: Map[String, () => CatalogProvider],
       customValidators: Map[String, () => Validator],
-      derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
+      derivedTables: Seq[DerivedTableDefinition],
       batchListeners: Seq[BatchListener] = Seq.empty,
       pipelineId: String = "local",
       codeVersion: String = "unversioned",

@@ -11,7 +11,7 @@ import com.etl.framework.orchestration.batch.{
 }
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.ExecutionPlanBuilder
-import com.etl.framework.pipeline.{DerivedTableContext, DerivedTableExecutor, DerivedTableResult}
+import com.etl.framework.pipeline.{DerivedTableDefinition, DerivedTableExecutor, DerivedTableResult}
 import com.etl.framework.validation.Validator
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
@@ -39,7 +39,7 @@ class FlowOrchestrator(
     pipelineDefinition: PipelineDefinition,
     threadPool: Option[java.util.concurrent.ExecutorService] = None,
     batchListeners: Seq[BatchListener] = Seq.empty,
-    derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq.empty
+    derivedTables: Seq[DerivedTableDefinition] = Seq.empty
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -118,7 +118,7 @@ class FlowOrchestrator(
               if (orphanError.isEmpty && derivedTables.nonEmpty) {
                 logger.info(s"Executing ${derivedTables.size} derived tables for attempt $attemptId")
                 derivedResults = new DerivedTableExecutor(globalConfig.iceberg)
-                  .execute(derivedTables, request)
+                  .execute(derivedTables, request, state.validatedFlows)
               }
 
               val derivedFailures = derivedResults.filterNot(_.success)
@@ -280,7 +280,7 @@ object FlowOrchestrator {
       customValidators: Map[String, () => Validator] = Map.empty,
       batchListeners: Seq[BatchListener] = Seq.empty,
       customReaders: Map[String, DataReaderFactory.ReaderFactory] = Map.empty,
-      derivedTables: Seq[(String, DerivedTableContext => DataFrame)] = Seq.empty,
+      derivedTables: Seq[DerivedTableDefinition] = Seq.empty,
       pipelineId: String = "local",
       codeVersion: String = "unversioned"
   )(implicit spark: SparkSession): FlowOrchestrator = {
@@ -301,7 +301,7 @@ object FlowOrchestrator {
       globalConfig,
       flowConfigs,
       domainsConfig,
-      derivedTables.map(_._1),
+      derivedTables.map(definition => definition.name -> definition.dependencies),
       semanticSparkConfig
     )
 

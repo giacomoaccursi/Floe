@@ -11,12 +11,13 @@ import com.etl.framework.util.SqlIdentifier
 import com.etl.framework.orchestration.{DataOutcome, ExecutionRequest}
 import org.apache.iceberg.exceptions.CommitStateUnknownException
 import org.apache.iceberg.spark.CommitMetadata
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.functions.lit
-import org.apache.spark.sql.types.StructType
 import org.slf4j.LoggerFactory
 
 import java.time.Instant
+import java.util.Locale
 import java.util.concurrent.Callable
 import scala.collection.JavaConverters._
 
@@ -30,8 +31,9 @@ class DerivedTableExecutor(
 
   /** Ad-hoc convenience API. Platform-managed execution should pass a complete ExecutionRequest. */
   def execute(
-      derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
+      derivedTables: Seq[DerivedTableDefinition],
       batchId: String,
+      inputTables: Map[String, DataFrame],
       effectiveAt: Instant = Instant.now()
   ): Seq[DerivedTableResult] =
     execute(
@@ -43,59 +45,95 @@ class DerivedTableExecutor(
         effectiveAt = effectiveAt,
         codeVersion = "unversioned",
         configDigest = "0" * 64
-      )
+      ),
+      inputTables
     )
 
-  /** Executes all derived table functions and writes results to Iceberg. */
+  /** Executes derived tables in dependency order using only attempt-pinned input DataFrames. */
   def execute(
-      derivedTables: Seq[(String, DerivedTableContext => DataFrame)],
-      request: ExecutionRequest
+      derivedTables: Seq[DerivedTableDefinition],
+      request: ExecutionRequest,
+      inputTables: Map[String, DataFrame]
   ): Seq[DerivedTableResult] = {
-    val ctx = DerivedTableContext(
-      spark,
-      request.logicalRunId,
-      request.attemptId,
-      request.effectiveAt,
-      icebergConfig.catalogName,
-      icebergConfig.namespace
-    )
+    val errors = DerivedTableExecutor.validateDefinitions(derivedTables, inputTables.keySet)
+    require(errors.isEmpty, s"Invalid derived table configuration: ${errors.mkString("; ")}")
 
-    derivedTables.map { case (tableName, fn) =>
-      executeSingle(tableName, fn, ctx, request)
+    var available = inputTables
+    var completed = Map.empty[String, DerivedTableResult]
+
+    DerivedTableExecutor.orderDefinitions(derivedTables).map { definition =>
+      val failedDependencies = definition.dependencies.filter(name => completed.get(name).exists(!_.success))
+      val execution =
+        if (failedDependencies.nonEmpty)
+          DerivedExecution(
+            DerivedTableResult(
+              definition.name,
+              success = false,
+              error = Some(s"Blocked by failed derived dependencies: ${failedDependencies.mkString(", ")}")
+            ),
+            None
+          )
+        else {
+          val resolvedInputs = definition.dependencies.map(name => name -> available(name)).toMap
+          val ctx = DerivedTableContext(
+            spark,
+            request.logicalRunId,
+            request.attemptId,
+            request.effectiveAt,
+            resolvedInputs
+          )
+          executeSingle(definition, ctx, request)
+        }
+
+      completed += definition.name -> execution.result
+      execution.output.foreach(data => available += definition.name -> data)
+      execution.result
     }
   }
 
   /** Executes a single derived table: computes the DataFrame, writes to Iceberg, tags the snapshot. */
   private def executeSingle(
-      tableName: String,
-      fn: DerivedTableContext => DataFrame,
+      definition: DerivedTableDefinition,
       ctx: DerivedTableContext,
       request: ExecutionRequest
-  ): DerivedTableResult = {
+  ): DerivedExecution = {
+    val tableName = definition.name
     val fullTableName = resolveTableName(tableName)
     var dataOutcome: DataOutcome = DataOutcome.NotAttempted
     logger.info(s"Computing derived table: $tableName")
     try {
-      val df = fn(ctx)
+      val df = definition.transform(ctx)
       val commitContext = CommitContext.forFlow(request, tableName, "derived-full")
       val write = writeToIceberg(fullTableName, df, commitContext, () => dataOutcome = DataOutcome.Unknown)
       dataOutcome = if (write.snapshotId.isDefined) DataOutcome.Committed else DataOutcome.NoChange
       write.snapshotId.foreach(tagSnapshot(fullTableName, _, request.attemptId))
       logger.info(s"Derived table $tableName written: ${write.recordsWritten} records")
-      DerivedTableResult(
+      val result = DerivedTableResult(
         tableName,
         success = true,
         recordsWritten = write.recordsWritten,
         snapshotId = write.snapshotId,
         resultingSnapshotId = write.resultingSnapshotId,
+        resultingSchemaJson = Some(write.resultingSchemaJson),
         operationId = Some(commitContext.operationId),
         reconciled = write.reconciled,
         dataOutcome = dataOutcome
       )
+      val output = write.resultingSnapshotId match {
+        case Some(snapshotId) =>
+          spark.read.option("snapshot-id", snapshotId).table(SqlIdentifier.quoteMultipart(fullTableName))
+        case None =>
+          val schema = DataType.fromJson(write.resultingSchemaJson).asInstanceOf[StructType]
+          spark.createDataFrame(spark.sparkContext.emptyRDD[Row], schema)
+      }
+      DerivedExecution(result, Some(output))
     } catch {
       case e: Exception =>
         logger.error(s"Derived table $tableName failed: ${e.getMessage}", e)
-        DerivedTableResult(tableName, success = false, error = Some(e.getMessage), dataOutcome = dataOutcome)
+        DerivedExecution(
+          DerivedTableResult(tableName, success = false, error = Some(e.getMessage), dataOutcome = dataOutcome),
+          None
+        )
     }
   }
 
@@ -106,8 +144,11 @@ class DerivedTableExecutor(
       recordsWritten: Long,
       snapshotId: Option[Long],
       resultingSnapshotId: Option[Long],
+      resultingSchemaJson: String,
       reconciled: Boolean
   )
+
+  private case class DerivedExecution(result: DerivedTableResult, output: Option[DataFrame])
 
   private def writeToIceberg(
       fullTableName: String,
@@ -139,7 +180,8 @@ class DerivedTableExecutor(
       val matches = reconcileSnapshots(fullTableName, context, None)
       val committedSnapshot = matches.headOption.map(_.snapshotId)
       val resultingSnapshot = committedSnapshot.orElse(tableManager.getCurrentSnapshotId(fullTableName))
-      DerivedWrite(recordsWritten, committedSnapshot, resultingSnapshot, reconciled)
+      val resultingSchemaJson = spark.table(SqlIdentifier.quoteMultipart(fullTableName)).schema.json
+      DerivedWrite(recordsWritten, committedSnapshot, resultingSnapshot, resultingSchemaJson, reconciled)
     } finally {
       cachedDf.unpersist()
     }
@@ -218,6 +260,59 @@ class DerivedTableExecutor(
   }
 }
 
+object DerivedTableExecutor {
+  def validateDefinitions(definitions: Seq[DerivedTableDefinition], primaryInputs: Set[String]): Seq[String] = {
+    val names = definitions.map(_.name)
+    val duplicateGroups = names
+      .groupBy(_.toLowerCase(Locale.ROOT))
+      .values
+      .filter(_.size > 1)
+      .map(_.sorted)
+      .toSeq
+      .sortBy(_.head)
+    val derivedNames = names.toSet
+    val known = primaryInputs ++ derivedNames
+    val errors = scala.collection.mutable.ArrayBuffer.empty[String]
+
+    duplicateGroups.foreach { duplicates =>
+      errors += s"Derived table names collide case-insensitively: ${duplicates.mkString(", ")}"
+    }
+    definitions.foreach { definition =>
+      if (definition.dependencies.distinct.size != definition.dependencies.size)
+        errors += s"Derived table '${definition.name}' declares duplicate dependencies"
+      if (definition.dependencies.contains(definition.name))
+        errors += s"Derived table '${definition.name}' cannot depend on itself"
+      definition.dependencies.filterNot(known).foreach { dependency =>
+        errors += s"Derived table '${definition.name}' references unknown dependency '$dependency'"
+      }
+    }
+
+    if (duplicateGroups.isEmpty && errors.isEmpty) {
+      val ordered = scala.util.Try(orderDefinitions(definitions))
+      ordered.failed.foreach(error => errors += error.getMessage)
+    }
+    errors.toSeq.distinct
+  }
+
+  private[pipeline] def orderDefinitions(definitions: Seq[DerivedTableDefinition]): Seq[DerivedTableDefinition] = {
+    val derivedNames = definitions.map(_.name).toSet
+    val remaining = scala.collection.mutable.ArrayBuffer(definitions: _*)
+    val ordered = Vector.newBuilder[DerivedTableDefinition]
+    var resolved = Set.empty[String]
+
+    while (remaining.nonEmpty) {
+      val ready = remaining.filter(definition => definition.dependencies.filter(derivedNames).forall(resolved))
+      require(ready.nonEmpty, s"Derived table dependency cycle: ${remaining.map(_.name).mkString(" -> ")}")
+      ready.foreach { definition =>
+        ordered += definition
+        resolved += definition.name
+      }
+      remaining --= ready
+    }
+    ordered.result()
+  }
+}
+
 case class DerivedTableResult(
     tableName: String,
     success: Boolean,
@@ -225,6 +320,7 @@ case class DerivedTableResult(
     error: Option[String] = None,
     snapshotId: Option[Long] = None,
     resultingSnapshotId: Option[Long] = None,
+    resultingSchemaJson: Option[String] = None,
     operationId: Option[String] = None,
     reconciled: Boolean = false,
     dataOutcome: DataOutcome = DataOutcome.NotAttempted

@@ -16,7 +16,8 @@ class ExecutionContractTest extends AnyFlatSpec with Matchers {
       codeVersion: String = "sha256:application-v1",
       sourceOptions: Map[String, String] = Map.empty,
       sparkConfig: Map[String, String] = Map("spark.sql.session.timeZone" -> "UTC"),
-      warehouse: String = "s3://warehouse-a"
+      warehouse: String = "s3://warehouse-a",
+      derivedTables: Seq[(String, Seq[String])] = Seq("daily_orders" -> Seq("orders"))
   ): PipelineDefinition = {
     val configuredFlows = flows.map(flow => flow.copy(source = flow.source.copy(options = sourceOptions)))
     PipelineDefinitionBuilder.build(
@@ -30,7 +31,7 @@ class ExecutionContractTest extends AnyFlatSpec with Matchers {
       ),
       flowConfigs = configuredFlows,
       domainsConfig = None,
-      derivedTableNames = Seq("daily_orders"),
+      derivedTableDefinitions = derivedTables,
       sparkSemanticConfig = sparkConfig
     )
   }
@@ -80,6 +81,25 @@ class ExecutionContractTest extends AnyFlatSpec with Matchers {
       definition(sparkConfig = Map("spark.sql.session.timeZone" -> "Europe/Rome")).configDigest
     definition(warehouse = "s3://warehouse-a").configDigest should not be
       definition(warehouse = "s3://warehouse-b").configDigest
+    definition(derivedTables = Seq("daily_orders" -> Seq("orders"))).configDigest should not be
+      definition(derivedTables = Seq("daily_orders" -> Seq("orders", "customers"))).configDigest
+  }
+
+  it should "canonicalize derived table and dependency declaration order" in {
+    val first = definition(
+      derivedTables = Seq(
+        "daily_orders" -> Seq("customers", "orders"),
+        "daily_customers" -> Seq("customers")
+      )
+    )
+    val second = definition(
+      derivedTables = Seq(
+        "daily_customers" -> Seq("customers"),
+        "daily_orders" -> Seq("orders", "customers")
+      )
+    )
+
+    first.configDigest shouldBe second.configDigest
   }
 
   it should "redact secret values from the digest input" in {

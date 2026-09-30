@@ -88,6 +88,7 @@ class BatchMetadataWriter(
           "records_written" -> derived.recordsWritten,
           "snapshot_id" -> derived.snapshotId.map(_.toString).getOrElse(""),
           "resulting_snapshot_id" -> derived.resultingSnapshotId.map(_.toString).getOrElse(""),
+          "resulting_schema_json" -> derived.resultingSchemaJson.getOrElse(""),
           "operation_id" -> derived.operationId.getOrElse(""),
           "data_outcome" -> derived.dataOutcome.name,
           "error" -> derived.error.getOrElse("")

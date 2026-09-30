@@ -48,7 +48,7 @@ A batch execution follows this sequence:
    Read → Rename columns → Pre-transform → Validate → Post-transform → Write to Iceberg
 
 5. Correctness and derived outputs
-   Orphan detection → Read current Iceberg inputs → Compute/write derived tables
+   Orphan detection → Resolve declared attempt-pinned inputs → Topologically compute/write derived tables
 
 6. Finalization
    Diagnostic metadata → Typed attempt result with per-target snapshot evidence

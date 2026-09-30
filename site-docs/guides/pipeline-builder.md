@@ -40,7 +40,7 @@ val result = pipeline.execute()
 | `withPostValidationTransformation(flow, fn)` | Shorthand for post-validation only |
 | `withCustomValidator(name, factory)` | Registers a custom validator by name. Use the same name in the flow YAML `class` field. |
 | `withCatalogProvider(type, provider)` | Registers a custom Iceberg catalog provider |
-| `withDerivedTable(name, fn)` | Registers a derived table computed after all flows are written to Iceberg |
+| `withDerivedTable(name, dependencies, fn)` | Registers a derived table with explicit, attempt-pinned dependencies |
 | `withDataReader(type, factory)` | Registers a custom data reader for a source type. See [Data Sources — Custom readers](data-sources.md#custom-readers). |
 | `withBatchListener(listener)` | Registers a listener notified on batch completion or failure. See [Batch Listeners](batch-listeners.md). |
 | `withPipelineId(id)` | Sets the stable environment-specific pipeline identity used by explicit execution requests. |
@@ -325,7 +325,7 @@ Flow availability depends on execution order. The framework orders flows by FK d
 
 ## Derived tables
 
-Derived tables are Iceberg tables computed after all flows and orphan checks complete. `ctx.table` currently reads catalog HEAD and writes the result as a full-load table; the application must externally serialize other writers for those inputs. Historical snapshots remain available separately through Iceberg time travel while retained.
+Derived tables are Iceberg tables computed after all flows and orphan checks complete. Every derived target declares its inputs. `ctx.table` resolves those names to the exact flow or derived state produced by this attempt; it never falls back to mutable catalog HEAD.
 
 This is the recommended way to produce aggregations, splits, denormalizations, or any other output derived from your ingested data. Derived tables are first-class Iceberg tables — they have snapshots, time travel, schema evolution, and can be referenced by the DAG or queried directly.
 
@@ -334,7 +334,7 @@ This is the recommended way to produce aggregations, splits, denormalizations, o
 ```scala
 IngestionPipeline.builder()
   .withConfigDirectory("config")
-  .withDerivedTable("order_summary", ctx =>
+  .withDerivedTable("order_summary", Seq("orders"), ctx =>
     ctx.table("orders")
       .groupBy("category")
       .agg(
@@ -342,7 +342,7 @@ IngestionPipeline.builder()
         count("*").as("order_count")
       )
   )
-  .withDerivedTable("orders_domestic", ctx =>
+  .withDerivedTable("orders_domestic", Seq("orders"), ctx =>
     ctx.table("orders").filter(col("country") === "IT")
   )
   .build()
@@ -356,21 +356,20 @@ Each derived table function receives a `DerivedTableContext`:
 | `logicalRunId` | `String` | Stable business execution identity |
 | `attemptId` | `String` | Current driver invocation (`batchId` is an alias) |
 | `effectiveAt` | `Instant` | Functional time supplied in the request |
-| `catalogName` | `String` | Iceberg catalog name (from `global.yaml`) |
-| `namespace` | `String` | Iceberg namespace (from `global.yaml`, defaults to `default`) |
+| `availableTables` | `Set[String]` | Declared dependencies successfully resolved for this target |
 
-Each derived table must have a unique name. Registering two derived tables with the same name throws `IllegalArgumentException` at build time.
+Each derived table must have a non-blank, unqualified name. Names are unique case-insensitively because Spark commonly resolves identifiers case-insensitively; catalog and namespace come from the Iceberg configuration. Dependencies are likewise unqualified logical flow or derived names. Invalid or colliding declarations fail during registration or build.
 
 ### ctx.table(name)
 
-Reads the current state of a table from the Iceberg catalog. This is the key difference from transformations, where `ctx.currentData` contains only the current batch's data. It does not union old snapshots; use Iceberg time travel explicitly for a historical snapshot.
+Returns a declared dependency pinned to the state produced by this attempt. A primary flow is read at its `resultingSnapshotId`; a valid empty table without a snapshot is reconstructed from its frozen resulting schema. A derived dependency is handled the same way after its write completes. Unknown, undeclared, failed, or not-yet-produced inputs fail instead of reading HEAD.
 
 ```scala
-ctx.table("orders")     // reads floe.default.orders
-ctx.table("customers")  // reads floe.default.customers
+ctx.table("orders")     // allowed only when "orders" is declared
+ctx.table("customers")  // fails unless "customers" is declared
 ```
 
-You can also use `ctx.spark` for arbitrary Spark operations (reading external data, SQL queries, etc.).
+`ctx.spark` remains available for computations that do not bypass the declared inputs. Direct `spark.table`/SQL reads or mutable external reads are outside FLOe's pinned-input guarantee and must not be used by a qualified derived transformation.
 
 !!!note "No validation on derived tables"
     Derived tables are not validated by the framework's validation engine. Their inputs may contain accepted warning rows, legacy data, or values produced by custom transformations. Enforce output invariants inside the function or in a downstream quality check.
@@ -379,16 +378,17 @@ You can also use `ctx.spark` for arbitrary Spark operations (reading external da
 
 1. All flows execute (read → validate → transform → write to Iceberg)
 2. Orphan detection completes successfully
-3. Derived tables execute in registration order
-4. Each derived table writes to `{catalogName}.{namespace}.{tableName}` as a full-load overwrite
-5. A successful snapshot is tagged when `enableSnapshotTagging` is enabled
-6. The attempt report records typed outcomes and snapshot references
+3. Derived dependencies are validated; unknown inputs, self-dependencies, duplicates, and cycles are rejected before execution
+4. Derived tables execute in stable topological order, so registration order does not encode dependencies
+5. Each derived table writes to `{catalogName}.{namespace}.{tableName}` as a full-load overwrite
+6. A successful snapshot is tagged when `enableSnapshotTagging` is enabled
+7. The attempt report records typed outcomes, resulting schemas, and snapshot references
 
-If a derived table fails, the remaining derived tables still execute, but the final batch result has `success = false`. `executeOrThrow()` throws, batch listeners receive `onBatchFailed`, and the batch summary and quality metrics record a failed batch. `IngestionResult.derivedTableResults` contains each derived table's outcome; already committed tables are not rolled back.
+If a derived table fails, its transitive dependents are returned as failed and `NOT_ATTEMPTED`; independent derived tables still execute. The final attempt has `success = false`, `executeOrThrow()` throws, and listeners receive `onBatchFailed`. Already committed tables are not rolled back.
 
 !!!warning "Known limitations"
     - Derived tables always perform a full overwrite. There is no delta/merge mode — the entire table is recomputed each batch. For most use cases (aggregations, splits, denormalizations) this is correct because the result depends on the full dataset.
-    - If a derived table reads from another derived table (via `ctx.table("other_derived")`), registration order matters. Register the dependency first. The framework does not validate or resolve inter-derived-table dependencies automatically.
+    - FLOe cannot sandbox arbitrary Scala code. A function that bypasses `ctx.table` can still read mutable state; such an application is outside the pinned-input contract.
 
 ### DerivedTableResult
 
@@ -400,6 +400,7 @@ If a derived table fails, the remaining derived tables still execute, but the fi
 | `error` | `Option[String]` | Error message on failure |
 | `snapshotId` | `Option[Long]` | Exact committed snapshot when a snapshot was created |
 | `resultingSnapshotId` | `Option[Long]` | Resulting table reference, including a no-change operation |
+| `resultingSchemaJson` | `Option[String]` | Frozen schema for downstream handling of a snapshotless empty result |
 | `operationId` | `Option[String]` | Identity of this commit attempt, stored in snapshot metadata |
 | `reconciled` | `Boolean` | Whether a client exception was resolved by finding this attempt's snapshot |
 | `dataOutcome` | `DataOutcome` | Typed data effect for the target |

@@ -87,7 +87,7 @@ Floe reads the source data, validates schema and rules, upserts into `floe.defau
 | **Batch listeners** | Pluggable notifications — Slack, SNS, email, or any custom endpoint |
 | **Explicit execution contract** | Separates logical run, physical attempt, effective time, code version, and canonical config digest |
 | **DAG aggregation** | Join, nest, flatten, and aggregate data across flows using a declarative DAG |
-| **Derived tables** | Compute post-batch tables from the complete current state of Iceberg inputs |
+| **Derived tables** | Declare a derived DAG and read only attempt-pinned flow or derived inputs |
 | **Typed outcomes** | Reports success, warnings, partial failure, and unknown commit outcomes without pretending the batch is atomic |
 | **Config validation** | Lint YAML and dependency graphs without reading source data or running Spark jobs |
 

@@ -92,6 +92,12 @@ class ConfigEnumsTest extends AnyFlatSpec with Matchers {
     rejected.left.getOrElse("") should include("Valid values: warn, ignore")
   }
 
+  "CatalogMode.fromString" should "parse only explicit ownership modes" in {
+    CatalogMode.fromString("existing") shouldBe Right(CatalogMode.Existing)
+    CatalogMode.fromString("CONFIGURE") shouldBe Right(CatalogMode.Configure)
+    CatalogMode.fromString("automatic").isLeft shouldBe true
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // AGGREGATION FUNCTION
   // ═══════════════════════════════════════════════════════════════════════════

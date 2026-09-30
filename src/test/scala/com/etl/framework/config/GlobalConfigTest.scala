@@ -20,8 +20,7 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
         |  maxRejectionRate: 0.05
         |performance:
         |  parallelFlows: true
-        |iceberg:
-        |  warehouse: "/tmp/test-warehouse"
+        |iceberg: {}
       """.stripMargin
 
     import ConfigHints._
@@ -33,6 +32,25 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
     c.processing.maxRejectionRate shouldBe Some(0.05)
     c.performance.parallelFlows shouldBe true
     c.iceberg.catalogName shouldBe "floe"
+    c.iceberg.catalogMode shouldBe CatalogMode.Existing
+    c.iceberg.warehouse shouldBe empty
+  }
+
+  it should "decode explicit catalog bootstrap mode" in {
+    val yaml =
+      """
+        |paths:
+        |  outputPath: "/data/output"
+        |  rejectedPath: "/data/rejected"
+        |  metadataPath: "/data/metadata"
+        |iceberg:
+        |  catalogMode: configure
+        |  catalogType: hadoop
+        |  warehouse: "/tmp/test-warehouse"
+      """.stripMargin
+
+    import ConfigHints._
+    YamlConfigSource.string(yaml).load[GlobalConfig].toOption.get.iceberg.catalogMode shouldBe CatalogMode.Configure
   }
 
   it should "default the optional performance section" in {

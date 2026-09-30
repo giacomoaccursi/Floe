@@ -1,10 +1,11 @@
 package com.etl.framework.config
 
 case class IcebergConfig(
+    catalogMode: CatalogMode = CatalogMode.Existing,
     catalogType: String = "hadoop",
     catalogName: String = "floe",
     namespace: String = "default",
-    warehouse: String,
+    warehouse: String = "",
     catalogProperties: Map[String, String] = Map.empty,
     fileFormat: String = "parquet",
     enableSnapshotTagging: Boolean = true,

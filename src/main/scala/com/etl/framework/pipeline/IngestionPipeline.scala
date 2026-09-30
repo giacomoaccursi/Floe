@@ -7,11 +7,10 @@ import com.etl.framework.config.{
   FlowConfigLoader,
   FlowConfigValidator,
   GlobalConfig,
-  GlobalConfigLoader,
-  IcebergConfig
+  GlobalConfigLoader
 }
 import com.etl.framework.exceptions.{BatchFailedException, ConfigFileException, MissingConfigFieldException}
-import com.etl.framework.iceberg.catalog.{CatalogFactory, CatalogProvider}
+import com.etl.framework.iceberg.catalog.{CatalogProvider, CatalogRuntime}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.{
   BatchListener,
@@ -107,7 +106,7 @@ class IngestionPipeline private (
   }
 
   private def createOrchestrator(): FlowOrchestrator = {
-    configureSparkForIceberg(globalConfig.iceberg, extraCatalogProviders)
+    CatalogRuntime.prepare(spark, globalConfig.iceberg, extraCatalogProviders.toMap)
     FlowOrchestrator(
       globalConfig,
       resolvedFlowConfigs,
@@ -119,32 +118,6 @@ class IngestionPipeline private (
       pipelineId = pipelineId,
       codeVersion = codeVersion
     )
-  }
-
-  /** Configures the SparkSession with Iceberg catalog settings. Resolves the catalog provider (hadoop, glue, or custom)
-    * and applies catalog properties.
-    */
-  private def configureSparkForIceberg(
-      config: IcebergConfig,
-      extraProviders: Map[String, () => CatalogProvider]
-  ): Unit = {
-    CatalogFactory.createCatalogProvider(config.catalogType, extraProviders.toMap) match {
-      case Right(provider) =>
-        provider.validateConfig(config) match {
-          case Right(_) =>
-            provider.configureCatalog(spark, config)
-            logger.info(
-              s"Iceberg configured: catalog=${config.catalogName}, " +
-                s"type=${config.catalogType}, warehouse=${config.warehouse}"
-            )
-          case Left(error) =>
-            throw new IllegalArgumentException(
-              s"Invalid Iceberg catalog config: $error"
-            )
-        }
-      case Left(error) =>
-        throw new IllegalArgumentException(error)
-    }
   }
 
   /** Returns the global configuration

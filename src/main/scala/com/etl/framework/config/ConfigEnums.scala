@@ -278,6 +278,33 @@ object OrphanAction {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CATALOG MODE
+// ═══════════════════════════════════════════════════════════════════════════
+sealed trait CatalogMode extends Product with Serializable {
+  def name: String
+}
+
+object CatalogMode {
+  case object Existing extends CatalogMode { val name = "existing" }
+  case object Configure extends CatalogMode { val name = "configure" }
+
+  val values: Seq[CatalogMode] = Seq(Existing, Configure)
+
+  def fromString(value: String): Either[String, CatalogMode] =
+    values
+      .find(_.name == Option(value).getOrElse("").toLowerCase)
+      .toRight(s"Unknown catalog mode: '$value'. Valid values: ${values.map(_.name).mkString(", ")}")
+
+  implicit val reader: ConfigReader[CatalogMode] =
+    ConfigReader.fromString[CatalogMode](value =>
+      fromString(value).left.map(message => CannotConvert(value, "CatalogMode", message))
+    )
+
+  implicit val writer: ConfigWriter[CatalogMode] =
+    ConfigWriter[String].contramap(_.name)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // AGGREGATION FUNCTION
 // ═══════════════════════════════════════════════════════════════════════════
 sealed trait AggregationFunction extends Product with Serializable {

@@ -43,6 +43,17 @@ jobs:
       - name: Test
         run: sbt -J-Xss4m test
 
+      - name: Verify published runtime ownership
+        run: |
+          sbt -J-Xss4m makePom
+          pom=$(find target/scala-2.12 -maxdepth 1 -name '*.pom' -print -quit)
+          test -n "$pom"
+          rg -U '<artifactId>iceberg-spark-runtime-3\.5_2\.12</artifactId>\s*<version>1\.10\.1</version>\s*<scope>provided</scope>' "$pom"
+          if rg -q '<artifactId>iceberg-aws-bundle</artifactId>' "$pom"; then
+            echo 'iceberg-aws-bundle must be supplied by the deployment, not Floe' >&2
+            exit 1
+          fi
+
       - name: Release
         run: npx semantic-release
         env:

@@ -20,7 +20,7 @@ val pipeline = IngestionPipeline.builder()
   .build()
 
 val request = pipeline.executionDefinition.newRequest(
-  logicalRunId = "orders/2026-09-30",
+  logicalRunId = "orders-2026-09-30",
   effectiveAt = Instant.parse("2026-09-30T00:00:00Z"),
   dataInterval = Some(DataInterval(
     Instant.parse("2026-09-29T00:00:00Z"),
@@ -44,7 +44,7 @@ The identifiers have different meanings:
 | `codeVersion` | Immutable application artifact identity, including custom Scala code |
 | `configDigest` | Canonical digest of the resolved semantic Floe/Spark configuration |
 
-Floe rejects a request when its pipeline, code version, or config digest differs from the built pipeline. Secret values are not included in the digest; store logical secret references and their externally managed versions in the platform request if rotation affects reproducibility.
+Floe rejects a request when its pipeline, code version, or config digest differs from the built pipeline. Secret values are not included in the digest. Never put credentials in an execution request: when rotation affects reproducibility, store only a non-sensitive logical reference or externally managed version under a key such as `secret_ref` or `credential_version`.
 
 ## Outcome model
 
@@ -108,6 +108,8 @@ The attempt report is written below:
 Per-flow metadata uses the sibling `flows/` directory. Rejected rows and validation warnings use the same three-part identity under their configured roots. Identifiers are validated to prevent path traversal.
 
 These files are diagnostic by default. A report-write failure adds a warning and does not reinterpret a known Iceberg commit. If consumers require the report as the delivery mechanism for pinned snapshots, that is a stricter application contract: treat report publication as a functional output in the surrounding application and never rerun data writers merely to recreate the report.
+
+The generic process contract, strict JSON request format, and exit-code mapping are documented in [Generic Runner](runner.md).
 
 ## Maintenance
 

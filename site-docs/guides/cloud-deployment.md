@@ -24,6 +24,8 @@ pipeline.executeOrThrow(request)
 
 Floe adds no coordinator database. The cloud platform retains the request, serializes writers, observes the application exit, and records incident decisions. See [Failure Handling and Production Operations](recovery.md) before configuring scheduler retries.
 
+For pipelines defined entirely in YAML, use `com.etl.framework.runner.FloeRunner` as the `spark-submit` main class and pass the persisted request URI. Pipelines with custom Scala components use an application-owned main class with the same API and exit semantics. See [Generic Runner](runner.md).
+
 ## withVariables for parameter injection
 
 Managed schedulers commonly expose explicit job arguments rather than portable environment variables. Normalize those arguments in the entry point and use `withVariables` to inject them into YAML configuration:
@@ -355,3 +357,4 @@ Common `--conf` properties for all platforms:
 - [Pipeline Builder](pipeline-builder.md) — builder API and custom catalog providers
 - [Installation](../getting-started/installation.md) — local setup and dependencies
 - [Failure Handling and Production Operations](recovery.md) — partial commits, retry rules, and incident runbook
+- [Generic Runner](runner.md) — immutable request, `spark-submit`, and exit-code contract

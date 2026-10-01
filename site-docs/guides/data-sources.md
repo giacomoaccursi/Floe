@@ -229,7 +229,7 @@ source:
     replayToken: "orders/extract/2026-09-24T00:00:00Z/v1"
 ```
 
-A token is an assertion by the application, not a snapshot mechanism. A constant token cannot make a changing query deterministic. See [Recovery and Production Operations](recovery.md#input-fingerprints).
+A token is an assertion by the application, not a snapshot mechanism. A constant token cannot make a changing query deterministic. See [Recovery and Production Operations](recovery.md#retry-policy).
 
 ## Custom readers
 

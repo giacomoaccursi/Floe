@@ -88,6 +88,7 @@ Floe reads the source data, validates schema and rules, upserts into `floe.defau
 | **Quality metrics** | Optional Iceberg table with per-flow rejection rates, orphan counts, execution times |
 | **Batch listeners** | Pluggable notifications — Slack, SNS, email, or any custom endpoint |
 | **Explicit execution contract** | Separates logical run, physical attempt, effective time, code version, and canonical config digest |
+| **Orchestrator-neutral runner** | Runs YAML-only pipelines from strict persisted JSON requests with typed process exit codes |
 | **DAG aggregation** | Join, nest, flatten, and aggregate data across flows using a declarative DAG |
 | **Derived tables** | Declare a derived DAG and read only attempt-pinned flow or derived inputs |
 | **Typed outcomes** | Reports success, warnings, partial failure, and unknown commit outcomes without pretending the batch is atomic |
@@ -175,6 +176,18 @@ pipeline.executeOrThrow(request)
 
 Floe performs no automatic flow or whole-job retry. Airflow, Step Functions, or another host owns scheduling and mutual exclusion; leave platform retries disabled unless the complete application has been proven repeatable. See [Failure Handling and Production Operations](https://giacomoaccursi.github.io/Floe/guides/recovery/).
 
+YAML-only applications can use the generic runner directly:
+
+```bash
+spark-submit \
+  --class com.etl.framework.runner.FloeRunner \
+  my-pipeline-assembly.jar \
+  run --config s3://company-config/orders/v42 \
+      --request s3://company-control/orders/requests/attempt.json
+```
+
+The request is strict, versioned JSON persisted by the host before submission. `FAILED`, `FAILED_PARTIAL`, and `UNKNOWN` produce distinct non-zero exit codes; Floe never turns a returned pipeline failure into process success. See the [Generic Runner guide](https://giacomoaccursi.github.io/Floe/guides/runner/).
+
 ## Deployment targets
 
 Floe runs locally and on compatible Spark 3.5 clusters. Managed platforms require matching Spark, Scala, and Iceberg artifacts plus platform-specific catalog configuration:
@@ -194,6 +207,7 @@ Full documentation at **[giacomoaccursi.github.io/Floe](https://giacomoaccursi.g
 - [Validation Engine](https://giacomoaccursi.github.io/Floe/guides/validation/) — all rule types
 - [Iceberg Integration](https://giacomoaccursi.github.io/Floe/guides/iceberg/) — write modes, snapshots, maintenance
 - [Pipeline Builder API](https://giacomoaccursi.github.io/Floe/guides/pipeline-builder/) — programmatic configuration
+- [Generic Runner](https://giacomoaccursi.github.io/Floe/guides/runner/) — persisted requests and orchestrator-neutral execution
 - [Failure Handling and Production Operations](https://giacomoaccursi.github.io/Floe/guides/recovery/) — partial commits, unknown outcomes, retry policy, and incident response
 
 ## License

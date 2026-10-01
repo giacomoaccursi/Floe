@@ -27,7 +27,7 @@ flowchart LR
     REQUEST --> PLAN --> FLOWS --> FK --> DERIVED --> REPORT
 ```
 
-`execute()` is an ad-hoc convenience that creates a new logical run, attempt, and time. Managed platforms should call `execute(request)` or `executeOrThrow(request)` after persisting the request outside Floe.
+`execute()` is an ad-hoc convenience that creates a new logical run, attempt, and time. Managed platforms should call `execute(request)` or `executeOrThrow(request)` after persisting the request outside Floe. YAML-only deployments can use the [generic runner](../guides/runner.md), which reads the same strict request contract and maps typed outcomes to process exit codes.
 
 The orchestrator is single-use. It closes its own worker pool but never stops the caller-owned `SparkSession` and never calls `System.exit`.
 
@@ -104,4 +104,4 @@ Airflow, Step Functions, Argo, Glue, EMR, or another platform owns:
 
 Scheduler retry must be disabled by default. A whole-job retry is allowed only for an application/deployment recipe that has passed repeatability tests. `UNKNOWN` blocks automatic retry.
 
-See [Failure Handling and Production Operations](../guides/recovery.md) for the operational contract.
+See [Generic Runner](../guides/runner.md) for the process boundary and [Failure Handling and Production Operations](../guides/recovery.md) for the operational contract.

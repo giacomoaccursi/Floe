@@ -60,6 +60,7 @@ nav:
     - SCD2: guides/scd2.md
     - DAG Aggregation: guides/dag-aggregation.md
     - Pipeline Builder: guides/pipeline-builder.md
+    - Generic Runner: guides/runner.md
     - Recovery & Operations: guides/recovery.md
     - Orphan Detection: guides/orphan-detection.md
     - Batch Listeners: guides/batch-listeners.md

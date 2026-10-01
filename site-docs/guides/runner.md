@@ -90,7 +90,7 @@ spark-submit \
   --request s3://company-control/orders/requests/d59882b1-b84a-4ae2-92fe-2bfe5ec78e41.json
 ```
 
-The runner rebuilds the pipeline, rejects pipeline/code/config identity mismatches, performs target preflight, executes exactly one attempt, writes the normal attempt report, and emits a compact JSON result. It never retries a flow or the whole job.
+The runner rebuilds the pipeline, rejects pipeline/code/config identity mismatches, performs target preflight, executes exactly one attempt, attempts the normal diagnostic report, and emits a compact JSON result. It never retries a flow or the whole job. A report failure after known data success produces `SUCCEEDED_WITH_WARNINGS`.
 
 The runner stops a `SparkSession` it created. When embedded in a process that already owns an active/default session, it leaves that session running.
 
@@ -104,6 +104,7 @@ The runner stops a `SparkSession` it created. When embedded in a process that al
 | `10` | `FAILED` | Inspect the report and target evidence before deciding on a new attempt |
 | `11` | `FAILED_PARTIAL` | Freeze overlapping writers and follow the recovery runbook |
 | `12` | `UNKNOWN` | Freeze overlapping writers; never retry automatically |
+| `13` | Inspection could not query every requested evidence source | Keep the incident open and resolve the catalog/storage access failure |
 | `70` | Runner/bootstrap internal failure | Treat the execution as unobserved until backend evidence is inspected |
 
 Exit code `0` does not mean that every diagnostic write succeeded: `SUCCEEDED_WITH_WARNINGS` deliberately remains a successful data-plane outcome. Conversely, a missing JSON line or missing report is never proof that no data commit occurred. Managed services may collapse application exit codes into a generic failed state, so retain the structured result, request, logs, and Iceberg evidence.
@@ -114,4 +115,34 @@ Airflow, Step Functions, Argo, Glue, EMR, and similar systems should invoke the 
 
 Do not split Floe's internal flow DAG into scheduler tasks: downstream reads are pinned and state is held inside one driver attempt. Do not generate a new request after a failure until the earlier application has terminated and its effects have been classified. See [Failure Handling and Production Operations](recovery.md).
 
-`inspect` is intentionally not exposed by this runner yet. A trustworthy inspector must correlate table identity, refs, snapshot history, operation summaries, and report evidence without turning absence of evidence into `NOT_COMMITTED`. Until that contract exists, use the documented incident runbook and native catalog/Iceberg inspection tools.
+## Inspect an attempt
+
+After the earlier remote application has terminated, run the read-only inspector with the original immutable request and configuration:
+
+```bash
+spark-submit \
+  --class com.etl.framework.runner.FloeRunner \
+  my-pipeline-assembly.jar \
+  inspect \
+  --config s3://company-config/orders/v42 \
+  --request s3://company-control/orders/requests/d59882b1-b84a-4ae2-92fe-2bfe5ec78e41.json
+```
+
+For every primary and registered derived target, the result includes:
+
+- the deterministic attempt operation ID and current table UUID;
+- snapshots whose summary contains that exact operation ID;
+- current `main` snapshot ID;
+- whether each matching snapshot is current, an ancestor of `main`, or outside its current ancestry;
+- presence/absence of the diagnostic attempt report.
+
+Target evidence is classified as `COMMIT_OBSERVED`, `NO_COMMIT_EVIDENCE`, `TABLE_MISSING`, `MULTIPLE_COMMITS_OBSERVED`, or `INSPECTION_FAILED`. Snapshot IDs are JSON strings to preserve 64-bit precision. Quality-metrics and other best-effort diagnostics are not mutation targets and are not used to infer the data outcome.
+
+The distinction is deliberate:
+
+- `COMMIT_OBSERVED` proves that the matching historical Iceberg commit exists; it does not prove the whole job succeeded or that its data is still current.
+- `NO_COMMIT_EVIDENCE` does **not** mean `NOT_COMMITTED`. The step may not have run, may have been a legitimate no-op, its snapshot may have expired, or evidence may be otherwise insufficient.
+- `NOT_ANCESTOR_OF_MAIN` can indicate rollback or another ref/history change; it does not erase the historical commit.
+- `MULTIPLE_COMMITS_OBSERVED` is an anomaly requiring investigation.
+
+`retry_safe` is therefore always `false`. Exit code `0` means only that every requested evidence query completed, not that the attempt succeeded or may be retried. Exit code `13` means inspection itself was incomplete. Missing tables and zero matching snapshots are completed observations and remain explicit in JSON rather than being converted into query failure.

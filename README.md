@@ -188,6 +188,8 @@ spark-submit \
 
 The request is strict, versioned JSON persisted by the host before submission. `FAILED`, `FAILED_PARTIAL`, and `UNKNOWN` produce distinct non-zero exit codes; Floe never turns a returned pipeline failure into process success. See the [Generic Runner guide](https://giacomoaccursi.github.io/Floe/guides/runner/).
 
+The same runner exposes a read-only `inspect` command for incident evidence. It correlates the original request with exact Iceberg operation metadata, current `main`, snapshot ancestry, table UUID, and report presence without claiming that missing evidence proves non-commit or that a retry is safe.
+
 ## Deployment targets
 
 Floe runs locally and on compatible Spark 3.5 clusters. Managed platforms require matching Spark, Scala, and Iceberg artifacts plus platform-specific catalog configuration:

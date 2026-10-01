@@ -105,3 +105,5 @@ Airflow, Step Functions, Argo, Glue, EMR, or another platform owns:
 Scheduler retry must be disabled by default. A whole-job retry is allowed only for an application/deployment recipe that has passed repeatability tests. `UNKNOWN` blocks automatic retry.
 
 See [Generic Runner](../guides/runner.md) for the process boundary and [Failure Handling and Production Operations](../guides/recovery.md) for the operational contract.
+
+`inspect` is a read-only evidence collector, not a resume protocol. A matching snapshot proves a historical commit; no matching live snapshot cannot prove non-commit. The inspector reports table UUID, current `main`, ancestry, exact operation matches, and report presence while always returning `retry_safe: false`.

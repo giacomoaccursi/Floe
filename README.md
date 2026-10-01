@@ -9,7 +9,7 @@
 
 Declarative batch ETL framework built on Apache Spark and Apache Iceberg.
 
-Define your data flows in YAML. The framework handles ingestion, validation, incremental loads, schema evolution, and table management — so you can focus on your data, not the plumbing.
+Define your data flows in YAML. The framework handles ingestion, validation, incremental loads, and Iceberg writes; table DDL is either validated against platform provisioning or explicitly delegated to Floe for local/bootstrap workflows.
 
 ## Why this framework
 
@@ -31,12 +31,13 @@ paths:
 
 iceberg:
   catalogMode: configure
+  ddlMode: automatic
   catalogType: hadoop
   catalogName: floe
   warehouse: "output/warehouse"
 ```
 
-`floe` is the logical Spark catalog name, not an external service. This local example opts into `catalogMode: configure`, so Floe registers an Iceberg `SparkCatalog`. Enterprise deployments normally keep the default `existing` mode and configure the catalog in `spark-submit` or the managed platform before the session starts.
+`floe` is the logical Spark catalog name, not an external service. This local example explicitly lets Floe configure the catalog and manage table DDL. Enterprise deployments normally keep the defaults `catalogMode: existing` and `ddlMode: validate`: the platform configures the catalog and provisions tables before execution.
 
 **`config/flows/orders.yaml`:**
 

@@ -47,7 +47,7 @@ See [Validation Engine](../guides/validation.md).
 
 Handles all Iceberg table operations:
 
-- **Table management**: CREATE TABLE IF NOT EXISTS, schema evolution (ADD COLUMN), partition spec updates, table property updates
+- **Table policy**: validate-only contracts by default; opt-in CREATE TABLE, schema evolution, partition updates, and property updates in `ddlMode: automatic`
 - **Write strategies**: full load (overwrite), delta (MERGE INTO with value-based change detection), SCD2 (NULL merge-key trick)
 - **Snapshot management**: tagging, metadata capture, operation-identity lookup
 - **Maintenance**: snapshot expiration, data compaction, orphan file cleanup, manifest rewrite

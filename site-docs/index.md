@@ -2,11 +2,11 @@
 
 Declarative ETL framework — built on Spark and Iceberg.
 
-Floe lets you define data ingestion pipelines in YAML. You describe your sources, schemas, validation rules, and load modes — the framework handles reading, validating, writing to Iceberg, schema evolution, snapshot tagging, and typed execution evidence. Scheduling, durable workflow state, writer coordination, and maintenance scheduling remain responsibilities of the hosting platform. Code is only needed where you want custom transformation logic.
+Floe lets you define data ingestion pipelines in YAML. You describe your sources, schemas, validation rules, and load modes — the framework handles reading, validating, writing to Iceberg, snapshot tagging, and typed execution evidence. By default it validates platform-provisioned table contracts without issuing DDL; automatic table management is an explicit local/bootstrap mode. Scheduling, durable workflow state, writer coordination, and maintenance scheduling remain responsibilities of the hosting platform. Code is only needed where you want custom transformation logic.
 
 ## What it does
 
-Define your data flows in YAML — the framework handles ingestion, validation, incremental loads, and Iceberg table management automatically.
+Define your data flows in YAML — the framework handles ingestion, validation, and incremental Iceberg writes while making catalog and table ownership explicit.
 
 ```yaml
 name: orders
@@ -47,7 +47,7 @@ val result = IngestionPipeline.builder()
 - **Keep history** — track how records change over time with SCD2 (Slowly Changing Dimensions). The framework handles versioning, timestamps, and soft deletes automatically.
 - **Combine tables** — join data from multiple flows into aggregated views using a DAG. Nest child records, flatten columns, or compute summaries.
 - **Transform in code** — hook into the pipeline with Scala functions to enrich, filter, or reshape data before or after validation.
-- **Detect broken references** — after a batch, the framework checks if parent records were removed and child records are now orphaned. It can warn or clean up automatically.
+- **Detect broken references** — after a batch, the framework can report child records orphaned by parent removals. Public policies are non-destructive (`warn` or `ignore`).
 - **Get notified** — register batch listeners to receive notifications on completion or failure. Send to Slack, SNS, or any custom endpoint.
 - **Track quality over time** — optionally write per-flow quality metrics to an Iceberg table for trend analysis and dashboards.
 - **Read from anywhere** — built-in support for CSV, Parquet, JSON, Avro, ORC files and JDBC databases. Register custom readers for any other source.
@@ -59,4 +59,4 @@ val result = IngestionPipeline.builder()
 - [Quickstart](getting-started/quickstart.md) — first pipeline
 - [Configuration](configuration/overview.md) — all YAML settings
 - [Architecture Overview](architecture/overview.md) — how it works
-- [Recovery and Production Operations](guides/recovery.md) — production setup, resume, replay, and incident handling
+- [Recovery and Production Operations](guides/recovery.md) — production setup, partial outcomes, and incident handling

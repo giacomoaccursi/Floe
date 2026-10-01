@@ -44,7 +44,7 @@ val spark = SparkSession.builder()
   .getOrCreate()
 ```
 
-All other Iceberg settings (catalog name, warehouse path, catalog type) are configured automatically by the framework from `global.yaml` — you only need the extensions line.
+The extensions must always be present before session creation. With the default `catalogMode: existing`, the platform must also configure the named `spark.sql.catalog.*` settings; Floe validates them without overwriting the session. `catalogMode: configure` is an explicit opt-in for provider-based bootstrap. Table ownership is separate: `ddlMode: validate` requires pre-provisioned targets, while `automatic` permits Floe-managed DDL for local/bootstrap workflows.
 
 ### On managed platforms
 

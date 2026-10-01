@@ -101,6 +101,7 @@ processing:
 
 iceberg:
   catalogMode: "${CATALOG_MODE}"
+  ddlMode: "${DDL_MODE}"
   catalogType: "${CATALOG_TYPE}"
   warehouse: "${WAREHOUSE_PATH}"
 ```
@@ -207,6 +208,7 @@ Configure the catalog through Floe's Glue provider:
 ```yaml
 iceberg:
   catalogMode: "configure"
+  ddlMode: "validate"
   catalogType: "glue"
   catalogName: "floe"
   warehouse: "s3://${BUCKET}/warehouse"
@@ -260,6 +262,7 @@ The recommended AWS configuration uses the Glue catalog in `global.yaml`, not Ha
 ```yaml
 iceberg:
   catalogMode: "configure"
+  ddlMode: "validate"
   catalogType: "glue"
   catalogName: "floe"
   warehouse: "s3://my-bucket/warehouse"
@@ -339,6 +342,9 @@ Common `--conf` properties for all platforms:
 
 !!!note
     The spark-submit `--conf` properties configure the Spark catalog directly. Keep the default `catalogMode: existing`: FLOe validates the named catalog and does not overwrite platform settings. Use `catalogMode: configure` only when no catalog is supplied externally, and never configure the same catalog through both paths.
+
+!!!note
+    Keep the enterprise default `ddlMode: validate` and provision all primary, derived, and quality-metrics tables through the platform's normal migration process. `ddlMode: automatic` is intended for explicit local/bootstrap workflows, not as an implicit production migration system.
 
 !!!note
     The `spark.sql.extensions` property **must** be set before the SparkSession is created. On managed platforms, set it in the cluster/job configuration rather than in code.

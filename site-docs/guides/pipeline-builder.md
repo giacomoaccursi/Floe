@@ -327,7 +327,7 @@ Flow availability depends on execution order. The framework orders flows by FK d
 
 Derived tables are Iceberg tables computed after all flows and orphan checks complete. Every derived target declares its inputs. `ctx.table` resolves those names to the exact flow or derived state produced by this attempt; it never falls back to mutable catalog HEAD.
 
-This is the recommended way to produce aggregations, splits, denormalizations, or any other output derived from your ingested data. Derived tables are first-class Iceberg tables — they have snapshots, time travel, schema evolution, and can be referenced by the DAG or queried directly.
+This is the recommended way to produce aggregations, splits, denormalizations, or any other output derived from your ingested data. Derived tables are first-class Iceberg tables with snapshots and time travel. In `ddlMode: validate` they must be provisioned with the exact derived schema; `automatic` permits Floe-managed creation and additive evolution.
 
 ### Registering derived tables
 
@@ -431,6 +431,7 @@ Providers are invoked only when `catalogMode: configure` is explicit:
 # Hadoop (default)
 iceberg:
   catalogMode: "configure"
+  ddlMode: "automatic"
   catalogType: "hadoop"
   catalogName: "floe"
   warehouse: "output/warehouse"
@@ -438,6 +439,7 @@ iceberg:
 # Glue
 iceberg:
   catalogMode: "configure"
+  ddlMode: "validate"
   catalogType: "glue"
   catalogName: "floe"
   warehouse: "s3://my-bucket/warehouse"
@@ -479,7 +481,7 @@ IngestionPipeline.builder()
   .build()
 ```
 
-The corresponding `global.yaml` must set `catalogMode: configure`. In the default `existing` mode the platform configures the named catalog before creating the session, and no provider—built-in or custom—is invoked.
+The corresponding `global.yaml` must set `catalogMode: configure`. In the default `existing` mode the platform configures the named catalog before creating the session, and no provider—built-in or custom—is invoked. This choice is independent of `ddlMode`: production integrations normally retain `ddlMode: validate` and provision tables separately.
 
 The `CatalogProvider` trait has three methods:
 

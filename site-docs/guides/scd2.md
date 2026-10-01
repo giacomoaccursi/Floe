@@ -228,7 +228,7 @@ These two boolean columns encode different information:
 
 ## Enabling detectDeletes on an existing table
 
-If you enable `detectDeletes` on an SCD2 table that already contains data, the `is_active` column is added automatically via schema evolution (`ALTER TABLE ADD COLUMN`). However, existing rows will have `is_active = NULL`, not `true`.
+If you enable `detectDeletes` on an SCD2 table that already contains data, `ddlMode: validate` requires you to migrate and backfill `is_active` before the next run. With `ddlMode: automatic`, Floe adds the column via schema evolution (`ALTER TABLE ADD COLUMN`), but existing rows will have `is_active = NULL`, not `true`.
 
 This means queries with `WHERE is_active = true` will exclude existing records — a **data correctness problem**.
 

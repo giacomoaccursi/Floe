@@ -38,6 +38,7 @@ The `iceberg` block in `global.yaml` is required:
 ```yaml
 iceberg:
   catalogMode: "existing"
+  ddlMode: "validate"
   catalogName: "floe"
   namespace: "default"
   fileFormat: "parquet"
@@ -56,6 +57,7 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 | Field | Default | Description |
 |-------|---------|-------------|
 | `catalogMode` | `existing` | `existing` validates a platform-owned catalog without mutation; `configure` explicitly runs a FLOe provider. |
+| `ddlMode` | `validate` | `validate` requires platform-provisioned tables and performs read-only contract checks; `automatic` opts into table creation and evolution. |
 | `catalogType` | `hadoop` | Iceberg catalog implementation: `hadoop`, `glue`, or a custom type registered via the [Pipeline Builder](pipeline-builder.md#custom-catalog-providers) |
 | `catalogName` | `floe` | Name used in SQL queries (`catalog.namespace.table`). The built-in providers reject Spark's reserved `spark_catalog` name because they install `SparkCatalog`, not `SparkSessionCatalog`. |
 | `namespace` | `default` | Iceberg namespace for tables |
@@ -98,6 +100,14 @@ The extensions (`spark.sql.extensions`) must be set by the user before creating 
 
 Only `configure` mode resolves `catalogType` and invokes a provider. Adding a new bootstrapped catalog type means implementing `CatalogProvider` and registering it on the builder. A platform-managed REST, Hive, Nessie, Glue, or other Iceberg catalog generally needs no FLOe provider in `existing` mode.
 
+### Table ownership and DDL
+
+Catalog ownership and table ownership are separate decisions. The enterprise default, `ddlMode: validate`, never creates a table, adds or widens a column, changes a partition or sort order, or sets a table property. Floe first verifies that every declared primary, derived, and quality-metrics target exists, before reading a source or committing any flow. Once a DataFrame's final schema is available, it validates the complete write contract immediately before that target's data mutation.
+
+Validation is intentionally strict: column names and Spark data types must match exactly; nullability differences are ignored because Spark SQL-created Iceberg columns are nullable by default. The current partition and sort orders must match the flow output configuration, the table must use Iceberg format version 2 and the configured file format, and every configured custom table property must have the expected value. Catalog or authorization errors are propagated and are not treated as an absent table.
+
+`ddlMode: automatic` preserves the convenience workflow for local development: Floe may create targets, add columns, widen supported types, add partition fields, set properties, and establish sort order on creation. It is an explicit DDL workflow with persistent effects, not a migration framework and not part of the enterprise validate-only guarantee. Derived tables and quality metrics follow the same policy.
+
 ### Table naming
 
 Every flow maps to a single Iceberg table with the convention:
@@ -110,11 +120,11 @@ For example, a flow named `customers` with catalog `floe` and namespace `default
 
 ### Table creation and schema
 
-Tables are created on first write with `CREATE TABLE IF NOT EXISTS`. The schema is derived from the flow's `SchemaConfig` columns plus any system columns added by the load mode (e.g., `valid_from`, `valid_to`, `is_current` for SCD2).
+In `ddlMode: validate`, tables are provisioned outside Floe and checked as described above. In `ddlMode: automatic`, a missing table is created on first write with `CREATE TABLE IF NOT EXISTS`. Its schema is derived from the final DataFrame plus any system columns added by the load mode (for example `valid_from`, `valid_to`, and `is_current` for SCD2).
 
 ### Schema evolution
 
-Every run, the framework compares the incoming schema with the existing table schema and adds any new columns via `ALTER TABLE ADD COLUMN`. Columns present in the table but absent from the incoming schema are left untouched — the framework never drops columns.
+The behavior in this section applies only to `ddlMode: automatic`. Every run, Floe compares the incoming schema with the existing table schema and adds any new columns via `ALTER TABLE ADD COLUMN`. Columns present in the table but absent from the incoming schema are left untouched — Floe never drops columns.
 
 The framework also applies safe type widening automatically. If an existing column's type can be safely widened to match the incoming schema, the change is applied via `ALTER TABLE ALTER COLUMN TYPE`:
 
@@ -127,7 +137,7 @@ The framework also applies safe type widening automatically. If an existing colu
 
 Incompatible type changes (e.g. `string` → `int`, `long` → `int`) are not applied. The framework logs a warning and leaves the column unchanged. Resolve these manually with `ALTER TABLE`.
 
-This means adding a column to a flow's `schema.columns` section takes effect at the next run without manual intervention:
+In automatic mode, adding a column to a flow's `schema.columns` section takes effect at the next run:
 
 1. The new column is added to the Iceberg table via ALTER TABLE
 2. Existing rows have `NULL` for the new column
@@ -159,20 +169,20 @@ columns:
     nullable: true
 ```
 
-At the next run, the framework logs `Added column notes (STRING) to catalog.default.orders` and the column becomes available.
+At the next run, Floe logs `Added column notes (STRING) to catalog.default.orders` and the column becomes available. In validate mode, deploy the corresponding reviewed table migration first; otherwise the run fails without altering the table.
 
 !!!note "Special case: `is_active` column on existing SCD2 tables"
     When `detectDeletes` is enabled mid-stream, the `is_active` column is added via schema evolution. Existing rows will have `is_active = NULL`, which causes `WHERE is_active = true` queries to exclude them. The framework emits a specific warning for this case. See [SCD2 Guide](scd2.md#enabling-detectdeletes-on-an-existing-table) for details and the recommended backfill procedure.
 
 ### Table configuration updates
 
-Every run, the framework compares the current table state against the flow config and applies any differences:
+In `ddlMode: automatic`, every run compares the current table state against the flow config and applies supported differences:
 
 - **Schema**: new columns are added via `ALTER TABLE ADD COLUMN` (see above).
 - **Table properties**: reads current properties via `SHOW TBLPROPERTIES` and applies only new or changed entries via `ALTER TABLE SET TBLPROPERTIES`. Existing properties not mentioned in the config are left untouched.
 - **Partition spec**: attempts `ALTER TABLE ADD PARTITION FIELD` for each configured partition. If the field already exists, the operation is silently skipped.
 
-This means adding `icebergPartitions`, `tableProperties`, or new schema columns to an existing flow config takes effect at the next run without manual intervention.
+This means adding `icebergPartitions`, `tableProperties`, or new schema columns to an existing flow config takes effect at the next run in automatic mode. Validate mode instead requires a separately deployed migration and rejects drift.
 
 #### Partition spec on tables with existing data
 
@@ -254,6 +264,8 @@ output:
     write.format.default: "parquet"
     commit.retry.num-retries: "4"
 ```
+
+`write.format.default` takes precedence over the global `iceberg.fileFormat` for that flow. `format-version` is reserved: configure it only through `iceberg.formatVersion`; a per-flow override is rejected so creation and validate-only checks cannot disagree about the required table format.
 
 ## Write operations
 

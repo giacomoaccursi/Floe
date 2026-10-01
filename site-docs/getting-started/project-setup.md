@@ -17,7 +17,7 @@ my-etl-project/
         └── MyPipeline.scala  # Entry point
 ```
 
-Source data can be local files, S3 paths, or JDBC databases — configured per-flow in the YAML. The `output/` directory (data, rejected, metadata, warehouse) is created automatically at runtime based on the paths in `global.yaml`.
+Source data can be local files, S3 paths, or JDBC databases — configured per-flow in the YAML. Diagnostic output paths are created when written. An Iceberg warehouse and target tables are platform-owned by default; the local quickstart explicitly enables catalog bootstrap and automatic DDL.
 
 ## build.sbt
 

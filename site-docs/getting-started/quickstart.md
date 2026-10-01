@@ -24,6 +24,7 @@ performance:
 
 iceberg:
   catalogMode: "configure"
+  ddlMode: "automatic"
   catalogType: "hadoop"
   catalogName: "floe"
   warehouse: "output/warehouse"

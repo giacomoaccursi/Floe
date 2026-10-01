@@ -375,5 +375,7 @@ output:
     commit.retry.num-retries: "4"
 ```
 
+`write.format.default` deliberately overrides the global `iceberg.fileFormat` for this flow. Do not set `format-version` here: Floe owns that invariant through `iceberg.formatVersion` and rejects a per-flow override.
+
 !!!note "Commit retry scope"
     `commit.retry.num-retries` configures Iceberg's validated catalog-commit retry. Floe does not retry a flow or pipeline. If a commit outcome is uncertain, do not start another writer until the outcome and any in-flight request have been reconciled.

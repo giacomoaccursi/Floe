@@ -11,7 +11,7 @@ processing:
   qualityMetricsTable: "quality_metrics"
 ```
 
-The table is created automatically on first use in the configured Iceberg catalog and namespace.
+The target follows the global DDL policy. With the enterprise default `ddlMode: validate`, provision it with the exact schema below before running the pipeline; its absence fails target preflight before any flow executes. With the explicit local/bootstrap mode `ddlMode: automatic`, Floe creates it on first use. Metric appends remain diagnostic and best-effort after the table contract has passed preflight.
 
 ## Table schema
 
@@ -32,6 +32,33 @@ The table is created automatically on first use in the configured Iceberg catalo
 | `success` | BOOLEAN | Whether this individual flow succeeded |
 
 Each batch appends one row per flow. Empty batches write a single summary row with `flow_name = "batch_summary"`.
+
+For the default Parquet/format-v2 contract, a platform migration can provision the table as follows (replace the identifier with the configured catalog, namespace, and `qualityMetricsTable` value):
+
+```sql
+CREATE TABLE floe.default.quality_metrics (
+  batch_id STRING,
+  batch_timestamp TIMESTAMP,
+  batch_success BOOLEAN,
+  flow_name STRING,
+  load_mode STRING,
+  input_records BIGINT,
+  valid_records BIGINT,
+  rejected_records BIGINT,
+  rejection_rate DOUBLE,
+  records_written BIGINT,
+  orphan_count BIGINT,
+  execution_time_ms BIGINT,
+  success BOOLEAN
+)
+USING iceberg
+TBLPROPERTIES (
+  'format-version' = '2',
+  'write.format.default' = 'parquet'
+);
+```
+
+If the global Iceberg format settings differ, the migration must use those exact values or validate-only execution will reject the table.
 
 ## Example queries
 

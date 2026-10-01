@@ -21,6 +21,7 @@ performance:
 
 iceberg:
   catalogMode: "configure"
+  ddlMode: "automatic"
   catalogType: "hadoop"
   catalogName: "floe"
   namespace: "default"
@@ -108,6 +109,7 @@ For the complete Iceberg integration guide, see [Iceberg Integration](../guides/
 | Field | Default | Description |
 |-------|---------|-------------|
 | `catalogMode` | `existing` | Catalog ownership: `existing` validates a platform-configured Spark catalog without mutating session settings; `configure` explicitly invokes a FLOe catalog provider. |
+| `ddlMode` | `validate` | Table ownership: `validate` requires pre-provisioned targets and performs read-only contract checks; `automatic` allows Floe to create and evolve tables. |
 | `catalogType` | `hadoop` | Catalog implementation: `hadoop`, `glue`, or a custom type registered via the [Pipeline Builder](../guides/pipeline-builder.md#custom-catalog-providers) |
 | `catalogName` | `floe` | Catalog name used in SQL queries. The built-in providers use `SparkCatalog`, so `spark_catalog` is rejected because Spark reserves it for the session catalog. |
 | `namespace` | `default` | Iceberg namespace (database) for tables. Tables are named `{catalogName}.{namespace}.{flowName}`. |
@@ -132,6 +134,7 @@ For local development, `hadoop` is the simplest choice — it works out of the b
 ```yaml
 iceberg:
   catalogMode: "configure"
+  ddlMode: "automatic"
   catalogType: "hadoop"
   warehouse: "output/warehouse"
 ```
@@ -141,6 +144,7 @@ For AWS production deployments with Glue:
 ```yaml
 iceberg:
   catalogMode: "configure"
+  ddlMode: "validate"
   catalogType: "glue"
   catalogName: "floe"
   warehouse: "s3://my-bucket/warehouse"
@@ -149,6 +153,8 @@ iceberg:
 ```
 
 `catalogProperties` is applied only in `catalogMode: configure`. In the default `existing` mode the platform owns every `spark.sql.catalog.*` setting; FLOe verifies that the named catalog and Iceberg extensions exist and does not overwrite them.
+
+`ddlMode` is independent from `catalogMode`. A job may bootstrap a catalog but still require tables to be provisioned separately. In `validate`, Floe checks that every primary, derived, and configured quality-metrics target exists before any flow runs; immediately before each write it also verifies the exact column names and types, current partition and sort orders, Iceberg format version, file format, and configured custom table properties. Any mismatch fails without issuing DDL.
 
 Custom catalog providers (Hive, REST, Nessie) can be registered via the [Pipeline Builder API](../guides/pipeline-builder.md#custom-catalog-providers).
 

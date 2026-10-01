@@ -50,6 +50,7 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
 
   private val icebergConfig = IcebergConfig(
     catalogName = "orphan_catalog",
+    ddlMode = DdlMode.Automatic,
     warehouse = warehousePath.toString,
     enableSnapshotTagging = false
   )

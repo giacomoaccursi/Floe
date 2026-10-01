@@ -33,7 +33,13 @@ class QualityMetricsWriterTest extends AnyFlatSpec with Matchers with BeforeAndA
 
   private def globalConfig(enabled: Boolean = true): GlobalConfig =
     TestFixtures
-      .globalConfig(iceberg = IcebergConfig(catalogName = "qm_catalog", warehouse = warehousePath))
+      .globalConfig(
+        iceberg = IcebergConfig(
+          catalogName = "qm_catalog",
+          ddlMode = DdlMode.Automatic,
+          warehouse = warehousePath
+        )
+      )
       .copy(processing = ProcessingConfig(qualityMetricsTable = if (enabled) Some(tableName) else None))
 
   private val flowConfigs = Seq(
@@ -140,6 +146,21 @@ class QualityMetricsWriterTest extends AnyFlatSpec with Matchers with BeforeAndA
   it should "do nothing when qualityMetricsTable is not configured" in {
     val w = writer(enabled = false)
     noException should be thrownBy w.write("batch_005", Seq(flowResult("flow_e")), Seq.empty, 500L, batchSuccess = true)
+  }
+
+  it should "honor validate mode without creating a missing metrics table" in {
+    val missingTable = "quality_metrics_validate_missing"
+    val config = globalConfig().copy(
+      processing = ProcessingConfig(qualityMetricsTable = Some(missingTable)),
+      iceberg = globalConfig().iceberg.copy(ddlMode = DdlMode.Validate)
+    )
+
+    noException should be thrownBy new QualityMetricsWriter(config, flowConfigs)
+      .write("batch_validate", Seq(flowResult("flow_a")), Seq.empty, 100L, batchSuccess = true)
+
+    an[org.apache.spark.sql.AnalysisException] should be thrownBy spark.sql(
+      s"DESCRIBE TABLE qm_catalog.default.$missingTable"
+    )
   }
 
   it should "handle empty flow results" in {

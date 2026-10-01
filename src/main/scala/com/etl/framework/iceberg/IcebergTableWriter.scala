@@ -80,7 +80,7 @@ class IcebergTableWriter(
   ): WriteResult = {
     val tableName = tableManager.resolveTableName(flowConfig)
     val sqlTableName = SqlIdentifier.quoteMultipart(tableName)
-    tableManager.createOrUpdateTable(flowConfig, df.schema)
+    tableManager.prepareTable(flowConfig, df.schema)
 
     logger.info(s"Writing full load to $tableName")
 
@@ -129,7 +129,7 @@ class IcebergTableWriter(
     try {
       validateMergeKeys(cachedDf, pkColumns)
       val recordCount = cachedDf.count()
-      tableManager.createOrUpdateTable(flowConfig, df.schema)
+      tableManager.prepareTable(flowConfig, df.schema)
       val result = executeTrackedCommit(flowConfig, tableName, commitContext, recordCount, beforeDataCommit) {
         val mergeCondition = pkColumns
           .map(c => s"${SqlIdentifier.qualified("target", c)} = ${SqlIdentifier.qualified("source", c)}")
@@ -200,7 +200,7 @@ class IcebergTableWriter(
     try {
       validateMergeKeys(cachedDf, cfg.pkColumns)
       val recordCount = cachedDf.count()
-      tableManager.createOrUpdateTable(flowConfig, scd2Schema)
+      tableManager.prepareTable(flowConfig, scd2Schema)
       val isInitialLoad = tableManager.getCurrentSnapshotId(flowConfig).isEmpty
       val result = executeTrackedCommit(flowConfig, tableName, commitContext, recordCount, beforeDataCommit) {
         if (isInitialLoad)

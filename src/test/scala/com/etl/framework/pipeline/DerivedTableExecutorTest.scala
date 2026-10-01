@@ -1,7 +1,7 @@
 package com.etl.framework.pipeline
 
 import com.etl.framework.TestFixtures
-import com.etl.framework.config.IcebergConfig
+import com.etl.framework.config.{DdlMode, IcebergConfig}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
@@ -39,7 +39,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
   }
 
   private def icebergConfig: IcebergConfig =
-    IcebergConfig(warehouse = tempWarehouse)
+    IcebergConfig(ddlMode = DdlMode.Automatic, warehouse = tempWarehouse)
 
   private def seedIcebergTable(tableName: String, df: DataFrame): Unit = {
     val fullName = s"floe.default.$tableName"
@@ -74,6 +74,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
       "base_derived",
       "second_derived",
       "undeclared_reader",
+      "validate_only_derived",
       "daily orders"
     )
       .foreach(dropTable)
@@ -108,6 +109,23 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     val written = spark.table("floe.default.order_summary")
     written.count() shouldBe 2L
     written.filter(col("category") === "electronics").select("total").first().getDouble(0) shouldBe 300.0
+  }
+
+  it should "honor validate mode without creating a missing derived table" in {
+    val executor = new DerivedTableExecutor(icebergConfig.copy(ddlMode = DdlMode.Validate))
+    val result = executor
+      .execute(
+        Seq(derived("validate_only_derived")(_ => Seq((1, "value")).toDF("id", "name"))),
+        "batch_validate_only",
+        Map.empty[String, DataFrame]
+      )
+      .head
+
+    result.success shouldBe false
+    result.error.get should include("ddlMode=validate")
+    an[org.apache.spark.sql.AnalysisException] should be thrownBy spark.sql(
+      "DESCRIBE TABLE floe.default.validate_only_derived"
+    )
   }
 
   it should "support multiple derived tables in a single execution" in {

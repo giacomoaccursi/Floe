@@ -70,7 +70,7 @@ class BatchListenerTest extends AnyFlatSpec with Matchers {
       outputPath = s"$tempDir/output",
       rejectedPath = s"$tempDir/rejected",
       metadataPath = s"$tempDir/metadata",
-      iceberg = IcebergConfig(warehouse = warehousePath)
+      iceberg = IcebergConfig(ddlMode = DdlMode.Automatic, warehouse = warehousePath)
     )
 
     val orchestrator = FlowOrchestrator(globalConfig, Seq(flow), batchListeners = Seq(listener))
@@ -90,7 +90,7 @@ class BatchListenerTest extends AnyFlatSpec with Matchers {
       outputPath = s"$tempDir/output",
       rejectedPath = s"$tempDir/rejected",
       metadataPath = s"$tempDir/metadata",
-      iceberg = IcebergConfig(warehouse = warehousePath)
+      iceberg = IcebergConfig(ddlMode = DdlMode.Automatic, warehouse = warehousePath)
     )
 
     val orchestrator = FlowOrchestrator(globalConfig, Seq.empty, batchListeners = Seq(listener))
@@ -110,7 +110,7 @@ class BatchListenerTest extends AnyFlatSpec with Matchers {
       outputPath = s"$tempDir/output",
       rejectedPath = s"$tempDir/rejected",
       metadataPath = s"$tempDir/metadata",
-      iceberg = IcebergConfig(warehouse = warehousePath)
+      iceberg = IcebergConfig(ddlMode = DdlMode.Automatic, warehouse = warehousePath)
     )
 
     val orchestrator = FlowOrchestrator(globalConfig, Seq(flow), batchListeners = Seq(listener1, listener2))
@@ -133,7 +133,7 @@ class BatchListenerTest extends AnyFlatSpec with Matchers {
       outputPath = s"$tempDir/output",
       rejectedPath = s"$tempDir/rejected",
       metadataPath = s"$tempDir/metadata",
-      iceberg = IcebergConfig(warehouse = warehousePath)
+      iceberg = IcebergConfig(ddlMode = DdlMode.Automatic, warehouse = warehousePath)
     )
 
     val orchestrator =

@@ -98,6 +98,12 @@ class ConfigEnumsTest extends AnyFlatSpec with Matchers {
     CatalogMode.fromString("automatic").isLeft shouldBe true
   }
 
+  "DdlMode.fromString" should "parse only explicit table-management modes" in {
+    DdlMode.fromString("validate") shouldBe Right(DdlMode.Validate)
+    DdlMode.fromString("AUTOMATIC") shouldBe Right(DdlMode.Automatic)
+    DdlMode.fromString("evolve").isLeft shouldBe true
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // AGGREGATION FUNCTION
   // ═══════════════════════════════════════════════════════════════════════════

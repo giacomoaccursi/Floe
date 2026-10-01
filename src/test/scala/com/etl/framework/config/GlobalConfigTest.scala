@@ -33,6 +33,7 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
     c.performance.parallelFlows shouldBe true
     c.iceberg.catalogName shouldBe "floe"
     c.iceberg.catalogMode shouldBe CatalogMode.Existing
+    c.iceberg.ddlMode shouldBe DdlMode.Validate
     c.iceberg.warehouse shouldBe empty
   }
 
@@ -45,12 +46,15 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
         |  metadataPath: "/data/metadata"
         |iceberg:
         |  catalogMode: configure
+        |  ddlMode: automatic
         |  catalogType: hadoop
         |  warehouse: "/tmp/test-warehouse"
       """.stripMargin
 
     import ConfigHints._
-    YamlConfigSource.string(yaml).load[GlobalConfig].toOption.get.iceberg.catalogMode shouldBe CatalogMode.Configure
+    val iceberg = YamlConfigSource.string(yaml).load[GlobalConfig].toOption.get.iceberg
+    iceberg.catalogMode shouldBe CatalogMode.Configure
+    iceberg.ddlMode shouldBe DdlMode.Automatic
   }
 
   it should "default the optional performance section" in {

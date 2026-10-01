@@ -57,7 +57,7 @@ object TestFixtures {
       parallelFlows: Boolean = false,
       batchIdFormat: String = "yyyyMMdd_HHmmss",
       maxRejectionRate: Option[Double] = None,
-      iceberg: IcebergConfig = IcebergConfig(warehouse = "/tmp/test/warehouse")
+      iceberg: IcebergConfig = IcebergConfig(ddlMode = DdlMode.Automatic, warehouse = "/tmp/test/warehouse")
   ): GlobalConfig = GlobalConfig(
     paths = PathsConfig(outputPath, rejectedPath, metadataPath),
     processing = ProcessingConfig(batchIdFormat, maxRejectionRate),

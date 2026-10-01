@@ -305,6 +305,33 @@ object CatalogMode {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// DDL MODE
+// ═══════════════════════════════════════════════════════════════════════════
+sealed trait DdlMode extends Product with Serializable {
+  def name: String
+}
+
+object DdlMode {
+  case object Validate extends DdlMode { val name = "validate" }
+  case object Automatic extends DdlMode { val name = "automatic" }
+
+  val values: Seq[DdlMode] = Seq(Validate, Automatic)
+
+  def fromString(value: String): Either[String, DdlMode] =
+    values
+      .find(_.name == Option(value).getOrElse("").toLowerCase)
+      .toRight(s"Unknown DDL mode: '$value'. Valid values: ${values.map(_.name).mkString(", ")}")
+
+  implicit val reader: ConfigReader[DdlMode] =
+    ConfigReader.fromString[DdlMode](value =>
+      fromString(value).left.map(message => CannotConvert(value, "DdlMode", message))
+    )
+
+  implicit val writer: ConfigWriter[DdlMode] =
+    ConfigWriter[String].contramap(_.name)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // AGGREGATION FUNCTION
 // ═══════════════════════════════════════════════════════════════════════════
 sealed trait AggregationFunction extends Product with Serializable {

@@ -156,7 +156,7 @@ class DerivedTableExecutor(
       context: CommitContext,
       beforeDataCommit: () => Unit
   ): DerivedWrite = {
-    createOrUpdateTable(fullTableName, df.schema)
+    tableManager.prepareTable(fullTableName, df.schema)
     val cachedDf = df.cache()
     try {
       val recordsWritten = cachedDf.count()
@@ -223,41 +223,6 @@ class DerivedTableExecutor(
       .takeWhile(_ != null)
       .exists(_.isInstanceOf[CommitStateUnknownException])
 
-  /** Creates the Iceberg table if it doesn't exist, or adds missing columns if it does. */
-  private def createOrUpdateTable(fullTableName: String, schema: StructType): Unit = {
-    val exists =
-      try {
-        spark.sql(s"DESCRIBE TABLE ${SqlIdentifier.quoteMultipart(fullTableName)}")
-        true
-      } catch {
-        case _: org.apache.spark.sql.AnalysisException => false
-      }
-
-    if (!exists) {
-      val columns = schema.fields.map(f => s"${SqlIdentifier.quote(f.name)} ${f.dataType.sql}").mkString(", ")
-      val sqlTableName = SqlIdentifier.quoteMultipart(fullTableName)
-      spark.sql(s"CREATE TABLE IF NOT EXISTS $sqlTableName ($columns) USING iceberg")
-
-      val props = Map(
-        "format-version" -> icebergConfig.formatVersion.toString,
-        "write.format.default" -> icebergConfig.fileFormat
-      )
-      props.foreach { case (k, v) =>
-        spark.sql(
-          s"ALTER TABLE $sqlTableName SET TBLPROPERTIES " +
-            s"(${SqlIdentifier.stringLiteral(k)} = ${SqlIdentifier.stringLiteral(v)})"
-        )
-      }
-      logger.info(s"Created Iceberg table $fullTableName")
-    } else {
-      val sqlTableName = SqlIdentifier.quoteMultipart(fullTableName)
-      val currentColumns = spark.table(sqlTableName).schema.fieldNames.toSet
-      schema.fields.filterNot(f => currentColumns.contains(f.name)).foreach { field =>
-        spark.sql(s"ALTER TABLE $sqlTableName ADD COLUMN ${SqlIdentifier.quote(field.name)} ${field.dataType.sql}")
-        logger.info(s"Added column ${field.name} to $fullTableName")
-      }
-    }
-  }
 }
 
 object DerivedTableExecutor {

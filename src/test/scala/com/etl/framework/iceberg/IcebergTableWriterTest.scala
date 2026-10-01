@@ -46,6 +46,7 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
 
   private val icebergConfig = IcebergConfig(
     catalogName = "writer_catalog",
+    ddlMode = DdlMode.Automatic,
     warehouse = warehousePath.toString,
     enableSnapshotTagging = true
   )

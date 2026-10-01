@@ -1,5 +1,6 @@
 package com.etl.framework
 
+import com.etl.framework.config.{DdlMode, IcebergConfig}
 import com.etl.framework.exceptions.ConfigFileException
 import com.etl.framework.orchestration.{BatchListener, IngestionResult}
 import com.etl.framework.orchestration.ExecutionStatus
@@ -71,6 +72,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
          |performance:
          |  parallelFlows: false
          |iceberg:
+         |  ddlMode: "automatic"
          |  catalogType: "hadoop"
          |  warehouse: "$warehousePath"
          |  enableSnapshotTagging: true
@@ -198,6 +200,38 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
     // Verify metadata JSON was written
     Files.exists(reportPath(result)) shouldBe true
+  }
+
+  it should "reject all missing validate-mode targets before reading or writing any flow" in {
+    val existing = "preflight_existing"
+    val missing = "preflight_missing"
+    spark.sql(s"DROP TABLE IF EXISTS floe.default.$existing")
+    spark.sql(s"DROP TABLE IF EXISTS floe.default.$missing")
+    spark.sql(s"CREATE TABLE floe.default.$existing (id INT) USING iceberg")
+
+    val global = TestFixtures.globalConfig(
+      outputPath = tempDir.resolve("preflight/output").toString,
+      rejectedPath = tempDir.resolve("preflight/rejected").toString,
+      metadataPath = tempDir.resolve("preflight/metadata").toString,
+      iceberg = IcebergConfig(catalogName = "floe", ddlMode = DdlMode.Validate)
+    )
+    val flows = Seq(
+      TestFixtures.flowConfig(existing, sourcePath = "/path/must/not/be/read"),
+      TestFixtures.flowConfig(missing, sourcePath = "/path/must/not/be/read")
+    )
+
+    val error = intercept[IllegalArgumentException] {
+      IngestionPipeline.builder().withGlobalConfig(global).withFlowConfigs(flows).build().execute()
+    }
+
+    error.getMessage should include("ddlMode=validate")
+    error.getMessage should include(s"floe.default.$missing")
+    spark.table(s"floe.default.$existing").count() shouldBe 0L
+    an[org.apache.spark.sql.AnalysisException] should be thrownBy spark.sql(
+      s"DESCRIBE TABLE floe.default.$missing"
+    )
+
+    spark.sql(s"DROP TABLE IF EXISTS floe.default.$existing")
   }
 
   it should "detect orphans when parent removes records" in {

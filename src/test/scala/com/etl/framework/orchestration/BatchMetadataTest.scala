@@ -65,7 +65,7 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
       rejectedPath = s"$tempDir/rejected",
       metadataPath = s"$tempDir/metadata",
       batchIdFormat = batchIdFormat,
-      iceberg = IcebergConfig(warehouse = warehousePath)
+      iceberg = IcebergConfig(ddlMode = DdlMode.Automatic, warehouse = warehousePath)
     )
 
   private def reportPath(tempDir: String, result: IngestionResult) =

@@ -2,6 +2,7 @@ package com.etl.framework.config
 
 case class IcebergConfig(
     catalogMode: CatalogMode = CatalogMode.Existing,
+    ddlMode: DdlMode = DdlMode.Validate,
     catalogType: String = "hadoop",
     catalogName: String = "floe",
     namespace: String = "default",

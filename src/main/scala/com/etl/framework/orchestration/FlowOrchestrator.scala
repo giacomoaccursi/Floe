@@ -1,7 +1,7 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig, OrphanAction}
-import com.etl.framework.iceberg.{OrphanDetectionResult, OrphanDetector, OrphanReport}
+import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetectionResult, OrphanDetector, OrphanReport}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.batch.{
   BatchIdGenerator,
@@ -78,6 +78,7 @@ class FlowOrchestrator(
         request.configDigest == pipelineDefinition.configDigest,
         "Execution request configDigest does not match the resolved pipeline configuration"
       )
+      validateTargetTables()
 
       val startedAtNanos = System.nanoTime()
       val attemptId = request.attemptId
@@ -160,6 +161,13 @@ class FlowOrchestrator(
     } finally {
       threadPool.foreach(_.shutdown())
     }
+  }
+
+  private def validateTargetTables(): Unit = {
+    val targetNames =
+      flowConfigs.map(_.name) ++ derivedTables.map(_.name) ++ globalConfig.processing.qualityMetricsTable.toSeq
+    new IcebergTableManager(spark, globalConfig.iceberg)
+      .validateTargetsExist(targetNames.map(globalConfig.iceberg.fullTableName))
   }
 
   private def executeGroup(

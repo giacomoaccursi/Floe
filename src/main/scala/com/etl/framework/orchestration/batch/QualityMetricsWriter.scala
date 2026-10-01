@@ -1,11 +1,20 @@
 package com.etl.framework.orchestration.batch
 
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
-import com.etl.framework.iceberg.OrphanReport
+import com.etl.framework.iceberg.{IcebergTableManager, OrphanReport}
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.util.SqlIdentifier
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{col, current_timestamp}
+import org.apache.spark.sql.types.{
+  BooleanType,
+  DoubleType,
+  LongType,
+  StringType,
+  StructField,
+  StructType,
+  TimestampType
+}
 import org.slf4j.LoggerFactory
 
 class QualityMetricsWriter(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConfig])(implicit
@@ -14,6 +23,24 @@ class QualityMetricsWriter(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConf
 
   private val logger = LoggerFactory.getLogger(getClass)
   private val flowConfigMap = flowConfigs.map(fc => fc.name -> fc).toMap
+  private val tableManager = new IcebergTableManager(spark, globalConfig.iceberg)
+  private val metricsSchema = StructType(
+    Seq(
+      StructField("batch_id", StringType),
+      StructField("batch_timestamp", TimestampType),
+      StructField("batch_success", BooleanType),
+      StructField("flow_name", StringType),
+      StructField("load_mode", StringType),
+      StructField("input_records", LongType),
+      StructField("valid_records", LongType),
+      StructField("rejected_records", LongType),
+      StructField("rejection_rate", DoubleType),
+      StructField("records_written", LongType),
+      StructField("orphan_count", LongType),
+      StructField("execution_time_ms", LongType),
+      StructField("success", BooleanType)
+    )
+  )
 
   def write(
       batchId: String,
@@ -39,29 +66,7 @@ class QualityMetricsWriter(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConf
   }
 
   private def ensureTable(fullTableName: String): Unit = {
-    try {
-      spark.sql(s"DESCRIBE TABLE ${SqlIdentifier.quoteMultipart(fullTableName)}")
-    } catch {
-      case _: org.apache.spark.sql.AnalysisException =>
-        spark.sql(
-          s"""CREATE TABLE ${SqlIdentifier.quoteMultipart(fullTableName)} (
-             |  batch_id STRING,
-             |  batch_timestamp TIMESTAMP,
-             |  batch_success BOOLEAN,
-             |  flow_name STRING,
-             |  load_mode STRING,
-             |  input_records LONG,
-             |  valid_records LONG,
-             |  rejected_records LONG,
-             |  rejection_rate DOUBLE,
-             |  records_written LONG,
-             |  orphan_count LONG,
-             |  execution_time_ms LONG,
-             |  success BOOLEAN
-             |) USING iceberg""".stripMargin
-        )
-        logger.info(s"Created quality metrics table: $fullTableName")
-    }
+    tableManager.prepareTable(fullTableName, metricsSchema)
   }
 
   private def buildMetricsDataFrame(

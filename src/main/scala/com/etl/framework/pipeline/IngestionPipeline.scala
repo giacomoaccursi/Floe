@@ -374,17 +374,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   def build(): IngestionPipeline = {
     logger.info("Building IngestionPipeline")
     val (globalConfig, flowConfigs) = loadConfigs()
-    val configErrors = flowConfigs.flatMap { config =>
-      FlowConfigValidator.validate(config).map(error => s"Flow '${config.name}': $error")
-    }
-    require(configErrors.isEmpty, s"Invalid flow configuration: ${configErrors.mkString("; ")}")
-    val collisions = derivedTableCollisions(globalConfig, flowConfigs)
-    require(
-      collisions.isEmpty,
-      s"Derived table names collide with managed tables: ${collisions.mkString(", ")}"
-    )
-    val derivedErrors = DerivedTableExecutor.validateDefinitions(derivedTables.toSeq, flowConfigs.map(_.name).toSet)
-    require(derivedErrors.isEmpty, s"Invalid derived table configuration: ${derivedErrors.mkString("; ")}")
+    val errors = validationErrors(globalConfig, flowConfigs)
+    require(errors.isEmpty, s"Invalid pipeline configuration: ${errors.mkString("; ")}")
 
     logger.info(s"IngestionPipeline built with ${flowConfigs.size} flows")
     IngestionPipeline.create(
@@ -417,6 +408,11 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     }
 
     val (globalConfig, flowConfigs) = configs.get
+    validationErrors(globalConfig, flowConfigs)
+  }
+
+  private def validationErrors(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConfig]): Seq[String] = {
+    val errors = scala.collection.mutable.ArrayBuffer[String]()
     derivedTableCollisions(globalConfig, flowConfigs).foreach { name =>
       errors += s"Derived table '$name' collides with a managed table"
     }
@@ -425,33 +421,27 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
 
     flowConfigs.foreach { config =>
       FlowConfigValidator.validate(config).foreach(error => errors += s"Flow '${config.name}': $error")
-    }
-
-    // Check FK references point to existing flows
-    flowConfigs.foreach { fc =>
-      fc.validation.foreignKeys.foreach { fk =>
+      config.validation.foreignKeys.foreach { fk =>
         if (!flowNames.contains(fk.references.flow))
-          errors += s"Flow '${fc.name}': FK references unknown flow '${fk.references.flow}'"
+          errors += s"Flow '${config.name}': FK references unknown flow '${fk.references.flow}'"
       }
-      fc.dependsOn.foreach { dep =>
-        if (!flowNames.contains(dep))
-          errors += s"Flow '${fc.name}': dependsOn references unknown flow '$dep'"
+      config.dependsOn.foreach { dependency =>
+        if (!flowNames.contains(dependency))
+          errors += s"Flow '${config.name}': dependsOn references unknown flow '$dependency'"
       }
     }
 
-    // Check for dependency cycles
     scala.util.Try {
       val graph = com.etl.framework.util.TopologicalSorter.buildGraph[FlowConfig](
         flowConfigs,
         _.name,
-        fc => fc.validation.foreignKeys.map(_.references.flow).toSet ++ fc.dependsOn.toSet
+        config => config.validation.foreignKeys.map(_.references.flow).toSet ++ config.dependsOn.toSet
       )
       com.etl.framework.util.TopologicalSorter.sort(graph, "flow dependency graph")
     } match {
-      case scala.util.Failure(e) => errors += e.getMessage
-      case _                     =>
+      case scala.util.Failure(error) => errors += error.getMessage
+      case _                         =>
     }
-
     errors.toSeq
   }
 

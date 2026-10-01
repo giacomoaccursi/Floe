@@ -102,7 +102,7 @@ final case class ExecutionRequest(
   require(PipelineDefinition.isSha256(configDigest), "configDigest must be a lowercase SHA-256 digest")
   require(inputReferences.map(_.datasetId).distinct.size == inputReferences.size, "input references must be unique")
   platformReferences.foreach { case (key, value) =>
-    ExecutionRequest.validateIdentifier("platform reference key", key)
+    ExecutionRequest.validatePlatformReferenceKey(key)
     require(value != null && value.nonEmpty && value.length <= 512, s"Invalid platform reference '$key'")
   }
   require(
@@ -116,10 +116,43 @@ final case class ExecutionRequest(
 object ExecutionRequest {
   val CurrentContractVersion: Int = 1
   private val Identifier = "[A-Za-z0-9][A-Za-z0-9._:-]{0,127}".r
+  private val SensitiveSegments = Set(
+    "authorization",
+    "bearer",
+    "cookie",
+    "credential",
+    "passwd",
+    "password",
+    "secret",
+    "session",
+    "token"
+  )
+  private val ReferenceMarkers = Set("arn", "id", "name", "ref", "reference", "version")
 
   def validateIdentifier(field: String, value: String): Unit = {
     require(value != null && Identifier.pattern.matcher(value).matches(), s"Invalid $field")
     require(value != "." && value != "..", s"Invalid $field")
+  }
+
+  private[orchestration] def validatePlatformReferenceKey(key: String): Unit = {
+    validateIdentifier("platform reference key", key)
+    val segments = key
+      .replaceAll("([a-z0-9])([A-Z])", "$1_$2")
+      .toLowerCase(java.util.Locale.ROOT)
+      .split("[._:-]")
+      .filter(_.nonEmpty)
+      .toSeq
+    val exposesSensitiveValue = segments.zipWithIndex.exists { case (segment, index) =>
+      SensitiveSegments.contains(segment) &&
+      !segments.lift(index + 1).exists(ReferenceMarkers.contains)
+    } || Seq(Seq("access", "key"), Seq("api", "key"), Seq("private", "key")).exists { compound =>
+      val index = segments.sliding(compound.size).indexWhere(_ == compound)
+      index >= 0 && !segments.lift(index + compound.size).exists(ReferenceMarkers.contains)
+    }
+    require(
+      !exposesSensitiveValue,
+      s"Platform reference '$key' may identify a secret but must not contain secret material; use an *_id, *_ref, or *_version key"
+    )
   }
 }
 

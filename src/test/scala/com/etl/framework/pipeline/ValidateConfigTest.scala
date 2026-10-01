@@ -127,6 +127,11 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
     val issues = IngestionPipeline.builder().withConfigDirectory(dir.toString).validate()
     issues should have size 1
     issues.head should include("nonexistent")
+
+    val buildError = intercept[IllegalArgumentException] {
+      IngestionPipeline.builder().withConfigDirectory(dir.toString).build()
+    }
+    buildError.getMessage should include("nonexistent")
   }
 
   it should "detect dependsOn reference to unknown flow" in {
@@ -165,6 +170,11 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
     val issues = IngestionPipeline.builder().withConfigDirectory(dir.toString).validate()
     issues should have size 1
     issues.head should include("missing_flow")
+
+    val buildError = intercept[IllegalArgumentException] {
+      IngestionPipeline.builder().withConfigDirectory(dir.toString).build()
+    }
+    buildError.getMessage should include("missing_flow")
   }
 
   it should "detect invalid YAML" in {

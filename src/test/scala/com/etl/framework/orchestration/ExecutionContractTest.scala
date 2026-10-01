@@ -63,6 +63,29 @@ class ExecutionContractTest extends AnyFlatSpec with Matchers {
     )
   }
 
+  it should "reject secret material while allowing versioned secret references" in {
+    val pipeline = definition()
+
+    an[IllegalArgumentException] should be thrownBy pipeline.newRequest(
+      "run-1",
+      effectiveAt,
+      platformReferences = Map("api_token" -> "do-not-persist")
+    )
+    an[IllegalArgumentException] should be thrownBy pipeline.newRequest(
+      "run-1",
+      effectiveAt,
+      platformReferences = Map("access_key" -> "do-not-persist")
+    )
+
+    pipeline
+      .newRequest(
+        "run-1",
+        effectiveAt,
+        platformReferences = Map("secret_ref" -> "vault/orders", "credential_version" -> "42")
+      )
+      .platformReferences should contain allOf ("secret_ref" -> "vault/orders", "credential_version" -> "42")
+  }
+
   it should "produce a stable digest for reordered maps and flow declarations" in {
     val a = TestFixtures.flowConfig("a")
     val b = TestFixtures.flowConfig("b")

@@ -52,6 +52,22 @@ final case class PipelineDefinition(pipelineId: String, codeVersion: String, con
   require(codeVersion != null && codeVersion.trim.nonEmpty, "codeVersion must not be blank")
   require(PipelineDefinition.isSha256(configDigest), "configDigest must be a lowercase SHA-256 digest")
 
+  def validateRequest(request: ExecutionRequest): Unit = {
+    require(request != null, "Execution request is required")
+    require(
+      request.pipelineId == pipelineId,
+      s"Execution request pipelineId '${request.pipelineId}' does not match configured pipeline '$pipelineId'"
+    )
+    require(
+      request.codeVersion == codeVersion,
+      s"Execution request codeVersion '${request.codeVersion}' does not match configured code '$codeVersion'"
+    )
+    require(
+      request.configDigest == configDigest,
+      "Execution request configDigest does not match the resolved pipeline configuration"
+    )
+  }
+
   def newRequest(
       logicalRunId: String,
       effectiveAt: Instant,

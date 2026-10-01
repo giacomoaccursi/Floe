@@ -20,6 +20,7 @@ import com.etl.framework.orchestration.{
   PipelineDefinition,
   PipelineDefinitionBuilder
 }
+import com.etl.framework.orchestration.recovery.{AttemptInspection, AttemptInspector, InspectionTarget}
 import com.etl.framework.validation.Validator
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
@@ -85,6 +86,28 @@ class IngestionPipeline private (
   def execute(request: ExecutionRequest): IngestionResult = {
     logger.info(s"Executing ingestion attempt ${request.attemptId} for logical run ${request.logicalRunId}")
     createOrchestrator().execute(request)
+  }
+
+  /** Collects read-only report and Iceberg snapshot evidence for one prior attempt. This does not authorize a retry. */
+  def inspect(request: ExecutionRequest): AttemptInspection = {
+    executionDefinition.validateRequest(request)
+    CatalogRuntime.prepare(spark, globalConfig.iceberg, extraCatalogProviders.toMap)
+    val flowTargets = resolvedFlowConfigs.map(config =>
+      InspectionTarget(
+        targetName = config.name,
+        tableName = globalConfig.iceberg.fullTableName(config.name),
+        operationType = config.loadMode.`type`.name
+      )
+    )
+    val derivedTargets = derivedTables.map(definition =>
+      InspectionTarget(
+        targetName = definition.name,
+        tableName = globalConfig.iceberg.fullTableName(definition.name),
+        operationType = "derived-full"
+      )
+    )
+    new AttemptInspector(spark, globalConfig.iceberg, globalConfig.paths.metadataPath)
+      .inspect(request, flowTargets ++ derivedTargets)
   }
 
   /** Executes the pipeline and throws BatchFailedException when synchronous batch publication fails. Use this on

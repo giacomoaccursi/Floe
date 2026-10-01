@@ -66,18 +66,7 @@ class FlowOrchestrator(
   /** Executes exactly one attempt. No automatic retry is performed at flow or job level. */
   def execute(request: ExecutionRequest): IngestionResult = {
     try {
-      require(
-        request.pipelineId == pipelineDefinition.pipelineId,
-        s"Execution request pipelineId '${request.pipelineId}' does not match configured pipeline '${pipelineDefinition.pipelineId}'"
-      )
-      require(
-        request.codeVersion == pipelineDefinition.codeVersion,
-        s"Execution request codeVersion '${request.codeVersion}' does not match configured code '${pipelineDefinition.codeVersion}'"
-      )
-      require(
-        request.configDigest == pipelineDefinition.configDigest,
-        "Execution request configDigest does not match the resolved pipeline configuration"
-      )
+      pipelineDefinition.validateRequest(request)
       validateTargetTables()
 
       val startedAtNanos = System.nanoTime()

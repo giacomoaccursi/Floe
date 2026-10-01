@@ -12,6 +12,8 @@ class RunnerArgumentsTest extends AnyFlatSpec with Matchers {
     ) shouldBe Right(RunnerCommand.Validate("config", "orders", "v1"))
     RunnerArguments.parse(Seq("run", "--request", "request.json", "--config", "config")) shouldBe
       Right(RunnerCommand.Run("config", "request.json"))
+    RunnerArguments.parse(Seq("inspect", "--request", "request.json", "--config", "config")) shouldBe
+      Right(RunnerCommand.Inspect("config", "request.json"))
   }
 
   it should "reject missing, duplicate, and unknown options" in {

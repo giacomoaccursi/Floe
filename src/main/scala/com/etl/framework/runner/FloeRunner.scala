@@ -2,6 +2,7 @@ package com.etl.framework.runner
 
 import com.etl.framework.exceptions.ConfigurationException
 import com.etl.framework.orchestration.{ExecutionRequestJson, ExecutionStatus}
+import com.etl.framework.orchestration.recovery.AttemptInspection
 import com.etl.framework.pipeline.IngestionPipeline
 import org.apache.spark.sql.SparkSession
 import org.json4s._
@@ -22,6 +23,7 @@ object FloeRunner {
     val Failed = 10
     val FailedPartial = 11
     val Unknown = 12
+    val InspectionIncomplete = 13
     val Internal = 70
 
     def forStatus(status: ExecutionStatus): Int = status match {
@@ -53,7 +55,8 @@ object FloeRunner {
     command match {
       case validate: RunnerCommand.Validate =>
         withSparkSession(err)(spark => validatePipeline(validate, spark, out, err))
-      case run: RunnerCommand.Run => runPipeline(run, out, err)
+      case run: RunnerCommand.Run         => runPipeline(run, out, err)
+      case inspect: RunnerCommand.Inspect => inspectPipeline(inspect, out, err)
     }
 
   private def validatePipeline(
@@ -122,6 +125,32 @@ object FloeRunner {
     }
   }
 
+  private def inspectPipeline(command: RunnerCommand.Inspect, out: PrintStream, err: PrintStream): Int =
+    withSparkSession(err) { spark =>
+      ExecutionRequestJson.read(command.requestPath, spark.sparkContext.hadoopConfiguration) match {
+        case Left(error) =>
+          err.println(error)
+          ExitCode.InvalidRequestOrConfig
+        case Right(request) =>
+          try {
+            implicit val implicitSpark: SparkSession = spark
+            val inspection = IngestionPipeline
+              .builder()
+              .withConfigDirectory(command.configDirectory)
+              .withPipelineId(request.pipelineId)
+              .withCodeVersion(request.codeVersion)
+              .build()
+              .inspect(request)
+            out.println(inspectionJson(inspection))
+            if (inspection.complete) ExitCode.Success else ExitCode.InspectionIncomplete
+          } catch {
+            case error: ConfigurationException   => invalid(error, err)
+            case error: IllegalArgumentException => invalid(error, err)
+            case NonFatal(error)                 => internal(error, err)
+          }
+      }
+    }
+
   private def withSparkSession(err: PrintStream)(operation: SparkSession => Int): Int = {
     val existing = SparkSession.getActiveSession.orElse(SparkSession.getDefaultSession)
     try {
@@ -149,4 +178,43 @@ object FloeRunner {
   }
 
   private def json(fields: (String, JValue)*): String = compact(render(JObject(fields.toList)))
+
+  private def inspectionJson(inspection: AttemptInspection): String =
+    json(
+      "status" -> JString(inspection.status),
+      "assessment" -> JString(inspection.assessment),
+      "complete" -> JBool(inspection.complete),
+      "retry_safe" -> JBool(inspection.retrySafe),
+      "pipeline_id" -> JString(inspection.request.pipelineId),
+      "logical_run_id" -> JString(inspection.request.logicalRunId),
+      "attempt_id" -> JString(inspection.request.attemptId),
+      "report" -> JObject(
+        "path" -> JString(inspection.report.path),
+        "status" -> JString(inspection.report.status),
+        "length_bytes" -> inspection.report.lengthBytes.map(JInt(_)).getOrElse(JNull),
+        "error" -> inspection.report.error.map(JString).getOrElse(JNull)
+      ),
+      "targets" -> JArray(inspection.targets.map { target =>
+        JObject(
+          "target_name" -> JString(target.targetName),
+          "table_name" -> JString(target.tableName),
+          "operation_type" -> JString(target.operationType),
+          "operation_id" -> JString(target.operationId),
+          "status" -> JString(target.status),
+          "table_uuid" -> target.tableUuid.map(JString).getOrElse(JNull),
+          "current_main_snapshot_id" -> target.currentMainSnapshotId
+            .map(value => JString(value.toString))
+            .getOrElse(JNull),
+          "matching_snapshots" -> JArray(target.matchingSnapshots.map { snapshot =>
+            JObject(
+              "snapshot_id" -> JString(snapshot.snapshotId.toString),
+              "parent_snapshot_id" -> snapshot.parentSnapshotId.map(value => JString(value.toString)).getOrElse(JNull),
+              "committed_at_ms" -> JInt(snapshot.committedAtMs),
+              "relation_to_main" -> JString(snapshot.relationToMain)
+            )
+          }.toList),
+          "error" -> target.error.map(JString).getOrElse(JNull)
+        )
+      }.toList)
+    )
 }

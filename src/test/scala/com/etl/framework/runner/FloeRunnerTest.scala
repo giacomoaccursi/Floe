@@ -130,6 +130,34 @@ class FloeRunnerTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     stderr should include("--request")
   }
 
+  it should "inspect a completed attempt without mutating it or authorizing a retry" in {
+    val pipeline = IngestionPipeline
+      .builder()
+      .withConfigDirectory(configDirectory.toString)
+      .withPipelineId("runner-pipeline")
+      .withCodeVersion("artifact-v1")
+      .build()
+    val request = pipeline.executionDefinition.newRequest("logical-inspect", Instant.parse("2026-10-01T08:30:00Z"))
+    Files.write(requestPath, ExecutionRequestJson.toJson(request).getBytes(StandardCharsets.UTF_8))
+    val (runExitCode, _, runStderr) = execute(
+      Seq("run", "--config", configDirectory.toString, "--request", requestPath.toString)
+    )
+    withClue(runStderr) {
+      runExitCode shouldBe FloeRunner.ExitCode.Success
+    }
+
+    val (exitCode, stdout, stderr) = execute(
+      Seq("inspect", "--config", configDirectory.toString, "--request", requestPath.toString)
+    )
+
+    exitCode shouldBe FloeRunner.ExitCode.Success
+    stdout should include("\"status\":\"INSPECTION_COMPLETED\"")
+    stdout should include("\"assessment\":\"NO_TRACKED_MUTATIONS\"")
+    stdout should include("\"retry_safe\":false")
+    stdout should include("\"status\":\"PRESENT\"")
+    stderr shouldBe empty
+  }
+
   it should "translate a normally returned pipeline failure into a non-zero exit code" in {
     val pipeline = IngestionPipeline
       .builder()

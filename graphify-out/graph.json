@@ -12312,7 +12312,7 @@
       "node_kind": "heading",
       "norm_label": "2. create your config",
       "source_file": "README.md",
-      "source_location": "L129"
+      "source_location": "L131"
     },
     {
       "id": "readme_3_run",
@@ -12324,7 +12324,7 @@
       "node_kind": "heading",
       "norm_label": "3. run",
       "source_file": "README.md",
-      "source_location": "L139"
+      "source_location": "L141"
     },
     {
       "id": "readme_contributing",
@@ -12336,7 +12336,7 @@
       "node_kind": "heading",
       "norm_label": "contributing",
       "source_file": "README.md",
-      "source_location": "L201"
+      "source_location": "L203"
     },
     {
       "id": "readme_deployment_targets",
@@ -12348,7 +12348,7 @@
       "node_kind": "heading",
       "norm_label": "deployment targets",
       "source_file": "README.md",
-      "source_location": "L176"
+      "source_location": "L178"
     },
     {
       "id": "readme_documentation",
@@ -12360,7 +12360,7 @@
       "node_kind": "heading",
       "norm_label": "documentation",
       "source_file": "README.md",
-      "source_location": "L186"
+      "source_location": "L188"
     },
     {
       "id": "readme_floe",
@@ -12408,7 +12408,7 @@
       "node_kind": "heading",
       "norm_label": "license",
       "source_file": "README.md",
-      "source_location": "L197"
+      "source_location": "L199"
     },
     {
       "id": "readme_quick_example",
@@ -14397,7 +14397,7 @@
       "node_kind": "heading",
       "norm_label": "adding transformations",
       "source_file": "site-docs/getting-started/project-setup.md",
-      "source_location": "L107"
+      "source_location": "L111"
     },
     {
       "id": "site_docs_getting_started_project_setup_build_sbt",
@@ -14421,7 +14421,7 @@
       "node_kind": "heading",
       "norm_label": "entry point",
       "source_file": "site-docs/getting-started/project-setup.md",
-      "source_location": "L41"
+      "source_location": "L45"
     },
     {
       "id": "site_docs_getting_started_project_setup_next_steps",
@@ -14433,7 +14433,7 @@
       "node_kind": "heading",
       "norm_label": "next steps",
       "source_file": "site-docs/getting-started/project-setup.md",
-      "source_location": "L124"
+      "source_location": "L128"
     },
     {
       "id": "site_docs_getting_started_project_setup_project_setup",
@@ -14469,7 +14469,7 @@
       "node_kind": "heading",
       "norm_label": "running locally",
       "source_file": "site-docs/getting-started/project-setup.md",
-      "source_location": "L101"
+      "source_location": "L105"
     },
     {
       "id": "src_main_scala_com_etl_framework_validation_validators_foreignkeyvalidator_scala_dataframe",
@@ -15039,7 +15039,7 @@
       "node_kind": "heading",
       "norm_label": "java compatibility",
       "source_file": "site-docs/getting-started/installation.md",
-      "source_location": "L24"
+      "source_location": "L38"
     },
     {
       "id": "site_docs_getting_started_installation_logging",
@@ -15051,7 +15051,7 @@
       "node_kind": "heading",
       "norm_label": "logging",
       "source_file": "site-docs/getting-started/installation.md",
-      "source_location": "L20"
+      "source_location": "L34"
     },
     {
       "id": "site_docs_getting_started_installation_on_managed_platforms",
@@ -15063,7 +15063,7 @@
       "node_kind": "heading",
       "norm_label": "on managed platforms",
       "source_file": "site-docs/getting-started/installation.md",
-      "source_location": "L49"
+      "source_location": "L63"
     },
     {
       "id": "site_docs_getting_started_installation_requirements",
@@ -15099,7 +15099,7 @@
       "node_kind": "heading",
       "norm_label": "sparksession setup",
       "source_file": "site-docs/getting-started/installation.md",
-      "source_location": "L32"
+      "source_location": "L46"
     },
     {
       "id": "site_docs_guides_quality_metrics_example_queries",
@@ -57003,7 +57003,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L176",
+      "source_location": "L178",
       "weight": 1.0
     },
     {
@@ -57014,7 +57014,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L186",
+      "source_location": "L188",
       "weight": 1.0
     },
     {
@@ -57025,7 +57025,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L197",
+      "source_location": "L199",
       "weight": 1.0
     },
     {
@@ -57047,7 +57047,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L201",
+      "source_location": "L203",
       "weight": 1.0
     },
     {
@@ -57091,7 +57091,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L129",
+      "source_location": "L131",
       "weight": 1.0
     },
     {
@@ -57102,7 +57102,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L139",
+      "source_location": "L141",
       "weight": 1.0
     },
     {
@@ -58339,28 +58339,6 @@
     },
     {
       "source": "site_docs_getting_started_installation_installation",
-      "target": "site_docs_getting_started_installation_logging",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "site-docs/getting-started/installation.md",
-      "source_location": "L20",
-      "weight": 1.0
-    },
-    {
-      "source": "site_docs_getting_started_installation_installation",
-      "target": "site_docs_getting_started_installation_java_compatibility",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "site-docs/getting-started/installation.md",
-      "source_location": "L24",
-      "weight": 1.0
-    },
-    {
-      "source": "site_docs_getting_started_installation_installation",
       "target": "site_docs_getting_started_installation_requirements",
       "relation": "contains",
       "_origin": "ast",
@@ -58372,13 +58350,35 @@
     },
     {
       "source": "site_docs_getting_started_installation_installation",
+      "target": "site_docs_getting_started_installation_logging",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "site-docs/getting-started/installation.md",
+      "source_location": "L34",
+      "weight": 1.0
+    },
+    {
+      "source": "site_docs_getting_started_installation_installation",
+      "target": "site_docs_getting_started_installation_java_compatibility",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "site-docs/getting-started/installation.md",
+      "source_location": "L38",
+      "weight": 1.0
+    },
+    {
+      "source": "site_docs_getting_started_installation_installation",
       "target": "site_docs_getting_started_installation_sparksession_setup",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/getting-started/installation.md",
-      "source_location": "L32",
+      "source_location": "L46",
       "weight": 1.0
     },
     {
@@ -58389,7 +58389,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/getting-started/installation.md",
-      "source_location": "L49",
+      "source_location": "L63",
       "weight": 1.0
     },
     {
@@ -58411,7 +58411,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/getting-started/project-setup.md",
-      "source_location": "L101",
+      "source_location": "L105",
       "weight": 1.0
     },
     {
@@ -58422,7 +58422,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/getting-started/project-setup.md",
-      "source_location": "L107",
+      "source_location": "L111",
       "weight": 1.0
     },
     {
@@ -58433,7 +58433,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/getting-started/project-setup.md",
-      "source_location": "L124",
+      "source_location": "L128",
       "weight": 1.0
     },
     {
@@ -58466,7 +58466,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/getting-started/project-setup.md",
-      "source_location": "L41",
+      "source_location": "L45",
       "weight": 1.0
     },
     {
@@ -72766,7 +72766,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "README.md",
-      "source_location": "L203",
+      "source_location": "L205",
       "weight": 1.0
     },
     {
@@ -73244,13 +73244,24 @@
     },
     {
       "source": "site_docs_getting_started_project_setup",
+      "target": "site_docs_guides_recovery",
+      "relation": "references",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "site-docs/getting-started/project-setup.md",
+      "source_location": "L103",
+      "weight": 1.0
+    },
+    {
+      "source": "site_docs_getting_started_project_setup",
       "target": "site_docs_configuration_overview",
       "relation": "references",
       "_origin": "ast",
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/getting-started/project-setup.md",
-      "source_location": "L126",
+      "source_location": "L130",
       "weight": 1.0
     },
     {
@@ -73261,7 +73272,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/getting-started/project-setup.md",
-      "source_location": "L127",
+      "source_location": "L131",
       "weight": 1.0
     },
     {
@@ -73272,18 +73283,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/getting-started/project-setup.md",
-      "source_location": "L128",
-      "weight": 1.0
-    },
-    {
-      "source": "site_docs_getting_started_project_setup",
-      "target": "site_docs_guides_recovery",
-      "relation": "references",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "site-docs/getting-started/project-setup.md",
-      "source_location": "L99",
+      "source_location": "L132",
       "weight": 1.0
     },
     {
@@ -76900,7 +76900,7 @@
       "confidence_score": 0.95,
       "context": "executeOrThrow()",
       "source_file": "site-docs/getting-started/project-setup.md",
-      "source_location": "L74",
+      "source_location": "L78",
       "weight": 1.0
     },
     {
@@ -77301,5 +77301,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "872d660a8a427d550c11f16cdb48ef685ed26046"
+  "built_at_commit": "25e816ebbace52ba3d35a6fec3462d8fe4cb32f4"
 }

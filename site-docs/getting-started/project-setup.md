@@ -25,11 +25,13 @@ Source data can be local files, S3 paths, or JDBC databases — configured per-f
 scalaVersion := "2.12.18"
 
 val sparkVersion = "3.5.8"
+val icebergVersion = "1.10.1"
 
 libraryDependencies ++= Seq(
   "io.github.giacomoaccursi" %% "floe" % "<version>",
   "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
-  "org.apache.spark" %% "spark-sql" % sparkVersion % "provided"
+  "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
+  "org.apache.iceberg" % "iceberg-spark-runtime-3.5_2.12" % icebergVersion % "provided"
 )
 
 run / fork := true    // Apply application JVM options to a separate process
@@ -37,6 +39,8 @@ run / javaOptions += "-Xmx2G"
 // If local Java 17 execution needs module access, copy the tested --add-opens
 // set from Floe's build.sbt. Spark 3.5 supports Java 8, 11, and 17.
 ```
+
+This is the cluster packaging profile: Spark and Iceberg are supplied once by the deployment. For local `sbt run`, remove `% "provided"` from those dependencies so they are present on the runtime classpath. Add `iceberg-aws-bundle` at the same version only when the chosen AWS catalog/FileIO needs it; do not add it for the local Hadoop catalog.
 
 ## Entry point
 

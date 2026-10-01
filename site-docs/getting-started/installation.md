@@ -15,7 +15,21 @@ Add to your `build.sbt`:
 libraryDependencies += "io.github.giacomoaccursi" %% "floe" % "<version>"
 ```
 
-Spark is a `provided` dependency—the framework expects a compatible runtime on the classpath (cluster, `spark-submit`, or local development). Floe's Iceberg runtime is built for Spark 3.5 and Scala 2.12; test any vendor-patched or different Spark version as a separate compatibility target.
+Spark and Iceberg are `provided` dependencies—the framework expects exactly one compatible engine runtime on the application or cluster classpath. Floe is compiled against `iceberg-spark-runtime-3.5_2.12` 1.10.1 but does not add that JAR, or `iceberg-aws-bundle`, transitively. Test any vendor-patched or different Spark/Iceberg combination as a separate compatibility target.
+
+For a self-managed deployment, supply the matching Iceberg runtime explicitly. Add the AWS bundle only for an AWS catalog/FileIO that requires it:
+
+```scala
+val icebergVersion = "1.10.1"
+
+libraryDependencies ++= Seq(
+  "org.apache.iceberg" % "iceberg-spark-runtime-3.5_2.12" % icebergVersion % "provided",
+  // Only for GlueCatalog/S3FileIO; omit for non-AWS deployments.
+  "org.apache.iceberg" % "iceberg-aws-bundle" % icebergVersion % "provided"
+)
+```
+
+Use normal compile/runtime scope instead of `provided` only for local `sbt run`, where no cluster supplies the JARs. Never package a second copy when the target platform already supplies Iceberg.
 
 ## Logging
 
@@ -48,4 +62,4 @@ The extensions must always be present before session creation. With the default 
 
 ### On managed platforms
 
-On Databricks, EMR, Dataproc, and Glue, the SparkSession may be pre-created by the platform. Configure the Iceberg extensions at cluster/job startup and verify that the platform's Spark, Scala, and Iceberg artifacts match Floe's compatibility matrix. Do not add a second Iceberg runtime JAR when the platform already supplies an incompatible copy.
+On Databricks, EMR, Dataproc, and Glue, the SparkSession may be pre-created by the platform. Configure the Iceberg extensions at cluster/job startup and verify that the platform's Spark, Scala, and Iceberg artifacts match Floe's compatibility matrix. Do not add a second Iceberg runtime JAR when the platform already supplies one; an incompatible platform version is an unsupported deployment, not something classpath ordering can repair.

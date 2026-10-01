@@ -80,7 +80,7 @@ For the full field reference, see [Global Configuration — iceberg](../configur
     FLOe clamps values below 24 hours (1440 minutes), but that is **not** a universal safe value: a write, checkpoint, backup or migration older than the threshold can still have in-flight files. Set the grace period above the longest expected operation and verify against your deployment before enabling cleanup.
 
 !!!warning "Catalogs on S3"
-    HadoopCatalog on S3 requires an appropriate lock manager for safe concurrent commits. FLOe rejects an S3 warehouse using the built-in Hadoop provider without `catalogProperties.lock-impl`; the [Iceberg AWS guide](https://iceberg.apache.org/docs/1.10.1/aws/) documents DynamoDB locking. GlueCatalog uses optimistic locking with supported AWS SDK versions. The built-in Glue provider also needs AWS SDK v2 client classes: the FLOe build now includes `iceberg-aws-bundle`, and deployed jobs must carry that JAR plus suitable AWS credentials, region and IAM permissions.
+    HadoopCatalog on S3 requires an appropriate lock manager for safe concurrent commits. FLOe rejects an S3 warehouse using the built-in Hadoop provider without `catalogProperties.lock-impl`; the [Iceberg AWS guide](https://iceberg.apache.org/docs/1.10.1/aws/) documents DynamoDB locking. GlueCatalog uses optimistic locking with supported AWS SDK versions. The built-in Glue provider also needs AWS SDK v2 client classes: Floe deliberately does not ship `iceberg-aws-bundle` transitively, so the application or platform must provide one bundle matching its single Iceberg runtime, plus suitable AWS credentials, region, and IAM permissions.
 
 ## Architecture
 

@@ -102,7 +102,7 @@ Floe reads the source data, validates schema and rules, upserts into `floe.defau
 - Apache Spark 3.5.8
 - SBT 1.9+
 
-Spark dependencies are marked as `provided`: the application or cluster must supply a compatible Spark runtime. Release artifacts are configured for GitHub Packages. GitHub requires authentication even when downloading a public Maven package; use a classic personal access token with `read:packages` and keep it outside the repository. See GitHub's [Apache Maven registry documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry).
+Spark and Iceberg are `provided` dependencies: the application or cluster must supply one compatible Spark/Iceberg runtime. Floe does not transitively inject the Iceberg runtime or AWS bundle into a managed platform. Release artifacts are configured for GitHub Packages. GitHub requires authentication even when downloading a public Maven package; use a classic personal access token with `read:packages` and keep it outside the repository. See GitHub's [Apache Maven registry documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry).
 
 ### 1. Add Floe
 
@@ -114,6 +114,8 @@ credentials += Credentials(Path.userHome / ".sbt" / "github-packages.credentials
 
 libraryDependencies += "io.github.giacomoaccursi" %% "floe" % "<version>"
 ```
+
+The deployed application must then provide exactly one compatible `iceberg-spark-runtime-3.5_2.12`. Add `iceberg-aws-bundle` only when the selected catalog/FileIO actually requires AWS classes (for example GlueCatalog with S3FileIO), and keep both artifacts on the same Iceberg version. Do not combine these JARs with a different platform-bundled Iceberg runtime.
 
 Store the credentials locally in `~/.sbt/github-packages.credentials`:
 

@@ -75,7 +75,7 @@ class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flow
     */
   private def validateNumericValue(value: String, fieldName: String, column: String): Unit = {
     try {
-      value.toDouble
+      val _ = value.toDouble
     } catch {
       case e: NumberFormatException =>
         throw ValidationConfigException(

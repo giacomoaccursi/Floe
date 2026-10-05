@@ -87,7 +87,7 @@ class ParallelExecutionTest extends AnyFlatSpec with Matchers {
   )
 
   private def cleanupTempDir(tempDir: String): Unit = {
-    Try {
+    val _ = Try {
       import scala.collection.JavaConverters._
       val dirPath = Paths.get(tempDir)
       if (Files.exists(dirPath)) {

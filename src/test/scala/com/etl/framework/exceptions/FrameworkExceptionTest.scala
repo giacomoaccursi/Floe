@@ -25,7 +25,7 @@ class FrameworkExceptionTest extends AnyFlatSpec with Matchers {
     val ex = SchemaValidationException(
       "flow1",
       Seq("col1"),
-      Map("col2" -> ("string", "int"))
+      Map("col2" -> Tuple2("string", "int"))
     )
 
     ex.errorCode shouldBe "VALIDATION_SCHEMA"

@@ -1,6 +1,6 @@
 package com.etl.framework.config
 
-import com.etl.framework.{config, exceptions}
+import com.etl.framework.exceptions
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 

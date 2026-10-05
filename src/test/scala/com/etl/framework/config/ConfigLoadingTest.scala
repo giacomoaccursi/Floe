@@ -34,7 +34,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
 
       loader.load(file.getAbsolutePath)
     } finally {
-      Files.deleteIfExists(tempFile)
+      val _ = Files.deleteIfExists(tempFile)
     }
   }
 
@@ -48,7 +48,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
       finally pw.close()
       loader.load(file.getAbsolutePath)
     } finally {
-      Files.deleteIfExists(tempFile)
+      val _ = Files.deleteIfExists(tempFile)
     }
   }
 

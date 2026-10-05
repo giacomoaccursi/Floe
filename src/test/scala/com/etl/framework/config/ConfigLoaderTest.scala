@@ -103,7 +103,7 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
   }
 
   // Helper to create temp files
-  def withTempFile(content: String)(f: File => Unit): Unit = {
+  def withTempFile[A](content: String)(f: File => A): A = {
     val file = File.createTempFile("test_config", ".yaml")
     file.deleteOnExit()
     Using(new PrintWriter(file)) { writer =>
@@ -112,7 +112,7 @@ class ConfigLoaderTest extends AnyFlatSpec with Matchers {
     try {
       f(file)
     } finally {
-      file.delete()
+      val _ = file.delete()
     }
   }
 

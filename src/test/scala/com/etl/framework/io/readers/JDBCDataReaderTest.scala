@@ -49,7 +49,7 @@ class JDBCDataReaderTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
       stmt.execute("INSERT INTO orders VALUES (100, 1, 50.00)")
       stmt.execute("INSERT INTO orders VALUES (101, 2, 75.50)")
       stmt.execute("INSERT INTO orders VALUES (102, 1, 120.00)")
-      stmt.execute("INSERT INTO orders VALUES (103, 3, 30.25)")
+      val _ = stmt.execute("INSERT INTO orders VALUES (103, 3, 30.25)")
     } finally {
       conn.close()
     }

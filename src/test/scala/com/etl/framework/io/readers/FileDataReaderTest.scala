@@ -23,6 +23,10 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
     csvFile
   }
 
+  private def deleteIfExists(path: Path): Unit = {
+    val _ = Files.deleteIfExists(path)
+  }
+
   "FileDataReader" should "read CSV file" in {
     val csvFile = createTempCsv("id,name\n1,Alice\n2,Bob")
     try {
@@ -38,8 +42,8 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       df.count() shouldBe 2
       df.columns should contain allOf ("id", "name")
     } finally {
-      Files.deleteIfExists(csvFile)
-      Files.deleteIfExists(csvFile.getParent)
+      deleteIfExists(csvFile)
+      deleteIfExists(csvFile.getParent)
     }
   }
 
@@ -67,8 +71,8 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       df.schema("id").dataType.simpleString shouldBe "int"
       df.schema("name").dataType.simpleString shouldBe "string"
     } finally {
-      Files.deleteIfExists(csvFile)
-      Files.deleteIfExists(csvFile.getParent)
+      deleteIfExists(csvFile)
+      deleteIfExists(csvFile.getParent)
     }
   }
 
@@ -93,8 +97,8 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       df.columns shouldBe Array("CustID", "nm")
       df.schema("CustID").dataType.simpleString shouldBe "int"
     } finally {
-      Files.deleteIfExists(csvFile)
-      Files.deleteIfExists(csvFile.getParent)
+      deleteIfExists(csvFile)
+      deleteIfExists(csvFile.getParent)
     }
   }
 
@@ -114,8 +118,8 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       val csvReader = new FileDataReader(csvConfig)
       csvReader.read().count() shouldBe 1
     } finally {
-      Files.deleteIfExists(csvFile)
-      Files.deleteIfExists(csvFile.getParent)
+      deleteIfExists(csvFile)
+      deleteIfExists(csvFile.getParent)
     }
   }
 
@@ -134,8 +138,8 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       df.count() shouldBe 1
       df.columns should contain allOf ("id", "name")
     } finally {
-      Files.deleteIfExists(csvFile)
-      Files.deleteIfExists(csvFile.getParent)
+      deleteIfExists(csvFile)
+      deleteIfExists(csvFile.getParent)
     }
   }
 
@@ -162,8 +166,10 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
 
       df.count() shouldBe 2
     } finally {
-      Files.list(tempDir).forEach(p => Files.deleteIfExists(p))
-      Files.deleteIfExists(tempDir)
+      val paths = Files.list(tempDir)
+      try paths.forEach(deleteIfExists)
+      finally paths.close()
+      deleteIfExists(tempDir)
     }
   }
 
@@ -214,8 +220,8 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
         ).read()
       }
     } finally {
-      Files.deleteIfExists(csvFile)
-      Files.deleteIfExists(csvFile.getParent)
+      deleteIfExists(csvFile)
+      deleteIfExists(csvFile.getParent)
     }
   }
 
@@ -239,8 +245,8 @@ class FileDataReaderTest extends AnyFlatSpec with Matchers {
       // Without enforced schema, CSV reads everything as string
       df.schema("id").dataType.simpleString shouldBe "string"
     } finally {
-      Files.deleteIfExists(csvFile)
-      Files.deleteIfExists(csvFile.getParent)
+      deleteIfExists(csvFile)
+      deleteIfExists(csvFile.getParent)
     }
   }
 }

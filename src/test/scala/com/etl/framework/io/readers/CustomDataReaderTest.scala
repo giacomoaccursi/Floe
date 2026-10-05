@@ -1,6 +1,6 @@
 package com.etl.framework.io.readers
 
-import com.etl.framework.config.{SchemaConfig, SourceConfig, SourceType}
+import com.etl.framework.config.{SourceConfig, SourceType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -14,8 +14,6 @@ class CustomDataReaderTest extends AnyFlatSpec with Matchers {
     .config("spark.ui.enabled", "false")
     .config("spark.driver.bindAddress", "127.0.0.1")
     .getOrCreate()
-
-  import spark.implicits._
 
   "DataReaderFactory" should "use custom reader for registered source type" in {
     val customReader: DataReaderFactory.ReaderFactory = (config, _, spark) => {

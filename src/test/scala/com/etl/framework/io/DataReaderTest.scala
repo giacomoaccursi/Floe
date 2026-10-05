@@ -34,7 +34,7 @@ class DataReaderTest extends AnyFlatSpec with Matchers {
   private def deleteDirectory(dir: File): Unit = {
     if (dir.exists()) {
       if (dir.isDirectory) dir.listFiles().foreach(deleteDirectory)
-      dir.delete()
+      val _ = dir.delete()
     }
   }
 

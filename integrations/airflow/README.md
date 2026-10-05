@@ -1,6 +1,6 @@
 # Airflow reference integration
 
-Status: **dependency installation, DAG import/validation, and contract structure tested on 5 October 2026; not qualified on a live Kubernetes/Airflow deployment**. The isolated check used Python 3.12.13 with the exact pinned Airflow/providers and completed `pip check`, DAG import, and `dag.validate()`. Do not list this combination as a supported production backend until the live checks below pass in the target environment.
+Status: **dependency installation, DAG import/validation, and contract structure tested on 5 October 2026; not qualified on a live Kubernetes/Airflow deployment**. The isolated check used Python 3.12.13 with the exact pinned Airflow/providers and completed `pip check`, DAG import, and `dag.validate()`. CI repeats the constrained dependency installation and DAG validation so dependency/API drift fails before merge. Do not list this combination as a supported production backend until the live checks below pass in the target environment.
 
 The DAG submits one already-persisted Floe request through `SparkSubmitOperator` in Kubernetes cluster mode and waits for the remote driver. It is pinned to Airflow 3.3.2, Spark provider 6.3.2, and the published Kubernetes provider 9.0.1. Airflow 3.3+ is required for the operator's durable task-state store; `track_driver_via_k8s_api=True` is required for Kubernetes reconnection.
 

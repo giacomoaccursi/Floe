@@ -357,7 +357,7 @@ The repository contains two deliberately thin integrations. They schedule the wh
 
 | Reference | Pinned control plane | Completion behavior | Repository verification | Production status |
 |---|---|---|---|---|
-| Airflow / Spark Kubernetes | Airflow 3.3.2, Spark provider 6.3.2, Kubernetes provider 9.0.1 | `SparkSubmitOperator` tracks the driver pod in cluster mode; durable state requires Airflow 3.3+ | Exact dependency install/`pip check`, DAG import/validation, and contract assertions | Not live-qualified |
+| Airflow / Spark Kubernetes | Airflow 3.3.2, Spark provider 6.3.2, Kubernetes provider 9.0.1 | `SparkSubmitOperator` tracks the driver pod in cluster mode; durable state requires Airflow 3.3+ | CI repeats exact dependency install/`pip check`, DAG import/validation, and contract assertions | Not live-qualified |
 | Step Functions / EMR Serverless | Standard Workflow using optimized `startJobRun.sync` | Waits for EMR Serverless job success; no state-machine retry | JSON/ASL contract assertions | Not deployed or live-qualified |
 
 The [Airflow reference](https://github.com/giacomoaccursi/floe/tree/develop/integrations/airflow) accepts only an immutable config URI and a request URI persisted before the DAG starts. It sets task retries to zero, uses one named Airflow pool slot, and enables Kubernetes driver tracking plus durable remote identity. The pool serializes only tasks that use that pool in the same Airflow deployment; it is not a universal table lock. Airflow worker loss at the submission/identity-persistence boundary remains an incident until the real backend proves whether a driver exists.

@@ -1,0 +1,50 @@
+{
+  "Comment": "Run one persisted Floe request on EMR Serverless and wait for the remote job",
+  "QueryLanguage": "JSONPath",
+  "StartAt": "RunFloe",
+  "States": {
+    "RunFloe": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::emr-serverless:startJobRun.sync",
+      "Parameters": {
+        "ApplicationId.$": "$.application_id",
+        "ExecutionRoleArn.$": "$.execution_role_arn",
+        "Name.$": "States.Format('floe-{}', $.attempt_id)",
+        "JobDriver": {
+          "SparkSubmit": {
+            "EntryPoint.$": "$.application_jar_uri",
+            "EntryPointArguments.$": "States.Array('run', '--config', $.config_uri, '--request', $.request_uri)",
+            "SparkSubmitParameters": "--class com.etl.framework.runner.FloeRunner --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+          }
+        },
+        "ConfigurationOverrides": {
+          "MonitoringConfiguration": {
+            "S3MonitoringConfiguration": {
+              "LogUri.$": "$.log_uri"
+            }
+          }
+        }
+      },
+      "TimeoutSeconds": 14400,
+      "ResultPath": "$.emr_serverless_result",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.emr_serverless_error",
+          "Next": "ExecutionUnobservedOrFailed"
+        }
+      ],
+      "Next": "ExecutionSucceeded"
+    },
+    "ExecutionSucceeded": {
+      "Type": "Succeed"
+    },
+    "ExecutionUnobservedOrFailed": {
+      "Type": "Fail",
+      "Error": "FloeRemoteExecutionFailed",
+      "Cause": "Freeze overlapping writers and reconcile the EMR Serverless job and Iceberg evidence before resubmission"
+    }
+  }
+}

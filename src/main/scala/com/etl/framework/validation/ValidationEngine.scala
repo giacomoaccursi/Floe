@@ -3,7 +3,7 @@ package com.etl.framework.validation
 import com.etl.framework.config.{DomainsConfig, FlowConfig, ValidationRule, ValidationRuleType}
 import com.etl.framework.validation.ValidationColumns._
 import com.etl.framework.validation.validators._
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.DataFrame
 
 /** Core validation engine that coordinates all validation steps Delegates actual validation logic to specialized
   * validators
@@ -11,7 +11,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 class ValidationEngine(
     domainsConfig: Option[DomainsConfig] = None,
     customValidators: Map[String, () => Validator] = Map.empty
-)(implicit spark: SparkSession) {
+) {
 
   /** Validates a DataFrame according to the flow configuration
     *

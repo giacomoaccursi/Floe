@@ -4,7 +4,7 @@ import com.etl.framework.config.{DomainsConfig, FlowConfig, OnFailureAction, Val
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils, Validator, ValidatorFactory}
 import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.DataFrame
 
 /** Validator for custom validation rules with reject/warn support. Orchestrates multiple validators and handles
   * skipNull for all rule types.
@@ -14,8 +14,7 @@ class CustomRulesValidator(
     domainsConfig: Option[DomainsConfig] = None,
     flowName: Option[String] = None,
     customValidators: Map[String, () => Validator] = Map.empty
-)(implicit spark: SparkSession)
-    extends Validator {
+) extends Validator {
 
   override def validate(
       df: DataFrame,

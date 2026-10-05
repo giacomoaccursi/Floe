@@ -298,4 +298,60 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
     issues should not be empty
     issues.head should include("domains.yaml")
   }
+
+  it should "reject programmatic flow names that collide case-insensitively" in {
+    val builder = IngestionPipeline
+      .builder()
+      .withGlobalConfig(TestFixtures.globalConfig())
+      .withFlowConfigs(Seq(TestFixtures.flowConfig("Orders"), TestFixtures.flowConfig("orders")))
+
+    val issues = builder.validate().mkString(" ")
+    issues should include("collide case-insensitively")
+    intercept[IllegalArgumentException](builder.build()).getMessage should include("collide case-insensitively")
+  }
+
+  it should "reject non-finite rejection thresholds" in {
+    val flow = TestFixtures.flowConfig("orders", maxRejectionRate = Some(Double.NaN))
+    val global = TestFixtures.globalConfig(maxRejectionRate = Some(Double.PositiveInfinity))
+    val builder = IngestionPipeline.builder().withGlobalConfig(global).withFlowConfigs(Seq(flow))
+
+    val issues = builder.validate().mkString(" ")
+    issues should include("processing.maxRejectionRate must be finite")
+    issues should include("Flow 'orders': maxRejectionRate must be finite")
+    intercept[IllegalArgumentException](builder.build()).getMessage should include("maxRejectionRate must be finite")
+  }
+
+  it should "reject SCD2 metadata columns that collide with source columns" in {
+    val flow = TestFixtures.flowConfig(
+      "customers",
+      loadMode = LoadMode.SCD2,
+      columns = Seq(
+        ColumnConfig("id", "string", nullable = false),
+        ColumnConfig("name", "string", nullable = true),
+        ColumnConfig("valid_from", "timestamp", nullable = true)
+      ),
+      enforceSchema = true
+    )
+    val builder = IngestionPipeline
+      .builder()
+      .withGlobalConfig(TestFixtures.globalConfig())
+      .withFlowConfigs(Seq(flow))
+
+    val issues = builder.validate().mkString(" ")
+    issues should include("SCD2 metadata columns collide with schema columns: valid_from")
+    intercept[IllegalArgumentException](builder.build()).getMessage should include("valid_from")
+  }
+
+  it should "reject a quality metrics target that collides with a flow" in {
+    val base = TestFixtures.globalConfig()
+    val global = base.copy(processing = base.processing.copy(qualityMetricsTable = Some("ORDERS")))
+    val builder = IngestionPipeline
+      .builder()
+      .withGlobalConfig(global)
+      .withFlowConfigs(Seq(TestFixtures.flowConfig("orders")))
+
+    val issues = builder.validate().mkString(" ")
+    issues should include("qualityMetricsTable 'ORDERS' collides with flow 'orders'")
+    intercept[IllegalArgumentException](builder.build()).getMessage should include("qualityMetricsTable")
+  }
 }

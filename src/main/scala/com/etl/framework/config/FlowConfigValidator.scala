@@ -1,5 +1,7 @@
 package com.etl.framework.config
 
+import java.util.Locale
+
 /** Structural validation shared by YAML loading and programmatic pipeline construction. */
 object FlowConfigValidator {
 
@@ -15,7 +17,8 @@ object FlowConfigValidator {
     if (physicalColumns.distinct.size != physicalColumns.size)
       errors += "sourceColumn mappings contain duplicate physical column names"
     config.maxRejectionRate.foreach { rate =>
-      if (rate < 0.0 || rate > 1.0) errors += "maxRejectionRate must be between 0.0 and 1.0"
+      if (!java.lang.Double.isFinite(rate)) errors += "maxRejectionRate must be finite"
+      else if (rate < 0.0 || rate > 1.0) errors += "maxRejectionRate must be between 0.0 and 1.0"
     }
     config.minInputRecords.foreach { minimum =>
       if (minimum < 0L) errors += "minInputRecords must be greater than or equal to zero"
@@ -55,6 +58,19 @@ object FlowConfigValidator {
         }
         if (nullablePk.nonEmpty)
           errors += s"SCD2 primary-key columns must be non-nullable: ${nullablePk.mkString(", ")}"
+
+        val metadataColumns = Seq(
+          config.loadMode.validFromColumn.getOrElse("valid_from"),
+          config.loadMode.validToColumn.getOrElse("valid_to"),
+          config.loadMode.isCurrentColumn.getOrElse("is_current")
+        ) ++ (if (config.loadMode.detectDeletes) Seq(config.loadMode.isActiveColumn.getOrElse("is_active"))
+              else config.loadMode.isActiveColumn.toSeq)
+        val declaredByNormalizedName = declaredColumns.map(name => name.toLowerCase(Locale.ROOT) -> name).toMap
+        val collisions = metadataColumns
+          .flatMap(name => declaredByNormalizedName.get(name.toLowerCase(Locale.ROOT)))
+          .distinct
+        if (collisions.nonEmpty)
+          errors += s"SCD2 metadata columns collide with schema columns: ${collisions.mkString(", ")}"
       }
     }
 

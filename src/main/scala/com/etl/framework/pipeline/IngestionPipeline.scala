@@ -437,7 +437,23 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
 
   private def validationErrors(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConfig]): Seq[String] = {
     val errors = scala.collection.mutable.ArrayBuffer[String]()
+    globalConfig.processing.maxRejectionRate.foreach { rate =>
+      if (!java.lang.Double.isFinite(rate)) errors += "processing.maxRejectionRate must be finite"
+      else if (rate < 0.0 || rate > 1.0)
+        errors += "processing.maxRejectionRate must be between 0.0 and 1.0"
+    }
     globalConfig.iceberg.maintenance.validationErrors.foreach(error => errors += s"Iceberg maintenance: $error")
+
+    val flowNameGroups = flowConfigs.groupBy(_.name.toLowerCase(Locale.ROOT)).values.filter(_.size > 1).toSeq
+    flowNameGroups.foreach { collisions =>
+      errors += s"Flow names collide case-insensitively: ${collisions.map(_.name).sorted.mkString(", ")}"
+    }
+
+    globalConfig.processing.qualityMetricsTable.foreach { metricsTable =>
+      flowConfigs.find(_.name.equalsIgnoreCase(metricsTable)).foreach { flow =>
+        errors += s"qualityMetricsTable '$metricsTable' collides with flow '${flow.name}'"
+      }
+    }
     derivedTableCollisions(globalConfig, flowConfigs).foreach { name =>
       errors += s"Derived table '$name' collides with a managed table"
     }

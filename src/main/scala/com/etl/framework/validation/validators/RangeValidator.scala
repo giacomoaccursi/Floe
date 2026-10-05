@@ -5,9 +5,9 @@ import com.etl.framework.config.ValidationRule
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Column
-import org.apache.spark.sql.types.DoubleType
+import org.apache.spark.sql.types.{DecimalType, StringType}
 
-/** Validator for range validation (numeric and date types)
+/** Validator for numeric range validation.
   */
 class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flowName) {
 
@@ -39,10 +39,14 @@ class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flow
       )
     }
 
+    val parsedMin = rule.min.map(parseFiniteNumericValue(_, "min", column))
+    val parsedMax = rule.max.map(parseFiniteNumericValue(_, "max", column))
+    val parsedBounds = Seq(parsedMin, parsedMax).flatten
+
     // Validate that min <= max
-    (rule.min, rule.max) match {
+    (parsedMin, parsedMax) match {
       case (Some(min), Some(max)) =>
-        if (min.toDouble > max.toDouble) {
+        if (min > max) {
           throw ValidationConfigException(
             s"Range validation error for column '$column'${flowContext}: 'min' ($min) > 'max' ($max)"
           )
@@ -50,38 +54,63 @@ class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flow
       case _ => // OK
     }
 
-    // Build conditions using numeric literals and a DoubleType cast on the column.
-    // This ensures numeric comparison regardless of the column's declared type:
-    // string columns containing numbers are cast correctly, and lexicographic
-    // ordering (e.g. "9" > "10") is avoided.
-    val minCondition = rule.min
+    // Decimal literals preserve exact integral and fixed-point bounds. Spark otherwise
+    // promotes String/Decimal comparisons to Double, so numeric strings are explicitly
+    // cast to the widest Decimal that can still represent the configured bounds.
+    val valueColumn = df.schema(column).dataType match {
+      case StringType => col(column).cast(decimalTypeFor(parsedBounds))
+      case _          => col(column)
+    }
+
+    val minCondition = parsedMin
       .map { minValue =>
-        validateNumericValue(minValue, "min", column)
-        col(column).cast(DoubleType) >= lit(minValue.toDouble)
+        valueColumn >= lit(minValue.bigDecimal)
       }
       .getOrElse(lit(true))
 
-    val maxCondition = rule.max
+    val maxCondition = parsedMax
       .map { maxValue =>
-        validateNumericValue(maxValue, "max", column)
-        col(column).cast(DoubleType) <= lit(maxValue.toDouble)
+        valueColumn <= lit(maxValue.bigDecimal)
       }
       .getOrElse(lit(true))
 
     minCondition && maxCondition
   }
 
-  /** Validates that a value is numeric
+  /** Parses a finite numeric bound.
     */
-  private def validateNumericValue(value: String, fieldName: String, column: String): Unit = {
+  private def parseFiniteNumericValue(value: String, fieldName: String, column: String): BigDecimal = {
     try {
-      val _ = value.toDouble
+      val parsed = BigDecimal(value).bigDecimal.stripTrailingZeros
+      val normalized = if (parsed.scale < 0) parsed.setScale(0) else parsed
+      val requiredPrecision = math.max(normalized.precision, normalized.scale)
+      if (requiredPrecision > DecimalType.MAX_PRECISION) {
+        throw ValidationConfigException(
+          s"Range validation error for column '$column'${flowContext}: '$fieldName' value '$value' exceeds Spark's maximum decimal precision of ${DecimalType.MAX_PRECISION} digits"
+        )
+      }
+      BigDecimal(normalized)
     } catch {
       case e: NumberFormatException =>
-        throw ValidationConfigException(
-          s"Range validation error for column '$column'${flowContext}: '$fieldName' value '$value' is not numeric",
-          e
-        )
+        val isNonFinite =
+          try !java.lang.Double.isFinite(java.lang.Double.parseDouble(value))
+          catch { case _: NumberFormatException => false }
+
+        if (isNonFinite)
+          throw ValidationConfigException(
+            s"Range validation error for column '$column'${flowContext}: '$fieldName' value '$value' must be finite",
+            e
+          )
+        else
+          throw ValidationConfigException(
+            s"Range validation error for column '$column'${flowContext}: '$fieldName' value '$value' is not numeric",
+            e
+          )
     }
+  }
+
+  private def decimalTypeFor(bounds: Seq[BigDecimal]): DecimalType = {
+    val integerDigits = bounds.map(value => math.max(value.precision - value.scale, 0)).max
+    DecimalType(DecimalType.MAX_PRECISION, DecimalType.MAX_PRECISION - integerDigits)
   }
 }

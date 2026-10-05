@@ -1,6 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.{ValidationRule, ValidationRuleType}
+import com.etl.framework.exceptions.ValidationConfigException
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -93,5 +94,61 @@ class RangeValidatorTest extends AnyFlatSpec with Matchers {
     result.valid.count() shouldBe 1
     result.rejected.get.count() shouldBe 1
     result.rejected.get.filter("value IS NULL").count() shouldBe 1
+  }
+
+  it should "report a typed configuration error for a non-numeric bound" in {
+    val df = Seq(10).toDF("value")
+    val rule = createRule(Some("not-a-number"), Some("15"))
+
+    val error = intercept[ValidationConfigException] {
+      new RangeValidator().validate(df, rule)
+    }
+
+    error.getMessage should include("'min' value 'not-a-number' is not numeric")
+  }
+
+  it should "reject non-finite numeric bounds" in {
+    val df = Seq(10).toDF("value")
+
+    Seq("NaN", "Infinity", "-Infinity").foreach { bound =>
+      val error = intercept[ValidationConfigException] {
+        new RangeValidator().validate(df, createRule(Some(bound), None))
+      }
+
+      error.getMessage should include(s"'min' value '$bound' must be finite")
+    }
+  }
+
+  it should "compare integral values without losing precision" in {
+    val firstValueOutsideDoubleIntegerPrecision = 9007199254740993L
+    val df = Seq(firstValueOutsideDoubleIntegerPrecision).toDF("value")
+    val rule = createRule(None, Some("9007199254740992"))
+
+    val result = new RangeValidator().validate(df, rule)
+
+    result.valid.count() shouldBe 0
+    result.rejected.get.select("value").as[Long].collect() should contain only firstValueOutsideDoubleIntegerPrecision
+  }
+
+  it should "compare numeric strings without losing decimal precision" in {
+    val valueAboveMaximum = "0.12345678901234567892"
+    val df = Seq(valueAboveMaximum).toDF("value")
+    val rule = createRule(None, Some("0.12345678901234567891"))
+
+    val result = new RangeValidator().validate(df, rule)
+
+    result.valid.count() shouldBe 0
+    result.rejected.get.select("value").as[String].collect() should contain only valueAboveMaximum
+  }
+
+  it should "reject bounds that exceed Spark decimal precision" in {
+    val df = Seq(10).toDF("value")
+    val boundWith39Digits = "123456789012345678901234567890123456789"
+
+    val error = intercept[ValidationConfigException] {
+      new RangeValidator().validate(df, createRule(Some(boundWith39Digits), None))
+    }
+
+    error.getMessage should include("exceeds Spark's maximum decimal precision of 38 digits")
   }
 }

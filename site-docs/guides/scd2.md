@@ -60,7 +60,7 @@ Primary key columns **must be non-nullable**. The framework validates this const
 
 ### System columns
 
-The SCD2 columns (`valid_from`, `valid_to`, `is_current`, `is_active`) **should not be declared in the flow schema** — the framework adds them automatically to the Iceberg table. Only declare business columns in the schema:
+The SCD2 columns (`valid_from`, `valid_to`, `is_current`, `is_active`, or their configured names) **must not be declared in the flow schema** — the framework adds them automatically to the Iceberg table and rejects case-insensitive collisions. Only declare business columns in the schema:
 
 ```yaml
 schema:
@@ -82,7 +82,7 @@ schema:
 
 All records are inserted with:
 
-- `valid_from = current_timestamp()`
+- `valid_from = ExecutionRequest.effectiveAt`
 - `valid_to = NULL`
 - `is_current = true`
 - `is_active = true` (if `detectDeletes: true`)
@@ -93,8 +93,8 @@ A record is considered "modified" when at least one of the `compareColumns` has 
 
 When a modification is detected:
 
-1. The current version is **closed**: `valid_to = now`, `is_current = false`
-2. A new version is **inserted**: `valid_from = now`, `valid_to = NULL`, `is_current = true`
+1. The current version is **closed**: `valid_to = ExecutionRequest.effectiveAt`, `is_current = false`
+2. A new version is **inserted**: `valid_from = ExecutionRequest.effectiveAt`, `valid_to = NULL`, `is_current = true`
 
 Both row changes are committed by one atomic Iceberg `MERGE` on that table.
 
@@ -453,7 +453,7 @@ ON target.customer_id = source._mk_customer_id
 
 -- Clause 1: close the old version of the modified record
 WHEN MATCHED AND (change condition) THEN UPDATE SET
-  target.valid_to = current_timestamp(),
+  target.valid_to = TIMESTAMP '<effectiveAt>',
   target.is_current = false
 
 -- Clause 2: insert the new version (merge key NULL → NOT MATCHED)
@@ -461,12 +461,12 @@ WHEN MATCHED AND (change condition) THEN UPDATE SET
 WHEN NOT MATCHED THEN INSERT
   (customer_id, email, tier, credit_limit, valid_from, valid_to, is_current, is_active)
   VALUES (source.customer_id, source.email, source.tier, source.credit_limit,
-          current_timestamp(), CAST(NULL AS TIMESTAMP), true, true)
+          TIMESTAMP '<effectiveAt>', CAST(NULL AS TIMESTAMP), true, true)
 
 -- Clause 3 (optional, only with detectDeletes=true):
 -- soft-delete records not present in the source
 WHEN NOT MATCHED BY SOURCE AND target.is_current = true THEN UPDATE SET
-  target.valid_to = current_timestamp(),
+  target.valid_to = TIMESTAMP '<effectiveAt>',
   target.is_current = false,
   target.is_active = false
 ```
@@ -489,7 +489,7 @@ version 1: valid_from=T1, valid_to=T2
 version 2: valid_from=T2, valid_to=NULL
 ```
 
-This is guaranteed because both operations (close old, open new) use `current_timestamp()` within the same MERGE statement, which is evaluated once. There are no temporal gaps between versions.
+This is guaranteed because both operations (close old, open new) use the same immutable `ExecutionRequest.effectiveAt` value rendered as a UTC timestamp literal. There are no temporal gaps between versions, and Spark executor clock differences cannot alter the boundary.
 
 ## Known limitations
 
@@ -499,7 +499,7 @@ The framework assumes a single writer per table. Concurrent executions of the sa
 
 ### Late-arriving data
 
-SCD2 in the framework uses `current_timestamp()` as `valid_from` for new versions. It does not support inserting historical versions with `valid_from` in the past. If a record arrives late with a state that was valid yesterday, it is inserted with `valid_from = now`, not `valid_from = yesterday`.
+SCD2 uses `ExecutionRequest.effectiveAt` as `valid_from` for new versions. The caller may set that instant to a historical processing boundary, but Floe does not infer event-valid time from source rows or splice a late record into existing history. The orchestrator must supply an effective time consistent with the table's version order.
 
 ### No hard-delete in this load mode
 

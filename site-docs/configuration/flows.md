@@ -3,7 +3,7 @@
 Complete reference for flow YAML files. Each file defines a single data ingestion pipeline and lives in the `flows/` subdirectory of the config directory.
 
 !!!warning "Unique flow names"
-    Each flow must have a unique `name`. If two YAML files in the `flows/` directory define the same name, the framework rejects the configuration at startup.
+    Each flow must have a unique `name`, case-insensitively. This applies to YAML files and programmatic configuration: names such as `orders` and `ORDERS` are rejected together because Spark commonly resolves identifiers without case distinctions.
 
 ## Full example
 
@@ -80,7 +80,7 @@ output:
 | `version` | no | `""` | Flow version string |
 | `owner` | no | `""` | Team or person responsible |
 | `dependsOn` | no | `[]` | List of flow names that must execute before this flow |
-| `maxRejectionRate` | no | — | Per-flow rejection rate threshold. Overrides the global `processing.maxRejectionRate`. |
+| `maxRejectionRate` | no | — | Finite per-flow rejection rate threshold in `[0.0, 1.0]`. Overrides the global `processing.maxRejectionRate`. |
 | `minInputRecords` | no | — | Pre-write cardinality gate. The flow fails before mutating Iceberg when the post-pre-transformation input count is below this value. Set deliberately on Full and SCD2 feeds where an unexpectedly empty/small snapshot would be destructive. |
 
 ### dependsOn
@@ -105,7 +105,7 @@ Defines where data is read from.
 | `format` | for `file` | — | File format: `csv`, `parquet`, `json`, `avro`, `orc`. Not used for `jdbc`. |
 | `options` | no | `{}` | Connector options plus Floe-owned metadata such as `replayToken`; built-in readers do not forward Floe-owned keys to Spark |
 
-`options.replayToken` is interpreted by Floe rather than Spark. For JDBC and custom readers it is required for `resume`/`replay` and must identify an immutable extract or source snapshot. It is optional for files, where Floe can derive an inventory fingerprint; use it there too if path, length, and modification time are not a strong enough identity.
+`options.replayToken` is reserved Floe metadata and is not forwarded by the built-in readers. It is not a retry or deduplication mechanism. Record the immutable source identity in `ExecutionRequest.inputReferences`; that request is the recovery evidence owned by the external orchestrator.
 
 ### File source
 

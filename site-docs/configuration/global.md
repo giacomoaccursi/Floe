@@ -65,11 +65,11 @@ Controls batch execution and validation behavior. This entire section is optiona
 | Field | Default | Description |
 |-------|---------|-------------|
 | `batchIdFormat` | `yyyyMMdd_HHmmss` | Java `DateTimeFormatter` pattern for the readable prefix of a batch ID. Use `timestamp` for epoch millis. A random UUID suffix is always appended to avoid collisions. |
-| `maxRejectionRate` | — (disabled) | If set, the batch stops when any flow's rejection rate exceeds this threshold (0.1 = 10%). |
-| `qualityMetricsTable` | — (disabled) | If set, writes per-flow quality metrics to this Iceberg table after each batch. See [Quality Metrics](../guides/quality-metrics.md). |
+| `maxRejectionRate` | — (disabled) | If set, it must be finite and in `[0.0, 1.0]`; the batch stops when any flow's rejection rate exceeds it (0.1 = 10%). |
+| `qualityMetricsTable` | — (disabled) | If set, writes per-flow quality metrics to this Iceberg table after each batch. Its name must not collide case-insensitively with a flow or derived table. See [Quality Metrics](../guides/quality-metrics.md). |
 
 !!!warning "Batch ID collisions"
-    The timestamp pattern controls readability, not uniqueness: every generated ID also includes a UUID suffix. Full and Delta loads are **not** generally idempotent under replay (Delta without a primary key appends), so retain the generated ID and the exact source input when investigating a failed run.
+    The timestamp pattern controls readability, not uniqueness: every generated ID also includes a UUID suffix. Full loads are destructive replacements and Delta loads require an explicit primary key; neither constitutes a general replay guarantee. Retain the generated ID and the exact source input when investigating a failed run.
 
 ### Rejection behavior
 

@@ -35,11 +35,12 @@ libraryDependencies ++= Seq(
   "com.github.pureconfig" %% "pureconfig" % "0.17.4",
   "com.github.pureconfig" %% "pureconfig-yaml" % "0.17.4",
 
-  // JSON serialization for metadata
-  "org.json4s" %% "json4s-jackson" % json4sVersion,
+  // Spark owns JSON4s/Jackson on the cluster classpath. Packaging another Jackson line in an
+  // application assembly can make driver and executor linkage depend on classpath order.
+  "org.json4s" %% "json4s-jackson" % json4sVersion % "provided",
 
-  // Logging
-  "org.slf4j" % "slf4j-api" % "2.0.17",
+  // Spark owns the logging API and provider. Floe must not package a competing copy.
+  "org.slf4j" % "slf4j-api" % "2.0.7" % "provided",
 
   // Testing
   "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
@@ -88,3 +89,14 @@ Test / javaOptions ++= Seq(
   "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
   "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
 )
+
+// The deployable assembly contains Floe and its non-engine libraries only. Spark supplies Scala,
+// Spark, Iceberg, JSON4s/Jackson, and SLF4J exactly once in the target runtime.
+assembly / assemblyOption := (assembly / assemblyOption).value.withIncludeScala(false)
+assembly / assemblyMergeStrategy := {
+  val defaultStrategy: String => sbtassembly.MergeStrategy = (assembly / assemblyMergeStrategy).value
+  (entry: String) => {
+    if (entry == "module-info.class" || entry.endsWith("/module-info.class")) sbtassembly.MergeStrategy.discard
+    else defaultStrategy(entry)
+  }
+}

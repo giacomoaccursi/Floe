@@ -48,9 +48,25 @@ jobs:
           sbt -J-Xss4m makePom
           pom=$(find target/scala-2.12 -maxdepth 1 -name '*.pom' -print -quit)
           test -n "$pom"
+          rg -U '<artifactId>spark-core_2\.12</artifactId>\s*<version>3\.5\.8</version>\s*<scope>provided</scope>' "$pom"
           rg -U '<artifactId>iceberg-spark-runtime-3\.5_2\.12</artifactId>\s*<version>1\.10\.1</version>\s*<scope>provided</scope>' "$pom"
+          rg -U '<artifactId>json4s-jackson_2\.12</artifactId>\s*<version>3\.7\.0-M11</version>\s*<scope>provided</scope>' "$pom"
+          rg -U '<artifactId>slf4j-api</artifactId>\s*<version>2\.0\.7</version>\s*<scope>provided</scope>' "$pom"
           if rg -q '<artifactId>iceberg-aws-bundle</artifactId>' "$pom"; then
             echo 'iceberg-aws-bundle must be supplied by the deployment, not Floe' >&2
+            exit 1
+          fi
+
+      - name: Verify deployable assembly boundary
+        run: |
+          sbt -J-Xss4m assembly
+          assembly_jar=$(find target/scala-2.12 -maxdepth 1 -name '*-assembly-*.jar' -print -quit)
+          test -n "$assembly_jar"
+          jar tf "$assembly_jar" > target/assembly-contents.txt
+          rg -q '^com/etl/framework/runner/FloeRunner\$.class$' target/assembly-contents.txt
+          rg -q '^pureconfig/ConfigReader.class$' target/assembly-contents.txt
+          if rg -q '^(scala/|org/apache/spark/|org/apache/iceberg/|org/json4s/|com/fasterxml/jackson/|org/slf4j/)' target/assembly-contents.txt; then
+            echo 'assembly contains a platform-owned runtime class' >&2
             exit 1
           fi
 

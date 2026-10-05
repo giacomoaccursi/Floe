@@ -169,7 +169,7 @@ Validates that numeric column values fall within a specified range. At least one
   onFailure: reject
 ```
 
-Values are compared numerically (cast to `DoubleType`), not lexicographically. This means string columns containing numbers are handled correctly — `"9"` is not considered greater than `"10"`.
+Values are compared with exact Spark decimal literals, not lexicographically or through an unconditional floating-point cast. This preserves integral and fixed-point comparisons beyond IEEE-754 double precision; string columns containing numbers are cast to the widest compatible Spark `DecimalType`. Bounds must be finite numeric values with at most 38 decimal digits: malformed values, excessive precision, `NaN`, and positive or negative infinity are rejected as configuration errors.
 
 If `min > max`, a `ValidationConfigException` is thrown. Rejection code: `RANGE_VALIDATION_FAILED`.
 

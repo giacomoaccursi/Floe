@@ -311,8 +311,8 @@ The FK is identified by an auto-generated display name (e.g. `(customer_id) -> c
 | `type` | string | yes | — | Rule type: `regex`, `range`, `domain`, `custom` |
 | `column` | string | conditional | — | Column to validate. Required for `regex`, `range`, `domain`. Optional for `custom` (custom validators can do cross-column validation). |
 | `pattern` | string | — | — | Regex pattern (for `regex` type) |
-| `min` | string | — | — | Minimum value (for `range` type) |
-| `max` | string | — | — | Maximum value (for `range` type) |
+| `min` | string | — | — | Finite numeric minimum with at most 38 decimal digits (for `range` type) |
+| `max` | string | — | — | Finite numeric maximum with at most 38 decimal digits (for `range` type) |
 | `domainName` | string | — | — | Domain name from `domains.yaml` (for `domain` type) |
 | `class` | string | — | — | Validator name (registered via builder) or fully qualified class name (for `custom` type) |
 | `config` | map | — | — | Key-value config passed to custom validators |

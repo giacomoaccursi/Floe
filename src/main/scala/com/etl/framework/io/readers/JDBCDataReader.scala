@@ -2,6 +2,7 @@ package com.etl.framework.io.readers
 
 import com.etl.framework.config.{SchemaConfig, SourceConfig}
 import com.etl.framework.exceptions.DataSourceException
+import com.etl.framework.util.SensitiveDataRedactor
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
@@ -23,7 +24,10 @@ class JDBCDataReader(
       throw DataSourceException("jdbc", sourceConfig.path, "Missing required option 'url'")
     )
 
-    logger.info(s"Reading JDBC source: ${sourceConfig.path} from $url")
+    logger.info(
+      s"Reading JDBC source: ${SensitiveDataRedactor.redact(sourceConfig.path)} " +
+        s"from ${SensitiveDataRedactor.redact(url)}"
+    )
 
     var reader = spark.read.format("jdbc").option("url", url)
 

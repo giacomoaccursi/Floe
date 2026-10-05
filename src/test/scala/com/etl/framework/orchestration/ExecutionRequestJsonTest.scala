@@ -73,4 +73,14 @@ class ExecutionRequestJsonTest extends AnyFlatSpec with Matchers {
       ()
     }
   }
+
+  it should "redact signed request locations from read errors" in {
+    val secret = "request-signature-secret"
+    val missing = s"file:///definitely-missing-floe-request.json?X-Amz-Signature=$secret"
+
+    val error = ExecutionRequestJson.read(missing, new Configuration()).left.get
+
+    error should include("[REDACTED]")
+    error should not include secret
+  }
 }

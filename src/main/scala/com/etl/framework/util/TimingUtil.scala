@@ -14,12 +14,15 @@ object TimingUtil {
     try {
       val result = block
       val durationMs = (System.nanoTime() - startTime) / 1000000
-      logger.info(s"$operation completed in ${durationMs}ms")
+      logger.info(s"${SensitiveDataRedactor.redact(operation)} completed in ${durationMs}ms")
       result
     } catch {
       case e: Throwable =>
         val durationMs = (System.nanoTime() - startTime) / 1000000
-        logger.error(s"$operation failed after ${durationMs}ms: ${e.getMessage}", e)
+        logger.error(
+          s"${SensitiveDataRedactor.redact(operation)} failed after ${durationMs}ms: ${SensitiveDataRedactor.message(e)}",
+          SensitiveDataRedactor.safeThrowable(e)
+        )
         throw e
     }
   }
@@ -40,12 +43,15 @@ object TimingUtil {
     try {
       val result = block
       val durationMs = (System.nanoTime() - startTime) / 1000000
-      logger.info(s"$operation completed in ${durationMs}ms")
+      logger.info(s"${SensitiveDataRedactor.redact(operation)} completed in ${durationMs}ms")
       (result, durationMs)
     } catch {
       case e: Throwable =>
         val durationMs = (System.nanoTime() - startTime) / 1000000
-        logger.error(s"$operation failed after ${durationMs}ms: ${e.getMessage}", e)
+        logger.error(
+          s"${SensitiveDataRedactor.redact(operation)} failed after ${durationMs}ms: ${SensitiveDataRedactor.message(e)}",
+          SensitiveDataRedactor.safeThrowable(e)
+        )
         throw e
     }
   }

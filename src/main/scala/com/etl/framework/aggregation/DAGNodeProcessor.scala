@@ -55,7 +55,7 @@ class DAGNodeProcessor(joinExecutor: JoinStrategyExecutor, catalogName: String, 
       data
     } else {
       filters.foldLeft(data) { (df, filter) =>
-        logger.debug(s"Applying filter: $filter")
+        logger.debug("Applying configured DAG filter")
         df.filter(filter)
       }
     }

@@ -1,6 +1,7 @@
 package com.etl.framework.orchestration
 
 import com.etl.framework.orchestration.flow.FlowResult
+import com.etl.framework.util.SensitiveDataRedactor
 import org.slf4j.LoggerFactory
 
 /** Handles logging for execution orchestration. Extracted from FlowOrchestrator to follow Single Responsibility
@@ -44,13 +45,16 @@ class ExecutionLogger {
   /** Logs execution failure.
     */
   def logExecutionFailure(batchId: String, executionTimeMs: Long, error: Throwable): Unit = {
-    logger.error(s"Ingestion execution failed after ${executionTimeMs}ms - batchId: $batchId", error)
+    logger.error(
+      s"Ingestion execution failed after ${executionTimeMs}ms - batchId: $batchId: ${SensitiveDataRedactor.message(error)}",
+      SensitiveDataRedactor.safeThrowable(error)
+    )
   }
 
   /** Logs flow failure.
     */
   def logFlowFailure(flowName: String, error: Option[String]): Unit = {
-    logger.error(s"Flow $flowName failed: ${error.getOrElse("Unknown error")}")
+    logger.error(s"Flow $flowName failed: ${SensitiveDataRedactor.redact(error.getOrElse("Unknown error"))}")
   }
 
   /** Logs execution stop due to rejection threshold.

@@ -3,7 +3,7 @@ package com.etl.framework.orchestration.batch
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
 import com.etl.framework.iceberg.{IcebergTableManager, OrphanReport}
 import com.etl.framework.orchestration.flow.FlowResult
-import com.etl.framework.util.SqlIdentifier
+import com.etl.framework.util.{SensitiveDataRedactor, SqlIdentifier}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{col, current_timestamp}
 import org.apache.spark.sql.types.{
@@ -60,7 +60,7 @@ class QualityMetricsWriter(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConf
           logger.info(s"Quality metrics written to $fullTableName: ${flowResults.size} flow rows")
         } catch {
           case e: Exception =>
-            logger.warn(s"Failed to write quality metrics: ${e.getMessage}")
+            logger.warn(s"Failed to write quality metrics: ${SensitiveDataRedactor.message(e)}")
         }
     }
   }

@@ -13,6 +13,7 @@ import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.ExecutionPlanBuilder
 import com.etl.framework.pipeline.{DerivedTableDefinition, DerivedTableExecutor, DerivedTableResult}
 import com.etl.framework.validation.Validator
+import com.etl.framework.util.SensitiveDataRedactor
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
@@ -132,7 +133,7 @@ class FlowOrchestrator(
         } catch {
           case error: Exception =>
             executionLogger.logExecutionFailure(attemptId, elapsedMillis(startedAtNanos), error)
-            failedResult(request, state.flowResults, Option(error.getMessage).getOrElse(error.getClass.getName))
+            failedResult(request, state.flowResults, SensitiveDataRedactor.message(error))
         }
 
       val executionTimeMs = elapsedMillis(startedAtNanos)
@@ -204,7 +205,7 @@ class FlowOrchestrator(
       request = request,
       flowResults = flowResults,
       success = false,
-      error = Some(error),
+      error = Some(SensitiveDataRedactor.redact(error)),
       derivedTableResults = derivedResults,
       orphanReports = orphanReports,
       status = status,
@@ -223,8 +224,8 @@ class FlowOrchestrator(
       metadataWriter.writeBatchMetadata(request, result, executionTimeMs)
     } catch {
       case error: Exception =>
-        val warning = s"Batch report write failed: ${error.getMessage}"
-        logger.warn(warning, error)
+        val warning = s"Batch report write failed: ${SensitiveDataRedactor.message(error)}"
+        logger.warn(warning, SensitiveDataRedactor.safeThrowable(error))
         warnings += warning
     }
 
@@ -239,7 +240,7 @@ class FlowOrchestrator(
       additionalWarnings: Seq[String],
       executionTimeMs: Long
   ): IngestionResult = {
-    val warnings = result.warnings ++ additionalWarnings
+    val warnings = SensitiveDataRedactor.redactAll(result.warnings ++ additionalWarnings)
     val status =
       if (result.success && warnings.nonEmpty) ExecutionStatus.SucceededWithWarnings
       else result.status
@@ -261,7 +262,10 @@ class FlowOrchestrator(
         if (result.success) listener.onBatchCompleted(result) else listener.onBatchFailed(result)
       } catch {
         case error: Exception =>
-          logger.warn(s"Batch listener ${listener.getClass.getSimpleName} failed: ${error.getMessage}", error)
+          logger.warn(
+            s"Batch listener ${listener.getClass.getSimpleName} failed: ${SensitiveDataRedactor.message(error)}",
+            SensitiveDataRedactor.safeThrowable(error)
+          )
       }
     }
 

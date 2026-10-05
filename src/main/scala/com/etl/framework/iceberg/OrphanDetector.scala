@@ -1,7 +1,7 @@
 package com.etl.framework.iceberg
 
 import com.etl.framework.config._
-import com.etl.framework.util.SqlIdentifier
+import com.etl.framework.util.{SensitiveDataRedactor, SqlIdentifier}
 import com.etl.framework.orchestration.ExecutionPlan
 import com.etl.framework.orchestration.flow.FlowResult
 import org.apache.spark.sql.types.{DataType, StructType}
@@ -67,8 +67,9 @@ class OrphanDetector(
       OrphanDetectionResult.Completed(reports.toSeq)
     } catch {
       case e: Exception =>
-        logger.error(s"Orphan detection failed after ${reports.size} reports: ${e.getMessage}")
-        OrphanDetectionResult.Failed(e.getMessage, reports.toSeq)
+        val message = SensitiveDataRedactor.message(e)
+        logger.error(s"Orphan detection failed after ${reports.size} reports: $message")
+        OrphanDetectionResult.Failed(message, reports.toSeq)
     } finally {
       removedKeysByFlow.values.foreach { df =>
         try { df.unpersist() }
@@ -181,7 +182,7 @@ class OrphanDetector(
         } catch {
           case e: Exception =>
             throw new IllegalStateException(
-              s"Failed to perform time travel on ${parentCfg.name}: ${e.getMessage}",
+              s"Failed to perform time travel on ${parentCfg.name}: ${SensitiveDataRedactor.message(e)}",
               e
             )
         }

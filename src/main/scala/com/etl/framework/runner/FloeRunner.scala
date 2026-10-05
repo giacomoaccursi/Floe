@@ -4,6 +4,7 @@ import com.etl.framework.exceptions.ConfigurationException
 import com.etl.framework.orchestration.{ExecutionRequestJson, ExecutionStatus}
 import com.etl.framework.orchestration.recovery.AttemptInspection
 import com.etl.framework.pipeline.IngestionPipeline
+import com.etl.framework.util.SensitiveDataRedactor
 import org.apache.spark.sql.SparkSession
 import org.json4s._
 import org.json4s.jackson.JsonMethods.{compact, render}
@@ -92,7 +93,7 @@ object FloeRunner {
     withSparkSession(err) { spark =>
       ExecutionRequestJson.read(command.requestPath, spark.sparkContext.hadoopConfiguration) match {
         case Left(error) =>
-          err.println(error)
+          err.println(SensitiveDataRedactor.redact(error))
           ExitCode.InvalidRequestOrConfig
         case Right(request) =>
           try {
@@ -111,8 +112,8 @@ object FloeRunner {
                 "pipeline_id" -> JString(result.pipelineId),
                 "logical_run_id" -> JString(result.logicalRunId),
                 "attempt_id" -> JString(result.attemptId),
-                "warnings" -> JArray(result.warnings.map(JString).toList),
-                "error" -> result.error.map(JString).getOrElse(JNull)
+                "warnings" -> JArray(SensitiveDataRedactor.redactAll(result.warnings).map(JString).toList),
+                "error" -> result.error.map(value => JString(SensitiveDataRedactor.redact(value))).getOrElse(JNull)
               )
             )
             ExitCode.forStatus(result.status)
@@ -129,7 +130,7 @@ object FloeRunner {
     withSparkSession(err) { spark =>
       ExecutionRequestJson.read(command.requestPath, spark.sparkContext.hadoopConfiguration) match {
         case Left(error) =>
-          err.println(error)
+          err.println(SensitiveDataRedactor.redact(error))
           ExitCode.InvalidRequestOrConfig
         case Right(request) =>
           try {
@@ -168,12 +169,12 @@ object FloeRunner {
   }
 
   private def invalid(error: Throwable, err: PrintStream): Int = {
-    err.println(Option(error.getMessage).getOrElse(error.getClass.getName))
+    err.println(SensitiveDataRedactor.message(error))
     ExitCode.InvalidRequestOrConfig
   }
 
   private def internal(error: Throwable, err: PrintStream): Int = {
-    err.println(s"${error.getClass.getName}: ${Option(error.getMessage).getOrElse("no message")}")
+    err.println(s"${error.getClass.getName}: ${SensitiveDataRedactor.message(error)}")
     ExitCode.Internal
   }
 
@@ -192,7 +193,7 @@ object FloeRunner {
         "path" -> JString(inspection.report.path),
         "status" -> JString(inspection.report.status),
         "length_bytes" -> inspection.report.lengthBytes.map(JInt(_)).getOrElse(JNull),
-        "error" -> inspection.report.error.map(JString).getOrElse(JNull)
+        "error" -> inspection.report.error.map(value => JString(SensitiveDataRedactor.redact(value))).getOrElse(JNull)
       ),
       "targets" -> JArray(inspection.targets.map { target =>
         JObject(
@@ -213,7 +214,7 @@ object FloeRunner {
               "relation_to_main" -> JString(snapshot.relationToMain)
             )
           }.toList),
-          "error" -> target.error.map(JString).getOrElse(JNull)
+          "error" -> target.error.map(value => JString(SensitiveDataRedactor.redact(value))).getOrElse(JNull)
         )
       }.toList)
     )

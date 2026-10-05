@@ -7,7 +7,7 @@ import com.etl.framework.iceberg.{
   DuplicateOperationCommitException,
   IcebergTableManager
 }
-import com.etl.framework.util.SqlIdentifier
+import com.etl.framework.util.{SensitiveDataRedactor, SqlIdentifier}
 import com.etl.framework.orchestration.{DataOutcome, ExecutionRequest}
 import org.apache.iceberg.exceptions.CommitStateUnknownException
 import org.apache.iceberg.spark.CommitMetadata
@@ -129,9 +129,10 @@ class DerivedTableExecutor(
       DerivedExecution(result, Some(output))
     } catch {
       case e: Exception =>
-        logger.error(s"Derived table $tableName failed: ${e.getMessage}", e)
+        val message = SensitiveDataRedactor.message(e)
+        logger.error(s"Derived table $tableName failed: $message", SensitiveDataRedactor.safeThrowable(e))
         DerivedExecution(
-          DerivedTableResult(tableName, success = false, error = Some(e.getMessage), dataOutcome = dataOutcome),
+          DerivedTableResult(tableName, success = false, error = Some(message), dataOutcome = dataOutcome),
           None
         )
     }
@@ -195,7 +196,7 @@ class DerivedTableExecutor(
         logger.info(s"Tagged derived table snapshot $snapshotId on $fullTableName")
     } catch {
       case e: Exception =>
-        logger.warn(s"Failed to tag snapshot on $fullTableName: ${e.getMessage}")
+        logger.warn(s"Failed to tag snapshot on $fullTableName: ${SensitiveDataRedactor.message(e)}")
     }
   }
 
@@ -254,7 +255,7 @@ object DerivedTableExecutor {
 
     if (duplicateGroups.isEmpty && errors.isEmpty) {
       val ordered = scala.util.Try(orderDefinitions(definitions))
-      ordered.failed.foreach(error => errors += error.getMessage)
+      ordered.failed.foreach(error => errors += SensitiveDataRedactor.message(error))
     }
     errors.toSeq.distinct
   }

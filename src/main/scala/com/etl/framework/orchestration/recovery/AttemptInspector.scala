@@ -3,7 +3,7 @@ package com.etl.framework.orchestration.recovery
 import com.etl.framework.config.IcebergConfig
 import com.etl.framework.iceberg.{CommitContext, CommittedSnapshot, IcebergTableManager}
 import com.etl.framework.orchestration.ExecutionRequest
-import com.etl.framework.util.SqlIdentifier
+import com.etl.framework.util.{SensitiveDataRedactor, SqlIdentifier}
 import org.apache.hadoop.fs.Path
 import org.apache.iceberg.spark.Spark3Util
 import org.apache.iceberg.util.SnapshotUtil
@@ -133,17 +133,18 @@ class AttemptInspector(spark: SparkSession, icebergConfig: IcebergConfig, metada
 
   private def inspectReport(request: ExecutionRequest): ReportInspection = {
     val pathValue = s"${metadataPath.stripSuffix("/")}/${request.artifactKey}/summary.json"
+    val diagnosticPath = SensitiveDataRedactor.redact(pathValue)
     try {
       val path = new Path(pathValue)
       val filesystem = path.getFileSystem(spark.sparkContext.hadoopConfiguration)
-      if (!filesystem.exists(path)) ReportInspection(pathValue, "MISSING")
+      if (!filesystem.exists(path)) ReportInspection(diagnosticPath, "MISSING")
       else {
         val status = filesystem.getFileStatus(path)
-        if (status.isFile) ReportInspection(pathValue, "PRESENT", Some(status.getLen))
-        else ReportInspection(pathValue, "NOT_A_FILE")
+        if (status.isFile) ReportInspection(diagnosticPath, "PRESENT", Some(status.getLen))
+        else ReportInspection(diagnosticPath, "NOT_A_FILE")
       }
     } catch {
-      case NonFatal(error) => ReportInspection(pathValue, "INSPECTION_FAILED", error = Some(message(error)))
+      case NonFatal(error) => ReportInspection(diagnosticPath, "INSPECTION_FAILED", error = Some(message(error)))
     }
   }
 
@@ -162,5 +163,5 @@ class AttemptInspector(spark: SparkSession, icebergConfig: IcebergConfig, metada
       else "NO_COMMIT_EVIDENCE"
     }
 
-  private def message(error: Throwable): String = Option(error.getMessage).getOrElse(error.getClass.getName)
+  private def message(error: Throwable): String = SensitiveDataRedactor.message(error)
 }

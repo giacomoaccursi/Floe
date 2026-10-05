@@ -4,8 +4,9 @@ import com.etl.framework.TestFixtures
 import com.etl.framework.config._
 import com.etl.framework.io.readers.{DataReader, DataReaderFactory}
 import com.etl.framework.iceberg.{IcebergTableManager, IcebergTableWriter}
-import com.etl.framework.orchestration.batch.{BatchIdGenerator, FlowGroupExecutor}
+import com.etl.framework.orchestration.batch.{BatchIdGenerator, BatchMetadataWriter, FlowGroupExecutor}
 import com.etl.framework.orchestration.flow.FlowResult
+import com.etl.framework.pipeline.DerivedTableResult
 import org.apache.spark.sql.SparkSession
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -183,6 +184,47 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
       val content = Files.readString(path)
       Seq("flow_name", "logical_run_id", "attempt_id", "success", "load_mode", "data_outcome")
         .foreach(content should include(_))
+    } finally cleanupTempDir(tempDir)
+  }
+
+  it should "redact diagnostic secrets even when callers construct result case classes directly" in {
+    val tempDir = Files.createTempDirectory("redacted-report-test").toString
+    try {
+      val config = createGlobalConfig(tempDir)
+      val request = ExecutionRequest(
+        pipelineId = "redaction-pipeline",
+        logicalRunId = "logical-1",
+        attemptId = "attempt-1",
+        effectiveAt = Instant.parse("2026-10-01T10:00:00Z"),
+        codeVersion = "artifact-v1",
+        configDigest = "a" * 64
+      )
+      val secret = "report-secret-value"
+      val result = IngestionResult(
+        request = request,
+        flowResults = Seq(
+          FlowResult(
+            flowName = "orders",
+            batchId = request.attemptId,
+            success = false,
+            error = Some(s"password=$secret"),
+            warnings = Seq(s"Authorization: Bearer $secret")
+          )
+        ),
+        success = false,
+        error = Some(s"jdbc:postgresql://alice:$secret@db/orders"),
+        derivedTableResults = Seq(
+          DerivedTableResult("daily_orders", success = false, error = Some(s"token=$secret"))
+        ),
+        status = ExecutionStatus.Failed,
+        warnings = Seq(s"client_secret=$secret")
+      )
+
+      new BatchMetadataWriter(config, Seq.empty).writeBatchMetadata(request, result, executionTimeMs = 10L)
+
+      val content = Files.readString(reportPath(tempDir, result))
+      content should not include secret
+      content should include("[REDACTED]")
     } finally cleanupTempDir(tempDir)
   }
 

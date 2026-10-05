@@ -4,6 +4,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.json4s._
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
+import com.etl.framework.util.SensitiveDataRedactor
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -33,19 +34,22 @@ object ExecutionRequestJson {
   def read(pathValue: String, configuration: Configuration = new Configuration()): Either[String, ExecutionRequest] =
     try {
       val path = new Path(pathValue)
+      val diagnosticPath = SensitiveDataRedactor.redact(pathValue)
       val filesystem = path.getFileSystem(configuration)
       val status = filesystem.getFileStatus(path)
-      if (!status.isFile) Left(s"Execution request path is not a file: $pathValue")
+      if (!status.isFile) Left(s"Execution request path is not a file: $diagnosticPath")
       else if (status.getLen > MaxRequestBytes)
-        Left(s"Execution request exceeds the $MaxRequestBytes-byte limit: $pathValue")
+        Left(s"Execution request exceeds the $MaxRequestBytes-byte limit: $diagnosticPath")
       else {
         val input = filesystem.open(path)
         try parseJson(readLimited(input, MaxRequestBytes))
         finally input.close()
       }
     } catch {
-      case _: CharacterCodingException => Left(s"Execution request is not valid UTF-8: $pathValue")
-      case NonFatal(error)             => Left(s"Failed to read execution request '$pathValue': ${message(error)}")
+      case _: CharacterCodingException =>
+        Left(s"Execution request is not valid UTF-8: ${SensitiveDataRedactor.redact(pathValue)}")
+      case NonFatal(error) =>
+        Left(s"Failed to read execution request '${SensitiveDataRedactor.redact(pathValue)}': ${message(error)}")
     }
 
   def parseJson(json: String): Either[String, ExecutionRequest] =
@@ -244,5 +248,5 @@ object ExecutionRequestJson {
       .toString
   }
 
-  private def message(error: Throwable): String = Option(error.getMessage).getOrElse(error.getClass.getName)
+  private def message(error: Throwable): String = SensitiveDataRedactor.message(error)
 }

@@ -2,6 +2,7 @@ package com.etl.framework.orchestration.flow
 
 import com.etl.framework.iceberg.IcebergFlowMetadata
 import com.etl.framework.orchestration.DataOutcome
+import com.etl.framework.util.SensitiveDataRedactor
 
 /** Result of flow execution
   */
@@ -52,7 +53,7 @@ object FlowResult {
       rejectedRecords = rejectedRecords,
       rejectionRate = if (inputRecords > 0) rejectedRecords.toDouble / inputRecords else 0.0,
       executionTimeMs = 0L, // Will be set by caller
-      rejectionReasons = rejectionReasons,
+      rejectionReasons = SensitiveDataRedactor.redactCountKeys(rejectionReasons),
       icebergMetadata = icebergMetadata,
       resultingSnapshotId = resultingSnapshotId.orElse(icebergMetadata.map(_.snapshotId)),
       resultingSchemaJson = resultingSchemaJson,
@@ -71,7 +72,7 @@ object FlowResult {
       flowName = flowName,
       batchId = batchId,
       success = false,
-      error = Some(error)
+      error = Some(SensitiveDataRedactor.redact(error))
     )
   }
 }

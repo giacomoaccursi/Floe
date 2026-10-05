@@ -5,7 +5,7 @@ import com.etl.framework.iceberg.{IcebergFlowMetadata, IcebergTableManager, Iceb
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.{DataOutcome, ExecutionRequest, RejectionThresholdPolicy}
 import com.etl.framework.exceptions.MaxRejectionRateExceededException
-import com.etl.framework.util.TimingUtil
+import com.etl.framework.util.{SensitiveDataRedactor, TimingUtil}
 import com.etl.framework.validation.{ValidationEngine, ValidationResult, Validator}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.col
@@ -65,8 +65,12 @@ class FlowExecutor(
         finalResult
       } catch {
         case e: Exception =>
-          logger.error(s"Flow metadata write failed for ${flowConfig.name}: ${e.getMessage}", e)
-          finalResult.copy(warnings = finalResult.warnings :+ s"Flow metadata write failed: ${e.getMessage}")
+          val message = SensitiveDataRedactor.message(e)
+          logger.error(
+            s"Flow metadata write failed for ${flowConfig.name}: $message",
+            SensitiveDataRedactor.safeThrowable(e)
+          )
+          finalResult.copy(warnings = finalResult.warnings :+ s"Flow metadata write failed: $message")
       }
     logFlowSummary(reportedResult)
 
@@ -217,7 +221,7 @@ class FlowExecutor(
         f"Validation rejected $rejectedCount/$totalCount records ($rejectionRate%.2f%%)"
       )
       validationResult.rejectionReasons.foreach { case (reason, count) =>
-        logger.warn(s"  - $reason: $count records")
+        logger.warn(s"  - ${SensitiveDataRedactor.redact(reason)}: $count records")
       }
     }
   }
@@ -253,9 +257,10 @@ class FlowExecutor(
     try write
     catch {
       case error: Exception =>
-        val warning = s"Failed to write $label for ${flowConfig.name}: ${error.getMessage}"
+        val warning =
+          s"Failed to write $label for ${flowConfig.name}: ${SensitiveDataRedactor.message(error)}"
         operationalWarnings :+= warning
-        logger.warn(warning, error)
+        logger.warn(warning, SensitiveDataRedactor.safeThrowable(error))
     }
 
   private def createSuccessResult(
@@ -286,7 +291,7 @@ class FlowExecutor(
       validRecords = metrics.validCount,
       rejectedRecords = metrics.rejectedCount,
       rejectionRate = if (metrics.inputCount > 0) metrics.rejectedCount.toDouble / metrics.inputCount else 0.0,
-      rejectionReasons = metrics.rejectionReasons,
+      rejectionReasons = SensitiveDataRedactor.redactCountKeys(metrics.rejectionReasons),
       error = metrics.thresholdError
     )
 
@@ -294,9 +299,10 @@ class FlowExecutor(
       batchId: String,
       error: Throwable
   ): FlowResult = {
-    logger.error(s"Flow ${flowConfig.name} failed: ${error.getMessage}", error)
+    val message = SensitiveDataRedactor.message(error)
+    logger.error(s"Flow ${flowConfig.name} failed: $message", SensitiveDataRedactor.safeThrowable(error))
     FlowResult
-      .failure(flowConfig.name, batchId, error.getMessage)
+      .failure(flowConfig.name, batchId, message)
       .copy(dataOutcome = dataOutcome)
   }
 

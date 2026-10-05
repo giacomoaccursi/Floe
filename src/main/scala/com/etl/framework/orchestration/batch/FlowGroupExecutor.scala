@@ -6,6 +6,7 @@ import com.etl.framework.orchestration.flow.{FlowExecutor, FlowResult}
 import com.etl.framework.orchestration.{ExecutionRequest, RejectionThresholdPolicy}
 import com.etl.framework.validation.Validator
 import com.etl.framework.orchestration.ExecutionGroup
+import com.etl.framework.util.SensitiveDataRedactor
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
@@ -59,8 +60,12 @@ class FlowGroupExecutor(
       Future {
         executeFlow(flowConfig, request, validatedFlows)
       }(parallelEc).recover { case NonFatal(error) =>
-        logger.error(s"Parallel flow ${flowConfig.name} terminated unexpectedly: ${error.getMessage}", error)
-        FlowResult.failure(flowConfig.name, request.attemptId, error.getMessage)
+        val message = SensitiveDataRedactor.message(error)
+        logger.error(
+          s"Parallel flow ${flowConfig.name} terminated unexpectedly: $message",
+          SensitiveDataRedactor.safeThrowable(error)
+        )
+        FlowResult.failure(flowConfig.name, request.attemptId, message)
       }(parallelEc)
     }
 

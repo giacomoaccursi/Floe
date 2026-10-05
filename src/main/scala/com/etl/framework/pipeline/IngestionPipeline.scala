@@ -21,6 +21,7 @@ import com.etl.framework.orchestration.{
   PipelineDefinitionBuilder
 }
 import com.etl.framework.orchestration.recovery.{AttemptInspection, AttemptInspector, InspectionTarget}
+import com.etl.framework.util.SensitiveDataRedactor
 import com.etl.framework.validation.Validator
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
@@ -179,7 +180,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     *   This builder for chaining
     */
   def withConfigDirectory(path: String): IngestionPipelineBuilder = {
-    logger.info(s"Setting config directory: $path")
+    logger.info(s"Setting config directory: ${SensitiveDataRedactor.redact(path)}")
     this.configDirectory = Some(path)
     this
   }
@@ -425,7 +426,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     val configs = scala.util.Try(loadConfigs())
     configs match {
       case scala.util.Failure(e) =>
-        errors += s"Configuration loading failed: ${e.getMessage}"
+        errors += s"Configuration loading failed: ${SensitiveDataRedactor.message(e)}"
         return errors.toSeq
       case _ =>
     }
@@ -462,7 +463,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       )
       com.etl.framework.util.TopologicalSorter.sort(graph, "flow dependency graph")
     } match {
-      case scala.util.Failure(error) => errors += error.getMessage
+      case scala.util.Failure(error) => errors += SensitiveDataRedactor.message(error)
       case _                         =>
     }
     errors.toSeq
@@ -504,7 +505,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   /** Loads all configurations from directory
     */
   private def loadConfigurationsFromDirectory(directory: String): (GlobalConfig, Seq[FlowConfig]) = {
-    logger.info(s"Loading configurations from directory: $directory")
+    logger.info(s"Loading configurations from directory: ${SensitiveDataRedactor.redact(directory)}")
 
     val hadoopConfiguration = spark.sparkContext.hadoopConfiguration
     val globalConfigLoader = new GlobalConfigLoader(hadoopConfiguration)
@@ -540,7 +541,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   /** Loads global config from directory
     */
   private def loadGlobalConfigFromDirectory(directory: String): GlobalConfig = {
-    logger.info(s"Loading global config from directory: $directory")
+    logger.info(s"Loading global config from directory: ${SensitiveDataRedactor.redact(directory)}")
     val loader = new GlobalConfigLoader(spark.sparkContext.hadoopConfiguration)
     loader.load(s"$directory/global.yaml", configVariables) match {
       case Right(config) => config
@@ -551,7 +552,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
   /** Loads flow configs from directory
     */
   private def loadFlowConfigsFromDirectory(directory: String): Seq[FlowConfig] = {
-    logger.info(s"Loading flow configs from directory: $directory")
+    logger.info(s"Loading flow configs from directory: ${SensitiveDataRedactor.redact(directory)}")
     val hadoopConfiguration = spark.sparkContext.hadoopConfiguration
     val domainsLoader = new DomainsConfigLoader(hadoopConfiguration)
     val flowLoader = new FlowConfigLoader(hadoopConfiguration)

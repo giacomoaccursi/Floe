@@ -2,7 +2,7 @@ package com.etl.framework.orchestration.batch
 
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
 import com.etl.framework.orchestration.{ExecutionRequest, IngestionResult}
-import com.etl.framework.util.{IcebergMetadataSerializer, JsonFileWriter}
+import com.etl.framework.util.{IcebergMetadataSerializer, JsonFileWriter, SensitiveDataRedactor}
 import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
 
@@ -72,8 +72,8 @@ class BatchMetadataWriter(
       "execution_time_ms" -> executionTimeMs,
       "success" -> result.success,
       "status" -> result.status.name,
-      "error" -> result.error.getOrElse(""),
-      "warnings" -> result.warnings,
+      "error" -> result.error.map(SensitiveDataRedactor.redact).getOrElse(""),
+      "warnings" -> SensitiveDataRedactor.redactAll(result.warnings),
       "flows_processed" -> flowResults.size,
       "total_input_records" -> totalInput,
       "total_valid_records" -> totalValid,
@@ -91,7 +91,7 @@ class BatchMetadataWriter(
           "resulting_schema_json" -> derived.resultingSchemaJson.getOrElse(""),
           "operation_id" -> derived.operationId.getOrElse(""),
           "data_outcome" -> derived.dataOutcome.name,
-          "error" -> derived.error.getOrElse("")
+          "error" -> derived.error.map(SensitiveDataRedactor.redact).getOrElse("")
         )
       },
       "flows" -> flowResults.map { result =>
@@ -105,9 +105,9 @@ class BatchMetadataWriter(
           "rejected_records" -> result.rejectedRecords,
           "rejection_rate" -> result.rejectionRate,
           "execution_time_ms" -> result.executionTimeMs,
-          "rejection_reasons" -> result.rejectionReasons,
-          "error" -> result.error.getOrElse(""),
-          "warnings" -> result.warnings,
+          "rejection_reasons" -> SensitiveDataRedactor.redactCountKeys(result.rejectionReasons),
+          "error" -> result.error.map(SensitiveDataRedactor.redact).getOrElse(""),
+          "warnings" -> SensitiveDataRedactor.redactAll(result.warnings),
           "data_outcome" -> result.dataOutcome.name,
           "resulting_snapshot_id" -> result.resultingSnapshotId.map(_.toString).getOrElse(""),
           "resulting_schema_json" -> result.resultingSchemaJson.getOrElse("")
@@ -123,6 +123,8 @@ class BatchMetadataWriter(
 
     JsonFileWriter.write(metadata, metadataPath, spark.sparkContext.hadoopConfiguration)
 
-    logger.debug(s"Batch report written - attemptId: ${request.attemptId}, path: $metadataPath")
+    logger.debug(
+      s"Batch report written - attemptId: ${request.attemptId}, path: ${SensitiveDataRedactor.redact(metadataPath)}"
+    )
   }
 }

@@ -1,7 +1,7 @@
 package com.etl.framework.iceberg
 
 import com.etl.framework.config.{DdlMode, FlowConfig, IcebergConfig, MaintenanceConfig}
-import com.etl.framework.util.SqlIdentifier
+import com.etl.framework.util.{SensitiveDataRedactor, SqlIdentifier}
 import org.apache.iceberg.{HasTableOperations, Table, TableProperties}
 import org.apache.iceberg.spark.Spark3Util
 import org.apache.spark.sql.AnalysisException
@@ -373,7 +373,7 @@ class IcebergTableManager(
       .mkString(", ")
 
     val createSql = s"CREATE TABLE IF NOT EXISTS ${SqlIdentifier.quoteMultipart(tableName)} ($columns) USING iceberg"
-    logger.info(s"Creating Iceberg table: $createSql")
+    logger.info(s"Creating Iceberg table: ${SensitiveDataRedactor.redact(createSql)}")
     spark.sql(createSql)
 
     // Apply partition spec if configured
@@ -545,7 +545,7 @@ class IcebergTableManager(
     } catch {
       case e: Exception =>
         logger.error(
-          s"Failed to tag snapshot $snapshotId on $tableName: ${e.getMessage}"
+          s"Failed to tag snapshot $snapshotId on $tableName: ${SensitiveDataRedactor.message(e)}"
         )
         false
     }
@@ -593,7 +593,7 @@ class IcebergTableManager(
     } catch {
       case e: Exception =>
         logger.error(
-          s"Failed to get snapshot metadata for $tableName: ${e.getMessage}"
+          s"Failed to get snapshot metadata for $tableName: ${SensitiveDataRedactor.message(e)}"
         )
         None
     }

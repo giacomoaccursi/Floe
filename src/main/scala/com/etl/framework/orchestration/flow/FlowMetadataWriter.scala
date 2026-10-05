@@ -2,7 +2,7 @@ package com.etl.framework.orchestration.flow
 
 import com.etl.framework.config.{FlowConfig, GlobalConfig}
 import com.etl.framework.orchestration.ExecutionRequest
-import com.etl.framework.util.{IcebergMetadataSerializer, JsonFileWriter}
+import com.etl.framework.util.{IcebergMetadataSerializer, JsonFileWriter, SensitiveDataRedactor}
 import org.apache.spark.sql.SparkSession
 import org.slf4j.LoggerFactory
 
@@ -31,9 +31,9 @@ class FlowMetadataWriter(
       "rejected_records" -> result.rejectedRecords,
       "rejection_rate" -> result.rejectionRate,
       "execution_time_ms" -> result.executionTimeMs,
-      "rejection_reasons" -> result.rejectionReasons,
-      "error" -> result.error.getOrElse(""),
-      "warnings" -> result.warnings,
+      "rejection_reasons" -> SensitiveDataRedactor.redactCountKeys(result.rejectionReasons),
+      "error" -> result.error.map(SensitiveDataRedactor.redact).getOrElse(""),
+      "warnings" -> SensitiveDataRedactor.redactAll(result.warnings),
       "data_outcome" -> result.dataOutcome.name,
       "resulting_snapshot_id" -> result.resultingSnapshotId.map(_.toString).getOrElse(""),
       "resulting_schema_json" -> result.resultingSchemaJson.getOrElse("")
@@ -45,6 +45,6 @@ class FlowMetadataWriter(
     }
 
     JsonFileWriter.write(metadata, metadataPath, spark.sparkContext.hadoopConfiguration)
-    logger.debug(s"Flow metadata written: ${flowConfig.name} → $metadataPath")
+    logger.debug(s"Flow metadata written: ${flowConfig.name} → ${SensitiveDataRedactor.redact(metadataPath)}")
   }
 }

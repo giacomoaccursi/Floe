@@ -361,7 +361,7 @@ class FlowConfigLoader(configuration: Configuration = new Configuration()) exten
     try {
       val hadoopPath = new HadoopPath(directory)
       val fs = FileSystem.get(hadoopPath.toUri, new Configuration())
-      if (!fs.exists(hadoopPath) || !fs.isDirectory(hadoopPath))
+      if (!fs.exists(hadoopPath) || !fs.getFileStatus(hadoopPath).isDirectory)
         Left(ConfigFileException(file = directory, message = "Directory does not exist or is not a directory"))
       else
         Right(

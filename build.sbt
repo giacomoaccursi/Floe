@@ -56,6 +56,7 @@ scalacOptions ++= Seq(
   "UTF-8",
   "-feature",
   "-unchecked",
+  "-Xfatal-warnings",
   "-Xlint:_",
   "-Ywarn-dead-code",
   "-Ywarn-numeric-widen",

@@ -351,6 +351,23 @@ Common `--conf` properties for all platforms:
 !!!note
     The `spark.sql.extensions` property **must** be set before the SparkSession is created. On managed platforms, set it in the cluster/job configuration rather than in code.
 
+## Orchestrator references and qualification status
+
+The repository contains two deliberately thin integrations. They schedule the whole Floe runner as one Spark application; they do not split Floe's internal DAG into platform tasks and do not add dependencies to the core library.
+
+| Reference | Pinned control plane | Completion behavior | Repository verification | Production status |
+|---|---|---|---|---|
+| Airflow / Spark Kubernetes | Airflow 3.3.2, Spark provider 6.3.2, Kubernetes provider 9.0.1 | `SparkSubmitOperator` tracks the driver pod in cluster mode; durable state requires Airflow 3.3+ | Exact dependency install/`pip check`, DAG import/validation, and contract assertions | Not live-qualified |
+| Step Functions / EMR Serverless | Standard Workflow using optimized `startJobRun.sync` | Waits for EMR Serverless job success; no state-machine retry | JSON/ASL contract assertions | Not deployed or live-qualified |
+
+The [Airflow reference](https://github.com/giacomoaccursi/floe/tree/develop/integrations/airflow) accepts only an immutable config URI and a request URI persisted before the DAG starts. It sets task retries to zero, uses one named Airflow pool slot, and enables Kubernetes driver tracking plus durable remote identity. The pool serializes only tasks that use that pool in the same Airflow deployment; it is not a universal table lock. Airflow worker loss at the submission/identity-persistence boundary remains an incident until the real backend proves whether a driver exists.
+
+The [Step Functions reference](https://github.com/giacomoaccursi/floe/tree/develop/integrations/aws-step-functions) uses `.sync`, stores the EMR Serverless result in execution state, and intentionally has no `Retry` block. A timeout or stopped execution does not prove cancellation: AWS describes `.sync` cancellation as best effort, so overlapping writers stay frozen until the job and Iceberg effects are reconciled.
+
+These examples are not entries in a supported-backend matrix yet. Qualification requires the exact deployment to prove successful and non-zero Floe exits, loss of the scheduler worker, timeout/cancellation, backend retry settings, remote application identity, polling/event permissions, and serialization against both scheduler and non-scheduler writers. The example READMEs contain the complete checklists.
+
+Official references: [Airflow SparkSubmitOperator durable execution](https://airflow.apache.org/docs/apache-airflow-providers-apache-spark/stable/operators.html#durable-execution-crash-recovery), [Airflow constrained installation](https://airflow.apache.org/docs/apache-airflow/stable/installation/installing-from-pypi.html), [Step Functions EMR Serverless integration](https://docs.aws.amazon.com/step-functions/latest/dg/connect-emr-serverless.html), and [Step Functions `.sync` permissions and cancellation](https://docs.aws.amazon.com/step-functions/latest/dg/service-integration-iam-templates.html).
+
 ## Related
 
 - [Configuration Overview — withVariables](../configuration/overview.md#variable-substitution) — variable substitution

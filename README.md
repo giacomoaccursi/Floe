@@ -194,12 +194,14 @@ The same runner exposes a read-only `inspect` command for incident evidence. It 
 
 Iceberg maintenance is another independent runner command: `maintenance --config <directory> --table <logical-table>`. It requires `iceberg.maintenance.enabled: true`, targets one table per process, returns per-action metrics and `SUCCEEDED`/`FAILED`/`UNKNOWN` evidence, and never retries ingestion. The hosting platform owns table inventory, serialization, result retention, and retry decisions.
 
+Reference integrations are included for Airflow/Spark-on-Kubernetes and Step Functions/EMR Serverless. Their contracts are structurally tested, but neither combination is claimed as a qualified production backend without live tests against the exact cluster, IAM, catalog, runtime, cancellation, and writer-lock configuration.
+
 ## Deployment targets
 
 Floe runs locally and on compatible Spark 3.5 clusters. Managed platforms require matching Spark, Scala, and Iceberg artifacts plus platform-specific catalog configuration:
 
-- **AWS Glue** — supported through the built-in Glue catalog provider; align Floe's Iceberg dependencies with the Glue runtime
-- **Amazon EMR** — supported through `spark-submit` with an explicitly compatible Iceberg runtime
+- **AWS Glue catalog** — a built-in catalog provider exists; a Glue job remains deployment-qualified only after testing the exact Glue/Spark/Iceberg and IAM/Lake Formation combination
+- **Amazon EMR / EMR Serverless** — the runner is compatible with `spark-submit`; no EMR release is certified by this repository without live runtime tests
 - **Databricks** — not currently a zero-configuration target; Unity Catalog requires a dedicated provider, an explicit maintenance-ownership decision, and integration testing against the selected runtime
 
 See the [Cloud Deployment Guide](https://giacomoaccursi.github.io/Floe/guides/cloud-deployment/) for platform-specific examples.

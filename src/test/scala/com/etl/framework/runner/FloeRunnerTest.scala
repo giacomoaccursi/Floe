@@ -45,6 +45,12 @@ class FloeRunnerTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
          |  catalogType: hadoop
          |  catalogName: runner_catalog
          |  warehouse: "${root.resolve("warehouse")}"
+         |  maintenance:
+         |    enabled: true
+         |    snapshotRetentionDays: null
+         |    targetFileSizeMb: null
+         |    orphanRetentionMinutes: null
+         |    enableManifestRewrite: true
          |""".stripMargin
     Files.write(configDirectory.resolve("global.yaml"), yaml.getBytes(StandardCharsets.UTF_8))
     Files.write(failingConfigDirectory.resolve("global.yaml"), yaml.getBytes(StandardCharsets.UTF_8))
@@ -178,6 +184,50 @@ class FloeRunnerTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     stdout should include("\"status\":\"FAILED\"")
     stdout should include("\"success\":false")
     stderr shouldBe empty
+  }
+
+  it should "run one table maintenance plan and emit structured evidence" in {
+    spark.conf.set("spark.sql.catalog.runner_catalog", "org.apache.iceberg.spark.SparkCatalog")
+    spark.conf.set("spark.sql.catalog.runner_catalog.type", "hadoop")
+    spark.conf.set("spark.sql.catalog.runner_catalog.warehouse", root.resolve("warehouse").toString)
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS runner_catalog.default")
+    spark.sql("DROP TABLE IF EXISTS runner_catalog.default.maintenance_target")
+    spark.sql("CREATE TABLE runner_catalog.default.maintenance_target (id INT) USING iceberg")
+    spark.sql("INSERT INTO runner_catalog.default.maintenance_target VALUES (1)")
+
+    val (exitCode, stdout, stderr) = execute(
+      Seq("maintenance", "--config", configDirectory.toString, "--table", "maintenance_target")
+    )
+
+    withClue(stderr) {
+      exitCode shouldBe FloeRunner.ExitCode.Success
+    }
+    stdout should include("\"contract_version\":1")
+    stdout should include("\"status\":\"SUCCEEDED\"")
+    stdout should include("\"action\":\"REWRITE_MANIFESTS\"")
+    stdout should include("\"rewritten_manifests_count\"")
+    stderr shouldBe empty
+  }
+
+  it should "return a typed maintenance failure when the selected table is missing" in {
+    val (exitCode, stdout, stderr) = execute(
+      Seq("maintenance", "--config", configDirectory.toString, "--table", "missing_table")
+    )
+
+    exitCode shouldBe FloeRunner.ExitCode.MaintenanceFailed
+    stdout should include("\"status\":\"FAILED\"")
+    stdout should include("\"status\":\"NOT_ATTEMPTED\"")
+    stderr shouldBe empty
+  }
+
+  it should "reject a qualified maintenance table so configuration owns the catalog and namespace" in {
+    val (exitCode, stdout, stderr) = execute(
+      Seq("maintenance", "--config", configDirectory.toString, "--table", "runner_catalog.default.orders")
+    )
+
+    exitCode shouldBe FloeRunner.ExitCode.InvalidRequestOrConfig
+    stdout shouldBe empty
+    stderr should include("logical table name")
   }
 
   private def execute(arguments: Seq[String]): (Int, String, String) = {

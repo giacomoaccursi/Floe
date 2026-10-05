@@ -437,6 +437,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
 
   private def validationErrors(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConfig]): Seq[String] = {
     val errors = scala.collection.mutable.ArrayBuffer[String]()
+    globalConfig.iceberg.maintenance.validationErrors.foreach(error => errors += s"Iceberg maintenance: $error")
     derivedTableCollisions(globalConfig, flowConfigs).foreach { name =>
       errors += s"Derived table '$name' collides with a managed table"
     }

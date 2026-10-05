@@ -206,6 +206,29 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
     issues shouldBe empty
   }
 
+  it should "reject unsafe maintenance settings during static validation" in {
+    val maintenance = MaintenanceConfig(
+      enabled = true,
+      snapshotRetentionDays = Some(0),
+      targetFileSizeMb = Some(0),
+      orphanRetentionMinutes = Some(1439),
+      enableManifestRewrite = false
+    )
+    val global = TestFixtures.globalConfig(
+      iceberg = IcebergConfig(ddlMode = DdlMode.Automatic, warehouse = "/tmp/test/warehouse", maintenance = maintenance)
+    )
+    val builder = IngestionPipeline
+      .builder()
+      .withGlobalConfig(global)
+      .withFlowConfigs(Seq(TestFixtures.flowConfig("orders")))
+
+    val issues = builder.validate().mkString(" ")
+    issues should include("snapshotRetentionDays")
+    issues should include("targetFileSizeMb")
+    issues should include("orphanRetentionMinutes")
+    intercept[IllegalArgumentException](builder.build()).getMessage should include("Iceberg maintenance")
+  }
+
   it should "reject an invalid programmatic FK during build" in {
     val parent = TestFixtures.flowConfig("parent")
     val child = TestFixtures.flowConfig(

@@ -1,5 +1,6 @@
 package com.etl.framework.runner
 
+import com.etl.framework.iceberg.MaintenanceStatus
 import com.etl.framework.orchestration.ExecutionStatus
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -14,6 +15,8 @@ class RunnerArgumentsTest extends AnyFlatSpec with Matchers {
       Right(RunnerCommand.Run("config", "request.json"))
     RunnerArguments.parse(Seq("inspect", "--request", "request.json", "--config", "config")) shouldBe
       Right(RunnerCommand.Inspect("config", "request.json"))
+    RunnerArguments.parse(Seq("maintenance", "--table", "orders", "--config", "config")) shouldBe
+      Right(RunnerCommand.Maintenance("config", "orders"))
   }
 
   it should "reject missing, duplicate, and unknown options" in {
@@ -34,5 +37,8 @@ class RunnerArgumentsTest extends AnyFlatSpec with Matchers {
     FloeRunner.ExitCode.forStatus(ExecutionStatus.Failed) shouldBe 10
     FloeRunner.ExitCode.forStatus(ExecutionStatus.FailedPartial) shouldBe 11
     FloeRunner.ExitCode.forStatus(ExecutionStatus.Unknown) shouldBe 12
+    FloeRunner.ExitCode.forMaintenanceStatus(MaintenanceStatus.Succeeded) shouldBe 0
+    FloeRunner.ExitCode.forMaintenanceStatus(MaintenanceStatus.Failed) shouldBe 20
+    FloeRunner.ExitCode.forMaintenanceStatus(MaintenanceStatus.Unknown) shouldBe 21
   }
 }

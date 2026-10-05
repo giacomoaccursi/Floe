@@ -392,50 +392,6 @@ class IcebergTableManagerTest extends AnyFlatSpec with Matchers with BeforeAndAf
     metadata.get.manifestListLocation should not be empty
   }
 
-  it should "not fail when running snapshot expiration" in {
-    val flowConfig = testFlowConfig("maintenance_test")
-    tableManager.prepareTable(flowConfig, testSchema)
-
-    Seq((1, "Alice", 10.0))
-      .toDF("id", "name", "value")
-      .writeTo("test_catalog.default.maintenance_test")
-      .append()
-    Seq((2, "Bob", 20.0))
-      .toDF("id", "name", "value")
-      .writeTo("test_catalog.default.maintenance_test")
-      .append()
-
-    val maintenanceConfig = MaintenanceConfig(
-      snapshotRetentionDays = Some(0),
-      targetFileSizeMb = None,
-      orphanRetentionMinutes = None,
-      enableManifestRewrite = false
-    )
-    noException should be thrownBy {
-      tableManager.runMaintenance(flowConfig, maintenanceConfig)
-    }
-  }
-
-  it should "not fail when running orphan cleanup with valid retention" in {
-    val flowConfig = testFlowConfig("orphan_cleanup_test")
-    tableManager.prepareTable(flowConfig, testSchema)
-
-    Seq((1, "Alice", 10.0))
-      .toDF("id", "name", "value")
-      .writeTo("test_catalog.default.orphan_cleanup_test")
-      .append()
-
-    val maintenanceConfig = MaintenanceConfig(
-      snapshotRetentionDays = None,
-      targetFileSizeMb = None,
-      orphanRetentionMinutes = Some(1440),
-      enableManifestRewrite = false
-    )
-    noException should be thrownBy {
-      tableManager.runMaintenance(flowConfig, maintenanceConfig)
-    }
-  }
-
   // --- parsePartitionTransform tests ---
 
   "parsePartitionTransform" should "pass through identity partitions" in {

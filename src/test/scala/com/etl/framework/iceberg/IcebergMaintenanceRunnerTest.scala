@@ -7,6 +7,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.{Files, Path}
+import java.time.{Clock, Instant, ZoneOffset}
 
 class IcebergMaintenanceRunnerTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
@@ -48,90 +49,157 @@ class IcebergMaintenanceRunnerTest extends AnyFlatSpec with Matchers with Before
     warehouse = warehousePath.toString
   )
 
-  private val runner = new IcebergMaintenanceRunner(spark, icebergConfig)
+  private val clock = Clock.fixed(Instant.parse("2100-01-01T00:00:00Z"), ZoneOffset.UTC)
+  private val runner = new IcebergMaintenanceRunner(spark, icebergConfig, clock)
   private val tableName = "maint_catalog.default.maint_test"
 
   override def beforeAll(): Unit = {
     super.beforeAll()
     spark.sql(s"CREATE TABLE $tableName (id INT, name STRING) USING iceberg")
-    // Write multiple snapshots so maintenance has something to work with
     Seq((1, "Alice")).toDF("id", "name").writeTo(tableName).append()
     Seq((2, "Bob")).toDF("id", "name").writeTo(tableName).append()
     Seq((3, "Charlie")).toDF("id", "name").writeTo(tableName).append()
   }
 
-  "IcebergMaintenanceRunner" should "expire old snapshots" in {
-    val snapshotsBefore = spark.sql(s"SELECT * FROM $tableName.snapshots").count()
-    snapshotsBefore should be >= 3L
+  "IcebergMaintenanceRunner" should "expire snapshots and expose every procedure metric" in {
+    val result = runner.run(tableName, config(snapshotRetentionDays = Some(1)))
 
-    runner.run(tableName, MaintenanceConfig(snapshotRetentionDays = Some(0)))
-
-    // After expiration with 0 days retention, at least the current snapshot survives.
-    // Iceberg never expires the current snapshot, so count should be >= 1 and <= before.
-    val snapshotsAfter = spark.sql(s"SELECT * FROM $tableName.snapshots").count()
-    snapshotsAfter should be >= 1L
-    snapshotsAfter should be <= snapshotsBefore
+    result.status shouldBe MaintenanceStatus.Succeeded
+    result.tableUuid should not be empty
+    result.startingSnapshotId should not be empty
+    result.actions.map(_.action) shouldBe Seq(MaintenanceAction.ExpireSnapshots)
+    result.actions.head.status shouldBe MaintenanceActionStatus.Succeeded
+    result.actions.head.metrics.keySet shouldBe Set(
+      "deleted_data_files_count",
+      "deleted_position_delete_files_count",
+      "deleted_equality_delete_files_count",
+      "deleted_manifest_files_count",
+      "deleted_manifest_lists_count"
+    )
+    spark.sql(s"SELECT * FROM $tableName.snapshots").count() should be >= 1L
   }
 
-  it should "compact data files" in {
-    // Write several small files
+  it should "compact data files and preserve table contents" in {
     (4 to 10).foreach { i =>
       Seq((i, s"Name_$i")).toDF("id", "name").writeTo(tableName).append()
     }
 
-    noException should be thrownBy {
-      runner.run(tableName, MaintenanceConfig(targetFileSizeMb = Some(128)))
-    }
+    val result = runner.run(tableName, config(targetFileSizeMb = Some(128)))
 
-    // Data should still be intact
+    result.status shouldBe MaintenanceStatus.Succeeded
+    result.actions.head.metrics.keySet shouldBe Set(
+      "rewritten_data_files_count",
+      "added_data_files_count",
+      "rewritten_bytes_count",
+      "failed_data_files_count",
+      "removed_delete_files_count"
+    )
     spark.sql(s"SELECT * FROM $tableName").count() should be >= 10L
   }
 
-  it should "clamp orphan retention to 1440 minutes minimum" in {
-    // orphanRetentionMinutes = 1 is below the 1440 minimum — should be clamped, not fail
-    noException should be thrownBy {
-      runner.run(tableName, MaintenanceConfig(orphanRetentionMinutes = Some(1)))
+  it should "reject unsafe orphan retention instead of silently changing it" in {
+    val exception = intercept[IllegalArgumentException] {
+      runner.run(tableName, config(orphanRetentionMinutes = Some(1439)))
     }
+
+    exception.getMessage should include("at least 1440")
   }
 
-  it should "rewrite manifests when enabled" in {
-    noException should be thrownBy {
-      runner.run(tableName, MaintenanceConfig(enableManifestRewrite = true))
-    }
+  it should "remove eligible orphan files and return the deleted-file count" in {
+    val result = runner.run(tableName, config(orphanRetentionMinutes = Some(4320)))
+
+    result.status shouldBe MaintenanceStatus.Succeeded
+    result.actions.map(_.action) shouldBe Seq(MaintenanceAction.RemoveOrphanFiles)
+    result.actions.head.metrics.keySet shouldBe Set("deleted_orphan_files_count")
   }
 
-  it should "run all operations in sequence" in {
-    // Add more snapshots for a full maintenance cycle
-    Seq((11, "Dave")).toDF("id", "name").writeTo(tableName).append()
-    Seq((12, "Eve")).toDF("id", "name").writeTo(tableName).append()
+  it should "rewrite manifests and return action metrics" in {
+    val result = runner.run(tableName, config(enableManifestRewrite = true))
 
-    val fullConfig = MaintenanceConfig(
-      snapshotRetentionDays = Some(0),
-      targetFileSizeMb = Some(128),
-      orphanRetentionMinutes = Some(1440),
-      enableManifestRewrite = true
+    result.status shouldBe MaintenanceStatus.Succeeded
+    result.actions.head.metrics.keySet shouldBe Set("rewritten_manifests_count", "added_manifests_count")
+  }
+
+  it should "return FAILED before mutation when the table cannot be loaded" in {
+    val result = runner.run("maint_catalog.default.missing_table", config(enableManifestRewrite = true))
+
+    result.status shouldBe MaintenanceStatus.Failed
+    result.success shouldBe false
+    result.tableUuid shouldBe empty
+    result.startingSnapshotId shouldBe empty
+    result.actions.map(_.status) shouldBe Seq(MaintenanceActionStatus.NotAttempted)
+    result.error should not be empty
+  }
+
+  it should "stop after the first uncertain action and retain completed action evidence" in {
+    val invoked = Seq.newBuilder[MaintenanceAction]
+    val failingRunner = new IcebergMaintenanceRunner(spark, icebergConfig, clock) {
+      override protected[iceberg] def executeAction(
+          action: MaintenanceAction,
+          targetTable: String,
+          maintenanceConfig: MaintenanceConfig
+      ): Map[String, Long] = {
+        invoked += action
+        action match {
+          case MaintenanceAction.ExpireSnapshots => Map("deleted_data_files_count" -> 2L)
+          case MaintenanceAction.RewriteDataFiles =>
+            throw new RuntimeException("password=super-secret")
+          case _ => fail("Later maintenance actions must not run after an unknown outcome")
+        }
+      }
+    }
+    val result = failingRunner.run(
+      tableName,
+      config(
+        snapshotRetentionDays = Some(7),
+        targetFileSizeMb = Some(128),
+        orphanRetentionMinutes = Some(1440),
+        enableManifestRewrite = true
+      )
     )
 
-    noException should be thrownBy {
-      runner.run(tableName, fullConfig)
-    }
-
-    // Data should still be intact after full maintenance
-    spark.sql(s"SELECT * FROM $tableName").count() should be >= 12L
+    invoked.result() shouldBe Seq(MaintenanceAction.ExpireSnapshots, MaintenanceAction.RewriteDataFiles)
+    result.status shouldBe MaintenanceStatus.Unknown
+    result.actions.map(_.status) shouldBe Seq(
+      MaintenanceActionStatus.Succeeded,
+      MaintenanceActionStatus.Unknown,
+      MaintenanceActionStatus.NotAttempted,
+      MaintenanceActionStatus.NotAttempted
+    )
+    result.actions(1).error.get should include("[REDACTED]")
+    result.actions(1).error.get should not include "super-secret"
   }
 
-  it should "skip disabled operations" in {
-    val noOpsConfig = MaintenanceConfig(
-      snapshotRetentionDays = None,
-      targetFileSizeMb = None,
-      orphanRetentionMinutes = None,
-      enableManifestRewrite = false
+  it should "require an explicit enable flag and at least one valid action" in {
+    val disabled = config(enableManifestRewrite = true).copy(enabled = false)
+    intercept[IllegalArgumentException](runner.run(tableName, disabled)).getMessage should include(
+      "maintenance.enabled"
     )
 
-    noException should be thrownBy {
-      runner.run(tableName, noOpsConfig)
-    }
+    val noActions = config()
+    intercept[IllegalArgumentException](runner.run(tableName, noActions)).getMessage should include(
+      "at least one maintenance action"
+    )
+
+    val invalidSize = config(targetFileSizeMb = Some(0))
+    intercept[IllegalArgumentException](runner.run(tableName, invalidSize)).getMessage should include(
+      "targetFileSizeMb"
+    )
   }
+
+  private def config(
+      snapshotRetentionDays: Option[Int] = None,
+      targetFileSizeMb: Option[Int] = None,
+      orphanRetentionMinutes: Option[Int] = None,
+      enableManifestRewrite: Boolean = false
+  ): MaintenanceConfig =
+    MaintenanceConfig(
+      enabled = true,
+      snapshotRetentionDays = snapshotRetentionDays,
+      targetFileSizeMb = targetFileSizeMb,
+      orphanRetentionMinutes = orphanRetentionMinutes,
+      enableManifestRewrite = enableManifestRewrite
+    )
 
   override def afterAll(): Unit = {
     spark.sql(s"DROP TABLE IF EXISTS $tableName")

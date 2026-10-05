@@ -5,13 +5,15 @@ object RunnerCommand {
   final case class Validate(configDirectory: String, pipelineId: String, codeVersion: String) extends RunnerCommand
   final case class Run(configDirectory: String, requestPath: String) extends RunnerCommand
   final case class Inspect(configDirectory: String, requestPath: String) extends RunnerCommand
+  final case class Maintenance(configDirectory: String, tableName: String) extends RunnerCommand
 }
 
 object RunnerArguments {
   val Usage: String =
     "Usage: FloeRunner validate --config <directory> --pipeline-id <id> --code-version <version>\n" +
       "       FloeRunner run --config <directory> --request <request.json>\n" +
-      "       FloeRunner inspect --config <directory> --request <request.json>"
+      "       FloeRunner inspect --config <directory> --request <request.json>\n" +
+      "       FloeRunner maintenance --config <directory> --table <logical-table>"
 
   def parse(args: Seq[String]): Either[String, RunnerCommand] = args.headOption match {
     case Some("validate") =>
@@ -35,6 +37,13 @@ object RunnerArguments {
           config <- required(options, "--config")
           request <- required(options, "--request")
         } yield RunnerCommand.Inspect(config, request)
+      }
+    case Some("maintenance") =>
+      parseOptions(args.tail, Set("--config", "--table")).flatMap { options =>
+        for {
+          config <- required(options, "--config")
+          table <- required(options, "--table")
+        } yield RunnerCommand.Maintenance(config, table)
       }
     case Some(other) => Left(s"Unknown command '$other'\n$Usage")
     case None        => Left(Usage)

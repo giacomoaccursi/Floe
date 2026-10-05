@@ -1,6 +1,6 @@
 package com.etl.framework.iceberg
 
-import com.etl.framework.config.{DdlMode, FlowConfig, IcebergConfig, MaintenanceConfig}
+import com.etl.framework.config.{DdlMode, FlowConfig, IcebergConfig}
 import com.etl.framework.util.{SensitiveDataRedactor, SqlIdentifier}
 import org.apache.iceberg.{HasTableOperations, Table, TableProperties}
 import org.apache.iceberg.spark.Spark3Util
@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 
-/** Enforces the configured table-management policy and provides Iceberg snapshot and maintenance operations.
+/** Enforces the configured table-management policy and provides Iceberg snapshot operations.
   */
 class IcebergTableManager(
     spark: SparkSession,
@@ -597,14 +597,5 @@ class IcebergTableManager(
         )
         None
     }
-  }
-
-  /** Runs post-batch maintenance operations on a flow's table. */
-  def runMaintenance(
-      flowConfig: FlowConfig,
-      config: MaintenanceConfig
-  ): Unit = {
-    val tableName = resolveTableName(flowConfig)
-    new IcebergMaintenanceRunner(spark, icebergConfig).run(tableName, config)
   }
 }

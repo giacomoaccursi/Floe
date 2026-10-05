@@ -1,6 +1,14 @@
 package com.etl.framework.runner
 
+import com.etl.framework.config.GlobalConfigLoader
 import com.etl.framework.exceptions.ConfigurationException
+import com.etl.framework.iceberg.{
+  IcebergMaintenanceRunner,
+  MaintenanceActionResult,
+  MaintenanceResult,
+  MaintenanceStatus
+}
+import com.etl.framework.iceberg.catalog.CatalogRuntime
 import com.etl.framework.orchestration.{ExecutionRequestJson, ExecutionStatus}
 import com.etl.framework.orchestration.recovery.AttemptInspection
 import com.etl.framework.pipeline.IngestionPipeline
@@ -17,6 +25,8 @@ import scala.util.control.NonFatal
   */
 object FloeRunner {
 
+  private val LogicalTableName = "[A-Za-z_][A-Za-z0-9_-]{0,127}".r
+
   object ExitCode {
     val Success = 0
     val Usage = 2
@@ -25,6 +35,8 @@ object FloeRunner {
     val FailedPartial = 11
     val Unknown = 12
     val InspectionIncomplete = 13
+    val MaintenanceFailed = 20
+    val MaintenanceUnknown = 21
     val Internal = 70
 
     def forStatus(status: ExecutionStatus): Int = status match {
@@ -32,6 +44,12 @@ object FloeRunner {
       case ExecutionStatus.Failed                                            => Failed
       case ExecutionStatus.FailedPartial                                     => FailedPartial
       case ExecutionStatus.Unknown                                           => Unknown
+    }
+
+    def forMaintenanceStatus(status: MaintenanceStatus): Int = status match {
+      case MaintenanceStatus.Succeeded => Success
+      case MaintenanceStatus.Failed    => MaintenanceFailed
+      case MaintenanceStatus.Unknown   => MaintenanceUnknown
     }
   }
 
@@ -58,6 +76,8 @@ object FloeRunner {
         withSparkSession(err)(spark => validatePipeline(validate, spark, out, err))
       case run: RunnerCommand.Run         => runPipeline(run, out, err)
       case inspect: RunnerCommand.Inspect => inspectPipeline(inspect, out, err)
+      case maintenance: RunnerCommand.Maintenance =>
+        withSparkSession(err)(spark => maintainTable(maintenance, spark, out, err))
     }
 
   private def validatePipeline(
@@ -152,6 +172,34 @@ object FloeRunner {
       }
     }
 
+  private def maintainTable(
+      command: RunnerCommand.Maintenance,
+      spark: SparkSession,
+      out: PrintStream,
+      err: PrintStream
+  ): Int =
+    try {
+      require(
+        LogicalTableName.pattern.matcher(command.tableName).matches(),
+        "--table must be one logical table name matching [A-Za-z_][A-Za-z0-9_-]{0,127}, without catalog or namespace"
+      )
+      val loader = new GlobalConfigLoader(spark.sparkContext.hadoopConfiguration)
+      val globalConfig = loader.load(s"${command.configDirectory}/global.yaml") match {
+        case Right(config) => config
+        case Left(error)   => throw error
+      }
+      globalConfig.iceberg.maintenance.requireRunnable()
+      CatalogRuntime.prepare(spark, globalConfig.iceberg)
+      val result = new IcebergMaintenanceRunner(spark, globalConfig.iceberg)
+        .run(globalConfig.iceberg.fullTableName(command.tableName), globalConfig.iceberg.maintenance)
+      out.println(maintenanceJson(result))
+      ExitCode.forMaintenanceStatus(result.status)
+    } catch {
+      case error: ConfigurationException   => invalid(error, err)
+      case error: IllegalArgumentException => invalid(error, err)
+      case NonFatal(error)                 => internal(error, err)
+    }
+
   private def withSparkSession(err: PrintStream)(operation: SparkSession => Int): Int = {
     val existing = SparkSession.getActiveSession.orElse(SparkSession.getDefaultSession)
     try {
@@ -217,5 +265,30 @@ object FloeRunner {
           "error" -> target.error.map(value => JString(SensitiveDataRedactor.redact(value))).getOrElse(JNull)
         )
       }.toList)
+    )
+
+  private def maintenanceJson(result: MaintenanceResult): String =
+    json(
+      "contract_version" -> JInt(result.contractVersion),
+      "status" -> JString(result.status.name),
+      "success" -> JBool(result.success),
+      "table_name" -> JString(result.tableName),
+      "table_uuid" -> result.tableUuid.map(JString).getOrElse(JNull),
+      "starting_snapshot_id" -> result.startingSnapshotId.map(value => JString(value.toString)).getOrElse(JNull),
+      "actions" -> JArray(result.actions.map(maintenanceActionJson).toList),
+      "error" -> result.error.map(value => JString(SensitiveDataRedactor.redact(value))).getOrElse(JNull)
+    )
+
+  private def maintenanceActionJson(result: MaintenanceActionResult): JValue =
+    JObject(
+      "action" -> JString(result.action.name),
+      "status" -> JString(result.status.name),
+      "parameters" -> JObject(
+        result.parameters.toSeq.sortBy(_._1).map { case (name, value) => name -> JString(value) }.toList
+      ),
+      "metrics" -> JObject(
+        result.metrics.toSeq.sortBy(_._1).map { case (name, value) => name -> JInt(value) }.toList
+      ),
+      "error" -> result.error.map(value => JString(SensitiveDataRedactor.redact(value))).getOrElse(JNull)
     )
 }

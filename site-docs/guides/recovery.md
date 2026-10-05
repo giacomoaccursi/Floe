@@ -109,6 +109,12 @@ Per-flow metadata uses the sibling `flows/` directory. Rejected rows and validat
 
 These files are diagnostic by default. A report-write failure adds a warning and does not reinterpret a known Iceberg commit. If consumers require the report as the delivery mechanism for pinned snapshots, that is a stricter application contract: treat report publication as a functional output in the surrounding application and never rerun data writers merely to recreate the report.
 
+### Sensitive diagnostic data
+
+Floe applies a last-line-of-defence redactor to error and warning text before it crosses a Floe-owned observability boundary: returned failure results, per-flow and attempt reports, runner JSON or stderr, inspection errors, and exception logs emitted by Floe. Common URI credentials, sensitive key/value assignments, authorization headers, bearer tokens, AWS access-key IDs, JWTs, and PEM private keys are replaced with `[REDACTED]`; diagnostic strings are also length-bounded. Logger-safe exception copies retain the original stack positions but deliberately omit the original cause and suppressed exceptions, because logging frameworks would otherwise traverse and print their unredacted messages.
+
+This mechanism is defence in depth, not a secret-management system or a proof that logs contain no sensitive data. An arbitrary value without a recognizable credential shape cannot be classified reliably, and Spark, Hadoop, Iceberg, JDBC drivers, custom extensions, and platform agents emit their own logs outside this boundary. Inject connector credentials through the platform's secret manager, keep them out of requests and identifiers, configure dependency/platform log redaction, restrict access to diagnostic storage, and test the complete deployed log pipeline with canary credentials. `platform_references` are persisted as supplied and therefore must contain only non-sensitive references.
+
 The generic process contract, strict JSON request format, and exit-code mapping are documented in [Generic Runner](runner.md).
 
 ## Maintenance

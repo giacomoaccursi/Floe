@@ -16,6 +16,8 @@ The platform must provide:
 
 The request and configuration may use local paths or Hadoop-compatible URIs such as `s3://...`. The request is limited to 1 MiB, must be valid UTF-8 JSON, and rejects duplicate or unknown fields. It must never contain credentials or secret values. A non-sensitive secret-manager identifier may use a key such as `secret_ref` or `credential_version`.
 
+Floe redacts recognized credential shapes from its own result, report, runner, inspection, and exception-log boundaries, but this is only defence in depth. It cannot identify arbitrary unlabeled secrets or sanitize logs emitted independently by Spark, Hadoop, Iceberg, connectors, custom code, or the hosting platform. See [Sensitive diagnostic data](recovery.md#sensitive-diagnostic-data) for the operational contract.
+
 ## Validate a deployment artifact
 
 Run validation with the same semantic Spark settings that production will use:

@@ -77,3 +77,65 @@ jobs:
           check_name: "Test Results"
           fail_on_failure: true
           require_passed_tests: true
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Install documentation dependencies
+        run: python -m pip install -r requirements-docs.txt
+
+      - name: Build documentation strictly
+        run: mkdocs build --strict
+
+  orchestrator-references:
+    name: Orchestrator references
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: integrations/airflow/requirements.txt
+
+      - name: Install pinned Airflow runtime
+        run: |
+          airflow_version=3.3.2
+          python_version=3.12
+          constraints="https://raw.githubusercontent.com/apache/airflow/constraints-${airflow_version}/constraints-${python_version}.txt"
+          python -m pip install "apache-airflow==${airflow_version}" --constraint "${constraints}"
+          python -m pip install -r integrations/airflow/requirements.txt
+          python -m pip check
+
+      - name: Validate Airflow DAG
+        run: |
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          path = Path("integrations/airflow/floe_orders_dag.py")
+          spec = importlib.util.spec_from_file_location("floe_orders_dag", path)
+          assert spec is not None and spec.loader is not None
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          module.dag.validate()
+
+          task = module.dag.get_task("run_floe")
+          assert task.retries == 0
+          assert task._deploy_mode == "cluster"
+          assert task._track_driver_via_k8s_api is True
+          assert task.durable is True
+          PY
+
+      - name: Validate Step Functions definition
+        run: python -m json.tool integrations/aws-step-functions/emr-serverless.asl.json >/dev/null

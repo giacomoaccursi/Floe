@@ -155,7 +155,7 @@ val result = IngestionPipeline.builder()
   .executeOrThrow()
 ```
 
-The Iceberg SQL extensions must be configured before Spark creates the session. Floe then registers the catalog declared in `global.yaml`; callers do not need to duplicate catalog properties in the `SparkSession` builder.
+The Iceberg SQL extensions must be configured before Spark creates the session. In the default `catalogMode: existing`, the platform owns catalog setup and Floe validates it without mutation. `catalogMode: configure` is an explicit opt-in for applications that delegate bootstrap to a built-in or custom provider.
 
 For a platform-managed run, build the pipeline with a stable identity and immutable artifact version, persist the request before submission, and pass it to Floe:
 

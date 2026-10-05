@@ -192,6 +192,8 @@ Requests and platform references must never contain secret values. Floe redacts 
 
 The same runner exposes a read-only `inspect` command for incident evidence. It correlates the original request with exact Iceberg operation metadata, current `main`, snapshot ancestry, table UUID, and report presence without claiming that missing evidence proves non-commit or that a retry is safe.
 
+Iceberg maintenance is another independent runner command: `maintenance --config <directory> --table <logical-table>`. It requires `iceberg.maintenance.enabled: true`, targets one table per process, returns per-action metrics and `SUCCEEDED`/`FAILED`/`UNKNOWN` evidence, and never retries ingestion. The hosting platform owns table inventory, serialization, result retention, and retry decisions.
+
 ## Deployment targets
 
 Floe runs locally and on compatible Spark 3.5 clusters. Managed platforms require matching Spark, Scala, and Iceberg artifacts plus platform-specific catalog configuration:

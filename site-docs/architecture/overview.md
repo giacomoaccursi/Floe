@@ -57,7 +57,7 @@ A batch execution follows this sequence:
    Load DAG config → Resolve join dependencies → Execute nodes → Produce output
 
 8. Maintenance (separately scheduled job)
-   Platform selects tables → Expire snapshots → Compact data files → Remove old orphan files → Rewrite manifests
+   One platform task selects one table → Expire snapshots → Compact data files → Remove old orphan files → Rewrite manifests
 ```
 
 ## Design principles
@@ -69,7 +69,7 @@ A batch execution follows this sequence:
 - **Bounded parallelism**: parallel execution uses explicitly sized thread pools, never the global execution context.
 - **Orchestrator-neutral**: Floe has no workflow database; the platform owns scheduling, serialization, and request retention.
 - **Explicit evidence**: typed data outcomes and pinned dependency snapshots expose partial and uncertain execution honestly.
-- **Independent maintenance**: ingestion never queues or retries maintenance; schedule it as a separate operational workload.
+- **Independent maintenance**: ingestion never queues or retries maintenance; schedule one table per operational task and retain its typed action result externally.
 
 ## Modules
 

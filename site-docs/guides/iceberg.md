@@ -44,9 +44,10 @@ iceberg:
   fileFormat: "parquet"
   enableSnapshotTagging: true
   maintenance:
+    enabled: false
     snapshotRetentionDays: 7
     targetFileSizeMb: 128
-    orphanRetentionMinutes: 1440
+    orphanRetentionMinutes: 4320
     enableManifestRewrite: false
 ```
 
@@ -65,19 +66,20 @@ For the full field reference, see [Global Configuration — iceberg](../configur
 | `fileFormat` | `parquet` | Default data file format |
 | `enableSnapshotTagging` | `true` | Tag each batch snapshot for time travel by batch ID |
 | `catalogProperties` | `{}` | Additional key-value properties passed to the catalog provider |
-| `maintenance.*` | see below | Settings consumed only when an independently scheduled application invokes `IcebergMaintenanceRunner` |
+| `maintenance.*` | see below | Settings consumed only by an independently scheduled maintenance process |
 
 ### Maintenance settings
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `snapshotRetentionDays` | `7` | Expiration threshold and retention for **new** batch tags. Live references can keep older snapshots. Remove to disable expiration and create tags without an explicit expiry; positive values are required when tagging is enabled. |
-| `targetFileSizeMb` | `128` | Target file size after compaction. Remove to disable. |
-| `orphanRetentionMinutes` | `1440` | Grace period before orphan files are removed (min 1440). Remove to disable. |
+| `enabled` | `false` | Explicit safety gate required by the maintenance runner; scheduling remains external. |
+| `snapshotRetentionDays` | `7` | Positive expiration threshold and retention for **new** batch tags. Live references can keep older snapshots. Set `null` to omit expiration and create tags without an explicit expiry. Tag retention applies independently of the enable flag. |
+| `targetFileSizeMb` | `128` | Positive target file size after compaction. Set `null` to omit compaction. |
+| `orphanRetentionMinutes` | `4320` | Grace period before orphan files are removed (minimum 1440). Set `null` to omit cleanup. |
 | `enableManifestRewrite` | `false` | Rewrite manifest files for scan optimization |
 
 !!!warning "Orphan cleanup minimum retention"
-    FLOe clamps values below 24 hours (1440 minutes), but that is **not** a universal safe value: a write, checkpoint, backup or migration older than the threshold can still have in-flight files. Set the grace period above the longest expected operation and verify against your deployment before enabling cleanup.
+    FLOe rejects values below 24 hours instead of silently changing them. Iceberg's 3-day default is still not a universal safe value: use a grace period longer than every write, checkpoint, backup, restore, migration, and delayed retry. Qualify path normalization and object-store authority behavior on the real deployment before enabling file deletion.
 
 !!!warning "Catalogs on S3"
     HadoopCatalog on S3 requires an appropriate lock manager for safe concurrent commits. FLOe rejects an S3 warehouse using the built-in Hadoop provider without `catalogProperties.lock-impl`; the [Iceberg AWS guide](https://iceberg.apache.org/docs/1.10.1/aws/) documents DynamoDB locking. GlueCatalog uses optimistic locking with supported AWS SDK versions. The built-in Glue provider also needs AWS SDK v2 client classes: Floe deliberately does not ship `iceberg-aws-bundle` transitively, so the application or platform must provide one bundle matching its single Iceberg runtime, plus suitable AWS credentials, region, and IAM permissions.
@@ -460,26 +462,47 @@ Per-flow diagnostic-output failures are returned in `FlowResult.warnings` and pr
 
 ### 4. Independently scheduled maintenance
 
-Run maintenance from a separate application and schedule it with the external platform:
+Set `maintenance.enabled: true` only after approving the retention and concurrency policy. Schedule one table per external task and pass the logical table name; the configured catalog and namespace remain authoritative:
+
+```bash
+spark-submit \
+  --class com.etl.framework.runner.FloeRunner \
+  my-pipeline-assembly.jar \
+  maintenance \
+  --config s3://company-config/orders/v42 \
+  --table orders
+```
+
+Applications with a custom catalog provider may call the same synchronous API from their own entry point:
 
 ```scala
 val runner = new IcebergMaintenanceRunner(spark, globalConfig.iceberg)
-runner.run("floe.default.orders", globalConfig.iceberg.maintenance)
+val result = runner.run("floe.default.orders", globalConfig.iceberg.maintenance)
 ```
 
-FLOe does not queue, claim, persist, or retry maintenance tasks. The hosting platform owns the table inventory, schedule, mutual exclusion, status, alerting, and retry policy. In particular, it must not run maintenance while a writer or incident investigation still needs the affected snapshots and files. Retrying maintenance must never rerun ingestion.
+FLOe does not queue, claim, persist, or retry maintenance tasks. The hosting platform owns the table inventory, schedule, mutual exclusion, result retention, alerting, and retry policy. It must not run maintenance while a writer, backup, migration, or incident investigation still needs the affected snapshots and files. Retrying maintenance must never rerun ingestion.
 
-For each explicitly selected table, the runner executes the enabled maintenance operations:
+For the selected table, the runner preflights table identity and executes enabled actions in this fixed order:
 
 | Operation | SQL | Purpose |
 |-----------|-----|---------|
 | Snapshot expiration | `CALL system.expire_snapshots(table, older_than)` | Removes eligible old snapshots and files exclusive to them; live refs and retention rules can protect older snapshots. |
-| Data compaction | `CALL system.rewrite_data_files(table, target_size)` | Merges small files into larger ones (target: 128MB default). Improves scan performance. |
+| Data compaction | `CALL system.rewrite_data_files(table, target_size)` | Merges small files into larger ones. FLOe explicitly disables Iceberg partial-progress commits for this action. |
 | Orphan file cleanup | `CALL system.remove_orphan_files(table, older_than)` | Removes data files not referenced by any snapshot. Cleans up after failed writes. |
 | Manifest rewrite | `CALL system.rewrite_manifests(table)` | Consolidates manifest files for faster metadata operations. Disabled by default. |
 
+The metric names mirror the outputs documented by the official [Iceberg Spark procedures](https://iceberg.apache.org/docs/1.10.0/spark-procedures/). For retention semantics and deployment-level scheduling guidance, see [Iceberg maintenance](https://iceberg.apache.org/docs/nightly/maintenance/).
+
+Each selected action returns its effective parameters, Iceberg result metrics, and one status:
+
+- `SUCCEEDED`: the action returned normally;
+- `UNKNOWN`: an exception occurred after the action was invoked, so a commit or file deletion may have happened;
+- `NOT_ATTEMPTED`: preflight failed or an earlier action became unknown.
+
+The overall status is `SUCCEEDED`, `FAILED` when table preflight failed before any mutation, or `UNKNOWN` when an invoked action had an uncertain outcome. Execution stops at the first `UNKNOWN`; actions already completed remain visible and later actions are not started. Snapshot IDs are emitted as JSON strings to preserve 64-bit precision.
+
 !!!note "Maintenance state is external"
-    The ingestion result contains no queued maintenance state. Record the maintenance application's status in the hosting platform and alert there. A maintenance failure says nothing about whether ingestion should be retried.
+    Persist the runner's one-line JSON output in the hosting platform. Floe has no durable maintenance store. Exit codes are `0` for success, `20` for preflight failure, and `21` for an unknown action outcome. A missing result line is unobserved execution, not proof of non-execution.
 
 !!!tip "Metadata file cleanup"
     Every commit creates a new metadata JSON file in the table's `metadata/` directory (e.g. `v1.metadata.json`, `v2.metadata.json`). These files are small (KB) but accumulate over time. To enable automatic cleanup, add these table properties:
@@ -678,7 +701,7 @@ Schema evolution only adds columns, never removes them. If a column is removed f
 
 ### Maintenance is not transactional
 
-If a maintenance operation fails mid-way (e.g., compaction fails on one table), subsequent maintenance operations for other tables may still run. There is no all-or-nothing guarantee for maintenance across tables. Each operation is independent.
+There is no transaction across maintenance actions. If an invoked action throws, Floe reports that action as `UNKNOWN` and does not start later actions for that table. Earlier `SUCCEEDED` actions are not rolled back. Other table tasks exist only in the external scheduler; whether they run or stop is an explicit platform policy, not a Floe side effect.
 
 ### Orphan remediation is external
 

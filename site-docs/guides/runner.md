@@ -96,6 +96,28 @@ The runner rebuilds the pipeline, rejects pipeline/code/config identity mismatch
 
 The runner stops a `SparkSession` it created. When embedded in a process that already owns an active/default session, it leaves that session running.
 
+## Maintain one table
+
+Maintenance is a separate process contract, not a phase of `run`. After setting `iceberg.maintenance.enabled: true` in the reviewed configuration, schedule one logical table per remote application:
+
+```bash
+spark-submit \
+  --class com.etl.framework.runner.FloeRunner \
+  --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+  my-pipeline-assembly.jar \
+  maintenance \
+  --config s3://company-config/orders/v42 \
+  --table orders
+```
+
+`--table` accepts one unqualified logical name matching `[A-Za-z_][A-Za-z0-9_-]{0,127}`. Floe resolves it through the configured `catalogName` and `namespace`; the command cannot redirect maintenance to a different catalog or namespace. The generic command supports built-in or already configured catalogs. Applications that register a custom `CatalogProvider` need an application-owned entry point calling `IcebergMaintenanceRunner`.
+
+The command emits one compact JSON object containing table identity, starting snapshot ID, and per-action parameters, metrics, status, and redacted error. It stops at the first uncertain action. `UNKNOWN` means the invoked Iceberg operation may have committed metadata or deleted files even though the client observed an exception; later actions are `NOT_ATTEMPTED`. The hosting platform must persist this stdout result because Floe has no maintenance database or queue.
+
+```json
+{"contract_version":1,"status":"SUCCEEDED","success":true,"table_name":"floe.default.orders","table_uuid":"2d1c...","starting_snapshot_id":"918273645012345678","actions":[{"action":"REWRITE_MANIFESTS","status":"SUCCEEDED","parameters":{},"metrics":{"added_manifests_count":1,"rewritten_manifests_count":8},"error":null}],"error":null}
+```
+
 ## Exit codes
 
 | Code | Meaning | Platform action |
@@ -107,6 +129,8 @@ The runner stops a `SparkSession` it created. When embedded in a process that al
 | `11` | `FAILED_PARTIAL` | Freeze overlapping writers and follow the recovery runbook |
 | `12` | `UNKNOWN` | Freeze overlapping writers; never retry automatically |
 | `13` | Inspection could not query every requested evidence source | Keep the incident open and resolve the catalog/storage access failure |
+| `20` | Maintenance table preflight failed before any action | Correct table/catalog access and submit a new maintenance task; never retry ingestion |
+| `21` | An invoked maintenance action has an `UNKNOWN` outcome | Freeze incompatible work, inspect table/storage evidence, and do not retry automatically |
 | `70` | Runner/bootstrap internal failure | Treat the execution as unobserved until backend evidence is inspected |
 
 Exit code `0` does not mean that every diagnostic write succeeded: `SUCCEEDED_WITH_WARNINGS` deliberately remains a successful data-plane outcome. Conversely, a missing JSON line or missing report is never proof that no data commit occurred. Managed services may collapse application exit codes into a generic failed state, so retain the structured result, request, logs, and Iceberg evidence.

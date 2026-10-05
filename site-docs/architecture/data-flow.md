@@ -143,7 +143,7 @@ After all flows complete:
 3. **Diagnostic outputs** — writes per-flow JSON, the attempt report, and optional quality metrics below the pipeline/logical-run/attempt identity.
 4. **Typed result** — returns functional success plus `SUCCEEDED`, `FAILED`, `FAILED_PARTIAL`, or `UNKNOWN` and per-target snapshot evidence.
 
-A separately scheduled application may invoke `IcebergMaintenanceRunner` for snapshot expiration, compaction, orphan-file cleanup, and optional manifest rewriting. See [Failure Handling and Production Operations](../guides/recovery.md).
+A separately scheduled, single-table task may invoke `FloeRunner maintenance` (or the synchronous `IcebergMaintenanceRunner` API) for snapshot expiration, compaction, orphan-file cleanup, and optional manifest rewriting. See [Failure Handling and Production Operations](../guides/recovery.md).
 
 ## Related
 

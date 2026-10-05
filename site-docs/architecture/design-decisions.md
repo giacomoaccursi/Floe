@@ -44,6 +44,8 @@ Snapshot expiration removes old snapshots. Orphan detection needs the previous s
 
 Running orphan detection before returning the ingestion result preserves the previous snapshot during that attempt. Compaction, snapshot expiration, manifest rewriting, and orphan-file deletion are independently scheduled operational work: they must not lengthen ingestion or cause data replay when they fail.
 
+Each maintenance process targets one table. Floe returns synchronous per-action evidence but deliberately owns no queue, durable status store, retry loop, or cross-table transaction. This lets Airflow, Step Functions, Argo, Glue, or another platform own inventory and scheduling without forcing a second control plane into the library.
+
 ## Why Floe does not claim multi-table publication
 
 Iceberg commits are atomic per table, not across a set of tables. Floe therefore returns per-target snapshot evidence and an explicit partial/unknown status; it does not label a set of independent commits as an atomic release. Consumers needing an atomic multi-table publication protocol must implement and qualify that separate contract instead of reading mutable HEADs.

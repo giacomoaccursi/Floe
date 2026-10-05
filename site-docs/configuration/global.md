@@ -30,9 +30,10 @@ iceberg:
   enableSnapshotTagging: true
   catalogProperties: {}
   maintenance:
+    enabled: false
     snapshotRetentionDays: 7
     targetFileSizeMb: 128
-    orphanRetentionMinutes: 1440
+    orphanRetentionMinutes: 4320
     enableManifestRewrite: false
 ```
 
@@ -160,17 +161,21 @@ Custom catalog providers (Hive, REST, Nessie) can be registered via the [Pipelin
 
 ### maintenance
 
-Settings consumed only when an independently scheduled application invokes `IcebergMaintenanceRunner`. Ingestion does not queue, run, or retry table maintenance.
+Settings consumed only by the independently scheduled `FloeRunner maintenance` command or a direct `IcebergMaintenanceRunner` call. Ingestion does not queue, run, or retry table maintenance. The command requires the explicit `enabled: true` safety gate.
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `snapshotRetentionDays` | `7` | Expiration threshold for eligible snapshots and retention of new batch tags. Tags/branches can preserve older snapshots. Remove to disable expiration; new tags then have no explicit expiry. Use a positive value when tagging is enabled. |
-| `targetFileSizeMb` | `128` | Target file size after compaction. Remove to disable compaction. |
-| `orphanRetentionMinutes` | `1440` | Grace period before orphan files are removed (min 1440). Remove to disable. |
+| `enabled` | `false` | Required opt-in for the maintenance command. It does not schedule maintenance. |
+| `snapshotRetentionDays` | `7` | Positive expiration threshold for eligible snapshots and retention of new batch tags. Tags/branches can preserve older snapshots. Set `null` to omit expiration; new tags then have no explicit expiry. Tag retention applies even while maintenance is disabled. |
+| `targetFileSizeMb` | `128` | Positive target file size after compaction. Set `null` to omit compaction. |
+| `orphanRetentionMinutes` | `4320` | Grace period before orphan files are removed (minimum 1440). Set `null` to omit orphan cleanup. The 3-day default matches Iceberg's procedure default. |
 | `enableManifestRewrite` | `false` | Rewrite manifest files for scan optimization |
 
 !!!warning "Orphan cleanup minimum retention"
-    FLOe clamps the configured threshold to **at least 24 hours** (1440 minutes). That is not universally safe: set it above the longest running write, backup or migration, or concurrent operations may lose in-flight files.
+    FLOe rejects, rather than silently clamps, a threshold below **24 hours** (1440 minutes). Even 3 days is not universally safe: configure a value longer than every write, checkpoint, backup, restore, migration, and delayed retry that may still own uncommitted files. Incorrect path normalization or object-store authority settings can also make orphan cleanup destructive; qualify it on the real catalog and storage deployment.
+
+!!!note "Action selection"
+    With `enabled: true`, at least one action must be selected. `null` disables an optional action; omitting a field uses its documented default. The fixed order is snapshot expiration, data-file rewrite, orphan cleanup, then manifest rewrite.
 
 !!!note "Maintenance ownership"
     The hosting platform owns the maintenance schedule, status, retries, and mutual exclusion. A maintenance failure must retry only maintenance, never ingestion. See [Failure Handling and Production Operations](../guides/recovery.md#maintenance).

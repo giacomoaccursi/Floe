@@ -119,6 +119,8 @@ The generic process contract, strict JSON request format, and exit-code mapping 
 
 ## Maintenance
 
-Run `IcebergMaintenanceRunner` from a separate scheduled job. Compaction, snapshot expiration, orphan-file cleanup, and manifest rewrite must not be coupled to ingestion retries. Establish retention and concurrency policy for the actual catalog/storage deployment before enabling deletion procedures.
+Run `FloeRunner maintenance --config <immutable-config> --table <logical-table>` as a separate, single-table task. Compaction, snapshot expiration, orphan-file cleanup, and manifest rewrite must not be coupled to ingestion retries. Establish retention, path-normalization, and mutual-exclusion policy for the actual catalog/storage deployment before setting `maintenance.enabled: true`.
+
+Persist the structured result. `FAILED` means table preflight failed before an action was entered; correct the cause and submit a new maintenance task. `UNKNOWN` means an invoked Iceberg action may have committed metadata or deleted some files. Freeze incompatible work, inspect table metadata and storage, and do not retry automatically. Actions after the uncertain one are deliberately `NOT_ATTEMPTED`; earlier successful actions are not rolled back. Missing JSON is an unobserved process outcome and requires the same conservative investigation.
 
 Do not confuse Iceberg orphan files with child rows that violate a configured foreign key. They have different causes and recovery procedures.

@@ -100,7 +100,7 @@ Airflow, Step Functions, Argo, Glue, EMR, or another platform owns:
 - writer mutual exclusion for overlapping targets;
 - job/application lifecycle and cancellation;
 - retry decisions and incident records;
-- maintenance scheduling.
+- maintenance inventory, single-table scheduling, result retention, and serialization.
 
 Scheduler retry must be disabled by default. A whole-job retry is allowed only for an application/deployment recipe that has passed repeatability tests. `UNKNOWN` blocks automatic retry.
 

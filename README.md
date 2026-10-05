@@ -103,7 +103,7 @@ Floe reads the source data, validates schema and rules, upserts into `floe.defau
 - Apache Spark 3.5.8
 - SBT 1.9+
 
-Spark and Iceberg are `provided` dependencies: the application or cluster must supply one compatible Spark/Iceberg runtime. Floe does not transitively inject the Iceberg runtime or AWS bundle into a managed platform. Release artifacts are configured for GitHub Packages. GitHub requires authentication even when downloading a public Maven package; use a classic personal access token with `read:packages` and keep it outside the repository. See GitHub's [Apache Maven registry documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry).
+Spark, Iceberg, Scala, JSON4s/Jackson, and SLF4J are runtime-owned dependencies: the application or cluster must supply the compatible versions exactly once. Floe assemblies contain Floe plus its non-engine libraries and do not inject a second engine, JSON, or logging stack into a managed platform. Floe also never bundles `iceberg-aws-bundle`; add it only when the chosen catalog/FileIO requires it. Release artifacts are configured for GitHub Packages. GitHub requires authentication even when downloading a public Maven package; use a classic personal access token with `read:packages` and keep it outside the repository. See GitHub's [Apache Maven registry documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry).
 
 ### 1. Add Floe
 

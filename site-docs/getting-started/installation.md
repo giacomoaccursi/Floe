@@ -15,9 +15,9 @@ Add to your `build.sbt`:
 libraryDependencies += "io.github.giacomoaccursi" %% "floe" % "<version>"
 ```
 
-Spark and Iceberg are `provided` dependencies—the framework expects exactly one compatible engine runtime on the application or cluster classpath. Floe is compiled against `iceberg-spark-runtime-3.5_2.12` 1.10.1 but does not add that JAR, or `iceberg-aws-bundle`, transitively. Test any vendor-patched or different Spark/Iceberg combination as a separate compatibility target.
+Spark, Iceberg, JSON4s/Jackson, and SLF4J are `provided` dependencies, and the assembly excludes Scala—the framework expects the platform-owned Spark stack exactly once on the application and executor classpaths. Floe is compiled against Spark 3.5.8, Scala 2.12.18, JSON4s 3.7.0-M11, SLF4J 2.0.7, and `iceberg-spark-runtime-3.5_2.12` 1.10.1, matching the upstream Spark distribution, but does not package those runtime classes or `iceberg-aws-bundle`. Test any vendor-patched or different combination as a separate compatibility target.
 
-For a self-managed deployment, supply the matching Iceberg runtime explicitly. Add the AWS bundle only for an AWS catalog/FileIO that requires it:
+For a self-managed deployment, start from the matching Spark distribution; it supplies Scala, JSON4s/Jackson, and SLF4J. Supply the matching Iceberg runtime explicitly. Add the AWS bundle only for an AWS catalog/FileIO that requires it:
 
 ```scala
 val icebergVersion = "1.10.1"
@@ -30,6 +30,12 @@ libraryDependencies ++= Seq(
 ```
 
 Use normal compile/runtime scope instead of `provided` only for local `sbt run`, where no cluster supplies the JARs. Never package a second copy when the target platform already supplies Iceberg.
+
+## Deployment assembly
+
+Running `sbt assembly` in this repository creates the generic YAML runner JAR. The build discards Java module descriptors that cannot coexist in an uber JAR, keeps Floe and its non-engine dependencies, and excludes every platform-owned class family listed above. CI inspects the resulting archive and fails if those classes leak into it.
+
+A custom application that depends on Floe owns its own assembly settings and must preserve the same boundary. Validate the finished application JAR with `spark-submit` on the exact Spark/Iceberg runtime selected for deployment; successful compilation alone does not qualify a managed platform.
 
 ## Logging
 

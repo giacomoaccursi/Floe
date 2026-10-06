@@ -491,6 +491,8 @@ version 2: valid_from=T2, valid_to=NULL
 
 This is guaranteed because both operations (close old, open new) use the same immutable `ExecutionRequest.effectiveAt` value rendered as a UTC timestamp literal. There are no temporal gaps between versions, and Spark executor clock differences cannot alter the boundary.
 
+Before a subsequent MERGE, Floe checks every changed key and every soft-deleted key. Its `effectiveAt` must be strictly later than the current version's `valid_from`; otherwise the load fails before mutation instead of creating a zero-length or negative interval. Repeating an unchanged row at the same instant remains a no-op. This check assumes the documented single-writer policy—it is not a distributed lock or fencing mechanism.
+
 ## Known limitations
 
 ### Single writer
@@ -499,7 +501,7 @@ The framework assumes a single writer per table. Concurrent executions of the sa
 
 ### Late-arriving data
 
-SCD2 uses `ExecutionRequest.effectiveAt` as `valid_from` for new versions. The caller may set that instant to a historical processing boundary, but Floe does not infer event-valid time from source rows or splice a late record into existing history. The orchestrator must supply an effective time consistent with the table's version order.
+SCD2 uses `ExecutionRequest.effectiveAt` as `valid_from` for new versions. The caller may set that instant to a historical processing boundary, but Floe does not infer event-valid time from source rows or splice a late record into existing history. For an existing key, a changed or deleted version whose time is not later than the current version is rejected. New keys start independent histories at the supplied instant.
 
 ### No hard-delete in this load mode
 

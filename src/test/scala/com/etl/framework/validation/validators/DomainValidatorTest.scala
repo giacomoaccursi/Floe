@@ -6,6 +6,7 @@ import org.scalatest.matchers.should.Matchers
 import org.apache.spark.sql.{SparkSession, Row}
 import org.apache.spark.sql.types._
 import scala.collection.JavaConverters._
+import java.util.Locale
 
 class DomainValidatorTest extends AnyFlatSpec with Matchers {
 
@@ -118,5 +119,19 @@ class DomainValidatorTest extends AnyFlatSpec with Matchers {
 
     result.valid.count() shouldBe 2
     result.rejected.flatMap(df => Some(df.count())).getOrElse(0L) shouldBe 0
+  }
+
+  it should "compare case-insensitive values independently of the host locale" in {
+    val original = Locale.getDefault
+    try {
+      Locale.setDefault(new Locale("tr", "TR"))
+      val schema = StructType(Seq(StructField("status", StringType, true)))
+      val df = spark.createDataFrame(Seq(Row("ACTIVE")).asJava, schema)
+      val domainsConfig = createDomainsConfig("STATUS_DOMAIN", Seq("ACTIVE"), caseSensitive = false)
+
+      val result = new DomainValidator(Some(domainsConfig)).validate(df, createRule("STATUS_DOMAIN"))
+
+      result.valid.count() shouldBe 1
+    } finally Locale.setDefault(original)
   }
 }

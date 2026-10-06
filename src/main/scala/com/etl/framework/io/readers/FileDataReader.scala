@@ -5,6 +5,8 @@ import com.etl.framework.exceptions.UnsupportedOperationException
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import java.util.Locale
+
 /** DataReader implementation for file-based sources Supports CSV, Parquet, JSON formats with file pattern matching Can
   * optionally enforce schema during read for type safety
   */
@@ -62,7 +64,7 @@ class FileDataReader(
   /** Maps string type names to Spark DataTypes
     */
   private def mapTypeToSparkType(typeName: String): DataType = {
-    typeName.toLowerCase match {
+    typeName.toLowerCase(Locale.ROOT) match {
       case "string" | "varchar" | "text" => StringType
       case "int" | "integer"             => IntegerType
       case "long" | "bigint"             => LongType
@@ -102,7 +104,7 @@ class FileDataReader(
     */
   private def validateFormat(format: String): Unit = {
     val supportedFormats = Set("csv", "parquet", "json", "avro", "orc")
-    if (!supportedFormats.contains(format.toLowerCase)) {
+    if (!supportedFormats.contains(format.toLowerCase(Locale.ROOT))) {
       throw UnsupportedOperationException(
         operation = s"file format '$format'",
         details = s"Supported formats: ${supportedFormats.mkString(", ")}"

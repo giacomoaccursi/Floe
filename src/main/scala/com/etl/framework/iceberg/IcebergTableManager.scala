@@ -9,6 +9,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types._
 import org.slf4j.LoggerFactory
 
+import java.util.Locale
 import scala.collection.JavaConverters._
 
 /** Enforces the configured table-management policy and provides Iceberg snapshot operations.
@@ -308,16 +309,17 @@ class IcebergTableManager(
     val transformPattern = """^(\w+)\((.+)\)$""".r
     partition.trim match {
       case transformPattern(func, args) =>
-        func.toLowerCase match {
+        val normalizedFunction = func.toLowerCase(Locale.ROOT)
+        normalizedFunction match {
           case "year" | "month" | "day" | "hour" =>
-            s"${func.toLowerCase}(${args.trim})"
+            s"$normalizedFunction(${args.trim})"
           case "bucket" | "truncate" =>
             val parts = args.split(",").map(_.trim)
             require(
               parts.length == 2 && parts(0).forall(_.isDigit),
-              s"Invalid ${func.toLowerCase} partition transform: $partition"
+              s"Invalid $normalizedFunction partition transform: $partition"
             )
-            s"${func.toLowerCase}[${parts(0)}](${parts(1)})"
+            s"$normalizedFunction[${parts(0)}](${parts(1)})"
           case _ =>
             throw new IllegalArgumentException(s"Unsupported Iceberg partition transform: $func")
         }
@@ -335,7 +337,7 @@ class IcebergTableManager(
   }
 
   private def isPartitionAlreadyExistsError(e: Exception): Boolean = {
-    val msg = Option(e.getMessage).getOrElse("").toLowerCase
+    val msg = Option(e.getMessage).getOrElse("").toLowerCase(Locale.ROOT)
     msg.contains("already exists") || msg.contains("redundant") || msg.contains("duplicate")
   }
 
@@ -421,9 +423,10 @@ class IcebergTableManager(
 
     partition match {
       case transformPattern(func, args) =>
-        func.toLowerCase match {
+        val normalizedFunction = func.toLowerCase(Locale.ROOT)
+        normalizedFunction match {
           case "year" | "month" | "day" | "hour" =>
-            s"${func.toLowerCase}(${SqlIdentifier.quote(args.trim)})"
+            s"$normalizedFunction(${SqlIdentifier.quote(args.trim)})"
           case "bucket" =>
             val parts = args.split(",").map(_.trim)
             require(parts.length == 2 && parts(0).forall(_.isDigit), s"Invalid bucket partition transform: $partition")

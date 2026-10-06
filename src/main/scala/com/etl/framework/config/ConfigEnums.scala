@@ -3,6 +3,8 @@ package com.etl.framework.config
 import pureconfig.{ConfigReader, ConfigWriter}
 import pureconfig.error.CannotConvert
 
+import java.util.Locale
+
 // ═══════════════════════════════════════════════════════════════════════════
 // JOIN STRATEGY
 // ═══════════════════════════════════════════════════════════════════════════
@@ -19,7 +21,7 @@ object JoinStrategy {
 
   def fromString(s: String): Either[String, JoinStrategy] =
     values
-      .find(_.name == s.toLowerCase)
+      .find(_.name == s.toLowerCase(Locale.ROOT))
       .toRight(
         s"Unknown join strategy: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
       )
@@ -56,7 +58,7 @@ object JoinType {
   val values: Seq[JoinType] = Seq(Inner, LeftOuter, RightOuter, FullOuter)
 
   def fromString(s: String): Either[String, JoinType] =
-    s.toLowerCase match {
+    s.toLowerCase(Locale.ROOT) match {
       case "left" | "left_outer"   => Right(LeftOuter)
       case "right" | "right_outer" => Right(RightOuter)
       case "full" | "full_outer"   => Right(FullOuter)
@@ -91,9 +93,9 @@ object SourceType {
 
   def fromString(s: String): Either[String, SourceType] =
     builtinValues
-      .find(_.name == s.toLowerCase)
+      .find(_.name == s.toLowerCase(Locale.ROOT))
       .map(Right(_))
-      .getOrElse(Right(Custom(s.toLowerCase)))
+      .getOrElse(Right(Custom(s.toLowerCase(Locale.ROOT))))
 
   implicit val reader: ConfigReader[SourceType] =
     ConfigReader.fromString[SourceType](s => fromString(s).left.map(msg => CannotConvert(s, "SourceType", msg)))
@@ -130,7 +132,7 @@ object FileFormat {
 
   def fromString(s: String): Either[String, FileFormat] =
     values
-      .find(_.name == s.toLowerCase)
+      .find(_.name == s.toLowerCase(Locale.ROOT))
       .toRight(
         s"Unknown file format: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
       )
@@ -158,7 +160,7 @@ object LoadMode {
 
   def fromString(s: String): Either[String, LoadMode] =
     values
-      .find(_.name == s.toLowerCase)
+      .find(_.name == s.toLowerCase(Locale.ROOT))
       .toRight(
         s"Unknown load mode: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
       )
@@ -205,7 +207,7 @@ object ValidationRuleType {
 
   def fromString(s: String): Either[String, ValidationRuleType] =
     values
-      .find(_.name == s.toLowerCase)
+      .find(_.name == s.toLowerCase(Locale.ROOT))
       .toRight(
         s"Unknown validation rule type: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
       )
@@ -235,7 +237,7 @@ object OnFailureAction {
 
   def fromString(s: String): Either[String, OnFailureAction] =
     values
-      .find(_.name == s.toLowerCase)
+      .find(_.name == s.toLowerCase(Locale.ROOT))
       .toRight(
         s"Unknown on-failure action: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
       )
@@ -265,7 +267,7 @@ object OrphanAction {
 
   def fromString(s: String): Either[String, OrphanAction] =
     values
-      .find(_.name == s.toLowerCase)
+      .find(_.name == s.toLowerCase(Locale.ROOT))
       .toRight(
         s"Unknown orphan action: '$s'. Valid values: ${values.map(_.name).mkString(", ")}"
       )
@@ -292,7 +294,7 @@ object CatalogMode {
 
   def fromString(value: String): Either[String, CatalogMode] =
     values
-      .find(_.name == Option(value).getOrElse("").toLowerCase)
+      .find(_.name == Option(value).getOrElse("").toLowerCase(Locale.ROOT))
       .toRight(s"Unknown catalog mode: '$value'. Valid values: ${values.map(_.name).mkString(", ")}")
 
   implicit val reader: ConfigReader[CatalogMode] =
@@ -319,7 +321,7 @@ object DdlMode {
 
   def fromString(value: String): Either[String, DdlMode] =
     values
-      .find(_.name == Option(value).getOrElse("").toLowerCase)
+      .find(_.name == Option(value).getOrElse("").toLowerCase(Locale.ROOT))
       .toRight(s"Unknown DDL mode: '$value'. Valid values: ${values.map(_.name).mkString(", ")}")
 
   implicit val reader: ConfigReader[DdlMode] =
@@ -357,7 +359,7 @@ object AggregationFunction {
     Seq(Sum, Count, Avg, Min, Max, First, Last, CollectList, CollectSet)
 
   def fromString(s: String): Either[String, AggregationFunction] =
-    s.toLowerCase match {
+    s.toLowerCase(Locale.ROOT) match {
       case "average" => Right(Avg)
       case other =>
         values

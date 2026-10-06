@@ -6,6 +6,8 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Column
 
+import java.util.Locale
+
 /** Validator for domain value validation Validates that values are in a predefined set of allowed values Requires
   * DomainsConfig to be provided - no inline values supported
   */
@@ -63,7 +65,7 @@ class DomainValidator(
     if (caseSensitive) {
       col(column).isin(domainValues: _*)
     } else {
-      val lowerValues = domainValues.map(_.toLowerCase)
+      val lowerValues = domainValues.map(_.toLowerCase(Locale.ROOT))
       lower(col(column)).isin(lowerValues: _*)
     }
   }

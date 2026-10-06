@@ -3,6 +3,8 @@ package com.etl.framework.config
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import java.util.Locale
+
 class ConfigEnumsTest extends AnyFlatSpec with Matchers {
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -36,6 +38,14 @@ class ConfigEnumsTest extends AnyFlatSpec with Matchers {
   it should "return Custom for unknown source types" in {
     SourceType.fromString("kafka") shouldBe Right(SourceType.Custom("kafka"))
     SourceType.fromString("s3select") shouldBe Right(SourceType.Custom("s3select"))
+  }
+
+  it should "parse identifiers independently of the host locale" in {
+    val original = Locale.getDefault
+    try {
+      Locale.setDefault(new Locale("tr", "TR"))
+      SourceType.fromString("FILE") shouldBe Right(SourceType.File)
+    } finally Locale.setDefault(original)
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

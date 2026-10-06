@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory
 
 import java.util.UUID
 import scala.collection.mutable
+import scala.util.control.NonFatal
 
 case class OrphanReport(
     flowName: String,
@@ -66,14 +67,14 @@ class OrphanDetector(
 
       OrphanDetectionResult.Completed(reports.toSeq)
     } catch {
-      case e: Exception =>
+      case NonFatal(e) =>
         val message = SensitiveDataRedactor.message(e)
         logger.error(s"Orphan detection failed after ${reports.size} reports: $message")
         OrphanDetectionResult.Failed(message, reports.toSeq)
     } finally {
       removedKeysByFlow.values.foreach { df =>
         try { df.unpersist() }
-        catch { case _: Exception => }
+        catch { case NonFatal(_) => }
       }
     }
   }
@@ -180,7 +181,7 @@ class OrphanDetector(
           val removed = previousPKs.join(currentPKs, refCols, "left_anti")
           Some(removed)
         } catch {
-          case e: Exception =>
+          case NonFatal(e) =>
             throw new IllegalStateException(
               s"Failed to perform time travel on ${parentCfg.name}: ${SensitiveDataRedactor.message(e)}",
               e

@@ -21,6 +21,7 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.concurrent.Callable
 import scala.collection.JavaConverters._
+import scala.util.control.NonFatal
 
 /** Executes derived table functions and writes results to Iceberg as full-load tables. */
 class DerivedTableExecutor(
@@ -129,7 +130,7 @@ class DerivedTableExecutor(
       }
       DerivedExecution(result, Some(output))
     } catch {
-      case e: Exception =>
+      case NonFatal(e) =>
         val message = SensitiveDataRedactor.message(e)
         logger.error(s"Derived table $tableName failed: $message", SensitiveDataRedactor.safeThrowable(e))
         DerivedExecution(
@@ -175,7 +176,7 @@ class DerivedTableExecutor(
           classOf[RuntimeException]
         )
       } catch {
-        case error: Throwable =>
+        case NonFatal(error) =>
           val matches = reconcileSnapshots(fullTableName, context, Some(error))
           if (matches.nonEmpty) reconciled = true else throw error
       }
@@ -196,7 +197,7 @@ class DerivedTableExecutor(
       if (tableManager.tagSnapshot(fullTableName, snapshotId, batchId))
         logger.info(s"Tagged derived table snapshot $snapshotId on $fullTableName")
     } catch {
-      case e: Exception =>
+      case NonFatal(e) =>
         logger.warn(s"Failed to tag snapshot on $fullTableName: ${SensitiveDataRedactor.message(e)}")
     }
   }
@@ -209,7 +210,7 @@ class DerivedTableExecutor(
     val snapshots =
       try tableManager.findSnapshotsByOperationId(tableName, context.operationId)
       catch {
-        case lookupError: Throwable =>
+        case NonFatal(lookupError) =>
           throw AmbiguousCommitException(context.operationId, tableName, commitError.getOrElse(lookupError))
       }
     if (snapshots.size > 1)

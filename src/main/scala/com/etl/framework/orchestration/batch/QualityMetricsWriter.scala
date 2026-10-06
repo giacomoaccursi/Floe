@@ -17,6 +17,8 @@ import org.apache.spark.sql.types.{
 }
 import org.slf4j.LoggerFactory
 
+import scala.util.control.NonFatal
+
 class QualityMetricsWriter(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConfig])(implicit
     spark: SparkSession
 ) {
@@ -59,7 +61,7 @@ class QualityMetricsWriter(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConf
           df.writeTo(SqlIdentifier.quoteMultipart(fullTableName)).append()
           logger.info(s"Quality metrics written to $fullTableName: ${flowResults.size} flow rows")
         } catch {
-          case e: Exception =>
+          case NonFatal(e) =>
             logger.warn(s"Failed to write quality metrics: ${SensitiveDataRedactor.message(e)}")
         }
     }

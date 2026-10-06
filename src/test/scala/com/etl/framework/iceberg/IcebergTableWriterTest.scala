@@ -413,6 +413,32 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     result.icebergMetadata.flatMap(_.summary.get("floe.operation-id")) shouldBe Some(context.operationId)
   }
 
+  it should "propagate fatal errors without attempting commit reconciliation" in {
+    class ProbeTableManager extends IcebergTableManager(spark, icebergConfig) {
+      var reconciliationLookups: Int = 0
+      override def findSnapshotsByOperationId(tableName: String, operationId: String): Seq[CommittedSnapshot] = {
+        reconciliationLookups += 1
+        Seq.empty
+      }
+    }
+    val probeManager = new ProbeTableManager
+    val probeWriter = new IcebergTableWriter(spark, icebergConfig, probeManager)
+    val fc = flowConfig("fatal_commit")
+    val fatal = new VirtualMachineError("simulated fatal error") {}
+
+    val thrown = intercept[VirtualMachineError] {
+      probeWriter.writeFullLoad(
+        Seq((1, "Alice")).toDF("id", "name"),
+        fc,
+        CommitContext.forFlow("fatal-attempt", fc.name, "full"),
+        () => throw fatal
+      )
+    }
+
+    thrown should be theSameInstanceAs fatal
+    probeManager.reconciliationLookups shouldBe 0
+  }
+
   it should "return unmodified result when no snapshot id" in {
     val noSnapshot = WriteResult(0, None)
     val fc = flowConfig("no_snapshot_tag")
@@ -626,6 +652,7 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     "scd2_no_detect_del",
     "tag_result_test",
     "tracked_commit",
+    "fatal_commit",
     "recovery_commit",
     "delta_no_pk",
     "scd2_null_change",

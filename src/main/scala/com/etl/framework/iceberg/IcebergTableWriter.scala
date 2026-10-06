@@ -14,6 +14,7 @@ import java.time.format.DateTimeFormatter
 import java.util.{UUID, Map => JMap}
 import java.util.concurrent.Callable
 import scala.collection.JavaConverters._
+import scala.util.control.NonFatal
 
 case class WriteResult(
     recordsProcessed: Long,
@@ -459,7 +460,7 @@ class IcebergTableWriter(
         classOf[RuntimeException]
       )
     } catch {
-      case error: Throwable =>
+      case NonFatal(error) =>
         val matches = reconcileSnapshots(tableName, context, Some(error))
         if (matches.nonEmpty) reconciled = true
         else throw error
@@ -504,7 +505,7 @@ class IcebergTableWriter(
     val snapshots =
       try tableManager.findSnapshotsByOperationId(tableName, context.operationId)
       catch {
-        case lookupError: Throwable =>
+        case NonFatal(lookupError) =>
           throw AmbiguousCommitException(context.operationId, tableName, commitError.getOrElse(lookupError))
       }
 

@@ -2,6 +2,8 @@ package com.etl.framework.util
 
 import org.slf4j.Logger
 
+import scala.util.control.NonFatal
+
 /** Simple utility for timing operations
   */
 /** Utility for measuring and logging execution time of code blocks. */
@@ -17,7 +19,7 @@ object TimingUtil {
       logger.info(s"${SensitiveDataRedactor.redact(operation)} completed in ${durationMs}ms")
       result
     } catch {
-      case e: Throwable =>
+      case NonFatal(e) =>
         val durationMs = (System.nanoTime() - startTime) / 1000000
         logger.error(
           s"${SensitiveDataRedactor.redact(operation)} failed after ${durationMs}ms: ${SensitiveDataRedactor.message(e)}",
@@ -46,7 +48,7 @@ object TimingUtil {
       logger.info(s"${SensitiveDataRedactor.redact(operation)} completed in ${durationMs}ms")
       (result, durationMs)
     } catch {
-      case e: Throwable =>
+      case NonFatal(e) =>
         val durationMs = (System.nanoTime() - startTime) / 1000000
         logger.error(
           s"${SensitiveDataRedactor.redact(operation)} failed after ${durationMs}ms: ${SensitiveDataRedactor.message(e)}",

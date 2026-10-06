@@ -14,6 +14,7 @@ import java.io.File
 import java.util.Locale
 import scala.io.Source
 import scala.util.Using
+import scala.util.control.NonFatal
 import java.util.regex.Matcher
 
 /** Global configuration hints to enforce CamelCase naming strategy (e.g. "outputPath" in YAML matches "outputPath" in
@@ -74,7 +75,7 @@ trait ConfigLoader[T] {
         stream.close()
       }
     } catch {
-      case ex: Exception =>
+      case NonFatal(ex) =>
         Left(ConfigFileException(file = path, message = "Failed to read configuration file", cause = ex))
     }
   }
@@ -376,7 +377,7 @@ class FlowConfigLoader(configuration: Configuration = new Configuration()) exten
             .map(_.getPath.toString)
         )
     } catch {
-      case ex: Exception =>
+      case NonFatal(ex) =>
         Left(ConfigFileException(file = directory, message = "Failed to list directory", cause = ex))
     }
   }

@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory
 
 import java.util.Locale
 import scala.collection.JavaConverters._
+import scala.util.control.NonFatal
 
 /** Enforces the configured table-management policy and provides Iceberg snapshot operations.
   */
@@ -190,7 +191,7 @@ class IcebergTableManager(
               s"partition pruning will apply only to files written from this run onwards."
           )
         } catch {
-          case e: Exception if isPartitionAlreadyExistsError(e) =>
+          case NonFatal(error) if isPartitionAlreadyExistsError(error) =>
             logger.debug(s"Partition field $partitionExpr already present on $tableName, skipping")
         }
       }
@@ -336,7 +337,7 @@ class IcebergTableManager(
     case _                                                          => false
   }
 
-  private def isPartitionAlreadyExistsError(e: Exception): Boolean = {
+  private def isPartitionAlreadyExistsError(e: Throwable): Boolean = {
     val msg = Option(e.getMessage).getOrElse("").toLowerCase(Locale.ROOT)
     msg.contains("already exists") || msg.contains("redundant") || msg.contains("duplicate")
   }
@@ -546,7 +547,7 @@ class IcebergTableManager(
       logger.info(s"Tagged snapshot $snapshotId as '$tagName' on $tableName")
       true
     } catch {
-      case e: Exception =>
+      case NonFatal(e) =>
         logger.error(
           s"Failed to tag snapshot $snapshotId on $tableName: ${SensitiveDataRedactor.message(e)}"
         )
@@ -594,7 +595,7 @@ class IcebergTableManager(
         )
       )
     } catch {
-      case e: Exception =>
+      case NonFatal(e) =>
         logger.error(
           s"Failed to get snapshot metadata for $tableName: ${SensitiveDataRedactor.message(e)}"
         )

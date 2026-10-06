@@ -12,6 +12,7 @@ import org.apache.spark.sql.functions.col
 import org.slf4j.LoggerFactory
 
 import scala.util.{Failure, Success, Try}
+import scala.util.control.NonFatal
 
 /** Executes a single flow through Read -> Validate -> Transform -> Write (Iceberg)
   */
@@ -64,7 +65,7 @@ class FlowExecutor(
         metadataWriter.writeFlowMetadata(finalResult, request)
         finalResult
       } catch {
-        case e: Exception =>
+        case NonFatal(e) =>
           val message = SensitiveDataRedactor.message(e)
           logger.error(
             s"Flow metadata write failed for ${flowConfig.name}: $message",
@@ -256,7 +257,7 @@ class FlowExecutor(
   private def writeDiagnostic(label: String)(write: => Unit): Unit =
     try write
     catch {
-      case error: Exception =>
+      case NonFatal(error) =>
         val warning =
           s"Failed to write $label for ${flowConfig.name}: ${SensitiveDataRedactor.message(error)}"
         operationalWarnings :+= warning

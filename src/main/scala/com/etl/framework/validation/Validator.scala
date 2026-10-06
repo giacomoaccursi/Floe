@@ -5,6 +5,8 @@ import com.etl.framework.exceptions.{UnsupportedOperationException, ValidationCo
 import com.etl.framework.validation.validators.{DomainValidator, RangeValidator, RegexValidator}
 import org.apache.spark.sql.DataFrame
 
+import scala.util.control.NonFatal
+
 /** Trait for custom validators
   */
 trait Validator {
@@ -114,7 +116,7 @@ object ValidatorFactory {
           e
         )
       case e: ValidationConfigException => throw e
-      case e: Exception =>
+      case NonFatal(e) =>
         throw ValidationConfigException(
           s"Failed to instantiate custom validator: $className",
           e

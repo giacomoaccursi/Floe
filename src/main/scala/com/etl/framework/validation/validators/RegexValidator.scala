@@ -6,6 +6,8 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Column
 
+import scala.util.control.NonFatal
+
 /** Validator for regex pattern matching
   */
 class RegexValidator(flowName: Option[String] = None) extends BaseValidator(flowName) {
@@ -36,7 +38,7 @@ class RegexValidator(flowName: Option[String] = None) extends BaseValidator(flow
     try {
       pattern.r
     } catch {
-      case e: Exception =>
+      case NonFatal(e) =>
         throw ValidationConfigException(
           s"Invalid regex pattern for column '$column'${flowContext}: '$pattern' - ${e.getMessage}",
           e

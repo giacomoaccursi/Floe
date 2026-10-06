@@ -22,6 +22,7 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
 /** Executes one immutable pipeline attempt.
   *
@@ -132,7 +133,7 @@ class FlowOrchestrator(
                 )
           }
         } catch {
-          case error: Exception =>
+          case NonFatal(error) =>
             executionLogger.logExecutionFailure(attemptId, elapsedMillis(startedAtNanos), error)
             failedResult(request, state.flowResults, SensitiveDataRedactor.message(error))
         }
@@ -224,7 +225,7 @@ class FlowOrchestrator(
     try {
       metadataWriter.writeBatchMetadata(request, result, executionTimeMs)
     } catch {
-      case error: Exception =>
+      case NonFatal(error) =>
         val warning = s"Batch report write failed: ${SensitiveDataRedactor.message(error)}"
         logger.warn(warning, SensitiveDataRedactor.safeThrowable(error))
         warnings += warning
@@ -262,7 +263,7 @@ class FlowOrchestrator(
       try {
         if (result.success) listener.onBatchCompleted(result) else listener.onBatchFailed(result)
       } catch {
-        case error: Exception =>
+        case NonFatal(error) =>
           logger.warn(
             s"Batch listener ${listener.getClass.getSimpleName} failed: ${SensitiveDataRedactor.message(error)}",
             SensitiveDataRedactor.safeThrowable(error)

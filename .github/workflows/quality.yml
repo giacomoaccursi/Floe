@@ -1,0 +1,142 @@
+name: Quality
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  checks: write
+
+env:
+  SPARK_LOCAL_IP: "127.0.0.1"
+  JAVA_OPTS: "-Xmx2G"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  check:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: sbt
+
+      - uses: sbt/setup-sbt@v1
+
+      - name: Scalafmt check
+        run: sbt -J-Xss4m scalafmtCheckAll
+
+      - name: Compile
+        run: sbt -J-Xss4m compile
+
+      - name: Verify published runtime ownership
+        run: |
+          sbt -J-Xss4m makePom
+          pom=$(find target/scala-2.12 -maxdepth 1 -name '*.pom' -print -quit)
+          test -n "$pom"
+          rg -U '<artifactId>spark-core_2\.12</artifactId>\s*<version>3\.5\.8</version>\s*<scope>provided</scope>' "$pom"
+          rg -U '<artifactId>iceberg-spark-runtime-3\.5_2\.12</artifactId>\s*<version>1\.10\.1</version>\s*<scope>provided</scope>' "$pom"
+          rg -U '<artifactId>json4s-jackson_2\.12</artifactId>\s*<version>3\.7\.0-M11</version>\s*<scope>provided</scope>' "$pom"
+          rg -U '<artifactId>slf4j-api</artifactId>\s*<version>2\.0\.7</version>\s*<scope>provided</scope>' "$pom"
+          if rg -q '<artifactId>iceberg-aws-bundle</artifactId>' "$pom"; then
+            echo 'iceberg-aws-bundle must be supplied by the deployment, not Floe' >&2
+            exit 1
+          fi
+
+      - name: Verify deployable assembly boundary
+        run: |
+          sbt -J-Xss4m assembly
+          assembly_jar=$(find target/scala-2.12 -maxdepth 1 -name '*-assembly-*.jar' -print -quit)
+          test -n "$assembly_jar"
+          jar tf "$assembly_jar" > target/assembly-contents.txt
+          rg -q '^com/etl/framework/runner/FloeRunner\$.class$' target/assembly-contents.txt
+          rg -q '^pureconfig/ConfigReader.class$' target/assembly-contents.txt
+          if rg -q '^(scala/|org/apache/spark/|org/apache/iceberg/|org/json4s/|com/fasterxml/jackson/|org/slf4j/)' target/assembly-contents.txt; then
+            echo 'assembly contains a platform-owned runtime class' >&2
+            exit 1
+          fi
+
+      - name: Test with coverage
+        run: sbt -J-Xss4m coverage test coverageReport
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: target/scala-2.12/scoverage-report/
+
+      - name: Publish test results
+        uses: mikepenz/action-junit-report@v5
+        if: always()
+        with:
+          report_paths: "target/test-reports/TEST-*.xml"
+          check_name: "Test Results"
+          fail_on_failure: true
+          require_passed_tests: true
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Install documentation dependencies
+        run: python -m pip install -r requirements-docs.txt
+
+      - name: Build documentation strictly
+        run: mkdocs build --strict
+
+  orchestrator-references:
+    name: Orchestrator references
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: integrations/airflow/requirements.txt
+
+      - name: Install pinned Airflow runtime
+        run: |
+          airflow_version=3.3.2
+          python_version=3.12
+          constraints="https://raw.githubusercontent.com/apache/airflow/constraints-${airflow_version}/constraints-${python_version}.txt"
+          python -m pip install "apache-airflow==${airflow_version}" --constraint "${constraints}"
+          python -m pip install -r integrations/airflow/requirements.txt
+          python -m pip check
+
+      - name: Validate Airflow DAG
+        run: |
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          path = Path("integrations/airflow/floe_orders_dag.py")
+          spec = importlib.util.spec_from_file_location("floe_orders_dag", path)
+          assert spec is not None and spec.loader is not None
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          module.dag.validate()
+
+          task = module.dag.get_task("run_floe")
+          assert task.retries == 0
+          assert task._deploy_mode == "cluster"
+          assert task._track_driver_via_k8s_api is True
+          assert task.durable is True
+          PY
+
+      - name: Validate Step Functions definition
+        run: python -m json.tool integrations/aws-step-functions/emr-serverless.asl.json >/dev/null

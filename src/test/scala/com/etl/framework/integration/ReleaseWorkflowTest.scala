@@ -34,6 +34,20 @@ class ReleaseWorkflowTest extends AnyFlatSpec with Matchers {
     workflow should include("@semantic-release/exec@7.1.0")
   }
 
+  it should "gate publication on the complete reusable quality workflow" in {
+    val workflow = read(".github/workflows/release.yml")
+    val quality = read(".github/workflows/quality.yml")
+
+    workflow should include("uses: ./.github/workflows/quality.yml")
+    workflow should include("needs: quality")
+    quality should include("workflow_call:")
+    quality should include("sbt -J-Xss4m scalafmtCheckAll")
+    quality should include("sbt -J-Xss4m coverage test coverageReport")
+    quality should include("mkdocs build --strict")
+    quality should include("module.dag.validate()")
+    quality should include("json.tool integrations/aws-step-functions/emr-serverless.asl.json")
+  }
+
   private def read(path: String): String =
     new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8)
 }

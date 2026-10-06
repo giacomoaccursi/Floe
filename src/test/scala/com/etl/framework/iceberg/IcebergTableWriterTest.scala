@@ -8,6 +8,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.{Files, Path}
+import java.time.Instant
 
 class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
@@ -233,6 +234,43 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     aliceRecords.count() shouldBe 2
   }
 
+  it should "reject a changed version whose effective time does not follow the current version" in {
+    val fc = flowConfig("scd2_out_of_order", loadMode = LoadMode.SCD2, compareColumns = Seq("name"))
+    val currentTime = Instant.parse("2026-10-06T10:00:00Z")
+    val staleTime = Instant.parse("2026-10-06T09:00:00Z")
+    writer.writeSCD2Load(
+      Seq((1, "Alice")).toDF("id", "name"),
+      fc,
+      CommitContext.forFlow("initial", fc.name, "scd2", currentTime)
+    )
+
+    val error = intercept[IllegalArgumentException] {
+      writer.writeSCD2Load(
+        Seq((1, "Alice stale")).toDF("id", "name"),
+        fc,
+        CommitContext.forFlow("stale", fc.name, "scd2", staleTime)
+      )
+    }
+
+    error.getMessage should include("must be later than the current SCD2 version")
+    val table = spark.sql("SELECT * FROM writer_catalog.default.scd2_out_of_order")
+    table.count() shouldBe 1L
+    table.filter("is_current = true AND name = 'Alice'").count() shouldBe 1L
+  }
+
+  it should "allow an unchanged retry at the same effective time" in {
+    val fc = flowConfig("scd2_same_time_noop", loadMode = LoadMode.SCD2, compareColumns = Seq("name"))
+    val effectiveAt = Instant.parse("2026-10-06T10:00:00Z")
+    val data = Seq((1, "Alice")).toDF("id", "name")
+
+    writer.writeSCD2Load(data, fc, CommitContext.forFlow("initial", fc.name, "scd2", effectiveAt))
+    writer.writeSCD2Load(data, fc, CommitContext.forFlow("retry", fc.name, "scd2", effectiveAt))
+
+    val table = spark.sql("SELECT * FROM writer_catalog.default.scd2_same_time_noop")
+    table.count() shouldBe 1L
+    table.filter("is_current = true").count() shouldBe 1L
+  }
+
   it should "reject duplicate source keys before an SCD2 load" in {
     val fc = flowConfig("scd2_duplicate_source", loadMode = LoadMode.SCD2, compareColumns = Seq("name"))
     val duplicates = Seq((1, "Alice"), (1, "Alice_v2")).toDF("id", "name")
@@ -290,6 +328,33 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     val aliceCurrent = afterDay2.filter("id = 1 AND is_current = true").collect().head
     aliceCurrent.getAs[String]("name") shouldBe "Alice_v2"
     aliceCurrent.getAs[Boolean]("is_active") shouldBe true
+  }
+
+  it should "reject an out-of-order soft delete" in {
+    val fc = flowConfig(
+      "scd2_out_of_order_delete",
+      loadMode = LoadMode.SCD2,
+      compareColumns = Seq("name"),
+      detectDeletes = true,
+      isActiveColumn = Some("is_active")
+    )
+    val currentTime = Instant.parse("2026-10-06T10:00:00Z")
+    writer.writeSCD2Load(
+      Seq((1, "Alice"), (2, "Bob")).toDF("id", "name"),
+      fc,
+      CommitContext.forFlow("initial-delete", fc.name, "scd2", currentTime)
+    )
+
+    intercept[IllegalArgumentException] {
+      writer.writeSCD2Load(
+        Seq((1, "Alice")).toDF("id", "name"),
+        fc,
+        CommitContext.forFlow("stale-delete", fc.name, "scd2", currentTime.minusSeconds(1))
+      )
+    }.getMessage should include("must be later than the current SCD2 version")
+
+    val table = spark.sql("SELECT * FROM writer_catalog.default.scd2_out_of_order_delete")
+    table.filter("is_current = true AND is_active = true").count() shouldBe 2L
   }
 
   it should "not affect missing records when detectDeletes is false" in {
@@ -554,7 +619,10 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     "delta_idempotent",
     "scd2_first",
     "scd2_change",
+    "scd2_out_of_order",
+    "scd2_same_time_noop",
     "scd2_detect_del",
+    "scd2_out_of_order_delete",
     "scd2_no_detect_del",
     "tag_result_test",
     "tracked_commit",

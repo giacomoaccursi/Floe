@@ -5,7 +5,7 @@ import com.etl.framework.util.SqlIdentifier
 import org.apache.iceberg.exceptions.CommitStateUnknownException
 import org.apache.iceberg.spark.CommitMetadata
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.functions.{col, count, lit}
+import org.apache.spark.sql.functions.{col, count, expr, lit}
 import org.apache.spark.sql.types.StructType
 import org.slf4j.LoggerFactory
 
@@ -290,6 +290,7 @@ class IcebergTableWriter(
 
     df.createOrReplaceTempView(sourceView)
     try {
+      validateSCD2EffectiveTime(df, tableName, cfg, commitContext)
       buildStagedView(df, tableName, sourceView, stagedView, cfg)
       val mergeSql = buildMergeSql(df, tableName, stagedView, cfg, commitContext)
       logger.info(s"Executing SCD2 MERGE INTO on $tableName")
@@ -300,6 +301,45 @@ class IcebergTableWriter(
         val _ = spark.catalog.dropTempView(viewName)
       }
     }
+  }
+
+  /** Prevents negative or zero-length SCD2 intervals. An unchanged row at the same effective time remains a no-op; only
+    * mutations that would close a current version are rejected.
+    */
+  private def validateSCD2EffectiveTime(
+      df: DataFrame,
+      tableName: String,
+      cfg: SCD2Config,
+      commitContext: CommitContext
+  ): Unit = {
+    val source = df.alias("source")
+    val target = spark
+      .table(SqlIdentifier.quoteMultipart(tableName))
+      .filter(col(cfg.isCurrentCol) === true)
+      .alias("target")
+    val keyCondition = cfg.pkColumns
+      .map(column => source.col(column).eqNullSafe(target.col(column)))
+      .reduce(_ && _)
+    val boundaryViolation = target.col(cfg.validFromCol) >= expr(timestampLiteral(commitContext))
+    val changedCondition = cfg.compareColumns
+      .map(column => !source.col(column).eqNullSafe(target.col(column)))
+      .reduce(_ || _)
+
+    val invalidChangedVersion = target
+      .join(source, keyCondition, "inner")
+      .filter(changedCondition && boundaryViolation)
+      .limit(1)
+      .count() > 0L
+    val invalidDeletion = cfg.detectDeletes && target
+      .join(source, keyCondition, "left_anti")
+      .filter(boundaryViolation)
+      .limit(1)
+      .count() > 0L
+
+    require(
+      !invalidChangedVersion && !invalidDeletion,
+      s"effectiveAt ${commitContext.effectiveAt} must be later than the current SCD2 version for every changed or deleted key"
+    )
   }
 
   private def buildStagedView(

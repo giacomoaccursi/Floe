@@ -268,7 +268,7 @@ source:
     compression: "GZIP"
 ```
 
-The factory receives the full `SourceConfig`, optional `SchemaConfig`, and the `SparkSession`. Custom readers override built-in readers if the same type name is used. They must ignore or consume Floe-owned options such as `replayToken` instead of forwarding them blindly to an external connector.
+The factory receives the full `SourceConfig`, optional `SchemaConfig`, and the `SparkSession`. Custom readers override built-in readers if the same type name is used. They must ignore or consume Floe-owned options such as `replayToken` instead of forwarding them blindly to an external connector. When schema enforcement is enabled, Floe validates the resulting DataFrame's declared column names and exact Spark data types regardless of reader implementation.
 
 ## Related
 

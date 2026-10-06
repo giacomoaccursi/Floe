@@ -75,7 +75,7 @@ output:
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `name` | yes | — | Flow name — maps to the Iceberg table name |
+| `name` | yes | — | Non-blank, unqualified flow name — maps to the Iceberg table name; catalog and namespace are configured globally |
 | `description` | no | `""` | Human-readable description |
 | `version` | no | `""` | Flow version string |
 | `owner` | no | `""` | Team or person responsible |
@@ -101,7 +101,7 @@ Defines where data is read from.
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `type` | no | `file` | Source type: `file` or `jdbc` |
-| `path` | yes | — | For `file`: path to data (file, directory, or glob). For `jdbc`: table name (e.g. `public.customers`), ignored when `query` is provided in options. |
+| `path` | yes | — | For `file`: non-blank path to data (file, directory, or glob). For `jdbc`: non-blank table name (e.g. `public.customers`), unless a non-blank `query` is provided in options. |
 | `format` | for `file` | — | File format: `csv`, `parquet`, `json`, `avro`, `orc`. Not used for `jdbc`. |
 | `options` | no | `{}` | Connector options plus Floe-owned metadata such as `replayToken`; built-in readers do not forward Floe-owned keys to Spark |
 
@@ -209,7 +209,7 @@ Defines the expected schema and controls enforcement during read.
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `enforceSchema` | yes | — | If `true`, validate column presence and apply Spark schema during read |
+| `enforceSchema` | yes | — | If `true`, validate column presence and exact Spark data types. File readers also apply the declared schema during parsing; JDBC values are validated after the database read. |
 | `allowExtraColumns` | no | `true` | If `false`, reject data with columns not defined in `columns`. Only evaluated when `enforceSchema: true`. |
 | `columns` | no | `[]` | List of column definitions. Required when `enforceSchema: true`. |
 
@@ -219,6 +219,8 @@ When schema enforcement is not needed, the minimal configuration is:
 schema:
   enforceSchema: false
 ```
+
+When `enforceSchema: true`, `columns` must be non-empty. Column names, physical `sourceColumn` mappings, primary keys, dependencies, and SCD2 metadata names are checked for blanks and ambiguous duplicates before any source is read.
 
 ### Column definition
 
@@ -319,6 +321,8 @@ The FK is identified by an auto-generated display name (e.g. `(customer_id) -> c
 | `description` | string | — | — | Human-readable description |
 | `skipNull` | boolean | — | `true` | If true, NULL values pass without being checked |
 | `onFailure` | string | — | `reject` | Action on failure: `reject`, `warn`, `skip` |
+
+Floe validates rule structure during pipeline construction: regex syntax, finite numeric range bounds (maximum 38 decimal digits), `min <= max`, referenced schema columns, domain existence/non-empty values, and custom-validator names. The engine-managed `schema`, `not_null`, `pk_uniqueness`, and `fk_integrity` stages must not be repeated in `rules`.
 
 ## output
 

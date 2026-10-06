@@ -4,6 +4,7 @@ import com.etl.framework.orchestration.{ExecutionRequest, PipelineDefinition}
 
 import java.nio.charset.StandardCharsets
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 /** Logical and attempt identity for one table mutation.
@@ -64,7 +65,7 @@ object CommitContext {
       batchId: String,
       targetName: String,
       operationType: String,
-      effectiveAt: Instant = Instant.now()
+      effectiveAt: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS)
   ): CommitContext = {
     val definition = PipelineDefinition("adhoc", "unversioned", "0" * 64)
     val request = ExecutionRequest(

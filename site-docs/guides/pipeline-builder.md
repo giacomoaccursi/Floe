@@ -292,7 +292,7 @@ The context is immutable. Every method that modifies state returns a new instanc
 | `validatedFlows` | `Map[String, DataFrame]` | Completed dependencies pinned to their resulting snapshots |
 | `logicalRunId` | `String` | Stable business execution identity |
 | `attemptId` | `String` | Current driver invocation identity (`batchId` is a compatibility alias) |
-| `effectiveAt` | `Instant` | Functional time supplied in the execution request |
+| `effectiveAt` | `Instant` | Functional time supplied in the execution request, with at most microsecond precision |
 | `spark` | `SparkSession` | The active SparkSession |
 
 ### withData(newData)
@@ -357,7 +357,7 @@ Each derived table function receives a `DerivedTableContext`:
 | `spark` | `SparkSession` | The active SparkSession |
 | `logicalRunId` | `String` | Stable business execution identity |
 | `attemptId` | `String` | Current driver invocation (`batchId` is an alias) |
-| `effectiveAt` | `Instant` | Functional time supplied in the request |
+| `effectiveAt` | `Instant` | Functional time supplied in the request, with at most microsecond precision |
 | `availableTables` | `Set[String]` | Declared dependencies successfully resolved for this target |
 
 Each derived table must have a non-blank, unqualified name. Names are unique case-insensitively because Spark commonly resolves identifiers case-insensitively; catalog and namespace come from the Iceberg configuration. Dependencies are likewise unqualified logical flow or derived names. Invalid or colliding declarations fail during registration or build.

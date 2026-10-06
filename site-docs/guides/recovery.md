@@ -40,7 +40,7 @@ The identifiers have different meanings:
 | `pipelineId` | Stable identity of the pipeline in one environment |
 | `logicalRunId` | Stable identity of the business execution; keep it across an approved retry |
 | `attemptId` | Unique driver invocation; every resubmission gets a new value |
-| `effectiveAt` | Functional timestamp used by SCD2 and exposed to transformations |
+| `effectiveAt` | Functional timestamp used by SCD2 and exposed to transformations; must have at most microsecond precision |
 | `codeVersion` | Immutable application artifact identity, including custom Scala code |
 | `configDigest` | Canonical digest of the resolved semantic Floe/Spark configuration |
 

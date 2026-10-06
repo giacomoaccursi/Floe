@@ -114,6 +114,10 @@ final case class ExecutionRequest(
   ExecutionRequest.validateIdentifier("logicalRunId", logicalRunId)
   ExecutionRequest.validateIdentifier("attemptId", attemptId)
   require(effectiveAt != null, "effectiveAt is required")
+  require(
+    effectiveAt.getNano % 1000 == 0,
+    "effectiveAt must have at most microsecond precision because Spark timestamps cannot preserve nanoseconds"
+  )
   require(codeVersion != null && codeVersion.trim.nonEmpty, "codeVersion must not be blank")
   require(PipelineDefinition.isSha256(configDigest), "configDigest must be a lowercase SHA-256 digest")
   require(inputReferences.map(_.datasetId).distinct.size == inputReferences.size, "input references must be unique")

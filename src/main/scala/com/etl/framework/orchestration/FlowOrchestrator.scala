@@ -18,6 +18,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
@@ -57,7 +58,7 @@ class FlowOrchestrator(
       pipelineId = pipelineDefinition.pipelineId,
       logicalRunId = BatchIdGenerator.generate(globalConfig.processing.batchIdFormat),
       attemptId = UUID.randomUUID().toString,
-      effectiveAt = Instant.now(),
+      effectiveAt = Instant.now().truncatedTo(ChronoUnit.MICROS),
       codeVersion = pipelineDefinition.codeVersion,
       configDigest = pipelineDefinition.configDigest
     )

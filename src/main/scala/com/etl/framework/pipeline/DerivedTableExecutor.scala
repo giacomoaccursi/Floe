@@ -17,6 +17,7 @@ import org.apache.spark.sql.functions.lit
 import org.slf4j.LoggerFactory
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.concurrent.Callable
 import scala.collection.JavaConverters._
@@ -34,7 +35,7 @@ class DerivedTableExecutor(
       derivedTables: Seq[DerivedTableDefinition],
       batchId: String,
       inputTables: Map[String, DataFrame],
-      effectiveAt: Instant = Instant.now()
+      effectiveAt: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS)
   ): Seq[DerivedTableResult] =
     execute(
       derivedTables,

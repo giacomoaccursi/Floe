@@ -47,7 +47,7 @@ read
   → best-effort diagnostics
 ```
 
-`effectiveAt`, `logicalRunId`, and `attemptId` are available in `TransformationContext`. SCD2 timestamps use `effectiveAt`, not wall-clock time.
+`effectiveAt`, `logicalRunId`, and `attemptId` are available in `TransformationContext`. SCD2 timestamps use `effectiveAt`, not wall-clock time. Supply `effectiveAt` with at most microsecond precision: Spark timestamps cannot preserve finer nanosecond digits, so the request rejects them instead of recording two inconsistent representations.
 
 After a successful parent flow, downstream validation reads the exact `resultingSnapshotId`. It does not silently read mutable HEAD. A successful snapshotless empty table is represented by an empty DataFrame with the table schema.
 

@@ -63,6 +63,15 @@ class ExecutionContractTest extends AnyFlatSpec with Matchers {
     )
   }
 
+  it should "reject effective times that cannot be represented by Spark timestamps" in {
+    val pipeline = definition()
+    val nanosecondInstant = Instant.parse("2026-09-29T08:00:00.123456789Z")
+
+    val error = intercept[IllegalArgumentException](pipeline.newRequest("run-1", nanosecondInstant))
+
+    error.getMessage should include("microsecond precision")
+  }
+
   it should "reject secret material while allowing versioned secret references" in {
     val pipeline = definition()
 

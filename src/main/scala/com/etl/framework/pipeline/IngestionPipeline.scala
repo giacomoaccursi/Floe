@@ -462,6 +462,18 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
 
     flowConfigs.foreach { config =>
       FlowConfigValidator.validate(config).foreach(error => errors += s"Flow '${config.name}': $error")
+      config.validation.rules
+        .filter(_.`type` == com.etl.framework.config.ValidationRuleType.Domain)
+        .flatMap(_.domainName)
+        .filter(_.trim.nonEmpty)
+        .foreach { domainName =>
+          domainsConfigOpt.flatMap(_.domains.get(domainName)) match {
+            case None => errors += s"Flow '${config.name}': domain '$domainName' is not configured"
+            case Some(domain) if domain.values.isEmpty =>
+              errors += s"Flow '${config.name}': domain '$domainName' has no values"
+            case _ =>
+          }
+        }
       config.validation.foreignKeys.foreach { fk =>
         if (!flowNames.contains(fk.references.flow))
           errors += s"Flow '${config.name}': FK references unknown flow '${fk.references.flow}'"

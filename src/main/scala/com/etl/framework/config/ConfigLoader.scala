@@ -11,6 +11,7 @@ import pureconfig.module.yaml._
 import ConfigHints._
 
 import java.io.File
+import java.util.Locale
 import scala.io.Source
 import scala.util.Using
 import java.util.regex.Matcher
@@ -330,7 +331,11 @@ class FlowConfigLoader(configuration: Configuration = new Configuration()) exten
           )
         )
       else {
-        val duplicates = configs.groupBy(_.name).collect { case (name, dups) if dups.size > 1 => name }.toSeq
+        val duplicates = configs
+          .groupBy(_.name.toLowerCase(Locale.ROOT))
+          .values
+          .collect { case dups if dups.size > 1 => dups.map(_.name).sorted.mkString("/") }
+          .toSeq
         if (duplicates.nonEmpty)
           Left(
             ConfigFileException(

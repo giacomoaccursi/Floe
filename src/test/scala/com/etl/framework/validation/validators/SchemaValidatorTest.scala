@@ -114,4 +114,16 @@ class SchemaValidatorTest extends AnyFlatSpec with Matchers {
     result.valid.count() shouldBe 0
     result.rejected.get.count() shouldBe 1
   }
+
+  it should "reject a source column whose data type differs from the contract" in {
+    val schema = StructType(Seq(StructField("id", LongType, nullable = false)))
+    val df = spark.createDataFrame(Seq(Row(1L)).asJava, schema)
+    val config = createConfig(Seq(ColumnConfig("id", "integer", nullable = false)))
+
+    val result = new SchemaValidator(config, Some("test_flow")).validate(df, ValidationRule(Schema))
+
+    result.valid.count() shouldBe 0
+    result.rejected.get.count() shouldBe 1
+    result.rejected.get.select("_rejection_reason").head().getString(0) should include("expected INT but found BIGINT")
+  }
 }

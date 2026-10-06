@@ -220,7 +220,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |  format: csv
         |  options: {}
         |schema:
-        |  enforceSchema: true
+        |  enforceSchema: false
         |  allowExtraColumns: false
         |  columns: []
         |loadMode:
@@ -260,7 +260,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |  format: csv
         |  options: {}
         |schema:
-        |  enforceSchema: true
+        |  enforceSchema: false
         |  allowExtraColumns: false
         |  columns: []
         |loadMode:
@@ -402,7 +402,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |  format: csv
         |  options: {}
         |schema:
-        |  enforceSchema: true
+        |  enforceSchema: false
         |  allowExtraColumns: false
         |  columns: []
         |loadMode:
@@ -528,7 +528,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |  format: csv
         |  options: {}
         |schema:
-        |  enforceSchema: true
+        |  enforceSchema: false
         |  allowExtraColumns: false
         |  columns: []
         |loadMode:
@@ -558,7 +558,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
     result.right.get.head.name shouldBe "valid_flow"
   }
 
-  it should "reject duplicate flow names in loadAll" in {
+  it should "reject case-insensitive duplicate flow names in loadAll" in {
     val tempDir = Files.createTempDirectory("dup-flow-test").toFile
     tempDir.deleteOnExit()
 
@@ -584,12 +584,13 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |  options: {}
       """.stripMargin
 
-    Seq("flow_a.yaml", "flow_b.yaml").foreach { fileName =>
-      val f = new java.io.File(tempDir, fileName)
-      f.deleteOnExit()
-      val pw = new PrintWriter(f)
-      try pw.write(flowYaml)
-      finally pw.close()
+    Seq("flow_a.yaml" -> flowYaml, "flow_b.yaml" -> flowYaml.replace("same_name", "SAME_NAME")).foreach {
+      case (fileName, content) =>
+        val f = new java.io.File(tempDir, fileName)
+        f.deleteOnExit()
+        val pw = new PrintWriter(f)
+        try pw.write(content)
+        finally pw.close()
     }
 
     val loader = new FlowConfigLoader()

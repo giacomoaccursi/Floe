@@ -1,7 +1,7 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.exceptions.ValidationConfigException
-import com.etl.framework.config.ValidationRule
+import com.etl.framework.config.{NumericBound, ValidationRule}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Column
@@ -79,35 +79,12 @@ class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flow
 
   /** Parses a finite numeric bound.
     */
-  private def parseFiniteNumericValue(value: String, fieldName: String, column: String): BigDecimal = {
-    try {
-      val parsed = BigDecimal(value).bigDecimal.stripTrailingZeros
-      val normalized = if (parsed.scale < 0) parsed.setScale(0) else parsed
-      val requiredPrecision = math.max(normalized.precision, normalized.scale)
-      if (requiredPrecision > DecimalType.MAX_PRECISION) {
-        throw ValidationConfigException(
-          s"Range validation error for column '$column'${flowContext}: '$fieldName' value '$value' exceeds Spark's maximum decimal precision of ${DecimalType.MAX_PRECISION} digits"
-        )
-      }
-      BigDecimal(normalized)
-    } catch {
-      case e: NumberFormatException =>
-        val isNonFinite =
-          try !java.lang.Double.isFinite(java.lang.Double.parseDouble(value))
-          catch { case _: NumberFormatException => false }
-
-        if (isNonFinite)
-          throw ValidationConfigException(
-            s"Range validation error for column '$column'${flowContext}: '$fieldName' value '$value' must be finite",
-            e
-          )
-        else
-          throw ValidationConfigException(
-            s"Range validation error for column '$column'${flowContext}: '$fieldName' value '$value' is not numeric",
-            e
-          )
+  private def parseFiniteNumericValue(value: String, fieldName: String, column: String): BigDecimal =
+    NumericBound.parse(value, fieldName) match {
+      case Right(parsed) => parsed
+      case Left(error) =>
+        throw ValidationConfigException(s"Range validation error for column '$column'${flowContext}: $error")
     }
-  }
 
   private def decimalTypeFor(bounds: Seq[BigDecimal]): DecimalType = {
     val integerDigits = bounds.map(value => math.max(value.precision - value.scale, 0)).max

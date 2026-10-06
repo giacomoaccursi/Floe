@@ -1,11 +1,9 @@
 package com.etl.framework.io.readers
 
-import com.etl.framework.config.{SchemaConfig, SourceConfig}
+import com.etl.framework.config.{ColumnDataType, SchemaConfig, SourceConfig}
 import com.etl.framework.exceptions.UnsupportedOperationException
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
-
-import java.util.Locale
 
 /** DataReader implementation for file-based sources Supports CSV, Parquet, JSON formats with file pattern matching Can
   * optionally enforce schema during read for type safety
@@ -64,34 +62,12 @@ class FileDataReader(
   /** Maps string type names to Spark DataTypes
     */
   private def mapTypeToSparkType(typeName: String): DataType = {
-    typeName.toLowerCase(Locale.ROOT) match {
-      case "string" | "varchar" | "text" => StringType
-      case "int" | "integer"             => IntegerType
-      case "long" | "bigint"             => LongType
-      case "float"                       => FloatType
-      case "double"                      => DoubleType
-      case "boolean" | "bool"            => BooleanType
-      case "date"                        => DateType
-      case "timestamp" | "datetime"      => TimestampType
-      case d if d.startsWith("decimal") =>
-        val paramPattern = """decimal\((\d+),\s*(\d+)\)""".r
-        d match {
-          case paramPattern(p, s) => DecimalType(p.toInt, s.toInt)
-          case "decimal"          => DecimalType(38, 18)
-          case _ =>
-            throw UnsupportedOperationException(
-              operation = s"type '$d'",
-              details = "Decimal format must be 'decimal' or 'decimal(precision, scale)', e.g. 'decimal(10, 2)'"
-            )
-        }
-      case "binary"             => BinaryType
-      case "byte" | "tinyint"   => ByteType
-      case "short" | "smallint" => ShortType
-      case other =>
+    ColumnDataType.parse(typeName) match {
+      case Right(dataType) => dataType
+      case Left(details) =>
         throw UnsupportedOperationException(
-          operation = s"type '$other'",
-          details =
-            "Supported types: string, int, long, float, double, boolean, date, timestamp, decimal, binary, byte, short"
+          operation = s"type '$typeName'",
+          details = details
         )
     }
   }
@@ -104,7 +80,7 @@ class FileDataReader(
     */
   private def validateFormat(format: String): Unit = {
     val supportedFormats = Set("csv", "parquet", "json", "avro", "orc")
-    if (!supportedFormats.contains(format.toLowerCase(Locale.ROOT))) {
+    if (!supportedFormats.exists(_.equalsIgnoreCase(format))) {
       throw UnsupportedOperationException(
         operation = s"file format '$format'",
         details = s"Supported formats: ${supportedFormats.mkString(", ")}"

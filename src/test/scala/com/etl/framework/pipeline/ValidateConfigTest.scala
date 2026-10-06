@@ -354,4 +354,83 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
     issues should include("qualityMetricsTable 'ORDERS' collides with flow 'orders'")
     intercept[IllegalArgumentException](builder.build()).getMessage should include("qualityMetricsTable")
   }
+
+  it should "reject malformed schema identifiers before reading a source" in {
+    val flow = TestFixtures.flowConfig(
+      "sales.daily",
+      columns = Seq(
+        ColumnConfig("OrderId", "long", nullable = false),
+        ColumnConfig("orderid", "long", nullable = false),
+        ColumnConfig(" ", " ", nullable = true, sourceColumn = Some(" "))
+      ),
+      enforceSchema = true
+    )
+
+    val issues = IngestionPipeline
+      .builder()
+      .withGlobalConfig(TestFixtures.globalConfig())
+      .withFlowConfigs(Seq(flow))
+      .validate()
+      .mkString(" ")
+
+    issues should include("name must be unqualified")
+    issues should include("schema column names must not be blank")
+    issues should include("schema column types must not be blank")
+    issues should include("case-insensitive duplicate column names")
+    issues should include("sourceColumn values must not be blank")
+  }
+
+  it should "reject incomplete validation rules before reading a source" in {
+    val flow = TestFixtures.flowConfig(
+      "orders",
+      columns = Seq(ColumnConfig("email", "string", nullable = true)),
+      enforceSchema = true,
+      rules = Seq(
+        ValidationRule(ValidationRuleType.Regex, column = Some("email"), pattern = Some("[")),
+        ValidationRule(ValidationRuleType.Range, column = Some("email")),
+        ValidationRule(ValidationRuleType.Range, column = Some("email"), min = Some("NaN")),
+        ValidationRule(ValidationRuleType.Domain, column = Some("email"), domainName = Some("missing")),
+        ValidationRule(ValidationRuleType.Custom, `class` = Some(" ")),
+        ValidationRule(ValidationRuleType.NotNull)
+      )
+    )
+
+    val issues = IngestionPipeline
+      .builder()
+      .withGlobalConfig(TestFixtures.globalConfig())
+      .withFlowConfigs(Seq(flow))
+      .validate()
+      .mkString(" ")
+
+    issues should include("invalid regex pattern")
+    issues should include("requires min or max")
+    issues should include("'min' value 'NaN' must be finite")
+    issues should include("domain 'missing' is not configured")
+    issues should include("custom rule requires a non-blank class")
+    issues should include("rule type 'not_null' is managed by the validation engine")
+  }
+
+  it should "reject colliding SCD2 metadata names" in {
+    val base = TestFixtures.flowConfig(
+      "customers",
+      loadMode = LoadMode.SCD2,
+      columns = Seq(
+        ColumnConfig("id", "string", nullable = false),
+        ColumnConfig("name", "string", nullable = true)
+      ),
+      enforceSchema = true
+    )
+    val flow = base.copy(
+      loadMode = base.loadMode.copy(validFromColumn = Some("state_time"), validToColumn = Some("STATE_TIME"))
+    )
+
+    val issues = IngestionPipeline
+      .builder()
+      .withGlobalConfig(TestFixtures.globalConfig())
+      .withFlowConfigs(Seq(flow))
+      .validate()
+      .mkString(" ")
+
+    issues should include("SCD2 metadata column names must be unique case-insensitively")
+  }
 }

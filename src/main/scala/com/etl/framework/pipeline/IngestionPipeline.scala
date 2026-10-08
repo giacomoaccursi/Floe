@@ -7,10 +7,11 @@ import com.etl.framework.config.{
   FlowConfigLoader,
   FlowConfigValidator,
   GlobalConfig,
-  GlobalConfigLoader
+  GlobalConfigLoader,
+  CatalogMode
 }
 import com.etl.framework.exceptions.{BatchFailedException, ConfigFileException, MissingConfigFieldException}
-import com.etl.framework.iceberg.catalog.{CatalogProvider, CatalogRuntime}
+import com.etl.framework.iceberg.catalog.{CatalogFactory, CatalogProvider, CatalogRuntime}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.{
   BatchListener,
@@ -29,6 +30,7 @@ import scala.collection._
 import java.util.Locale
 import java.io.FileNotFoundException
 import java.nio.file.NoSuchFileException
+import java.time.format.DateTimeFormatter
 
 /** Fluent API builder for Ingestion pipeline (Extract, Load & Validation)
   */
@@ -437,6 +439,24 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
 
   private def validationErrors(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConfig]): Seq[String] = {
     val errors = scala.collection.mutable.ArrayBuffer[String]()
+    val requiredPaths = Seq(
+      "outputPath" -> globalConfig.paths.outputPath,
+      "rejectedPath" -> globalConfig.paths.rejectedPath,
+      "metadataPath" -> globalConfig.paths.metadataPath
+    )
+    requiredPaths.foreach { case (name, value) =>
+      if (value.trim.isEmpty) errors += s"paths.$name must not be blank"
+    }
+    if (globalConfig.paths.warningsPath.exists(_.trim.isEmpty))
+      errors += "paths.warningsPath must not be blank when configured"
+    val batchIdFormat = globalConfig.processing.batchIdFormat
+    if (batchIdFormat.trim.isEmpty) errors += "processing.batchIdFormat must not be blank"
+    else if (
+      batchIdFormat != "timestamp" && batchIdFormat != "datetime" &&
+      scala.util.Try(DateTimeFormatter.ofPattern(batchIdFormat)).isFailure
+    ) errors += "processing.batchIdFormat is not a valid DateTimeFormatter pattern"
+    if (globalConfig.processing.qualityMetricsTable.exists(_.trim.isEmpty))
+      errors += "processing.qualityMetricsTable must not be blank"
     globalConfig.processing.maxRejectionRate.foreach { rate =>
       if (!java.lang.Double.isFinite(rate)) errors += "processing.maxRejectionRate must be finite"
       else if (rate < 0.0 || rate > 1.0)
@@ -444,6 +464,24 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     }
     if (globalConfig.performance.maxParallelFlows <= 0)
       errors += "performance.maxParallelFlows must be greater than zero"
+    if (globalConfig.iceberg.catalogName.trim.isEmpty) errors += "iceberg.catalogName must not be blank"
+    if (globalConfig.iceberg.namespace.trim.isEmpty) errors += "iceberg.namespace must not be blank"
+    if (!Set("avro", "orc", "parquet").contains(globalConfig.iceberg.fileFormat))
+      errors += "iceberg.fileFormat must be one of: avro, orc, parquet"
+    if (globalConfig.iceberg.catalogProperties.keys.exists(_.trim.isEmpty))
+      errors += "iceberg.catalogProperties keys must not be blank"
+    if (globalConfig.iceberg.catalogMode == CatalogMode.Configure) {
+      CatalogFactory.createCatalogProvider(globalConfig.iceberg.catalogType, extraCatalogProviders.toMap) match {
+        case Left(error) => errors += error
+        case Right(provider) =>
+          scala.util.Try(provider.validateConfig(globalConfig.iceberg)) match {
+            case scala.util.Success(Left(error)) => errors += s"Invalid Iceberg catalog config: $error"
+            case scala.util.Failure(error) =>
+              errors += s"Iceberg catalog validation failed: ${SensitiveDataRedactor.message(error)}"
+            case _ =>
+          }
+      }
+    }
     globalConfig.iceberg.maintenance.validationErrors.foreach(error => errors += s"Iceberg maintenance: $error")
 
     val flowNameGroups = flowConfigs.groupBy(_.name.toLowerCase(Locale.ROOT)).values.filter(_.size > 1).toSeq

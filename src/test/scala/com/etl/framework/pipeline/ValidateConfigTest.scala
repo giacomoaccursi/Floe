@@ -446,4 +446,97 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
 
     issues should contain("performance.maxParallelFlows must be greater than zero")
   }
+
+  it should "reject invalid Iceberg layout before creating a target table" in {
+    val flow = TestFixtures.flowConfig(
+      "events",
+      columns = Seq(
+        ColumnConfig("id", "long", nullable = false),
+        ColumnConfig("event_time", "timestamp", nullable = false),
+        ColumnConfig("payload", "string", nullable = true)
+      ),
+      enforceSchema = true,
+      output = OutputConfig(
+        sortOrder = Seq("missing", " ", "ID", "id"),
+        icebergPartitions = Seq(
+          "month(missing)",
+          "bucket(0, id)",
+          "truncate(-1, payload)",
+          "unknown(event_time)",
+          " ",
+          "DAY(event_time)",
+          "day(EVENT_TIME)"
+        )
+      )
+    )
+
+    val issues = IngestionPipeline
+      .builder()
+      .withGlobalConfig(TestFixtures.globalConfig())
+      .withFlowConfigs(Seq(flow))
+      .validate()
+      .mkString(" ")
+
+    issues should include("sortOrder columns must not be blank")
+    issues should include("sortOrder columns must be unique case-insensitively")
+    issues should include("sortOrder columns are not declared in schema: missing")
+    issues should include("Iceberg partition transform 'month(missing)' references undeclared column 'missing'")
+    issues should include("Iceberg partition transform 'bucket(0, id)' requires a positive width")
+    issues should include("invalid Iceberg partition transform 'truncate(-1, payload)'")
+    issues should include("unsupported Iceberg partition transform 'unknown(event_time)'")
+    issues should include("Iceberg partition transforms must not be blank")
+    issues should include("Iceberg partition transforms must be unique case-insensitively")
+  }
+
+  it should "reject invalid global runtime contracts during static validation" in {
+    val base = TestFixtures.globalConfig()
+    val global = base.copy(
+      paths = PathsConfig(" ", "", " ", warningsPath = Some("")),
+      processing = ProcessingConfig(batchIdFormat = "invalid", qualityMetricsTable = Some(" ")),
+      iceberg = base.iceberg.copy(
+        catalogMode = CatalogMode.Configure,
+        catalogType = "missing",
+        catalogName = " ",
+        namespace = "",
+        fileFormat = "json",
+        catalogProperties = Map(" " -> "value")
+      )
+    )
+
+    val issues = IngestionPipeline
+      .builder()
+      .withGlobalConfig(global)
+      .withFlowConfigs(Seq(TestFixtures.flowConfig("orders")))
+      .validate()
+      .mkString(" ")
+
+    issues should include("paths.outputPath must not be blank")
+    issues should include("paths.rejectedPath must not be blank")
+    issues should include("paths.metadataPath must not be blank")
+    issues should include("paths.warningsPath must not be blank when configured")
+    issues should include("processing.batchIdFormat is not a valid DateTimeFormatter pattern")
+    issues should include("processing.qualityMetricsTable must not be blank")
+    issues should include("iceberg.catalogName must not be blank")
+    issues should include("iceberg.namespace must not be blank")
+    issues should include("iceberg.fileFormat must be one of: avro, orc, parquet")
+    issues should include("iceberg.catalogProperties keys must not be blank")
+    issues should include("Unsupported catalog type: 'missing'")
+  }
+
+  it should "reject reserved and blank Iceberg table properties before execution" in {
+    val flow = TestFixtures.flowConfig(
+      "orders",
+      output = OutputConfig(tableProperties = Map("format-version" -> "1", " " -> "value"))
+    )
+
+    val issues = IngestionPipeline
+      .builder()
+      .withGlobalConfig(TestFixtures.globalConfig())
+      .withFlowConfigs(Seq(flow))
+      .validate()
+      .mkString(" ")
+
+    issues should include("tableProperties must not override 'format-version'")
+    issues should include("tableProperties keys must not be blank")
+  }
 }

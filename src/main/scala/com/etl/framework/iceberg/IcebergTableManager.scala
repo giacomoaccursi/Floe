@@ -1,6 +1,6 @@
 package com.etl.framework.iceberg
 
-import com.etl.framework.config.{DdlMode, FlowConfig, IcebergConfig}
+import com.etl.framework.config.{DdlMode, FlowConfig, IcebergConfig, IcebergPartitionTransform}
 import com.etl.framework.util.{SensitiveDataRedactor, SqlIdentifier}
 import org.apache.iceberg.{HasTableOperations, Table, TableProperties}
 import org.apache.iceberg.spark.Spark3Util
@@ -307,26 +307,7 @@ class IcebergTableManager(
   }
 
   private def canonicalPartitionTransform(partition: String): String = {
-    val transformPattern = """^(\w+)\((.+)\)$""".r
-    partition.trim match {
-      case transformPattern(func, args) =>
-        val normalizedFunction = func.toLowerCase(Locale.ROOT)
-        normalizedFunction match {
-          case "year" | "month" | "day" | "hour" =>
-            s"$normalizedFunction(${args.trim})"
-          case "bucket" | "truncate" =>
-            val parts = args.split(",").map(_.trim)
-            require(
-              parts.length == 2 && parts(0).forall(_.isDigit),
-              s"Invalid $normalizedFunction partition transform: $partition"
-            )
-            s"$normalizedFunction[${parts(0)}](${parts(1)})"
-          case _ =>
-            throw new IllegalArgumentException(s"Unsupported Iceberg partition transform: $func")
-        }
-      case column if column.nonEmpty => s"identity($column)"
-      case _                         => throw new IllegalArgumentException("Partition column cannot be blank")
-    }
+    IcebergPartitionTransform.parse(partition).fold(error => throw new IllegalArgumentException(error), _.canonical)
   }
 
   /** Checks if a type change is safe (no data loss). Only int→long, float→double, decimal precision up. */
@@ -420,30 +401,13 @@ class IcebergTableManager(
   }
 
   private[iceberg] def parsePartitionTransform(partition: String): String = {
-    val transformPattern = """^(\w+)\((.+)\)$""".r
-
-    partition match {
-      case transformPattern(func, args) =>
-        val normalizedFunction = func.toLowerCase(Locale.ROOT)
-        normalizedFunction match {
-          case "year" | "month" | "day" | "hour" =>
-            s"$normalizedFunction(${SqlIdentifier.quote(args.trim)})"
-          case "bucket" =>
-            val parts = args.split(",").map(_.trim)
-            require(parts.length == 2 && parts(0).forall(_.isDigit), s"Invalid bucket partition transform: $partition")
-            s"bucket(${parts(0)}, ${SqlIdentifier.quote(parts(1))})"
-          case "truncate" =>
-            val parts = args.split(",").map(_.trim)
-            require(
-              parts.length == 2 && parts(0).forall(_.isDigit),
-              s"Invalid truncate partition transform: $partition"
-            )
-            s"truncate(${parts(0)}, ${SqlIdentifier.quote(parts(1))})"
-          case _ =>
-            throw new IllegalArgumentException(s"Unsupported Iceberg partition transform: $func")
-        }
-      case _ =>
-        SqlIdentifier.quote(partition.trim)
+    val transform = IcebergPartitionTransform
+      .parse(partition)
+      .fold(error => throw new IllegalArgumentException(error), identity)
+    transform.width match {
+      case Some(width) => s"${transform.function}($width, ${SqlIdentifier.quote(transform.column)})"
+      case None if transform.function == "identity" => SqlIdentifier.quote(transform.column)
+      case None => s"${transform.function}(${SqlIdentifier.quote(transform.column)})"
     }
   }
 

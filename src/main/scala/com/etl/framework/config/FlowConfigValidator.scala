@@ -61,6 +61,38 @@ object FlowConfigValidator {
     if (config.dependsOn.map(_.toLowerCase(Locale.ROOT)).distinct.size != config.dependsOn.size)
       errors += "dependsOn names must be unique case-insensitively"
     if (config.dependsOn.exists(_.equalsIgnoreCase(config.name))) errors += "a flow cannot depend on itself"
+    if (config.output.tableProperties.keys.exists(_.trim.isEmpty))
+      errors += "tableProperties keys must not be blank"
+    if (config.output.tableProperties.keys.exists(_.equalsIgnoreCase("format-version")))
+      errors += "tableProperties must not override 'format-version'; Floe requires Iceberg format version 2"
+
+    val sortColumns = config.output.sortOrder.map(_.trim)
+    if (sortColumns.exists(_.isEmpty)) errors += "sortOrder columns must not be blank"
+    if (sortColumns.map(_.toLowerCase(Locale.ROOT)).distinct.size != sortColumns.size)
+      errors += "sortOrder columns must be unique case-insensitively"
+    if (declaredSet.nonEmpty) {
+      val declaredNormalized = normalizedDeclaredColumns.toSet
+      val missingSortColumns = sortColumns
+        .filter(_.nonEmpty)
+        .filterNot(column => declaredNormalized.contains(column.toLowerCase(Locale.ROOT)))
+        .distinct
+      if (missingSortColumns.nonEmpty)
+        errors += s"sortOrder columns are not declared in schema: ${missingSortColumns.mkString(", ")}"
+    }
+
+    val parsedPartitions = config.output.icebergPartitions.map(IcebergPartitionTransform.parse)
+    parsedPartitions.collect { case Left(error) => error }.foreach(errors += _)
+    val validPartitions = parsedPartitions.collect { case Right(transform) => transform }
+    if (validPartitions.map(_.canonicalKey).distinct.size != validPartitions.size)
+      errors += "Iceberg partition transforms must be unique case-insensitively"
+    if (declaredSet.nonEmpty) {
+      val declaredNormalized = normalizedDeclaredColumns.toSet
+      validPartitions.foreach { transform =>
+        if (!declaredNormalized.contains(transform.column.toLowerCase(Locale.ROOT)))
+          errors +=
+            s"Iceberg partition transform '${transform.display}' references undeclared column '${transform.column}'"
+      }
+    }
 
     if (declaredSet.nonEmpty) {
       val missingPk = config.validation.primaryKey.filterNot(declaredSet)

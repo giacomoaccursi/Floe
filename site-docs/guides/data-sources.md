@@ -32,7 +32,7 @@ source:
 
 ### Common CSV options
 
-Connector options are passed to Spark's CSV reader via `spark.read.options()`. Floe-owned metadata such as `replayToken` is removed first.
+Connector options are passed directly to Spark's CSV reader via `spark.read.options()`.
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -211,7 +211,7 @@ Key options:
 | `lowerBound` / `upperBound` | Range for partition column |
 | `numPartitions` | Number of parallel JDBC connections |
 
-Reader options are passed through to the Spark JDBC datasource except Floe-owned recovery metadata such as `replayToken`. The framework does not bundle database drivers — add the appropriate driver JAR to your classpath.
+The reader consumes `url` and `query`; remaining options are passed through to the Spark JDBC datasource. The framework does not bundle database drivers — add the appropriate driver JAR to your classpath.
 
 Credentials should not be hardcoded in YAML. Use variable substitution (`${DB_PASSWORD}`) and resolve them at runtime via `withVariables()` in the pipeline builder, sourcing values from your secret manager.
 
@@ -219,17 +219,19 @@ Credentials should not be hardcoded in YAML. Use variable substitution (`${DB_PA
 
 JDBC queries are not inherently repeatable. For an operator-approved retry, materialize a stable extract or bind the query to a database mechanism that truly preserves the same source version, then record that version in the execution request:
 
-```yaml
-source:
-  type: jdbc
-  path: public.orders
-  options:
-    url: "jdbc:postgresql://db/app"
-    query: "SELECT * FROM orders_extract WHERE extract_id = '2026-09-24T00:00:00Z'"
-    replayToken: "orders/extract/2026-09-24T00:00:00Z/v1"
+```scala
+import com.etl.framework.orchestration.InputReference
+
+val request = pipeline.executionDefinition.newRequest(
+  logicalRunId = "orders-2026-09-24",
+  effectiveAt = java.time.Instant.parse("2026-09-24T00:00:00Z"),
+  inputReferences = Seq(
+    InputReference("orders", "extract/2026-09-24T00:00:00Z/v1", "jdbc-materialized-extract")
+  )
+)
 ```
 
-A token is an assertion by the application, not a snapshot mechanism. A constant token cannot make a changing query deterministic. See [Recovery and Production Operations](recovery.md#retry-policy).
+An input reference is evidence, not a snapshot mechanism. A constant version cannot make a changing query deterministic. See [Recovery and Production Operations](recovery.md#retry-policy).
 
 ## Custom readers
 
@@ -245,7 +247,7 @@ val s3SelectReader: DataReaderFactory.ReaderFactory = (config, schema, spark) =>
     override def read(): DataFrame = {
       spark.read
         .format("s3selectCSV")
-        .options(config.options - "replayToken")
+        .options(config.options)
         .load(config.path)
     }
   }
@@ -268,7 +270,7 @@ source:
     compression: "GZIP"
 ```
 
-The factory receives the full `SourceConfig`, optional `SchemaConfig`, and the `SparkSession`. Custom readers override built-in readers if the same type name is used. They must ignore or consume Floe-owned options such as `replayToken` instead of forwarding them blindly to an external connector. When schema enforcement is enabled, Floe validates the resulting DataFrame's declared column names and exact Spark data types regardless of reader implementation.
+The factory receives the full `SourceConfig`, optional `SchemaConfig`, and the `SparkSession`. Custom readers override built-in readers if the same type name is used. When schema enforcement is enabled, Floe validates the resulting DataFrame's declared column names and exact Spark data types regardless of reader implementation.
 
 ## Related
 

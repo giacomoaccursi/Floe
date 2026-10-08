@@ -31,7 +31,7 @@ graph TD
 The `DataReaderFactory` creates a reader based on the flow's `source.type` config:
 
 - **File** (`FileDataReader`): validates CSV, Parquet, JSON, Avro, or ORC, optionally applies the schema, and loads from the configured path.
-- **JDBC** (`JDBCDataReader`): connects through a JDBC URL and reads a table or wrapped query. Spark connector options are passed through, while Floe-owned keys such as `replayToken` are removed.
+- **JDBC** (`JDBCDataReader`): connects through a JDBC URL and reads a table or wrapped query. The reader consumes `url` and `query`; remaining Spark connector options are passed through.
 - **Custom**: a factory registered with `withDataReader` handles any other `source.type`.
 
 The result is a raw DataFrame with the source data.

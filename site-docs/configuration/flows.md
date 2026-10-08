@@ -103,9 +103,7 @@ Defines where data is read from.
 | `type` | no | `file` | Source type: `file` or `jdbc` |
 | `path` | yes | — | For `file`: non-blank path to data (file, directory, or glob). For `jdbc`: non-blank table name (e.g. `public.customers`), unless a non-blank `query` is provided in options. |
 | `format` | for `file` | — | File format: `csv`, `parquet`, `json`, `avro`, `orc`. Not used for `jdbc`. |
-| `options` | no | `{}` | Connector options plus Floe-owned metadata such as `replayToken`; built-in readers do not forward Floe-owned keys to Spark |
-
-`options.replayToken` is reserved Floe metadata and is not forwarded by the built-in readers. It is not a retry or deduplication mechanism. Record the immutable source identity in `ExecutionRequest.inputReferences`; that request is the recovery evidence owned by the external orchestrator.
+| `options` | no | `{}` | Spark connector options. The JDBC reader consumes `url` and `query` itself and forwards the remaining entries. |
 
 ### File source
 
@@ -136,7 +134,6 @@ source:
     password: "${DB_PASSWORD}"
     driver: "org.postgresql.Driver"
     fetchSize: "10000"
-    replayToken: "customers/extract/2026-09-24T00:00:00Z/v1"
 ```
 
 To read a custom query instead of a full table:

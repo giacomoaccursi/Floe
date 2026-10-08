@@ -6,6 +6,8 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.slf4j.LoggerFactory
 
+import java.util.Locale
+
 /** Executes different join strategies
   */
 class JoinStrategyExecutor {
@@ -19,6 +21,7 @@ class JoinStrategyExecutor {
       right: DataFrame,
       joinConfig: JoinConfig
   ): DataFrame = {
+    validateJoinInputs(left, right, joinConfig)
     logger.info(
       s"Applying ${joinConfig.strategy} join with type ${joinConfig.`type`}"
     )
@@ -83,13 +86,14 @@ class JoinStrategyExecutor {
       s"Applying flatten join strategy with type ${joinConfig.`type`.name}"
     )
 
-    val leftColumns = left.columns.toSet
+    val caseSensitive = isCaseSensitive(left)
+    val leftColumns = left.columns.map(normalizeColumnName(_, caseSensitive)).toSet
     val rightJoinKeys = joinConfig.conditions.map(_.right).toSet
     val rightDataColumns = right.columns.toSeq.filterNot(rightJoinKeys)
 
     val prefix = s"${joinConfig.`with`}_"
     val renamedRight = rightDataColumns.foldLeft(right) { (df, rightCol) =>
-      if (leftColumns.contains(rightCol)) {
+      if (leftColumns.contains(normalizeColumnName(rightCol, caseSensitive))) {
         df.withColumnRenamed(rightCol, s"$prefix$rightCol")
       } else {
         df
@@ -109,7 +113,7 @@ class JoinStrategyExecutor {
     }
 
     val finalRightColumns = rightDataColumns.toSeq.map { rightCol =>
-      if (leftColumns.contains(rightCol)) s"$prefix$rightCol" else rightCol
+      if (leftColumns.contains(normalizeColumnName(rightCol, caseSensitive))) s"$prefix$rightCol" else rightCol
     }
 
     // Preserve parent column order, append child columns after
@@ -177,7 +181,8 @@ class JoinStrategyExecutor {
   private def orderingColumn(right: DataFrame, spec: com.etl.framework.config.AggregationSpec) = {
     if (spec.orderBy.isEmpty)
       throw ValidationConfigException(s"Aggregation '${spec.alias}' with ${spec.function.name} requires orderBy")
-    val missing = spec.orderBy.filterNot(right.columns.contains)
+    val caseSensitive = isCaseSensitive(right)
+    val missing = spec.orderBy.filterNot(hasColumn(right, _, caseSensitive))
     if (missing.nonEmpty)
       throw ValidationConfigException(
         s"Aggregation '${spec.alias}' orderBy columns not found: ${missing.mkString(", ")}"
@@ -187,12 +192,89 @@ class JoinStrategyExecutor {
   }
 
   private def rejectOutputNameCollisions(left: DataFrame, outputNames: Seq[String], strategy: String): Unit = {
-    val duplicates = outputNames.groupBy(identity).collect { case (name, values) if values.size > 1 => name }.toSeq
-    val parentCollisions = outputNames.distinct.filter(left.columns.contains)
+    val caseSensitive = isCaseSensitive(left)
+    val duplicates = outputNames
+      .groupBy(normalizeColumnName(_, caseSensitive))
+      .collect { case (_, values) if values.size > 1 => values.head }
+      .toSeq
+    val parentColumns = left.columns.map(normalizeColumnName(_, caseSensitive)).toSet
+    val parentCollisions = outputNames.distinct.filter { name =>
+      parentColumns.contains(normalizeColumnName(name, caseSensitive))
+    }
     val collisions = (duplicates ++ parentCollisions).distinct
     if (collisions.nonEmpty)
       throw ValidationConfigException(
         s"$strategy join output names collide with parent or each other: ${collisions.mkString(", ")}"
       )
   }
+
+  private def validateJoinInputs(left: DataFrame, right: DataFrame, joinConfig: JoinConfig): Unit = {
+    val errors = Seq.newBuilder[String]
+    val caseSensitive = isCaseSensitive(left)
+
+    if (joinConfig.conditions.isEmpty) errors += "join requires at least one condition"
+    val conditionKeys = joinConfig.conditions.map { condition =>
+      normalizeColumnName(condition.left.trim, caseSensitive) ->
+        normalizeColumnName(condition.right.trim, caseSensitive)
+    }
+    if (conditionKeys.distinct.size != conditionKeys.size) errors += "join contains duplicate conditions"
+
+    joinConfig.conditions.foreach { condition =>
+      if (condition.left.trim.isEmpty) errors += "join condition left column must not be blank"
+      else if (!hasColumn(left, condition.left, caseSensitive))
+        errors += s"join condition left column '${condition.left}' was not found"
+      if (condition.right.trim.isEmpty) errors += "join condition right column must not be blank"
+      else if (!hasColumn(right, condition.right, caseSensitive))
+        errors += s"join condition right column '${condition.right}' was not found"
+    }
+
+    import com.etl.framework.config.JoinStrategy._
+    joinConfig.strategy match {
+      case Nest =>
+        if (joinConfig.nestAs.exists(_.trim.isEmpty)) errors += "nest join nestAs must not be blank"
+        if (joinConfig.nestAs.exists(value => value != value.trim))
+          errors += "nest join nestAs must not have surrounding whitespace"
+        if (joinConfig.aggregations.nonEmpty) errors += "nest join must not define aggregations"
+      case Flatten =>
+        if (joinConfig.nestAs.nonEmpty) errors += "flatten join must not define nestAs"
+        if (joinConfig.aggregations.nonEmpty) errors += "flatten join must not define aggregations"
+      case Aggregate =>
+        if (joinConfig.nestAs.nonEmpty) errors += "aggregate join must not define nestAs"
+        if (joinConfig.aggregations.isEmpty) errors += "aggregate join requires at least one aggregation function"
+        joinConfig.aggregations.foreach { aggregation =>
+          if (aggregation.column.trim.isEmpty) errors += "aggregation column must not be blank"
+          else if (!hasColumn(right, aggregation.column, caseSensitive))
+            errors += s"aggregation column '${aggregation.column}' was not found"
+          if (aggregation.alias.trim.isEmpty) errors += "aggregation alias must not be blank"
+          if (aggregation.orderBy.exists(_.trim.isEmpty)) errors += "aggregation orderBy columns must not be blank"
+          aggregation.orderBy.filter(_.trim.nonEmpty).foreach { column =>
+            if (!hasColumn(right, column, caseSensitive))
+              errors += s"aggregation orderBy column '$column' was not found"
+          }
+          aggregation.function match {
+            case com.etl.framework.config.AggregationFunction.First |
+                com.etl.framework.config.AggregationFunction.Last =>
+              if (aggregation.orderBy.isEmpty)
+                errors += s"aggregation '${aggregation.alias}' with ${aggregation.function.name} requires orderBy"
+            case _ if aggregation.orderBy.nonEmpty =>
+              errors += s"aggregation '${aggregation.alias}' orderBy is only supported by first and last"
+            case _ =>
+          }
+        }
+    }
+
+    val validationErrors = errors.result()
+    if (validationErrors.nonEmpty) throw ValidationConfigException(validationErrors.distinct.mkString("; "))
+  }
+
+  private def hasColumn(dataFrame: DataFrame, name: String, caseSensitive: Boolean): Boolean =
+    dataFrame.columns.exists(column =>
+      normalizeColumnName(column, caseSensitive) == normalizeColumnName(name, caseSensitive)
+    )
+
+  private def isCaseSensitive(dataFrame: DataFrame): Boolean =
+    dataFrame.sparkSession.conf.getOption("spark.sql.caseSensitive").exists(_.toBoolean)
+
+  private def normalizeColumnName(name: String, caseSensitive: Boolean): String =
+    if (caseSensitive) name else name.toLowerCase(Locale.ROOT)
 }

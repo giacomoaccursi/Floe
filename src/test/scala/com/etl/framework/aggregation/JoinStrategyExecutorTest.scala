@@ -185,6 +185,49 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     // parent_id is a join key and should not appear as a separate column
   }
 
+  it should "reject joins without conditions before building a Spark expression" in {
+    val parent = Seq((1, "Alice")).toDF("id", "name")
+    val child = Seq((1, "Rome")).toDF("parent_id", "city")
+    import com.etl.framework.config.JoinType._
+
+    val error = intercept[ValidationConfigException] {
+      executor.applyJoin(parent, child, JoinConfig(Inner, "child", Seq.empty, Flatten))
+    }
+
+    error.getMessage should include("at least one condition")
+  }
+
+  it should "report missing join columns before Spark analysis" in {
+    val parent = Seq((1, "Alice")).toDF("id", "name")
+    val child = Seq((1, "Rome")).toDF("parent_id", "city")
+    import com.etl.framework.config.JoinType._
+
+    val error = intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(Inner, "child", Seq(JoinCondition("missing_id", "missing_parent_id")), Flatten)
+      )
+    }
+
+    error.getMessage should include("left column 'missing_id' was not found")
+    error.getMessage should include("right column 'missing_parent_id' was not found")
+  }
+
+  it should "rename case-insensitive child column conflicts" in {
+    val parent = Seq((1, "Alice")).toDF("id", "Name")
+    val child = Seq((1, "child-name")).toDF("parent_id", "name")
+    import com.etl.framework.config.JoinType._
+
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(Inner, "child", Seq(JoinCondition("id", "parent_id")), Flatten)
+    )
+
+    result.columns shouldBe Array("id", "Name", "child_name")
+  }
+
   // --- Aggregate strategy ---
 
   "JoinStrategyExecutor (aggregate)" should "apply sum aggregation" in {
@@ -320,6 +363,29 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     }
 
     error.getMessage should include("name")
+  }
+
+  it should "reject case-insensitive aggregate alias collisions" in {
+    val parent = Seq((1, 10.0)).toDF("id", "Total")
+    val child = Seq((1, 5.0)).toDF("parent_id", "amount")
+    import com.etl.framework.config.AggregationFunction._
+    import com.etl.framework.config.JoinType._
+
+    val error = intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(
+          LeftOuter,
+          "child",
+          Seq(JoinCondition("id", "parent_id")),
+          Aggregate,
+          aggregations = Seq(AggregationSpec("amount", Sum, "total"))
+        )
+      )
+    }
+
+    error.getMessage should include("total")
   }
 
   it should "require orderBy for first and last aggregations" in {

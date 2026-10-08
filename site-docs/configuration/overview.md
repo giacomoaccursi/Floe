@@ -31,6 +31,10 @@ The directory can be a local path, or any Hadoop-compatible filesystem path:
 .withConfigDirectory("abfss://container@account/config")  // Azure
 ```
 
+Remote directory listing and every subsequent file read use the caller's `SparkContext.hadoopConfiguration`, including
+registered filesystem implementations, credentials providers, endpoints, and authority settings. Floe does not create
+a separate default Hadoop configuration for discovery. Keep secrets in the platform credential chain, not in YAML.
+
 `global.yaml` and `flows/` are required. `domains.yaml` is optional — if absent, the framework uses empty domains (domain validation rules will fail if they reference a domain).
 
 ## Naming convention

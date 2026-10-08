@@ -104,6 +104,8 @@ By default, a node reads from `{catalogName}.{namespace}.{sourceFlow}`. If you n
   sourceTable: "other_catalog.analytics.customers"
 ```
 
+Write `sourceTable` as an unquoted dot-separated identifier. Floe quotes each component before passing it to Spark, so names containing spaces, hyphens, reserved words, or backticks do not require hand-written SQL quoting.
+
 When `sourceTable` is set, `sourceFlow` is not needed. Use one or the other:
 
 - `sourceFlow: customers` → reads from `{catalogName}.default.customers` (framework-managed table)

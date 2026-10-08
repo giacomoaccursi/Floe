@@ -4,7 +4,7 @@ import com.etl.framework.exceptions.{ConfigFileException, ConfigurationException
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path => HadoopPath}
 import pureconfig._
-import pureconfig.error.{ConfigReaderFailures, ConvertFailure, KeyNotFound, ThrowableFailure}
+import pureconfig.error.{ConfigReaderFailures, ConvertFailure, KeyNotFound, ThrowableFailure, UnknownKey}
 import pureconfig.generic.auto._
 import pureconfig.module.yaml._
 // Import ConfigHints at top level to ensure all derived readers in this file use CamelCase
@@ -26,7 +26,7 @@ object ConfigHints {
   import pureconfig.CamelCase
 
   implicit def productHint[T]: ProductHint[T] =
-    ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
+    ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase), allowUnknownKeys = false)
 }
 
 /** Base trait for configuration loaders using PureConfig
@@ -104,32 +104,45 @@ trait ConfigLoader[T] {
       failures: ConfigReaderFailures,
       path: String
   ): ConfigurationException = {
-    failures.head match {
-      case ConvertFailure(KeyNotFound(key, _), _, configPath) =>
-        val location = if (configPath.isEmpty) "root" else configPath
-        ConfigFileException(
-          file = path,
-          message = s"Missing required field '$key' at '$location'"
-        )
+    val unknownFields = failures.toList
+      .collect { case ConvertFailure(UnknownKey(key), _, configPath) =>
+        if (configPath.isEmpty) key else configPath
+      }
+      .distinct
+      .sorted
 
-      case ThrowableFailure(throwable, _)
-          if throwable.getMessage != null &&
-            throwable.getMessage.contains("while parsing") =>
-        YAMLSyntaxException(
-          file = path,
-          details = throwable.getMessage,
-          cause = throwable
-        )
+    if (unknownFields.nonEmpty)
+      ConfigFileException(
+        file = path,
+        message = s"Unknown configuration field(s): ${unknownFields.mkString(", ")}"
+      )
+    else
+      failures.head match {
+        case ConvertFailure(KeyNotFound(key, _), _, configPath) =>
+          val location = if (configPath.isEmpty) "root" else configPath
+          ConfigFileException(
+            file = path,
+            message = s"Missing required field '$key' at '$location'"
+          )
 
-      case other =>
-        val location =
-          other.origin.map(_.description).getOrElse("unknown location")
-        val description = other.description
-        ConfigFileException(
-          file = path,
-          message = s"Configuration Error at $location: $description"
-        )
-    }
+        case ThrowableFailure(throwable, _)
+            if throwable.getMessage != null &&
+              throwable.getMessage.contains("while parsing") =>
+          YAMLSyntaxException(
+            file = path,
+            details = throwable.getMessage,
+            cause = throwable
+          )
+
+        case other =>
+          val location =
+            other.origin.map(_.description).getOrElse("unknown location")
+          val description = other.description
+          ConfigFileException(
+            file = path,
+            message = s"Configuration Error at $location: $description"
+          )
+      }
   }
 
   /** Substitutes environment variables in the format ${VAR_NAME} or $VAR_NAME. Returns Left if any referenced variable

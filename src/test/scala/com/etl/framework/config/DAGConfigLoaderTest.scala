@@ -38,4 +38,24 @@ class DAGConfigLoaderTest extends AnyFlatSpec with Matchers {
       result.left.get.getMessage should include("exactly one of sourceFlow or sourceTable")
     }
   }
+
+  it should "reject unknown YAML fields instead of ignoring typos" in {
+    val yaml =
+      """
+        |name: typo
+        |parallelNdoes: true
+        |nodes:
+        |  - id: customers
+        |    sourceFlow: customers
+        |    soruceTable: catalog.ns.customers
+        |""".stripMargin
+
+    withTempFile(yaml) { file =>
+      val result = loader.load(file.getAbsolutePath)
+
+      result.left.get shouldBe a[ConfigFileException]
+      result.left.get.getMessage should include("parallelNdoes")
+      result.left.get.getMessage should include("soruceTable")
+    }
+  }
 }

@@ -203,11 +203,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |  primaryKey: []
         |  foreignKeys: []
         |  rules: []
-        |output:
-        |  format: parquet
-        |  partitionBy: []
-        |  compression: snappy
-        |  options: {}
+        |output: {}
       """.stripMargin
     val result = writeInvalidYaml(yaml, new FlowConfigLoader())
     result.isLeft shouldBe true
@@ -248,11 +244,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |  primaryKey: []
         |  foreignKeys: []
         |  rules: []
-        |output:
-        |  format: parquet
-        |  partitionBy: []
-        |  compression: snappy
-        |  options: {}
+        |output: {}
       """.stripMargin
 
     val result = writeInvalidYaml(yaml, new FlowConfigLoader())
@@ -289,11 +281,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |    - id
         |  foreignKeys: []
         |  rules: []
-        |output:
-        |  format: parquet
-        |  partitionBy: []
-        |  compression: snappy
-        |  options: {}
+        |output: {}
       """.stripMargin
 
     val result = writeInvalidYaml(yaml, new FlowConfigLoader())
@@ -340,11 +328,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |    - id
         |  foreignKeys: []
         |  rules: []
-        |output:
-        |  format: parquet
-        |  partitionBy: []
-        |  compression: snappy
-        |  options: {}
+        |output: {}
       """.stripMargin
 
     val result = writeInvalidYaml(yaml, new FlowConfigLoader())
@@ -389,11 +373,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |    - id
         |  foreignKeys: []
         |  rules: []
-        |output:
-        |  format: parquet
-        |  partitionBy: []
-        |  compression: snappy
-        |  options: {}
+        |output: {}
       """.stripMargin
 
     val result = writeInvalidYaml(yaml, new FlowConfigLoader())
@@ -424,11 +404,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |  primaryKey: []
         |  foreignKeys: []
         |  rules: []
-        |output:
-        |  format: parquet
-        |  partitionBy: []
-        |  compression: snappy
-        |  options: {}
+        |output: {}
       """.stripMargin
 
     val result = writeInvalidYaml(yaml, new FlowConfigLoader())
@@ -458,11 +434,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |  primaryKey: []
         |  foreignKeys: []
         |  rules: []
-        |output:
-        |  format: parquet
-        |  partitionBy: []
-        |  compression: snappy
-        |  options: {}
+        |output: {}
       """.stripMargin
 
     val result = writeInvalidYaml(yaml, new FlowConfigLoader())
@@ -504,11 +476,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |  primaryKey: []
         |  foreignKeys: []
         |  rules: []
-        |output:
-        |  format: parquet
-        |  partitionBy: []
-        |  compression: snappy
-        |  options: {}
+        |output: {}
       """.stripMargin
 
     writeFile("bad1.yaml", missingNameYaml)
@@ -565,11 +533,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |  primaryKey: []
         |  foreignKeys: []
         |  rules: []
-        |output:
-        |  format: parquet
-        |  partitionBy: []
-        |  compression: snappy
-        |  options: {}
+        |output: {}
       """.stripMargin
 
     val f = new java.io.File(tempDir, "flow.yaml")
@@ -608,8 +572,7 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
         |  primaryKey: [id]
         |  foreignKeys: []
         |  rules: []
-        |output:
-        |  options: {}
+        |output: {}
       """.stripMargin
 
     Seq("flow_a.yaml" -> flowYaml, "flow_b.yaml" -> flowYaml.replace("same_name", "SAME_NAME")).foreach {

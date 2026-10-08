@@ -401,47 +401,13 @@ class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
     } yield config
   }
 
-  /** Validates DAG config: no empty nodes, no duplicate IDs, all join targets exist, all joins have conditions. */
+  /** Validates the complete structural DAG contract. */
   private def validateAggregationConfig(
       config: AggregationConfig,
       path: String
   ): Either[ConfigurationException, Unit] = {
-    def err(msg: String): Either[ConfigurationException, Unit] =
-      Left(ConfigFileException(file = path, message = s"DAG '${config.name}': $msg"))
-
-    val nodeIds = config.nodes.map(_.id).toSet
-    val duplicates = config.nodes
-      .map(_.id)
-      .groupBy(identity)
-      .collect { case (id, ids) if ids.size > 1 => id }
-      .toSeq
-
-    def validateNode(node: DAGNode): Either[ConfigurationException, Unit] = {
-      val sourceErrors =
-        if (node.sourceFlow.isEmpty && node.sourceTable.isEmpty)
-          Seq(s"node '${node.id}' must have either sourceFlow or sourceTable")
-        else Seq.empty
-      val joinErrors = node.joins.flatMap { joinConfig =>
-        val missingWith =
-          if (!nodeIds.contains(joinConfig.`with`))
-            Seq(s"node '${node.id}' references missing join target '${joinConfig.`with`}'")
-          else Seq.empty
-        val emptyOn =
-          if (joinConfig.conditions.isEmpty)
-            Seq(s"node '${node.id}' has a join with no conditions")
-          else Seq.empty
-        missingWith ++ emptyOn
-      }
-      val allErrors = sourceErrors ++ joinErrors
-      allErrors.headOption.fold[Either[ConfigurationException, Unit]](Right(()))(err)
-    }
-
-    if (config.maxParallelNodes <= 0) err("maxParallelNodes must be greater than zero")
-    else if (config.nodes.isEmpty) err("nodes list must not be empty")
-    else if (duplicates.nonEmpty) err(s"duplicate node IDs: ${duplicates.mkString(", ")}")
-    else
-      config.nodes.foldLeft[Either[ConfigurationException, Unit]](Right(())) { (acc, node) =>
-        acc.flatMap(_ => validateNode(node))
-      }
+    val errors = AggregationConfigValidator.validate(config)
+    if (errors.isEmpty) Right(())
+    else Left(ConfigFileException(file = path, message = s"DAG '${config.name}': ${errors.mkString("; ")}"))
   }
 }

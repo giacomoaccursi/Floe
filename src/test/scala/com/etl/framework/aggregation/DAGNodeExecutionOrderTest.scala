@@ -1,7 +1,7 @@
 package com.etl.framework.aggregation
 
 import com.etl.framework.config._
-import com.etl.framework.exceptions.CircularDependencyException
+import com.etl.framework.exceptions.{CircularDependencyException, ValidationConfigException}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -62,7 +62,7 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
 
   it should "handle empty node list" in {
     val dagConfig = createDagConfig(Seq.empty)
-    intercept[IllegalStateException] {
+    intercept[ValidationConfigException] {
       new DAGOrchestrator(dagConfig, globalConfig).buildExecutionPlan()
     }
   }
@@ -78,8 +78,28 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
   it should "reject a non-positive node concurrency limit" in {
     val dagConfig = createDagConfig(Seq(leaf("node"))).copy(parallelNodes = true, maxParallelNodes = 0)
 
-    intercept[IllegalArgumentException] {
+    intercept[ValidationConfigException] {
       new DAGOrchestrator(dagConfig, globalConfig)
     }.getMessage should include("maxParallelNodes must be greater than zero")
+  }
+
+  it should "reject aggregate joins without aggregation expressions during planning" in {
+    val aggregateRoot = DAGNode(
+      id = "root",
+      sourceFlow = "flow_root",
+      joins = Seq(
+        JoinConfig(
+          `type` = JoinType.LeftOuter,
+          `with` = "child",
+          conditions = Seq(JoinCondition("id", "id")),
+          strategy = JoinStrategy.Aggregate
+        )
+      )
+    )
+    val dagConfig = createDagConfig(Seq(leaf("child"), aggregateRoot))
+
+    intercept[ValidationConfigException] {
+      new DAGOrchestrator(dagConfig, globalConfig).buildExecutionPlan()
+    }.getMessage should include("requires at least one aggregation")
   }
 }

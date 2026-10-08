@@ -1,6 +1,7 @@
 package com.etl.framework.aggregation
 
-import com.etl.framework.config.DAGNode
+import com.etl.framework.config.{AggregationConfigValidator, DAGNode}
+import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.util.TopologicalSorter
 import org.slf4j.LoggerFactory
 
@@ -27,26 +28,9 @@ class DAGGraphBuilder(parallelNodes: Boolean) {
   }
 
   private def validateNodes(nodes: Seq[DAGNode]): Unit = {
-    if (nodes.isEmpty)
-      throw new IllegalStateException("DAG must contain at least one node")
-
-    val nodeIds = nodes.map(_.id).toSet
-    val duplicates = nodes.map(_.id).groupBy(identity).collect { case (id, ids) if ids.size > 1 => id }
-    if (duplicates.nonEmpty)
-      throw new IllegalStateException(s"DAG contains duplicate node IDs: ${duplicates.mkString(", ")}")
-
-    nodes.foreach { node =>
-      node.joins.foreach { joinConfig =>
-        if (joinConfig.`with` == node.id)
-          throw new IllegalStateException(s"Node '${node.id}' has a self-referential join")
-        if (!nodeIds.contains(joinConfig.`with`))
-          throw new IllegalStateException(
-            s"Node '${node.id}' references join target '${joinConfig.`with`}' which does not exist"
-          )
-        if (joinConfig.conditions.isEmpty)
-          throw new IllegalStateException(s"Node '${node.id}' has a join with no conditions")
-      }
-    }
+    val structuralErrors = AggregationConfigValidator.validateNodes(nodes)
+    if (structuralErrors.nonEmpty)
+      throw ValidationConfigException(structuralErrors.mkString("; "))
   }
 
   private def findRootNode(nodes: Seq[DAGNode], graph: Map[String, Set[String]]): String = {

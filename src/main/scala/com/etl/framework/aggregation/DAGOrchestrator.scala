@@ -1,6 +1,7 @@
 package com.etl.framework.aggregation
 
-import com.etl.framework.config.{AggregationConfig, GlobalConfig}
+import com.etl.framework.config.{AggregationConfig, AggregationConfigValidator, GlobalConfig}
+import com.etl.framework.exceptions.ValidationConfigException
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 
@@ -15,7 +16,9 @@ class DAGOrchestrator(
     globalConfig: GlobalConfig
 )(implicit spark: SparkSession) {
 
-  require(dagConfig.maxParallelNodes > 0, "maxParallelNodes must be greater than zero")
+  private val validationErrors = AggregationConfigValidator.validate(dagConfig)
+  if (validationErrors.nonEmpty)
+    throw ValidationConfigException(s"DAG '${dagConfig.name}': ${validationErrors.mkString("; ")}")
 
   private val logger = LoggerFactory.getLogger(getClass)
   private val graphBuilder = new DAGGraphBuilder(dagConfig.parallelNodes)

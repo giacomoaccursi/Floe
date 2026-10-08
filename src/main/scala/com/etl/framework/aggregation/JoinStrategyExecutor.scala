@@ -2,7 +2,7 @@ package com.etl.framework.aggregation
 
 import com.etl.framework.config.JoinConfig
 import com.etl.framework.exceptions.ValidationConfigException
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
 import org.slf4j.LoggerFactory
 
@@ -66,7 +66,7 @@ class JoinStrategyExecutor {
 
     // Use parent-qualified column references to avoid ambiguity when the join key
     // has the same name in both parent and groupedRight
-    val columnsToKeep = left.columns.map(left(_)) :+
+    val columnsToKeep = selectParentColumns(left, groupedRight, joinConfig) :+
       coalesce(
         joined(nestFieldName),
         array().cast(joined.schema(nestFieldName).dataType)
@@ -106,19 +106,15 @@ class JoinStrategyExecutor {
 
     val joined = left.join(renamedRight, joinExpr, joinConfig.`type`.sparkType)
 
-    // Drop child-side join key columns by DataFrame reference to resolve ambiguity
-    // when the join key has the same name in both parent and right
-    val withoutRightJoinKeys = joinConfig.conditions.foldLeft(joined) { (df, cond) =>
-      df.drop(renamedRight(cond.right))
-    }
-
-    val finalRightColumns = rightDataColumns.toSeq.map { rightCol =>
-      if (leftColumns.contains(normalizeColumnName(rightCol, caseSensitive))) s"$prefix$rightCol" else rightCol
+    val finalRightColumns = rightDataColumns.map { rightCol =>
+      val outputName =
+        if (leftColumns.contains(normalizeColumnName(rightCol, caseSensitive))) s"$prefix$rightCol" else rightCol
+      renamedRight(outputName)
     }
 
     // Preserve parent column order, append child columns after
-    val allColumns = left.columns.toSeq ++ finalRightColumns
-    withoutRightJoinKeys.select(allColumns.map(col): _*)
+    val allColumns = selectParentColumns(left, renamedRight, joinConfig) ++ finalRightColumns
+    joined.select(allColumns: _*)
   }
 
   /** Applies aggregate join strategy - aggregates child records with functions
@@ -173,7 +169,7 @@ class JoinStrategyExecutor {
 
     // Use parent-qualified references for parent columns and aggregatedRight references
     // for aggregation aliases to avoid ambiguity on shared join key names
-    val leftSelects = left.columns.map(left(_))
+    val leftSelects = selectParentColumns(left, aggregatedRight, joinConfig)
     val aggSelects = joinConfig.aggregations.map(spec => aggregatedRight(spec.alias))
     result.select((leftSelects ++ aggSelects): _*)
   }
@@ -226,6 +222,14 @@ class JoinStrategyExecutor {
       if (condition.right.trim.isEmpty) errors += "join condition right column must not be blank"
       else if (!hasColumn(right, condition.right, caseSensitive))
         errors += s"join condition right column '${condition.right}' was not found"
+
+      for {
+        leftField <- findField(left, condition.left, caseSensitive)
+        rightField <- findField(right, condition.right, caseSensitive)
+        if leftField.dataType != rightField.dataType
+      } errors +=
+        s"join key types must match for '${condition.left}' and '${condition.right}': " +
+          s"${leftField.dataType.catalogString} != ${rightField.dataType.catalogString}"
     }
 
     import com.etl.framework.config.JoinStrategy._
@@ -268,9 +272,29 @@ class JoinStrategyExecutor {
   }
 
   private def hasColumn(dataFrame: DataFrame, name: String, caseSensitive: Boolean): Boolean =
-    dataFrame.columns.exists(column =>
-      normalizeColumnName(column, caseSensitive) == normalizeColumnName(name, caseSensitive)
+    findField(dataFrame, name, caseSensitive).nonEmpty
+
+  private def findField(dataFrame: DataFrame, name: String, caseSensitive: Boolean) =
+    dataFrame.schema.fields.find(field =>
+      normalizeColumnName(field.name, caseSensitive) == normalizeColumnName(name, caseSensitive)
     )
+
+  private def selectParentColumns(left: DataFrame, right: DataFrame, joinConfig: JoinConfig): Seq[Column] = {
+    import com.etl.framework.config.JoinType.{FullOuter, RightOuter}
+    val preserveRightKeys = joinConfig.`type` == RightOuter || joinConfig.`type` == FullOuter
+    val caseSensitive = isCaseSensitive(left)
+
+    left.columns.toSeq.map { leftColumn =>
+      val matchingCondition = joinConfig.conditions.find { condition =>
+        normalizeColumnName(condition.left, caseSensitive) == normalizeColumnName(leftColumn, caseSensitive)
+      }
+      if (preserveRightKeys)
+        matchingCondition
+          .map(condition => coalesce(left(leftColumn), right(condition.right)).as(leftColumn))
+          .getOrElse(left(leftColumn))
+      else left(leftColumn)
+    }
+  }
 
   private def isCaseSensitive(dataFrame: DataFrame): Boolean =
     dataFrame.sparkSession.conf.getOption("spark.sql.caseSensitive").exists(_.toBoolean)

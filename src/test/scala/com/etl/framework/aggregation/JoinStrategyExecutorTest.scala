@@ -101,6 +101,27 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     error.getMessage should include("orders")
   }
 
+  it should "preserve child-only keys in full outer nest joins" in {
+    val parent = Seq((1, "Alice")).toDF("id", "name")
+    val child = Seq((2, "order2")).toDF("parent_id", "order_name")
+    import com.etl.framework.config.JoinType._
+
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(
+        FullOuter,
+        "child",
+        Seq(JoinCondition("id", "parent_id")),
+        Nest,
+        nestAs = Some("orders")
+      )
+    )
+
+    result.filter($"id".isNull).count() shouldBe 0
+    result.select("id").as[Int].collect().toSet shouldBe Set(1, 2)
+  }
+
   // --- Flatten strategy ---
 
   "JoinStrategyExecutor (flatten)" should "flatten child fields into parent record" in {
@@ -214,6 +235,23 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     error.getMessage should include("right column 'missing_parent_id' was not found")
   }
 
+  it should "reject join keys with different data types" in {
+    val parent = Seq((1, "Alice")).toDF("id", "name")
+    val child = Seq((1L, "Rome")).toDF("parent_id", "city")
+    import com.etl.framework.config.JoinType._
+
+    val error = intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(Inner, "child", Seq(JoinCondition("id", "parent_id")), Flatten)
+      )
+    }
+
+    error.getMessage should include("join key types must match")
+    error.getMessage should include("int != bigint")
+  }
+
   it should "rename case-insensitive child column conflicts" in {
     val parent = Seq((1, "Alice")).toDF("id", "Name")
     val child = Seq((1, "child-name")).toDF("parent_id", "name")
@@ -226,6 +264,21 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     )
 
     result.columns shouldBe Array("id", "Name", "child_name")
+  }
+
+  it should "preserve child-only keys in full outer flatten joins" in {
+    val parent = Seq((1, "Alice")).toDF("id", "name")
+    val child = Seq((2, "Rome")).toDF("parent_id", "city")
+    import com.etl.framework.config.JoinType._
+
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(FullOuter, "child", Seq(JoinCondition("id", "parent_id")), Flatten)
+    )
+
+    result.filter($"id".isNull).count() shouldBe 0
+    result.select("id").as[Int].collect().toSet shouldBe Set(1, 2)
   }
 
   // --- Aggregate strategy ---
@@ -476,6 +529,28 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     )
 
     result.select("values").as[Seq[String]].head() shouldBe Seq("a", "b", "m", "z")
+  }
+
+  it should "preserve child-only keys in right outer aggregate joins" in {
+    val parent = Seq((1, "Alice")).toDF("id", "name")
+    val child = Seq((2, 5.0)).toDF("parent_id", "amount")
+    import com.etl.framework.config.AggregationFunction._
+    import com.etl.framework.config.JoinType._
+
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(
+        RightOuter,
+        "child",
+        Seq(JoinCondition("id", "parent_id")),
+        Aggregate,
+        aggregations = Seq(AggregationSpec("amount", Sum, "total"))
+      )
+    )
+
+    result.filter($"id".isNull).count() shouldBe 0
+    result.select("id", "total").as[(Int, Double)].head() shouldBe ((2, 5.0))
   }
 
 }

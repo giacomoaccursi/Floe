@@ -5,6 +5,7 @@ import org.scalatest.matchers.should.Matchers
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
+import scala.collection.JavaConverters._
 
 class ReleaseWorkflowTest extends AnyFlatSpec with Matchers {
 
@@ -46,6 +47,28 @@ class ReleaseWorkflowTest extends AnyFlatSpec with Matchers {
     quality should include("mkdocs build --strict")
     quality should include("module.dag.validate()")
     quality should include("json.tool integrations/aws-step-functions/emr-serverless.asl.json")
+  }
+
+  it should "pin every remote GitHub Action to an immutable commit" in {
+    val workflowDirectory = Paths.get(".github/workflows")
+    val stream = Files.list(workflowDirectory)
+    val workflowPaths =
+      try stream.iterator().asScala.toSeq
+      finally stream.close()
+    val workflows = workflowPaths
+      .filter(path => path.toString.endsWith(".yml") || path.toString.endsWith(".yaml"))
+      .flatMap(path => read(path.toString).linesIterator)
+      .map(_.trim)
+      .filter(line => line.startsWith("uses:") || line.startsWith("- uses:"))
+      .map(_.stripPrefix("-").trim.stripPrefix("uses:").trim)
+      .filterNot(_.startsWith("./"))
+
+    workflows should not be empty
+    workflows.foreach { action =>
+      withClue(s"Unpinned action '$action': ") {
+        action.split("@", 2).lastOption.getOrElse("").takeWhile(!_.isWhitespace) should fullyMatch regex "[0-9a-f]{40}"
+      }
+    }
   }
 
   private def read(path: String): String =

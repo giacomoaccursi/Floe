@@ -302,6 +302,9 @@ The entire `validation` section is optional only for Full loads. `primaryKey` is
 | `onOrphan` | string | — | `warn` | Post-batch orphan action: `warn` or `ignore`. Destructive `delete` is unsupported. See [Orphan Detection](../guides/orphan-detection.md). |
 
 The FK is identified by an auto-generated display name (e.g. `(customer_id) -> customers.(customer_id)`).
+Floe statically checks non-empty/equal arity, local column declarations, parent-flow existence, and—when the parent
+declares `schema.columns`—every referenced parent column. A deliberately dynamic parent schema defers only the final
+parent-column resolution to Spark.
 
 ### Rule fields
 

@@ -135,7 +135,9 @@ For the full field reference, see [Flow Configuration — Foreign key fields](..
 
 - NULL FK values are not considered violations. A NULL means "no reference" (standard SQL semantics) and passes FK validation.
 - The referenced parent DataFrame is joined for FK lookup. Multiple FK constraints referencing the same parent flow/columns share a single deduplicated reference.
-- If the referenced flow name does not exist in the batch configuration, a `ValidationConfigException` is thrown at startup.
+- Static validation rejects an unknown parent flow, unequal or empty FK arity, undeclared local columns, and referenced
+  columns absent from a declared parent schema. A parent with a dynamic schema defers its final column resolution to
+  Spark.
 - Rejection code: `FK_VIOLATION`.
 
 The `onOrphan` field does not affect intra-batch validation — it controls post-batch orphan detection behavior. See [Orphan Detection](orphan-detection.md).

@@ -48,8 +48,8 @@ class JDBCDataReader(
 }
 
 object JDBCDataReader {
-  private val floeOwnedOptions = Set("url", "query", "replayToken")
+  private val readerOwnedOptions = Set("url", "query")
 
   private[readers] def connectorOptions(options: Map[String, String]): Map[String, String] =
-    options.filterNot { case (key, _) => floeOwnedOptions.contains(key) }
+    options.filterNot { case (key, _) => readerOwnedOptions.contains(key) }
 }

@@ -104,14 +104,13 @@ class JDBCDataReaderTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     df.count() shouldBe 3
   }
 
-  it should "keep Floe recovery metadata out of JDBC connector options" in {
+  it should "keep reader-owned options out of JDBC connector options" in {
     val config = SourceConfig(
       `type` = SourceType.JDBC,
       path = "customers",
       options = Map(
         "url" -> h2Url,
         "query" -> "SELECT * FROM customers",
-        "replayToken" -> "customers/extract/v1",
         "fetchSize" -> "100"
       )
     )

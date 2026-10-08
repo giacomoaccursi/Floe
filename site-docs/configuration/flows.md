@@ -332,6 +332,10 @@ Controls how validated data is written.
 | `icebergPartitions` | `[]` | Iceberg partition expressions |
 | `tableProperties` | `{}` | Iceberg table properties |
 
+Table-property keys must be non-blank. `format-version` is framework-owned and cannot be overridden per flow; Floe
+requires Iceberg format version 2. `write.format.default` remains a supported per-flow override of the validated global
+file format.
+
 ### Partition transforms
 
 Supported transforms for `icebergPartitions`:
@@ -346,7 +350,10 @@ Supported transforms for `icebergPartitions`:
 | `bucket(n, col)` | `bucket(16, customer_id)` | Hash-partition into n buckets |
 | `truncate(len, col)` | `truncate(3, zip_code)` | Partition by truncated value |
 
-Transforms are case-insensitive.
+Transforms are case-insensitive. Bucket counts and truncate widths must be positive integers. Floe rejects blank,
+duplicate, malformed, unsupported, or schema-unknown partition and sort columns during static validation, before any
+table DDL or source read. Column-existence checks require a declared `schema.columns`; Spark/Iceberg performs the final
+resolution when a flow intentionally uses a dynamic schema.
 
 !!!warning "Partitioning guidelines"
     - Partition on low-cardinality temporal columns (`month(order_date)`, `year(created_at)`)

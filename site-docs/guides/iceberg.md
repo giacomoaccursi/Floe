@@ -239,7 +239,7 @@ output:
     - "customer_id"
 ```
 
-Supported partition transforms: `year()`, `month()`, `day()`, `hour()`, `bucket(n, col)`, `truncate(len, col)`, and identity (bare column name). Transforms are case-insensitive (`MONTH(ts)` and `month(ts)` are equivalent).
+Supported partition transforms: `year()`, `month()`, `day()`, `hour()`, `bucket(n, col)`, `truncate(len, col)`, and identity (bare column name). Transforms are case-insensitive (`MONTH(ts)` and `month(ts)` are equivalent); bucket counts and truncate widths must be positive integers. With a declared schema, static validation also rejects unknown, blank, duplicate, malformed, or unsupported partition and sort columns before Floe executes table DDL.
 
 | Transform | Example | When to use |
 |-----------|---------|-------------|

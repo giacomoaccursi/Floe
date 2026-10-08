@@ -49,7 +49,9 @@ Base directories for all pipeline output.
 | `metadataPath` | yes | — | Directory for batch and flow metadata JSON |
 | `warningsPath` | no | `{outputPath}/warnings` | Base directory for validation warning records. Each batch is written to `{warningsPath}/{flowName}/batch_id={batchId}/`. |
 
-The first three paths are required. `warningsPath` is optional — if omitted, warnings go to `{outputPath}/warnings`. They can use [variable substitution](overview.md#variable-substitution):
+The first three paths are required and must be non-blank. `warningsPath` is optional, but must also be non-blank when
+present; if omitted, warnings go to `{outputPath}/warnings`. These invariants are checked by `validate()` before any
+source read. Paths can use [variable substitution](overview.md#variable-substitution):
 
 ```yaml
 paths:
@@ -65,9 +67,9 @@ Controls batch execution and validation behavior. This entire section is optiona
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `batchIdFormat` | `yyyyMMdd_HHmmss` | Java `DateTimeFormatter` pattern for the readable prefix of a batch ID. Use `timestamp` for epoch millis. A random UUID suffix is always appended to avoid collisions. |
+| `batchIdFormat` | `yyyyMMdd_HHmmss` | Non-blank Java `DateTimeFormatter` pattern for the readable prefix of a batch ID. Use `timestamp` for epoch millis or `datetime` for `yyyyMMdd_HHmmss`. Invalid patterns fail static validation. A random UUID suffix is always appended to avoid collisions. |
 | `maxRejectionRate` | — (disabled) | If set, it must be finite and in `[0.0, 1.0]`; the batch stops when any flow's rejection rate exceeds it (0.1 = 10%). |
-| `qualityMetricsTable` | — (disabled) | If set, writes per-flow quality metrics to this Iceberg table after each batch. Its name must not collide case-insensitively with a flow or derived table. See [Quality Metrics](../guides/quality-metrics.md). |
+| `qualityMetricsTable` | — (disabled) | If set, it must be non-blank and writes per-flow quality metrics to this Iceberg table after each batch. Its name must not collide case-insensitively with a flow or derived table. See [Quality Metrics](../guides/quality-metrics.md). |
 
 !!!warning "Batch ID collisions"
     The timestamp pattern controls readability, not uniqueness: every generated ID also includes a UUID suffix. Full loads are destructive replacements and Delta loads require an explicit primary key; neither constitutes a general replay guarantee. Retain the generated ID and the exact source input when investigating a failed run.
@@ -160,6 +162,9 @@ iceberg:
 `ddlMode` is independent from `catalogMode`. A job may bootstrap a catalog but still require tables to be provisioned separately. In `validate`, Floe checks that every primary, derived, and configured quality-metrics target exists before any flow runs; immediately before each write it also verifies the exact column names and types, current partition and sort orders, Iceberg format version, file format, and configured custom table properties. Any mismatch fails without issuing DDL.
 
 Custom catalog providers (Hive, REST, Nessie) can be registered via the [Pipeline Builder API](../guides/pipeline-builder.md#custom-catalog-providers).
+In `configure` mode, `validate()` resolves the selected built-in or custom provider and runs its configuration checks;
+unsupported catalog types therefore fail before pipeline construction. Catalog names, namespaces, and catalog-property
+keys must be non-blank, and the global file format must be exactly `parquet`, `orc`, or `avro`.
 
 ### maintenance
 

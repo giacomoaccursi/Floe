@@ -566,4 +566,34 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
     )
     intercept[IllegalArgumentException](builder.build()).getMessage should include("missing-reader")
   }
+
+  it should "reject foreign keys whose referenced columns are absent from the parent contract" in {
+    val parent = TestFixtures.flowConfig(
+      "customers",
+      columns = Seq(ColumnConfig("id", "long", nullable = false)),
+      enforceSchema = true
+    )
+    val child = TestFixtures.flowConfig(
+      "orders",
+      columns = Seq(
+        ColumnConfig("id", "long", nullable = false),
+        ColumnConfig("customer_id", "long", nullable = false)
+      ),
+      enforceSchema = true,
+      foreignKeys = Seq(
+        ForeignKeyConfig(Seq("customer_id"), ReferenceConfig("customers", Seq("missing_id")))
+      )
+    )
+
+    val builder = IngestionPipeline
+      .builder()
+      .withGlobalConfig(TestFixtures.globalConfig())
+      .withFlowConfigs(Seq(parent, child))
+
+    val issues = builder.validate().mkString(" ")
+    issues should include(
+      "Flow 'orders': FK (customer_id) -> customers.(missing_id) references columns not declared by flow 'customers': missing_id"
+    )
+    intercept[IllegalArgumentException](builder.build()).getMessage should include("missing_id")
+  }
 }

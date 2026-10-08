@@ -512,6 +512,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     }
     errors ++= DerivedTableExecutor.validateDefinitions(derivedTables.toSeq, flowConfigs.map(_.name).toSet)
     val flowNames = flowConfigs.map(_.name).toSet
+    val flowsByName = flowConfigs.map(flow => flow.name -> flow).toMap
     flowTransformations.keys.filterNot(flowNames).toSeq.sorted.foreach { flowName =>
       errors += s"Transformation references unknown flow '$flowName'"
     }
@@ -548,6 +549,15 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       config.validation.foreignKeys.foreach { fk =>
         if (!flowNames.contains(fk.references.flow))
           errors += s"Flow '${config.name}': FK references unknown flow '${fk.references.flow}'"
+        else {
+          val referencedColumns = flowsByName(fk.references.flow).schema.columns.map(_.name).toSet
+          if (referencedColumns.nonEmpty) {
+            val missing = fk.references.columns.filterNot(referencedColumns)
+            if (missing.nonEmpty)
+              errors +=
+                s"Flow '${config.name}': FK ${fk.displayName} references columns not declared by flow '${fk.references.flow}': ${missing.mkString(", ")}"
+          }
+        }
       }
       config.dependsOn.foreach { dependency =>
         if (!flowNames.contains(dependency))

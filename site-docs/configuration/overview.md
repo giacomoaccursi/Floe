@@ -47,7 +47,7 @@ loadMode:
   type: delta
   compareColumns: [status, amount]
 
-# Wrong — will not be recognized
+# Wrong — rejected as unknown fields
 load_mode:
   type: delta
   compare_columns: [status, amount]
@@ -106,12 +106,14 @@ If you need a literal dollar sign followed by a valid variable name pattern (e.g
 
 ## Error handling
 
-If a YAML file has syntax errors, the framework reports the file name and error location. If a required field is missing, the error message names the field and the section. If multiple flow files fail to load, all errors are reported together.
+Configuration parsing is strict at every nesting level. Unknown keys are rejected and reported with their complete path, so a typo can never silently fall back to a default or leave a setting unused. If a YAML file has syntax errors, the framework reports the file name and error location. If a required field is missing, the error message names the field and the section. If multiple flow files fail to load, all errors are reported together.
 
 ```
 [CONFIG_FILE_ERROR] Configuration file error in 'config/flows/orders.yaml':
   Missing required field 'name' at 'root'
 ```
+
+For example, `output.partitionBy` is rejected rather than ignored; the supported Iceberg field is `output.icebergPartitions`.
 
 ## Programmatic configuration
 

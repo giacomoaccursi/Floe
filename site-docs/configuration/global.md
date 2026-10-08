@@ -18,6 +18,7 @@ processing:
 
 performance:
   parallelFlows: true
+  maxParallelFlows: 4
 
 iceberg:
   catalogMode: "configure"
@@ -91,13 +92,14 @@ For the full validation pipeline, see [Validation Engine](../guides/validation.m
 
 Controls parallel execution of flows.
 
-The section is optional. If omitted, `parallelFlows` remains `false`.
+The section is optional. If omitted, `parallelFlows` remains `false` and `maxParallelFlows` remains `4`.
 
 | Field | Default | Description |
 |-------|---------|-------------|
 | `parallelFlows` | `false` | Execute independent flows (no FK or `dependsOn` dependency) in parallel |
+| `maxParallelFlows` | `4` | Positive upper bound on flow tasks submitted concurrently when parallel execution is enabled |
 
-When `parallelFlows` is `true`, flows with no dependency relationship (neither FK nor `dependsOn`) are grouped and executed concurrently using a bounded thread pool. Flows connected by FK dependencies or `dependsOn` always execute in topological order regardless of this setting.
+When `parallelFlows` is `true`, flows with no dependency relationship (neither FK nor `dependsOn`) are grouped and executed concurrently using a thread pool of exactly `maxParallelFlows` workers. Flows connected by FK dependencies or `dependsOn` always execute in topological order regardless of this setting. Size the limit against driver memory, source-system connection limits, catalog commit capacity, and the Spark scheduler; Floe never derives it from the host CPU count.
 
 For parallel DAG node execution, see the `parallelNodes` field in [DAG Configuration](../configuration/dag.md).
 

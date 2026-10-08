@@ -242,7 +242,7 @@ Nodes within the same execution group can run in parallel if `parallelNodes` is 
 parallelNodes: true
 ```
 
-Parallel execution uses a bounded thread pool sized at `availableProcessors * 2` to avoid saturating the driver.
+Parallel execution uses a bounded thread pool sized by `maxParallelNodes` (default `4`). Choose the bound explicitly for driver memory and Spark scheduler capacity; it is never inferred from the host CPU count.
 
 If `parallelNodes` is `false`, all groups execute sequentially regardless of independence.
 

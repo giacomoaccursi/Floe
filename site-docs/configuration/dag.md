@@ -8,6 +8,7 @@ Brief reference for DAG YAML files. For the complete guide including join strate
 name: customer_orders_aggregation
 description: "Customers with nested orders"
 parallelNodes: true
+maxParallelNodes: 4
 
 nodes:
   - id: orders_node
@@ -36,6 +37,7 @@ nodes:
 | `description` | no | `""` | Human-readable description |
 | `version` | no | `""` | Version string |
 | `parallelNodes` | no | `false` | Execute independent nodes in parallel |
+| `maxParallelNodes` | no | `4` | Positive upper bound on concurrently submitted independent nodes |
 | `nodes` | yes | — | List of node definitions |
 
 ## Node fields

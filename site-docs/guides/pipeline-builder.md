@@ -128,11 +128,12 @@ Flows are not executed in config file order. The framework builds an execution p
 2. Flows are topologically sorted so that dependencies execute before dependents
 3. Independent flows (no dependency relationship) are grouped for potential parallel execution
 
-If `performance.parallelFlows` is `true` in `global.yaml`, independent flows within the same group run in parallel using a bounded thread pool.
+If `performance.parallelFlows` is `true` in `global.yaml`, independent flows within the same group run in parallel using a bounded thread pool sized by `maxParallelFlows`.
 
 ```yaml
 performance:
   parallelFlows: true
+  maxParallelFlows: 4
 ```
 
 This means if flow `orders` has a FK referencing `customers` (or declares `dependsOn: [customers]`), `customers` is guaranteed to execute first — regardless of the order in the YAML files or the `withFlowConfigs()` list.

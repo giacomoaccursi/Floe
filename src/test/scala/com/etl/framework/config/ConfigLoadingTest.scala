@@ -1,5 +1,7 @@
 package com.etl.framework.config
 
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, FilterFileSystem}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.yaml.snakeyaml.{DumperOptions, Yaml}
@@ -7,8 +9,19 @@ import pureconfig.ConfigWriter
 import pureconfig.generic.auto._
 
 import java.io.PrintWriter
+import java.io.IOException
+import java.net.URI
 import java.nio.file.Files
 import ConfigHints._
+
+class InjectedConfigurationFileSystem extends FilterFileSystem {
+  override def initialize(uri: URI, configuration: Configuration): Unit =
+    throw new IOException(InjectedConfigurationFileSystem.Marker)
+}
+
+object InjectedConfigurationFileSystem {
+  val Marker = "injected Hadoop configuration was used"
+}
 
 class ConfigLoadingTest extends AnyFlatSpec with Matchers {
 
@@ -508,6 +521,21 @@ class ConfigLoadingTest extends AnyFlatSpec with Matchers {
     val msg = result.left.get.getMessage
     // Should report both failures, not just the first
     msg should include("2 flow configuration(s) failed to load")
+  }
+
+  it should "use the injected Hadoop configuration when listing a remote flow directory" in {
+    val configuration = new Configuration(false)
+    configuration.setClass(
+      "fs.floe-test.impl",
+      classOf[InjectedConfigurationFileSystem],
+      classOf[FileSystem]
+    )
+    configuration.setBoolean("fs.floe-test.impl.disable.cache", true)
+
+    val result = new FlowConfigLoader(configuration).loadAll("floe-test:///flows")
+
+    result.isLeft shouldBe true
+    result.left.get.getCause.getMessage should include(InjectedConfigurationFileSystem.Marker)
   }
 
   it should "succeed when all files in directory are valid" in {

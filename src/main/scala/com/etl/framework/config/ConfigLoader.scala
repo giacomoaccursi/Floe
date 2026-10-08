@@ -366,7 +366,7 @@ class FlowConfigLoader(configuration: Configuration = new Configuration()) exten
   private def listYamlFilesFromHadoop(directory: String): Either[ConfigurationException, Seq[String]] = {
     try {
       val hadoopPath = new HadoopPath(directory)
-      val fs = FileSystem.get(hadoopPath.toUri, new Configuration())
+      val fs = FileSystem.get(hadoopPath.toUri, hadoopConfiguration)
       if (!fs.exists(hadoopPath) || !fs.getFileStatus(hadoopPath).isDirectory)
         Left(ConfigFileException(file = directory, message = "Directory does not exist or is not a directory"))
       else

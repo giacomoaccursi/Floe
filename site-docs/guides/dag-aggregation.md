@@ -76,7 +76,7 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 |-------|------|----------|---------|-------------|
 | `type` | string | yes | — | Join type: `inner`, `left_outer` (or `left`), `right_outer` (or `right`), `full_outer` (or `full`) |
 | `with` | string | yes | — | ID of the node to join with |
-| `conditions` | list | yes | — | Join conditions: `left` = column on the current node, `right` = column on the `with` node |
+| `conditions` | list | yes | — | Non-empty join conditions: `left` = current node column, `right` = `with` node column. Each pair must have the same Spark data type. |
 | `strategy` | string | yes | — | Join strategy: `nest`, `flatten`, `aggregate` |
 | `nestAs` | string | — | `nested_records` | Field name for the nested array. Valid only for `nest`. |
 | `aggregations` | list | for `aggregate` | — | Non-empty aggregation specs required by `aggregate`; invalid for the other strategies. |
@@ -140,7 +140,7 @@ Result (`customers` with nested `orders`):
 | 2 | Bob | [{order_id: 103, total: 75.0}] |
 | 3 | Charlie | [] |
 
-With a `left_outer` join, parents with no matching children get an empty array (`[]`), not NULL. With an `inner` join, those parents are excluded from the result.
+With a `left_outer` join, parents with no matching children get an empty array (`[]`), not NULL. With an `inner` join, those parents are excluded from the result. For `right_outer` and `full_outer`, the output parent key is `coalesce(leftKey, rightKey)`, so child-only rows retain their identity.
 
 The child records are grouped by the join key columns using `collect_list(struct(*))`. The `nestAs` field controls the output column name (defaults to `nested_records`).
 
@@ -167,7 +167,7 @@ Result (`orders` with `shipping` columns flattened in):
 | 101 | shipped | 2024-01-15 | FedEx |
 | 102 | pending | NULL | NULL |
 
-If a child column has the same name as a parent column (excluding join keys), it is automatically prefixed with the node ID (e.g. `orders_node_status`) to avoid ambiguity. Join key columns from the child side are dropped.
+If a child column has the same name as a parent column under Spark's case-sensitivity setting (excluding join keys), it is automatically prefixed with the node ID (e.g. `orders_node_status`) to avoid ambiguity. Join key columns from the child side are dropped. For `right_outer` and `full_outer`, the retained parent-side key is coalesced with the child key before that drop, so child-only rows never lose the join key.
 
 !!!warning "Fan-out risk"
     Flatten is a standard join — if a parent row matches multiple child rows (1:N relationship), the parent row is duplicated for each match. Use Nest or Aggregate if you need to preserve the parent's cardinality.
@@ -200,7 +200,7 @@ Combines a parent table with a child table by computing summary statistics from 
 
 At least one aggregation is required — an empty `aggregations` list throws `ValidationConfigException`.
 
-The child is grouped by the join key columns, aggregated, then joined to the parent. Only the parent columns and the aggregation aliases appear in the output.
+The child is grouped by the join key columns, aggregated, then joined to the parent. Only the parent columns and the aggregation aliases appear in the output. For `right_outer` and `full_outer`, child-only group keys are coalesced into the corresponding parent key columns.
 
 !!!note "Data skew on aggregate and nest joins"
     Aggregate and Nest strategies use `groupBy` on the join key columns. If a key value is heavily skewed (e.g. one customer has 90% of all orders), the executor handling that key becomes a bottleneck. AQE can mitigate eligible skewed shuffle joins in Flatten plans, subject to Spark settings and thresholds, but it does not make a hot-key `groupBy` cheap. Inspect the physical plan and partition-size metrics.

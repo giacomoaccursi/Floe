@@ -58,7 +58,7 @@ nodes:
 |-------|------|----------|---------|-------------|
 | `type` | string | yes | — | `inner`, `left_outer`, `right_outer`, `full_outer` |
 | `with` | string | yes | — | ID of the node to join with |
-| `conditions` | list | yes | — | Join conditions (`left` = current node column, `right` = `with` node column) |
+| `conditions` | list | yes | — | Non-empty join conditions (`left` = current node column, `right` = `with` node column). Each key pair must have the same Spark data type. |
 | `strategy` | string | yes | — | `nest`, `flatten`, `aggregate` |
 | `nestAs` | string | no | `nested_records` | Field name for the nested array. Valid only for `nest`. |
 | `aggregations` | list | conditional | — | Non-empty aggregation specs required by `aggregate`; invalid for the other strategies. |

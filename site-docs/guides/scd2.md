@@ -220,7 +220,11 @@ These two boolean columns encode different information:
 | false | false | Record deleted from source (soft-delete) |
 | true | false | Not possible under normal conditions |
 
-**`is_current`** tracks the open version. An active key should have one open version; after a soft-delete it has **zero**. Iceberg does not enforce this invariant across pre-existing bad data or concurrent writers, so monitor it explicitly.
+**`is_current`** tracks the open version. An active key should have one open version; after a soft-delete it has **zero**.
+Iceberg does not provide a database uniqueness constraint. Before each non-initial SCD2 merge, Floe scans open versions
+and rejects duplicate current primary keys, null primary keys or `valid_from`, non-null `valid_to`, and (with delete
+detection) current rows whose `is_active` is not `true`. Continue to monitor both open and historical invariants: this
+preflight is not a distributed lock and does not validate every closed interval.
 
 **`is_active`** tracks logical deletion. In this implementation, a deleted customer's last version has `is_current = false` and `is_active = false`; query that state explicitly (and choose the latest `valid_to` per key if necessary).
 
@@ -383,13 +387,13 @@ This ensures:
 
 ### MERGE performance
 
-The MERGE INTO for SCD2 only operates on rows with `is_current = true` thanks to the condition `AND target.is_current = true` in the `ON` clause. Historical versions (potentially millions) are not touched.
+The MERGE INTO for SCD2 only operates on rows with `is_current = true` thanks to the condition `AND target.is_current = true` in the `ON` clause. Historical versions (potentially millions) are not touched. Floe also performs bounded-result preflight queries over current rows to validate their shape, key uniqueness, and temporal ordering before the mutation; include those scans when measuring the workload.
 
 The `is_current` predicate is semantically necessary, but it does **not** guarantee that Spark/Iceberg reads only current rows or that a table with 50 million historical versions costs the same as one with 1 million total rows. Planning, partition/file pruning and file layout determine the scan. Check `EXPLAIN`, bytes read and rewritten files on representative tables.
 
 ### Consistency invariant
 
-For a valid single-writer input and a clean target, one MERGE atomically closes the old version and inserts the new version. This does not create a database PK constraint: duplicate target rows, concurrent writers or historical corruption can still violate "at most one current row per key". Add a post-write quality check, and remember that a soft-deleted key intentionally has no current row.
+For a valid single-writer input and a clean target, one MERGE atomically closes the old version and inserts the new version. Floe rejects duplicate current target keys immediately before the MERGE, but this does not create a database PK constraint or close the race with another writer. Add a post-write quality check, and remember that a soft-deleted key intentionally has no current row.
 
 If the single SCD2 `MERGE` fails before its Iceberg commit completes, no partial row-level state is published: the table remains at the previous snapshot. A later failure elsewhere in the multi-table batch does not roll this successful table commit back.
 
@@ -491,7 +495,11 @@ version 2: valid_from=T2, valid_to=NULL
 
 This is guaranteed because both operations (close old, open new) use the same immutable `ExecutionRequest.effectiveAt` value rendered as a UTC timestamp literal. There are no temporal gaps between versions, and Spark executor clock differences cannot alter the boundary.
 
-Before a subsequent MERGE, Floe checks every changed key and every soft-deleted key. Its `effectiveAt` must be strictly later than the current version's `valid_from`; otherwise the load fails before mutation instead of creating a zero-length or negative interval. Repeating an unchanged row at the same instant remains a no-op. This check assumes the documented single-writer policy—it is not a distributed lock or fencing mechanism.
+Before a subsequent MERGE, Floe first verifies that every current target row is structurally valid and that no primary key
+has multiple current versions. It then checks every changed key and every soft-deleted key: `effectiveAt` must be strictly
+later than the current version's `valid_from`, otherwise the load fails before mutation instead of creating a zero-length
+or negative interval. Repeating an unchanged row at the same instant remains a no-op. These checks assume the documented
+single-writer policy—they are not a distributed lock or fencing mechanism.
 
 ## Known limitations
 

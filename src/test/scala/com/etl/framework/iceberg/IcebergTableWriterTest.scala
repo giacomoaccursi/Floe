@@ -258,6 +258,58 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     table.filter("is_current = true AND name = 'Alice'").count() shouldBe 1L
   }
 
+  it should "reject a target with multiple current versions before the SCD2 MERGE" in {
+    val fc = flowConfig("scd2_duplicate_current", loadMode = LoadMode.SCD2, compareColumns = Seq("name"))
+    writer.writeSCD2Load(
+      Seq((1, "Alice")).toDF("id", "name"),
+      fc,
+      CommitContext.forFlow("initial", fc.name, "scd2", Instant.parse("2026-10-06T10:00:00Z"))
+    )
+    spark.sql(
+      """INSERT INTO writer_catalog.default.scd2_duplicate_current
+        |VALUES (1, 'corrupt duplicate', TIMESTAMP '2026-10-06 11:00:00', CAST(NULL AS TIMESTAMP), true)""".stripMargin
+    )
+
+    val error = intercept[IllegalArgumentException] {
+      writer.writeSCD2Load(
+        Seq((1, "Alice changed")).toDF("id", "name"),
+        fc,
+        CommitContext.forFlow("update", fc.name, "scd2", Instant.parse("2026-10-06T12:00:00Z"))
+      )
+    }
+
+    error.getMessage should include("more than one current version for the same primary key")
+    spark.sql("SELECT * FROM writer_catalog.default.scd2_duplicate_current").count() shouldBe 2L
+  }
+
+  it should "reject a malformed current SCD2 interval before the MERGE" in {
+    val fc = flowConfig("scd2_invalid_current", loadMode = LoadMode.SCD2, compareColumns = Seq("name"))
+    writer.writeSCD2Load(
+      Seq((1, "Alice")).toDF("id", "name"),
+      fc,
+      CommitContext.forFlow("initial", fc.name, "scd2", Instant.parse("2026-10-06T10:00:00Z"))
+    )
+    spark.sql(
+      """UPDATE writer_catalog.default.scd2_invalid_current
+        |SET valid_to = TIMESTAMP '2026-10-06 11:00:00'
+        |WHERE id = 1""".stripMargin
+    )
+
+    val error = intercept[IllegalArgumentException] {
+      writer.writeSCD2Load(
+        Seq((1, "Alice changed")).toDF("id", "name"),
+        fc,
+        CommitContext.forFlow("update", fc.name, "scd2", Instant.parse("2026-10-06T12:00:00Z"))
+      )
+    }
+
+    error.getMessage should include("invalid current version")
+    spark
+      .sql("SELECT * FROM writer_catalog.default.scd2_invalid_current")
+      .filter("is_current = true AND valid_to IS NOT NULL")
+      .count() shouldBe 1L
+  }
+
   it should "allow an unchanged retry at the same effective time" in {
     val fc = flowConfig("scd2_same_time_noop", loadMode = LoadMode.SCD2, compareColumns = Seq("name"))
     val effectiveAt = Instant.parse("2026-10-06T10:00:00Z")
@@ -646,6 +698,8 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     "scd2_first",
     "scd2_change",
     "scd2_out_of_order",
+    "scd2_duplicate_current",
+    "scd2_invalid_current",
     "scd2_same_time_noop",
     "scd2_detect_del",
     "scd2_out_of_order_delete",

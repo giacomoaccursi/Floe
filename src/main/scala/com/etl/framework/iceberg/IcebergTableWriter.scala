@@ -291,6 +291,7 @@ class IcebergTableWriter(
 
     df.createOrReplaceTempView(sourceView)
     try {
+      validateSCD2CurrentRows(tableName, cfg)
       validateSCD2EffectiveTime(df, tableName, cfg, commitContext)
       buildStagedView(df, tableName, sourceView, stagedView, cfg)
       val mergeSql = buildMergeSql(df, tableName, stagedView, cfg, commitContext)
@@ -302,6 +303,43 @@ class IcebergTableWriter(
         val _ = spark.catalog.dropTempView(viewName)
       }
     }
+  }
+
+  /** The MERGE assumes one well-formed open version per key. Validate only current rows—the history may be large and
+    * does not participate in the mutation—but fail before a corrupt target can amplify duplicate open versions.
+    */
+  private def validateSCD2CurrentRows(tableName: String, cfg: SCD2Config): Unit = {
+    val current = spark
+      .table(SqlIdentifier.quoteMultipart(tableName))
+      .filter(col(cfg.isCurrentCol) === true)
+
+    val nullPrimaryKey = cfg.pkColumns.map(column => col(column).isNull).reduce(_ || _)
+    val invalidOpenVersion =
+      nullPrimaryKey || col(cfg.validFromCol).isNull || col(cfg.validToCol).isNotNull
+    val invalidActiveState =
+      if (cfg.detectDeletes) cfg.isActiveCol.map(column => !col(column).eqNullSafe(lit(true)))
+      else None
+    val hasInvalidCurrentRow = current
+      .filter(invalidActiveState.fold(invalidOpenVersion)(invalidOpenVersion || _))
+      .limit(1)
+      .count() > 0L
+    require(
+      !hasInvalidCurrentRow,
+      "SCD2 target contains an invalid current version: primary keys and valid_from must be non-null, " +
+        "valid_to must be null, and is_active must be true when delete detection is enabled"
+    )
+
+    val duplicateCountColumn = s"__floe_current_count_${UUID.randomUUID().toString.replace("-", "")}"
+    val hasDuplicateCurrentKey = current
+      .groupBy(cfg.pkColumns.map(col): _*)
+      .agg(count(lit(1)).as(duplicateCountColumn))
+      .filter(col(duplicateCountColumn) > 1L)
+      .limit(1)
+      .count() > 0L
+    require(
+      !hasDuplicateCurrentKey,
+      "SCD2 target contains more than one current version for the same primary key; repair the table before retrying"
+    )
   }
 
   /** Prevents negative or zero-length SCD2 intervals. An unchanged row at the same effective time remains a no-op; only

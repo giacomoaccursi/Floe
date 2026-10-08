@@ -72,6 +72,11 @@ Each flow and derived target exposes a `DataOutcome`:
 
 Floe performs no automatic flow or whole-pipeline retry. The default contract is `manual-recovery`.
 
+Floe also applies no internal wall-clock timeout. Airflow, Step Functions, Kubernetes, EMR, or the hosting application
+owns the execution deadline and must wait for confirmed driver/application termination after cancellation. A scheduler
+timeout is not proof of non-commit; if the target outcome cannot be reconciled, classify it as `UNKNOWN` and block
+automatic retry or overlapping writers.
+
 Do not configure scheduler retries merely because the failed flow says `NOT_ATTEMPTED`: an earlier target may already be committed. A whole-job retry is allowed only after the complete application recipe has been proven repeatable for its real inputs, transformations, write modes, catalog, storage, cancellation behavior, and concurrency policy. `UNKNOWN` always blocks automatic retry.
 
 At minimum, a repeatability assessment must establish:

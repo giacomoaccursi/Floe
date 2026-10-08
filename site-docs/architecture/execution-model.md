@@ -69,6 +69,12 @@ Aggregate statuses are:
 
 Parallel flows already running are allowed to finish and all their results are retained. Subsequent groups are not started after a failure.
 
+Floe deliberately has no in-process elapsed-time deadline for a flow, group, or DAG: the synchronous API waits until
+the submitted work completes or the hosting platform terminates/interrupts the application. An arbitrary library timer
+cannot prove that a remote Spark job or an Iceberg commit stopped and could return control while a writer is still
+active. Configure deadlines at the platform job/application boundary, preserve the resulting state as potentially
+uncertain, and reconcile before starting an overlapping writer.
+
 ## Commit identity
 
 Every managed flow and derived commit writes snapshot summary properties for:

@@ -71,7 +71,7 @@ See [Data Sources](../guides/data-sources.md).
 
 DAG-based aggregation module for joining and aggregating data across multiple flows:
 
-- **DAGOrchestrator** — entry point, loads config, delegates to builder and executor
+- **DAGOrchestrator** — entry point, validates the supplied config, delegates to builder and executor
 - **DAGGraphBuilder** — validates nodes, builds dependency graph, topological sort
 - **DAGExecutor** — executes the plan group by group
 - **DAGNodeProcessor** — loads source data, applies filters/select, joins with parent

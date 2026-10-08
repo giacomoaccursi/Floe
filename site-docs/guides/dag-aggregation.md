@@ -64,8 +64,8 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 |-------|------|----------|---------|-------------|
 | `id` | string | yes | — | Unique node identifier |
 | `description` | string | no | `""` | Human-readable description |
-| `sourceFlow` | string | — | — | Name of the source flow. Reads from `{catalogName}.{namespace}.{sourceFlow}`. Required if `sourceTable` is not set. |
-| `sourceTable` | string | — | — | Full Iceberg table name. Use instead of `sourceFlow` for external tables. |
+| `sourceFlow` | string | — | — | Name of the source flow. Reads from `{catalogName}.{namespace}.{sourceFlow}`. Configure exactly one source field. |
+| `sourceTable` | string | — | — | Full external Iceberg table name. Configure exactly one of `sourceFlow` and `sourceTable`; neither silently overrides the other. |
 | `joins` | list | — | `[]` | List of join configurations. Dependencies are inferred automatically. |
 | `select` | list | — | all columns | Columns to select from source data |
 | `filters` | list | — | none | SQL filter expressions applied to source data |
@@ -78,8 +78,8 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 | `with` | string | yes | — | ID of the node to join with |
 | `conditions` | list | yes | — | Join conditions: `left` = column on the current node, `right` = column on the `with` node |
 | `strategy` | string | yes | — | Join strategy: `nest`, `flatten`, `aggregate` |
-| `nestAs` | string | — | `nested_records` | Field name for nested array (Nest strategy only) |
-| `aggregations` | list | — | — | Aggregation specs (Aggregate strategy only) |
+| `nestAs` | string | — | `nested_records` | Field name for the nested array. Valid only for `nest`. |
+| `aggregations` | list | for `aggregate` | — | Non-empty aggregation specs required by `aggregate`; invalid for the other strategies. |
 
 ### Aggregation specification
 
@@ -227,9 +227,9 @@ The execution order is: **load source → apply filters → apply select → joi
 
 ## Dependency resolution and execution order
 
-The DAG is executed in topological order. The framework:
+The DAG is executed in topological order. YAML and programmatic construction share the same fail-fast structural validation. The framework:
 
-1. Validates all nodes: checks for duplicate IDs, missing dependencies, self-referential joins, empty join conditions.
+1. Validates all nodes: checks source exclusivity, blank and case-insensitively duplicated identifiers, missing or self-referential dependencies, join conditions, strategy-specific fields, aggregation aliases, and ordering requirements.
 2. Builds a dependency graph. Join parents are implicit dependencies — a node cannot execute before its join parent even if not listed in `dependencies`.
 3. Performs topological sort. If a cycle is detected, a `CircularDependencyException` is thrown with the full cycle path.
 4. Groups nodes by execution level: nodes whose dependencies are all satisfied can run in the same group.

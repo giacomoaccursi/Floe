@@ -10,7 +10,6 @@ object AggregationConfigValidator {
 
     if (config.name.trim.isEmpty) errors += "name must not be blank"
     else if (config.name != config.name.trim) errors += "name must not have leading or trailing whitespace"
-    if (config.maxParallelNodes <= 0) errors += "maxParallelNodes must be greater than zero"
     errors ++= validateNodes(config.nodes)
 
     errors.result()

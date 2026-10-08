@@ -75,14 +75,6 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
     plan.groups.head.nodes.head.id shouldBe "single_node"
   }
 
-  it should "reject a non-positive node concurrency limit" in {
-    val dagConfig = createDagConfig(Seq(leaf("node"))).copy(parallelNodes = true, maxParallelNodes = 0)
-
-    intercept[ValidationConfigException] {
-      new DAGOrchestrator(dagConfig, globalConfig)
-    }.getMessage should include("maxParallelNodes must be greater than zero")
-  }
-
   it should "reject aggregate joins without aggregation expressions during planning" in {
     val aggregateRoot = DAGNode(
       id = "root",
@@ -101,5 +93,34 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
     intercept[ValidationConfigException] {
       new DAGOrchestrator(dagConfig, globalConfig).buildExecutionPlan()
     }.getMessage should include("requires at least one aggregation")
+  }
+
+  it should "build a lazy root DataFrame that the caller can materialize" in {
+    import spark.implicits._
+    Seq((1, "Alice")).toDF("id", "name").createOrReplaceTempView("dag_parent")
+    Seq((1, "Rome")).toDF("parent_id", "city").createOrReplaceTempView("dag_child")
+    try {
+      val childNode = DAGNode(id = "child", sourceTable = Some("dag_child"))
+      val rootNode = DAGNode(
+        id = "root",
+        sourceTable = Some("dag_parent"),
+        joins = Seq(
+          JoinConfig(
+            `type` = JoinType.Inner,
+            `with` = "child",
+            conditions = Seq(JoinCondition("id", "parent_id")),
+            strategy = JoinStrategy.Flatten
+          )
+        )
+      )
+
+      val result = new DAGOrchestrator(createDagConfig(Seq(childNode, rootNode)), globalConfig).execute()
+
+      result.select("id", "name", "city").as[(Int, String, String)].head() shouldBe ((1, "Alice", "Rome"))
+    } finally {
+      Seq("dag_parent", "dag_child").foreach { viewName =>
+        val _ = spark.catalog.dropTempView(viewName)
+      }
+    }
   }
 }

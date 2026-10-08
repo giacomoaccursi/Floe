@@ -5,10 +5,10 @@ import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.util.TopologicalSorter
 import org.slf4j.LoggerFactory
 
-/** Builds the DAG execution plan: validates nodes, resolves dependencies via topological sort, groups independent nodes
-  * for parallel execution, and identifies the root node.
+/** Builds the DAG execution plan: validates nodes, resolves dependencies via topological sort, groups nodes by
+  * dependency level, and identifies the root node.
   */
-class DAGGraphBuilder(parallelNodes: Boolean) {
+class DAGGraphBuilder {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -19,8 +19,8 @@ class DAGGraphBuilder(parallelNodes: Boolean) {
     val nodeMap = nodes.map(n => n.id -> n).toMap
     val graph = TopologicalSorter.buildGraph[DAGNode](nodes, _.id, _.joins.map(_.`with`).toSet)
     val sorted = TopologicalSorter.sort(graph, "DAG")
-    val groups = TopologicalSorter.group(sorted, graph, parallelNodes).map { case (ids, parallel) =>
-      DAGExecutionGroup(ids.flatMap(nodeMap.get), parallel)
+    val groups = TopologicalSorter.group(sorted, graph, parallelEnabled = false).map { case (ids, _) =>
+      DAGExecutionGroup(ids.flatMap(nodeMap.get))
     }
     val rootNode = findRootNode(nodes, graph)
 

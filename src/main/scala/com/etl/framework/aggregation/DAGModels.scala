@@ -9,9 +9,6 @@ case class DAGExecutionPlan(
     rootNode: String
 )
 
-/** Group of DAG nodes that can be executed together
+/** Dependency-level group of DAG nodes
   */
-case class DAGExecutionGroup(
-    nodes: Seq[DAGNode],
-    parallel: Boolean
-)
+case class DAGExecutionGroup(nodes: Seq[DAGNode])

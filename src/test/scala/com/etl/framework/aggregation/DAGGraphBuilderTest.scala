@@ -59,7 +59,7 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
   }
 
   it should "build execution plan in correct order" in {
-    val builder = new DAGGraphBuilder(parallelNodes = false)
+    val builder = new DAGGraphBuilder()
     val plan = builder.buildExecutionPlan(Seq(leaf("A"), child("B", "A"), child("C", "B")))
 
     val allIds = plan.groups.flatMap(_.nodes.map(_.id))
@@ -69,13 +69,13 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
   }
 
   it should "identify root node" in {
-    val builder = new DAGGraphBuilder(parallelNodes = false)
+    val builder = new DAGGraphBuilder()
     val plan = builder.buildExecutionPlan(Seq(leaf("A"), child("B", "A"), child("C", "B")))
     plan.rootNode shouldBe "C"
   }
 
   it should "reject multiple root nodes" in {
-    val builder = new DAGGraphBuilder(parallelNodes = false)
+    val builder = new DAGGraphBuilder()
     // A and B are both roots (no one depends on them via joins)
     // C depends on A, D depends on B — but A and B are independent roots
     val ex = intercept[IllegalStateException] {
@@ -85,22 +85,22 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
   }
 
   it should "detect circular dependency" in {
-    val builder = new DAGGraphBuilder(parallelNodes = false)
+    val builder = new DAGGraphBuilder()
     intercept[CircularDependencyException] {
       builder.buildExecutionPlan(Seq(child("A", "B"), child("B", "A")))
     }
   }
 
   it should "reject self-referential join" in {
-    val builder = new DAGGraphBuilder(parallelNodes = false)
+    val builder = new DAGGraphBuilder()
     intercept[Exception] {
       builder.buildExecutionPlan(Seq(child("A", "A")))
     }
   }
 
-  it should "group independent nodes for parallel execution" in {
-    val builder = new DAGGraphBuilder(parallelNodes = true)
-    // A, B are independent leaves; C joins both → single root C, group 1 has A,B in parallel
+  it should "group independent nodes at the same dependency level" in {
+    val builder = new DAGGraphBuilder()
+    // A, B are independent leaves; C joins both, so group 1 contains A and B.
     val nodeC = DAGNode(
       id = "C",
       sourceFlow = "flow_C",
@@ -121,20 +121,12 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
     )
     val plan = builder.buildExecutionPlan(Seq(leaf("A"), leaf("B"), nodeC))
 
-    plan.groups.head.parallel shouldBe true
     plan.groups.head.nodes.map(_.id).toSet shouldBe Set("A", "B")
     plan.rootNode shouldBe "C"
   }
 
-  it should "disable parallel when parallelNodes is false" in {
-    val builder = new DAGGraphBuilder(parallelNodes = false)
-    val plan = builder.buildExecutionPlan(Seq(leaf("A"), child("B", "A")))
-    plan.groups.head.parallel shouldBe false
-    plan.rootNode shouldBe "B"
-  }
-
   it should "handle single node DAG" in {
-    val builder = new DAGGraphBuilder(parallelNodes = false)
+    val builder = new DAGGraphBuilder()
     val plan = builder.buildExecutionPlan(Seq(leaf("A")))
     plan.groups.size shouldBe 1
     plan.rootNode shouldBe "A"

@@ -6,9 +6,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 import org.slf4j.LoggerFactory
 
-/** Processes individual DAG nodes
-  */
-/** Processes a single DAG node: loads source data from Iceberg, applies filters and column selection, then executes
+/** Prepares a single lazy DAG node DataFrame: references source data, applies filters and column selection, then builds
   * joins with dependent nodes using the configured strategy.
   */
 class DAGNodeProcessor(joinExecutor: JoinStrategyExecutor, catalogName: String, namespace: String = "default")(implicit
@@ -20,7 +18,7 @@ class DAGNodeProcessor(joinExecutor: JoinStrategyExecutor, catalogName: String, 
   /** Executes a single DAG node
     */
   def executeNode(node: DAGNode, nodeResults: Map[String, DataFrame]): DataFrame = {
-    logger.info(s"Executing DAG node: ${node.id}")
+    logger.info(s"Preparing DAG node: ${node.id}")
 
     val tableName = node.sourceTable.getOrElse(s"$catalogName.$namespace.${node.sourceFlow}")
     val sourceData = spark.table(SqlIdentifier.quoteMultipart(tableName))
@@ -45,7 +43,7 @@ class DAGNodeProcessor(joinExecutor: JoinStrategyExecutor, catalogName: String, 
       }
     }
 
-    logger.info(s"Node ${node.id} execution completed")
+    logger.info(s"DAG node ${node.id} plan prepared")
     result
   }
 

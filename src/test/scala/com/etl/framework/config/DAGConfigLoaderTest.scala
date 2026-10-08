@@ -58,4 +58,23 @@ class DAGConfigLoaderTest extends AnyFlatSpec with Matchers {
       result.left.get.getMessage should include("soruceTable")
     }
   }
+
+  it should "reject removed driver-side node parallelism settings" in {
+    val yaml =
+      """
+        |name: obsolete_parallelism
+        |parallelNodes: true
+        |maxParallelNodes: 8
+        |nodes:
+        |  - id: customers
+        |    sourceFlow: customers
+        |""".stripMargin
+
+    withTempFile(yaml) { file =>
+      val message = loader.load(file.getAbsolutePath).left.get.getMessage
+
+      message should include("parallelNodes")
+      message should include("maxParallelNodes")
+    }
+  }
 }

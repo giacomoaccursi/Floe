@@ -122,6 +122,32 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     result.count() shouldBe 2
   }
 
+  it should "preserve the declared order of child data columns" in {
+    val parent = Seq((1, "Alice")).toDF("id", "name")
+    val child = Seq((1, "z", "a", "m", "o")).toDF(
+      "parent_id",
+      "zeta",
+      "alpha",
+      "middle",
+      "omega"
+    )
+
+    import com.etl.framework.config.JoinType._
+
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(
+        `type` = Inner,
+        `with` = "child",
+        conditions = Seq(JoinCondition("id", "parent_id")),
+        strategy = Flatten
+      )
+    )
+
+    result.columns shouldBe Array("id", "name", "zeta", "alpha", "middle", "omega")
+  }
+
   it should "rename conflicting columns with node name prefix" in {
     val parent = Seq((1, "Alice")).toDF("id", "name")
     val child = Seq((1, "AliceChild")).toDF("parent_id", "name")
@@ -361,6 +387,29 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     )
 
     result.select("values").as[Seq[String]].head() shouldBe Seq("a", "b", "c")
+  }
+
+  it should "sort collect_set output deterministically after removing duplicates" in {
+    val parent = Seq(1).toDF("id")
+    val child = Seq((1, "z"), (1, "a"), (1, "m"), (1, "a"), (1, "b"))
+      .toDF("parent_id", "value")
+      .repartition(4)
+    import com.etl.framework.config.AggregationFunction._
+    import com.etl.framework.config.JoinType._
+
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(
+        LeftOuter,
+        "child",
+        Seq(JoinCondition("id", "parent_id")),
+        Aggregate,
+        aggregations = Seq(AggregationSpec("value", CollectSet, "values"))
+      )
+    )
+
+    result.select("values").as[Seq[String]].head() shouldBe Seq("a", "b", "m", "z")
   }
 
 }

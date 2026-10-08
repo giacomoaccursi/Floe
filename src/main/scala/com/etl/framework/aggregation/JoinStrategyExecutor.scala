@@ -84,9 +84,8 @@ class JoinStrategyExecutor {
     )
 
     val leftColumns = left.columns.toSet
-    val rightColumns = right.columns.toSet
     val rightJoinKeys = joinConfig.conditions.map(_.right).toSet
-    val rightDataColumns = rightColumns -- rightJoinKeys
+    val rightDataColumns = right.columns.toSeq.filterNot(rightJoinKeys)
 
     val prefix = s"${joinConfig.`with`}_"
     val renamedRight = rightDataColumns.foldLeft(right) { (df, rightCol) =>
@@ -143,7 +142,7 @@ class JoinStrategyExecutor {
         case First       => min_by(right(aggSpec.column), orderingColumn(right, aggSpec))
         case Last        => max_by(right(aggSpec.column), orderingColumn(right, aggSpec))
         case CollectList => sort_array(collect_list(right(aggSpec.column)))
-        case CollectSet  => collect_set(right(aggSpec.column))
+        case CollectSet  => sort_array(collect_set(right(aggSpec.column)))
       }
       aggFunc.as(aggSpec.alias)
     }

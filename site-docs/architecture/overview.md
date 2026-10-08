@@ -54,7 +54,7 @@ A batch execution follows this sequence:
    Diagnostic metadata → Typed attempt result with per-target snapshot evidence
 
 7. DAG aggregation (if configured, separate execution)
-   Load DAG config → Resolve join dependencies → Execute nodes → Produce output
+   Load DAG config → Resolve join dependencies → Build lazy root DataFrame → Caller materializes output
 
 8. Maintenance (separately scheduled job)
    One platform task selects one table → Expire snapshots → Compact data files → Remove old orphan files → Rewrite manifests
@@ -66,7 +66,7 @@ A batch execution follows this sequence:
 - **Iceberg-required**: every managed flow and derived target is written through Iceberg for per-table ACID guarantees, time travel, and schema evolution.
 - **Fail-fast**: configuration errors are caught at startup, not at runtime. Missing fields, invalid references, and type mismatches all fail before any data is processed.
 - **Immutable context**: `TransformationContext` is immutable. Every modification returns a new instance, preventing side effects between transformations.
-- **Bounded parallelism**: parallel execution uses explicitly sized thread pools, never the global execution context.
+- **Bounded flow parallelism**: concurrent ingestion flows use an explicitly sized thread pool, never the global execution context; lazy DAG DataFrames rely on Spark's physical scheduler.
 - **Orchestrator-neutral**: Floe has no workflow database; the platform owns scheduling, serialization, and request retention.
 - **Explicit evidence**: typed data outcomes and pinned dependency snapshots expose partial and uncertain execution honestly.
 - **Independent maintenance**: ingestion never queues or retries maintenance; schedule one table per operational task and retain its typed action result externally.

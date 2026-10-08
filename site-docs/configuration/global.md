@@ -103,7 +103,7 @@ The section is optional. If omitted, `parallelFlows` remains `false` and `maxPar
 
 When `parallelFlows` is `true`, flows with no dependency relationship (neither FK nor `dependsOn`) are grouped and executed concurrently using a thread pool of exactly `maxParallelFlows` workers. Flows connected by FK dependencies or `dependsOn` always execute in topological order regardless of this setting. Size the limit against driver memory, source-system connection limits, catalog commit capacity, and the Spark scheduler; Floe never derives it from the host CPU count.
 
-For parallel DAG node execution, see the `parallelNodes` field in [DAG Configuration](../configuration/dag.md).
+This setting applies to ingestion flows, which perform actions and Iceberg writes. DAG aggregation instead returns one lazy DataFrame; Spark owns its physical task parallelism when the caller materializes it. See [DAG Configuration](dag.md).
 
 ## iceberg
 

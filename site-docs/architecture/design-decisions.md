@@ -60,11 +60,11 @@ Rewriting all existing files on a config change would be an unbounded, blocking 
 
 The decision to repartition existing data is an explicit operational action, not an automatic side effect of a config change. For large tables, use Iceberg's `rewrite_data_files` procedure.
 
-## Why bounded parallelism
+## Why bounded flow parallelism
 
 Using `ExecutionContext.Implicits.global` for parallel Spark operations is dangerous: the global pool has a fixed size based on available processors, and Spark jobs submitted from it compete for the same resources. This can lead to thread starvation and deadlocks.
 
-The framework uses explicitly sized thread pools for both flow and DAG parallelism, ensuring predictable resource usage and preventing driver saturation.
+The framework uses an explicitly sized thread pool only for independent ingestion flows, which actually run Spark actions and Iceberg writes. DAG aggregation returns one lazy DataFrame: driver-side threads would only parallelize logical-plan construction, not Spark execution, so Floe deliberately does not expose DAG thread-pool settings. Spark owns stage and task parallelism when the caller materializes the result.
 
 ## Why warn is the default for orphan detection
 

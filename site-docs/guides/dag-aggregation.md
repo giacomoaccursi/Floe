@@ -4,11 +4,11 @@
 
 The DAG aggregation module builds a directed acyclic graph of data transformations that join, filter, and aggregate data from multiple flows. Each node in the DAG represents a data source (an Iceberg table derived from a flow) and optionally joins its data with a parent node using one of three strategies: Nest, Flatten, or Aggregate.
 
-The DAG is defined in a YAML configuration file. At execution time, the framework resolves dependencies, detects cycles, groups independent nodes for parallel execution, and produces a single output DataFrame from the root node.
+The DAG is defined in a YAML configuration file. Floe resolves dependencies, detects cycles, and builds a single lazy output DataFrame from the root node.
 
 ## Architecture
 
-The module validates the DAG configuration, resolves dependencies from join declarations, detects cycles, groups independent nodes for parallel execution, and produces a single output DataFrame from the root node. Three join strategies are supported: Nest, Flatten, and Aggregate.
+The module validates the DAG configuration, resolves dependencies from join declarations, detects cycles, groups nodes by dependency level, and produces a single lazy DataFrame from the root node. Three join strategies are supported: Nest, Flatten, and Aggregate.
 
 DAG nodes can reference any Iceberg table in the catalog, including [derived tables](pipeline-builder.md#derived-tables) produced by the pipeline.
 
@@ -234,19 +234,13 @@ The DAG is executed in topological order. YAML and programmatic construction sha
 1. Validates all nodes: checks source exclusivity, blank and case-insensitively duplicated identifiers, missing or self-referential dependencies, join conditions, strategy-specific fields, aggregation aliases, and ordering requirements.
 2. Builds a dependency graph. Join parents are implicit dependencies — a node cannot execute before its join parent even if not listed in `dependencies`.
 3. Performs topological sort. If a cycle is detected, a `CircularDependencyException` is thrown with the full cycle path.
-4. Groups nodes by execution level: nodes whose dependencies are all satisfied can run in the same group.
+4. Groups nodes by dependency level, then constructs their logical plans in deterministic sequence.
 
-### Parallel execution
+### Lazy execution boundary
 
-Nodes within the same execution group can run in parallel if `parallelNodes` is `true` in the DAG YAML:
+`DAGOrchestrator.execute()` constructs and returns a DataFrame; it does not call a Spark action and does not materialize or cache intermediate nodes. This keeps the library composable and prevents hidden scans, memory pressure, and duplicate work.
 
-```yaml
-parallelNodes: true
-```
-
-Parallel execution uses a bounded thread pool sized by `maxParallelNodes` (default `4`). Choose the bound explicitly for driver memory and Spark scheduler capacity; it is never inferred from the host CPU count.
-
-If `parallelNodes` is `false`, all groups execute sequentially regardless of independence.
+The caller or external orchestrator owns the terminal action or write. Once materialization starts, Spark—not Floe driver threads—plans stages and task parallelism from the complete physical DAG. The removed `parallelNodes` and `maxParallelNodes` fields are rejected as unknown configuration rather than silently ignored.
 
 ### Root node
 

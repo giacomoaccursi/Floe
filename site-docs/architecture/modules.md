@@ -73,8 +73,8 @@ DAG-based aggregation module for joining and aggregating data across multiple fl
 
 - **DAGOrchestrator** — entry point, validates the supplied config, delegates to builder and executor
 - **DAGGraphBuilder** — validates nodes, builds dependency graph, topological sort
-- **DAGExecutor** — executes the plan group by group
-- **DAGNodeProcessor** — loads source data, applies filters/select, joins with parent
+- **DAGExecutor** — builds the lazy root DataFrame in dependency order
+- **DAGNodeProcessor** — references source data and composes filters/select/joins without triggering an action
 - **JoinStrategyExecutor** — implements Nest, Flatten, and Aggregate join strategies
 
 See [DAG Aggregation](../guides/dag-aggregation.md).

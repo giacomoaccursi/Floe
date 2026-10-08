@@ -109,6 +109,22 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
     result.count() shouldBe 2
   }
 
+  it should "load sourceTable identifiers that require Spark SQL quoting" in {
+    spark.sql("CREATE OR REPLACE TEMP VIEW `test-order-items` AS SELECT 1 AS id, 'item' AS name")
+    try {
+      val node = DAGNode(
+        id = "order_items",
+        sourceTable = Some("test-order-items")
+      )
+
+      val result = processor.executeNode(node, Map.empty)
+
+      result.select("id", "name").as[(Int, String)].head() shouldBe ((1, "item"))
+    } finally {
+      val _ = spark.sql("DROP VIEW IF EXISTS `test-order-items`")
+    }
+  }
+
   it should "throw an exception when join parent is not found in node results" in {
     val node = DAGNode(
       id = "child_node",

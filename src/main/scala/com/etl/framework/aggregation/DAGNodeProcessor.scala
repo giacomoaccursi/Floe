@@ -1,6 +1,7 @@
 package com.etl.framework.aggregation
 
 import com.etl.framework.config.DAGNode
+import com.etl.framework.util.SqlIdentifier
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 import org.slf4j.LoggerFactory
@@ -22,7 +23,7 @@ class DAGNodeProcessor(joinExecutor: JoinStrategyExecutor, catalogName: String, 
     logger.info(s"Executing DAG node: ${node.id}")
 
     val tableName = node.sourceTable.getOrElse(s"$catalogName.$namespace.${node.sourceFlow}")
-    val sourceData = spark.table(tableName)
+    val sourceData = spark.table(SqlIdentifier.quoteMultipart(tableName))
     logger.debug(s"Source data loaded from table: $tableName")
 
     val filtered = applyFilters(sourceData, node.filters)

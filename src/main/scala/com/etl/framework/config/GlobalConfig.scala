@@ -21,5 +21,6 @@ case class ProcessingConfig(
 )
 
 case class PerformanceConfig(
-    parallelFlows: Boolean = false
+    parallelFlows: Boolean = false,
+    maxParallelFlows: Int = 4
 )

@@ -433,4 +433,17 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
 
     issues should include("SCD2 metadata column names must be unique case-insensitively")
   }
+
+  it should "reject a non-positive flow concurrency limit" in {
+    val base = TestFixtures.globalConfig(parallelFlows = true)
+    val global = base.copy(performance = PerformanceConfig(parallelFlows = true, maxParallelFlows = 0))
+
+    val issues = IngestionPipeline
+      .builder()
+      .withGlobalConfig(global)
+      .withFlowConfigs(Seq(TestFixtures.flowConfig("orders")))
+      .validate()
+
+    issues should contain("performance.maxParallelFlows must be greater than zero")
+  }
 }

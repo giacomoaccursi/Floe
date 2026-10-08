@@ -287,7 +287,9 @@ object FlowOrchestrator {
       pipelineId: String = "local",
       codeVersion: String = "unversioned"
   )(implicit spark: SparkSession): FlowOrchestrator = {
-    val pool = Executors.newFixedThreadPool(math.max(1, Runtime.getRuntime.availableProcessors() * 2))
+    require(globalConfig.performance.maxParallelFlows > 0, "maxParallelFlows must be greater than zero")
+    val workerCount = if (globalConfig.performance.parallelFlows) globalConfig.performance.maxParallelFlows else 1
+    val pool = Executors.newFixedThreadPool(workerCount)
     val executionContext = ExecutionContext.fromExecutorService(pool)
     val groupExecutor =
       new FlowGroupExecutor(globalConfig, domainsConfig, executionContext, customValidators, customReaders)

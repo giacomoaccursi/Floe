@@ -20,6 +20,7 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
         |  maxRejectionRate: 0.05
         |performance:
         |  parallelFlows: true
+        |  maxParallelFlows: 7
         |iceberg: {}
       """.stripMargin
 
@@ -31,6 +32,7 @@ class GlobalConfigTest extends AnyFlatSpec with Matchers {
     c.paths.outputPath shouldBe "/data/output"
     c.processing.maxRejectionRate shouldBe Some(0.05)
     c.performance.parallelFlows shouldBe true
+    c.performance.maxParallelFlows shouldBe 7
     c.iceberg.catalogName shouldBe "floe"
     c.iceberg.catalogMode shouldBe CatalogMode.Existing
     c.iceberg.ddlMode shouldBe DdlMode.Validate
@@ -116,6 +118,7 @@ class GlobalConfigLoaderLogicTest extends AnyFlatSpec with Matchers {
         |  batchIdFormat: "timestamp"
         |performance:
         |  parallelFlows: true
+        |  maxParallelFlows: 7
         |iceberg:
         |  warehouse: "/tmp/test-warehouse"
       """.stripMargin
@@ -125,5 +128,6 @@ class GlobalConfigLoaderLogicTest extends AnyFlatSpec with Matchers {
     val config = result.toOption.get
 
     config.paths.outputPath shouldBe "/out/output"
+    config.performance.maxParallelFlows shouldBe 7
   }
 }

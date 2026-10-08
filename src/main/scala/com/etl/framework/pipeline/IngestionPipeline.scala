@@ -442,6 +442,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       else if (rate < 0.0 || rate > 1.0)
         errors += "processing.maxRejectionRate must be between 0.0 and 1.0"
     }
+    if (globalConfig.performance.maxParallelFlows <= 0)
+      errors += "performance.maxParallelFlows must be greater than zero"
     globalConfig.iceberg.maintenance.validationErrors.foreach(error => errors += s"Iceberg maintenance: $error")
 
     val flowNameGroups = flowConfigs.groupBy(_.name.toLowerCase(Locale.ROOT)).values.filter(_.size > 1).toSeq

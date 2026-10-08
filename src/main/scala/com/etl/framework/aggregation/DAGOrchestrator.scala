@@ -15,6 +15,8 @@ class DAGOrchestrator(
     globalConfig: GlobalConfig
 )(implicit spark: SparkSession) {
 
+  require(dagConfig.maxParallelNodes > 0, "maxParallelNodes must be greater than zero")
+
   private val logger = LoggerFactory.getLogger(getClass)
   private val graphBuilder = new DAGGraphBuilder(dagConfig.parallelNodes)
 
@@ -25,7 +27,8 @@ class DAGOrchestrator(
 
   def execute(): DataFrame = {
     logger.info("Starting DAG execution")
-    val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * 2)
+    val workerCount = if (dagConfig.parallelNodes) dagConfig.maxParallelNodes else 1
+    val pool = Executors.newFixedThreadPool(workerCount)
     try {
       val joinExecutor = new JoinStrategyExecutor()
       val nodeProcessor =

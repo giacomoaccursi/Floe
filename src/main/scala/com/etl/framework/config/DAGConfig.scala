@@ -7,6 +7,7 @@ case class AggregationConfig(
     description: String = "",
     version: String = "",
     parallelNodes: Boolean = false,
+    maxParallelNodes: Int = 4,
     nodes: Seq[DAGNode]
 )
 

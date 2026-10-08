@@ -436,7 +436,8 @@ class DAGConfigLoader extends ConfigLoader[AggregationConfig] {
       allErrors.headOption.fold[Either[ConfigurationException, Unit]](Right(()))(err)
     }
 
-    if (config.nodes.isEmpty) err("nodes list must not be empty")
+    if (config.maxParallelNodes <= 0) err("maxParallelNodes must be greater than zero")
+    else if (config.nodes.isEmpty) err("nodes list must not be empty")
     else if (duplicates.nonEmpty) err(s"duplicate node IDs: ${duplicates.mkString(", ")}")
     else
       config.nodes.foldLeft[Either[ConfigurationException, Unit]](Right(())) { (acc, node) =>

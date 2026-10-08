@@ -74,4 +74,12 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
     plan.groups should have size 1
     plan.groups.head.nodes.head.id shouldBe "single_node"
   }
+
+  it should "reject a non-positive node concurrency limit" in {
+    val dagConfig = createDagConfig(Seq(leaf("node"))).copy(parallelNodes = true, maxParallelNodes = 0)
+
+    intercept[IllegalArgumentException] {
+      new DAGOrchestrator(dagConfig, globalConfig)
+    }.getMessage should include("maxParallelNodes must be greater than zero")
+  }
 }

@@ -17,18 +17,21 @@ class ExecutionContractTest extends AnyFlatSpec with Matchers {
       sourceOptions: Map[String, String] = Map.empty,
       sparkConfig: Map[String, String] = Map("spark.sql.session.timeZone" -> "UTC"),
       warehouse: String = "s3://warehouse-a",
+      maxParallelFlows: Int = 4,
       derivedTables: Seq[(String, Seq[String])] = Seq("daily_orders" -> Seq("orders"))
   ): PipelineDefinition = {
     val configuredFlows = flows.map(flow => flow.copy(source = flow.source.copy(options = sourceOptions)))
+    val globalConfig = TestFixtures.globalConfig(
+      iceberg = IcebergConfig(
+        warehouse = warehouse,
+        catalogProperties = Map("region" -> "eu-west-1")
+      )
+    )
     PipelineDefinitionBuilder.build(
       pipelineId = "orders-prod",
       codeVersion = codeVersion,
-      globalConfig = TestFixtures.globalConfig(
-        iceberg = IcebergConfig(
-          warehouse = warehouse,
-          catalogProperties = Map("region" -> "eu-west-1")
-        )
-      ),
+      globalConfig =
+        globalConfig.copy(performance = globalConfig.performance.copy(maxParallelFlows = maxParallelFlows)),
       flowConfigs = configuredFlows,
       domainsConfig = None,
       derivedTableDefinitions = derivedTables,
@@ -113,6 +116,7 @@ class ExecutionContractTest extends AnyFlatSpec with Matchers {
       definition(sparkConfig = Map("spark.sql.session.timeZone" -> "Europe/Rome")).configDigest
     definition(warehouse = "s3://warehouse-a").configDigest should not be
       definition(warehouse = "s3://warehouse-b").configDigest
+    definition(maxParallelFlows = 4).configDigest should not be definition(maxParallelFlows = 8).configDigest
     definition(derivedTables = Seq("daily_orders" -> Seq("orders"))).configDigest should not be
       definition(derivedTables = Seq("daily_orders" -> Seq("orders", "customers"))).configDigest
   }

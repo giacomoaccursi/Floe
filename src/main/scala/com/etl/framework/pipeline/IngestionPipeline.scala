@@ -255,6 +255,12 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       preValidation: Option[FlowTransformation] = None,
       postValidation: Option[FlowTransformation] = None
   ): IngestionPipelineBuilder = {
+    require(flowName != null && flowName.trim.nonEmpty, "Transformation flow name must not be blank")
+    require(preValidation.nonEmpty || postValidation.nonEmpty, "At least one flow transformation must be supplied")
+    require(
+      preValidation.forall(_ != null) && postValidation.forall(_ != null),
+      "Flow transformations must not be null"
+    )
     logger.info(s"Adding transformation for flow: $flowName")
 
     val existing = flowTransformations.getOrElse(flowName, FlowTransformations(None, None))
@@ -314,6 +320,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       catalogType: String,
       provider: () => CatalogProvider
   ): IngestionPipelineBuilder = {
+    require(catalogType != null && catalogType.trim.nonEmpty, "Catalog provider type must not be blank")
+    require(provider != null, "Catalog provider factory must not be null")
     extraCatalogProviders(catalogType) = provider
     this
   }
@@ -331,6 +339,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       name: String,
       factory: () => Validator
   ): IngestionPipelineBuilder = {
+    require(name != null && name.trim.nonEmpty, "Custom validator name must not be blank")
+    require(factory != null, "Custom validator factory must not be null")
     customValidators(name) = factory
     this
   }
@@ -361,6 +371,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
 
   /** Registers a BatchListener that receives notifications on batch completion or failure. */
   def withBatchListener(listener: BatchListener): IngestionPipelineBuilder = {
+    require(listener != null, "Batch listener must not be null")
     batchListeners += listener
     this
   }
@@ -386,6 +397,8 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
       typeName: String,
       factory: DataReaderFactory.ReaderFactory
   ): IngestionPipelineBuilder = {
+    require(typeName != null && typeName.trim.nonEmpty, "Data reader type must not be blank")
+    require(factory != null, "Data reader factory must not be null")
     customReaders(typeName) = factory
     this
   }
@@ -499,9 +512,27 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     }
     errors ++= DerivedTableExecutor.validateDefinitions(derivedTables.toSeq, flowConfigs.map(_.name).toSet)
     val flowNames = flowConfigs.map(_.name).toSet
+    flowTransformations.keys.filterNot(flowNames).toSeq.sorted.foreach { flowName =>
+      errors += s"Transformation references unknown flow '$flowName'"
+    }
 
     flowConfigs.foreach { config =>
       FlowConfigValidator.validate(config).foreach(error => errors += s"Flow '${config.name}': $error")
+      config.source.`type` match {
+        case com.etl.framework.config.SourceType.Custom(typeName) if !customReaders.contains(typeName) =>
+          errors += s"Flow '${config.name}': custom source type '$typeName' has no registered data reader"
+        case _ =>
+      }
+      config.validation.rules
+        .filter(_.`type` == com.etl.framework.config.ValidationRuleType.Custom)
+        .flatMap(_.`class`)
+        .filter(_.trim.nonEmpty)
+        .distinct
+        .filterNot(name => customValidators.contains(name) || isLoadableValidatorClass(name))
+        .foreach { name =>
+          errors +=
+            s"Flow '${config.name}': custom validator '$name' is neither registered nor a loadable Validator class"
+        }
       config.validation.rules
         .filter(_.`type` == com.etl.framework.config.ValidationRuleType.Domain)
         .flatMap(_.domainName)
@@ -537,6 +568,16 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     }
     errors.toSeq
   }
+
+  private def isLoadableValidatorClass(className: String): Boolean =
+    scala.util
+      .Try {
+        val clazz = Class.forName(className, false, getClass.getClassLoader)
+        classOf[Validator].isAssignableFrom(clazz) &&
+        java.lang.reflect.Modifier.isPublic(clazz.getModifiers) &&
+        java.lang.reflect.Modifier.isPublic(clazz.getDeclaredConstructor().getModifiers)
+      }
+      .getOrElse(false)
 
   private def derivedTableCollisions(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConfig]): Seq[String] = {
     val managedNames =

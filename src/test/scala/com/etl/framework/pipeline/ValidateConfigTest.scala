@@ -539,4 +539,31 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
     issues should include("tableProperties must not override 'format-version'")
     issues should include("tableProperties keys must not be blank")
   }
+
+  it should "reject unresolved code registrations before reading a source" in {
+    val base = TestFixtures.flowConfig(
+      "orders",
+      rules = Seq(
+        ValidationRule(
+          ValidationRuleType.Custom,
+          `class` = Some("com.example.validators.DoesNotExist")
+        )
+      )
+    )
+    val flow = base.copy(source = base.source.copy(`type` = SourceType.Custom("missing-reader")))
+    val builder = IngestionPipeline
+      .builder()
+      .withGlobalConfig(TestFixtures.globalConfig())
+      .withFlowConfigs(Seq(flow))
+      .withFlowTransformation("orderz", preValidation = Some(context => context))
+
+    val issues = builder.validate().mkString(" ")
+
+    issues should include("Transformation references unknown flow 'orderz'")
+    issues should include("Flow 'orders': custom source type 'missing-reader' has no registered data reader")
+    issues should include(
+      "Flow 'orders': custom validator 'com.example.validators.DoesNotExist' is neither registered nor a loadable Validator class"
+    )
+    intercept[IllegalArgumentException](builder.build()).getMessage should include("missing-reader")
+  }
 }

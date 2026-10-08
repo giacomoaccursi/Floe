@@ -51,6 +51,12 @@ val result = pipeline.execute()
 
 The builder does not have an `execute()` method: call `build()` first, then `execute()`/`executeOrThrow()` for an ad-hoc run or pass an explicit `ExecutionRequest` for platform-managed execution.
 
+Registration names and factories/listeners must be non-blank and non-null. During `validate()` and `build()`, every
+registered transformation must name a configured flow, every custom source type must have a matching data-reader
+factory, and a custom validation rule must resolve either to a registered factory name or to a loadable public
+`Validator` class with a public no-argument constructor. These checks happen before a source is read; names are exact
+contract identifiers, so keep their case consistent between code and configuration.
+
 The built pipeline also exposes `inspect(request)`. It performs read-only reconciliation of the original attempt against current Iceberg table identity, `main`, snapshot ancestry, exact operation-summary metadata, and report presence. Its `retrySafe` field is always false: evidence collection does not replace the recovery decision. See [Generic Runner — Inspect an attempt](runner.md#inspect-an-attempt).
 
 ### execute() vs executeOrThrow()

@@ -29,7 +29,7 @@ flowchart LR
 
 `execute()` is an ad-hoc convenience that creates a new logical run, attempt, and time. Managed platforms should call `execute(request)` or `executeOrThrow(request)` after persisting the request outside Floe. YAML-only deployments can use the [generic runner](../guides/runner.md), which reads the same strict request contract and maps typed outcomes to process exit codes.
 
-The orchestrator is single-use. It closes its own worker pool but never stops the caller-owned `SparkSession` and never calls `System.exit`.
+The orchestrator is single-use. A second or concurrent `execute` call on the same instance is rejected before validation or data work begins; direct callers must create one instance per attempt. It closes its own worker pool but never stops the caller-owned `SparkSession` and never calls `System.exit`.
 
 ## Flow path
 

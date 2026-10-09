@@ -172,7 +172,7 @@ Result (`orders` with `shipping` columns flattened in):
 | 101 | shipped | 2024-01-15 | FedEx |
 | 102 | pending | NULL | NULL |
 
-If a child column has the same name as a parent column under Spark's case-sensitivity setting (excluding join keys), it is automatically prefixed with the node ID (e.g. `orders_node_status`) to avoid ambiguity. Join key columns from the child side are dropped. For `right_outer` and `full_outer`, the retained parent-side key is coalesced with the child key before that drop, so child-only rows never lose the join key.
+If a child column has the same name as a parent column under Spark's case-sensitivity setting (excluding join keys), it is automatically prefixed with the node ID (e.g. `orders_node_status`) to avoid ambiguity. Join key columns from the child side are identified with the same Spark case-sensitivity rule and dropped. For `right_outer` and `full_outer`, the retained parent-side key is coalesced with the child key before that drop, so child-only rows never lose the join key.
 
 !!!warning "Fan-out risk"
     Flatten is a standard join — if a parent row matches multiple child rows (1:N relationship), the parent row is duplicated for each match. Use Nest or Aggregate if you need to preserve the parent's cardinality.

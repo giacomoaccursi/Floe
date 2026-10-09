@@ -662,6 +662,37 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     result.select("values").as[Seq[String]].head() shouldBe Seq("a", "b", "m", "z")
   }
 
+  it should "use SQL aggregation identities for parents without children" in {
+    val parent = Seq(1, 2).toDF("id")
+    val child = Seq((1, 10.0, "paid")).toDF("parent_id", "amount", "status")
+    import com.etl.framework.config.AggregationFunction._
+    import com.etl.framework.config.JoinType._
+
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(
+        LeftOuter,
+        "child",
+        Seq(JoinCondition("id", "parent_id")),
+        Aggregate,
+        aggregations = Seq(
+          AggregationSpec("amount", Count, "item_count"),
+          AggregationSpec("status", CollectList, "statuses"),
+          AggregationSpec("status", CollectSet, "unique_statuses"),
+          AggregationSpec("amount", Sum, "total_amount")
+        )
+      )
+    )
+
+    val unmatched = result.filter($"id" === 2).head()
+    unmatched.isNullAt(unmatched.fieldIndex("item_count")) shouldBe false
+    unmatched.getAs[Long]("item_count") shouldBe 0L
+    unmatched.getAs[Seq[String]]("statuses") shouldBe empty
+    unmatched.getAs[Seq[String]]("unique_statuses") shouldBe empty
+    unmatched.isNullAt(unmatched.fieldIndex("total_amount")) shouldBe true
+  }
+
   it should "preserve child-only keys in right outer aggregate joins" in {
     val parent = Seq((1, "Alice")).toDF("id", "name")
     val child = Seq((2, 5.0)).toDF("parent_id", "amount")

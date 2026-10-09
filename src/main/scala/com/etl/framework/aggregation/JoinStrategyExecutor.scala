@@ -182,8 +182,23 @@ class JoinStrategyExecutor {
     // Use parent-qualified references for parent columns and aggregatedRight references
     // for aggregation aliases to avoid ambiguity on shared join key names
     val leftSelects = selectParentColumns(left, aggregatedRight, joinConfig)
-    val aggSelects = joinConfig.aggregations.map(spec => aggregatedRight(spec.alias))
+    val aggSelects = joinConfig.aggregations.map(spec => aggregationOutput(aggregatedRight, spec))
     result.select((leftSelects ++ aggSelects): _*)
+  }
+
+  private def aggregationOutput(
+      aggregatedRight: DataFrame,
+      spec: com.etl.framework.config.AggregationSpec
+  ): Column = {
+    import com.etl.framework.config.AggregationFunction.{CollectList, CollectSet, Count}
+
+    val output = aggregatedRight(spec.alias)
+    spec.function match {
+      case Count => coalesce(output, lit(0L)).as(spec.alias)
+      case CollectList | CollectSet =>
+        coalesce(output, array().cast(aggregatedRight.schema(spec.alias).dataType)).as(spec.alias)
+      case _ => output
+    }
   }
 
   private def orderingColumn(right: DataFrame, spec: com.etl.framework.config.AggregationSpec) = {

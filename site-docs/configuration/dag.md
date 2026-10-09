@@ -25,6 +25,7 @@ nodes:
             right: customer_id
         strategy: nest
         nestAs: orders
+        orderBy: [order_id]
 ```
 
 ## Top-level fields
@@ -57,6 +58,7 @@ nodes:
 | `conditions` | list | yes | — | Non-empty join conditions (`left` = current node column, `right` = `with` node column). Each key pair must have the same Spark data type. |
 | `strategy` | string | yes | — | `nest`, `flatten`, `aggregate` |
 | `nestAs` | string | no | `nested_records` | Field name for the nested array. Valid only for `nest`. |
+| `orderBy` | list | for `nest` | — | Child columns defining the nested array's ascending lexicographic order. Required and valid only for `nest`; use a unique final tie-breaker. |
 | `aggregations` | list | conditional | — | Non-empty aggregation specs required by `aggregate`; invalid for the other strategies. |
 
 ## Aggregation fields
@@ -68,7 +70,7 @@ nodes:
 | `alias` | string | yes | Output column name |
 | `orderBy` | list | for `first`/`last` | Child columns that define ascending semantic order. `first` uses the minimum ordering tuple and `last` the maximum; include a unique tie-breaker for deterministic selection. |
 
-`first` and `last` require a non-empty `orderBy`; the other functions reject `orderBy` because it would otherwise be ignored. `nestAs` and aggregation aliases must be unique and must not collide with parent columns. Nested arrays are sorted by their complete child struct. Both `collect_list` and `collect_set` are sorted by value for deterministic output, and `collect_set` removes duplicates; use Spark-orderable input types.
+The join-level `orderBy` and `aggregations[].orderBy` are separate fields. `first` and `last` require a non-empty aggregation-level `orderBy`; the other functions reject it because it would otherwise be ignored. `nestAs` and aggregation aliases must be unique and must not collide with parent columns. Nest ordering keys and collection inputs must be Spark-orderable; the nested payload itself may contain non-orderable values such as maps. Both `collect_list` and `collect_set` are sorted by value for deterministic output, and `collect_set` removes duplicates.
 
 ## Fail-fast validation
 

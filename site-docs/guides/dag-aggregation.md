@@ -54,6 +54,7 @@ nodes:
             right: customer_id
         strategy: nest
         nestAs: orders
+        orderBy: [order_date, order_id]
 ```
 
 For the field reference, see [DAG Configuration](../configuration/dag.md).
@@ -79,6 +80,7 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 | `conditions` | list | yes | — | Non-empty join conditions: `left` = current node column, `right` = `with` node column. Each pair must have the same Spark data type. |
 | `strategy` | string | yes | — | Join strategy: `nest`, `flatten`, `aggregate` |
 | `nestAs` | string | — | `nested_records` | Field name for the nested array. Valid only for `nest`. |
+| `orderBy` | list | for `nest` | — | Child columns defining ascending lexicographic order inside the nested array. Required and valid only for `nest`. |
 | `aggregations` | list | for `aggregate` | — | Non-empty aggregation specs required by `aggregate`; invalid for the other strategies. |
 
 ### Aggregation specification
@@ -128,6 +130,7 @@ Combines a parent table with a child table by grouping all matching child record
           right: customer_id
       strategy: nest
       nestAs: orders
+      orderBy: [order_id]
 ```
 
 In `conditions`, `left` refers to the current node's column and `right` refers to the `with` node's column.
@@ -142,7 +145,9 @@ Result (`customers` with nested `orders`):
 
 With a `left_outer` join, parents with no matching children get an empty array (`[]`), not NULL. With an `inner` join, those parents are excluded from the result. For `right_outer` and `full_outer`, the output parent key is `coalesce(leftKey, rightKey)`, so child-only rows retain their identity.
 
-The child records are grouped by the join key columns using `collect_list(struct(*))`. The `nestAs` field controls the output column name (defaults to `nested_records`).
+The child records are grouped by the join key columns and sorted lexicographically by the required join-level `orderBy`. Ordering is ascending with nulls first. Make the key list a total order—normally ending with a stable unique child key—because records tied on every key may appear in either order after a shuffle. Only the ordering keys must be Spark-orderable; the nested payload can contain maps or other non-orderable fields. The `nestAs` field controls the output column name (defaults to `nested_records`).
+
+Do not confuse this field with `aggregations[].orderBy`: the former orders a Nest array, while the latter chooses the deterministic row for `first` or `last` inside an Aggregate strategy.
 
 ### Flatten
 
@@ -301,6 +306,7 @@ nodes:
             right: customer_id
         strategy: nest
         nestAs: orders
+        orderBy: [order_date, order_id]
 ```
 
 In this DAG:
@@ -308,19 +314,19 @@ In this DAG:
 - `order_items_node` and `shipping_node` are leaf nodes — they load data from Iceberg
 - `orders_node` joins with both `order_items_node` (aggregate) and `shipping_node` (flatten) — multiple joins on a single node
 - `customers_node` is the root — it nests the enriched orders into each customer
-- `order_items_node` and `shipping_node` can execute in parallel (no dependency between them)
+- `order_items_node` and `shipping_node` are independent in the logical graph; Floe builds one lazy plan and Spark decides their physical scheduling when the caller materializes it
 
 ## Error handling
 
 | Error | When | Exception |
 |-------|------|-----------|
-| Duplicate node IDs | Graph build | `IllegalStateException` |
-| Missing dependency | Graph build | `IllegalStateException` |
-| Self-referential join | Graph build | `IllegalStateException` |
-| Empty join conditions | Graph build | `IllegalStateException` |
+| Invalid or duplicate node IDs | Configuration/planning | `ValidationConfigException` |
+| Missing dependency | Configuration/planning | `ValidationConfigException` |
+| Self-referential join | Configuration/planning | `ValidationConfigException` |
+| Empty or duplicate join conditions | Configuration/planning | `ValidationConfigException` |
 | Circular dependency | Topological sort | `CircularDependencyException` (includes cycle path) |
 | Missing parent result | Node execution | `IllegalStateException` |
-| Empty aggregations on Aggregate strategy | Join execution | `ValidationConfigException` |
+| Missing/invalid strategy fields, including Nest ordering | Configuration or direct join execution | `ValidationConfigException` |
 | No root node found | Defensive graph invariant check | `IllegalStateException` |
 
 ## Related

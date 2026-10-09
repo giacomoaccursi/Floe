@@ -205,7 +205,7 @@ Combines a parent table with a child table by computing summary statistics from 
 
 At least one aggregation is required — an empty `aggregations` list throws `ValidationConfigException`.
 
-The child is grouped by the join key columns, aggregated, then joined to the parent. Only the parent columns and the aggregation aliases appear in the output. For `right_outer` and `full_outer`, child-only group keys are coalesced into the corresponding parent key columns.
+The child is grouped by the join key columns, aggregated, then joined to the parent. Only the parent columns and the aggregation aliases appear in the output. For a parent retained by an outer join with no matching child group, `count` is `0`, `collect_list` and `collect_set` are empty arrays, and `sum`, `avg`, `min`, `max`, `first`, and `last` remain `NULL`, matching their SQL empty-input semantics. For `right_outer` and `full_outer`, child-only group keys are coalesced into the corresponding parent key columns.
 
 !!!note "Data skew on aggregate and nest joins"
     Aggregate and Nest strategies use `groupBy` on the join key columns. If a key value is heavily skewed (e.g. one customer has 90% of all orders), the executor handling that key becomes a bottleneck. AQE can mitigate eligible skewed shuffle joins in Flatten plans, subject to Spark settings and thresholds, but it does not make a hot-key `groupBy` cheap. Inspect the physical plan and partition-size metrics.

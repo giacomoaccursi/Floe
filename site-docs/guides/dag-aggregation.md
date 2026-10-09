@@ -94,7 +94,7 @@ For the field reference, see [DAG Configuration](../configuration/dag.md).
 
 Supported aggregation functions: `sum`, `count`, `avg` (alias: `average`), `min`, `max`, `first`, `last`, `collect_list`, `collect_set`.
 
-`first` and `last` are rejected without `orderBy`; relying on Spark's post-shuffle row order is not deterministic. Make `orderBy` a total order (usually ending with a unique key), because ties may select either tied row. `collect_list` and `collect_set` are returned in ascending value order; `collect_set` also removes duplicates. Their input column must therefore have a Spark-orderable type. Output aliases cannot duplicate one another or a parent column.
+`first` and `last` are rejected without `orderBy`; relying on Spark's post-shuffle row order is not deterministic. Make `orderBy` a total order (usually ending with a unique key), because ties may select either tied row. Every ordering key and every input to `min`, `max`, `collect_list`, or `collect_set` must have a Spark-orderable type; Floe rejects unsupported types before Spark planning. The value returned by `first` or `last` need not itself be orderable. Collection outputs are returned in ascending value order, and `collect_set` also removes duplicates. Output aliases cannot duplicate one another or a parent column.
 
 ## sourceTable — reading from external Iceberg tables
 

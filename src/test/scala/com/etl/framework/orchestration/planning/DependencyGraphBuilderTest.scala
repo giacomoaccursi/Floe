@@ -6,6 +6,8 @@ import com.etl.framework.exceptions.CircularDependencyException
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import scala.collection.immutable.{ListMap, ListSet}
+
 class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
 
   def createFlowConfig(
@@ -95,6 +97,24 @@ class DependencyGraphBuilderTest extends AnyFlatSpec with Matchers {
 
     sorted should contain allOf ("flow_a", "flow_b", "flow_c")
     sorted.size shouldBe 3
+  }
+
+  it should "use stable lexical tie-breaking independent of map and set iteration order" in {
+    val independentGraph = ListMap(
+      "z_flow" -> Set.empty[String],
+      "a_flow" -> Set.empty[String],
+      "m_flow" -> Set.empty[String]
+    )
+    val dependencyGraph = ListMap(
+      "root" -> ListSet("z_dependency", "a_dependency"),
+      "z_dependency" -> Set.empty[String],
+      "a_dependency" -> Set.empty[String]
+    )
+
+    val builder = new DependencyGraphBuilder(Seq.empty)
+
+    builder.topologicalSort(independentGraph) shouldBe Seq("a_flow", "m_flow", "z_flow")
+    builder.topologicalSort(dependencyGraph) shouldBe Seq("a_dependency", "z_dependency", "root")
   }
 
   it should "perform topological sort with linear dependencies" in {

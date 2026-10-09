@@ -44,7 +44,7 @@ object TopologicalSorter {
       if (!visited.contains(node)) {
         visiting.add(node)
         path.append(node)
-        graph.getOrElse(node, Set.empty).foreach(visit)
+        graph.getOrElse(node, Set.empty).toSeq.sorted.foreach(visit)
         path.remove(path.length - 1)
         visiting.remove(node)
         visited.add(node)
@@ -52,7 +52,7 @@ object TopologicalSorter {
       }
     }
 
-    graph.keys.foreach(visit)
+    graph.keys.toSeq.sorted.foreach(visit)
     sorted.toSeq
   }
 

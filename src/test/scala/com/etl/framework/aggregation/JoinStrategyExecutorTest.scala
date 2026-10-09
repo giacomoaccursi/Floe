@@ -34,7 +34,8 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
       `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = Nest,
-      nestAs = Some("orders")
+      nestAs = Some("orders"),
+      orderBy = Seq("order_name")
     )
 
     val result = executor.applyJoin(parent, child, joinConfig)
@@ -57,7 +58,8 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
       `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = Nest,
-      nestAs = None
+      nestAs = None,
+      orderBy = Seq("item")
     )
 
     val result = executor.applyJoin(parent, child, joinConfig)
@@ -76,7 +78,8 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
       `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = Nest,
-      nestAs = Some("orders")
+      nestAs = Some("orders"),
+      orderBy = Seq("order_name")
     )
 
     val result = executor.applyJoin(parent, child, joinConfig)
@@ -94,7 +97,14 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
       executor.applyJoin(
         parent,
         child,
-        JoinConfig(LeftOuter, "child", Seq(JoinCondition("id", "parent_id")), Nest, nestAs = Some("orders"))
+        JoinConfig(
+          LeftOuter,
+          "child",
+          Seq(JoinCondition("id", "parent_id")),
+          Nest,
+          nestAs = Some("orders"),
+          orderBy = Seq("order_name")
+        )
       )
     }
 
@@ -114,12 +124,133 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
         "child",
         Seq(JoinCondition("id", "parent_id")),
         Nest,
-        nestAs = Some("orders")
+        nestAs = Some("orders"),
+        orderBy = Seq("order_name")
       )
     )
 
     result.filter($"id".isNull).count() shouldBe 0
     result.select("id").as[Int].collect().toSet shouldBe Set(1, 2)
+  }
+
+  it should "nest map payloads without requiring the complete child struct to be orderable" in {
+    val parent = Seq(1).toDF("id")
+    val child = Seq(
+      (1, 2, Map("status" -> "new")),
+      (1, 1, Map("status" -> "old"))
+    ).toDF("parent_id", "sequence", "attributes")
+    import com.etl.framework.config.JoinType._
+
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(
+        LeftOuter,
+        "child",
+        Seq(JoinCondition("id", "parent_id")),
+        Nest,
+        nestAs = Some("events"),
+        orderBy = Seq("sequence")
+      )
+    )
+
+    result
+      .selectExpr("transform(events, event -> event.sequence) AS sequences")
+      .as[Seq[Int]]
+      .head() shouldBe Seq(1, 2)
+  }
+
+  it should "order nested records lexicographically with nulls first" in {
+    val parent = Seq(1).toDF("id")
+    val child = Seq(
+      (1, Some(1), 2, "first-b"),
+      (1, None, 9, "unknown"),
+      (1, Some(1), 1, "first-a"),
+      (1, Some(2), 1, "second")
+    ).toDF("parent_id", "sequence", "tie_breaker", "label")
+    import com.etl.framework.config.JoinType._
+
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(
+        LeftOuter,
+        "child",
+        Seq(JoinCondition("id", "parent_id")),
+        Nest,
+        orderBy = Seq("sequence", "tie_breaker")
+      )
+    )
+
+    result
+      .selectExpr("transform(nested_records, event -> event.label) AS labels")
+      .as[Seq[String]]
+      .head() shouldBe Seq("unknown", "first-a", "first-b", "second")
+  }
+
+  it should "reject missing, duplicate, and non-orderable nest ordering columns" in {
+    val parent = Seq(1).toDF("id")
+    val child = Seq((1, 1, Map("status" -> "new"))).toDF("parent_id", "sequence", "attributes")
+    import com.etl.framework.config.JoinType._
+
+    val missingAndDuplicate = intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(
+          LeftOuter,
+          "child",
+          Seq(JoinCondition("id", "parent_id")),
+          Nest,
+          orderBy = Seq("missing", "sequence", "SEQUENCE")
+        )
+      )
+    }
+    missingAndDuplicate.getMessage should include("must be unique")
+    missingAndDuplicate.getMessage should include("'missing' was not found")
+
+    val nonOrderable = intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(
+          LeftOuter,
+          "child",
+          Seq(JoinCondition("id", "parent_id")),
+          Nest,
+          orderBy = Seq("attributes")
+        )
+      )
+    }
+    nonOrderable.getMessage should include("non-orderable type map<string,string>")
+  }
+
+  it should "require nest ordering and reject join-level ordering for other strategies" in {
+    val parent = Seq(1).toDF("id")
+    val child = Seq((1, 1)).toDF("parent_id", "sequence")
+    import com.etl.framework.config.JoinType._
+
+    intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(LeftOuter, "child", Seq(JoinCondition("id", "parent_id")), Nest)
+      )
+    }.getMessage should include("nest join requires orderBy")
+
+    intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(
+          LeftOuter,
+          "child",
+          Seq(JoinCondition("id", "parent_id")),
+          Flatten,
+          orderBy = Seq("sequence")
+        )
+      )
+    }.getMessage should include("flatten join must not define orderBy")
   }
 
   // --- Flatten strategy ---

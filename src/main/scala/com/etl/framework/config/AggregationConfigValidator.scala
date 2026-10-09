@@ -108,13 +108,17 @@ object AggregationConfigValidator {
         if (join.nestAs.exists(value => value != value.trim))
           errors += s"$prefix nestAs must not have surrounding whitespace"
         if (join.aggregations.nonEmpty) errors += s"$prefix nest strategy must not define aggregations"
+        if (join.orderBy.isEmpty) errors += s"$prefix nest strategy requires orderBy"
+        validateNonBlankUnique(join.orderBy, s"$prefix orderBy columns").foreach(errors += _)
 
       case JoinStrategy.Flatten =>
         if (join.nestAs.nonEmpty) errors += s"$prefix flatten strategy must not define nestAs"
         if (join.aggregations.nonEmpty) errors += s"$prefix flatten strategy must not define aggregations"
+        if (join.orderBy.nonEmpty) errors += s"$prefix flatten strategy must not define orderBy"
 
       case JoinStrategy.Aggregate =>
         if (join.nestAs.nonEmpty) errors += s"$prefix aggregate strategy must not define nestAs"
+        if (join.orderBy.nonEmpty) errors += s"$prefix aggregate strategy must not define join-level orderBy"
         if (join.aggregations.isEmpty) errors += s"$prefix aggregate strategy requires at least one aggregation"
         validateAggregations(join.aggregations, prefix).foreach(errors += _)
     }

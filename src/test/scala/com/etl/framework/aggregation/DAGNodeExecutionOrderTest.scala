@@ -35,7 +35,8 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
           `type` = JoinType.LeftOuter,
           `with` = withNode,
           conditions = Seq(JoinCondition("id", "id")),
-          strategy = JoinStrategy.Nest
+          strategy = JoinStrategy.Nest,
+          orderBy = Seq("id")
         )
       )
     )

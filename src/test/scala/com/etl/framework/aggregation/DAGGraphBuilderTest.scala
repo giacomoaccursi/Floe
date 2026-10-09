@@ -20,7 +20,8 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
           `type` = JoinType.LeftOuter,
           `with` = withNode,
           conditions = Seq(JoinCondition("id", "id")),
-          strategy = JoinStrategy.Nest
+          strategy = JoinStrategy.Nest,
+          orderBy = Seq("id")
         )
       )
     )
@@ -109,7 +110,8 @@ class DAGGraphBuilderTest extends AnyFlatSpec with Matchers {
           `type` = JoinType.LeftOuter,
           `with` = "A",
           conditions = Seq(JoinCondition("id", "id")),
-          strategy = JoinStrategy.Nest
+          strategy = JoinStrategy.Nest,
+          orderBy = Seq("id")
         ),
         JoinConfig(
           `type` = JoinType.LeftOuter,

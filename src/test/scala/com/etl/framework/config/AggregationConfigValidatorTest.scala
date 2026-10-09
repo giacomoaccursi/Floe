@@ -69,6 +69,25 @@ class AggregationConfigValidatorTest extends AnyFlatSpec with Matchers {
     errors.mkString("; ") should include("flatten strategy must not define aggregations")
   }
 
+  it should "require a valid explicit order for nest joins" in {
+    val missingOrder = DAGNode(id = "root", sourceFlow = "root", joins = Seq(join(JoinStrategy.Nest)))
+    val malformedOrder = DAGNode(
+      id = "other_root",
+      sourceFlow = "other_root",
+      joins = Seq(join(JoinStrategy.Nest).copy(orderBy = Seq(" sequence", "id", "ID")))
+    )
+
+    val missingErrors =
+      AggregationConfigValidator.validate(AggregationConfig("invalid", nodes = Seq(leaf("child"), missingOrder)))
+    missingErrors.mkString("; ") should include("nest strategy requires orderBy")
+
+    val malformedErrors = AggregationConfigValidator.validate(
+      AggregationConfig("invalid", nodes = Seq(leaf("child"), malformedOrder))
+    )
+    malformedErrors.mkString("; ") should include("must not have surrounding whitespace")
+    malformedErrors.mkString("; ") should include("must be unique case-insensitively")
+  }
+
   it should "enforce ordering semantics and unique aggregate aliases" in {
     val specs = Seq(
       AggregationSpec("value", AggregationFunction.First, "chosen"),

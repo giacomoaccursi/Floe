@@ -77,4 +77,36 @@ class DAGConfigLoaderTest extends AnyFlatSpec with Matchers {
       message should include("maxParallelNodes")
     }
   }
+
+  it should "load explicit nest ordering and reject a nest without it" in {
+    val validYaml =
+      """
+        |name: ordered_nest
+        |nodes:
+        |  - id: orders
+        |    sourceFlow: orders
+        |  - id: customers
+        |    sourceFlow: customers
+        |    joins:
+        |      - type: left_outer
+        |        with: orders
+        |        conditions:
+        |          - left: customer_id
+        |            right: customer_id
+        |        strategy: nest
+        |        nestAs: orders
+        |        orderBy: [created_at, order_id]
+        |""".stripMargin
+
+    withTempFile(validYaml) { file =>
+      val config = loader.load(file.getAbsolutePath).toOption.get
+
+      config.nodes.last.joins.head.orderBy shouldBe Seq("created_at", "order_id")
+    }
+
+    val missingOrderYaml = validYaml.replace("        orderBy: [created_at, order_id]\n", "")
+    withTempFile(missingOrderYaml) { file =>
+      loader.load(file.getAbsolutePath).left.get.getMessage should include("nest strategy requires orderBy")
+    }
+  }
 }

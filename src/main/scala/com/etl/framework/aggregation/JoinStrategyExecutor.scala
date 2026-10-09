@@ -4,6 +4,7 @@ import com.etl.framework.config.JoinConfig
 import com.etl.framework.exceptions.ValidationConfigException
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{ArrayType, DataType, MapType, StructType}
 import org.slf4j.LoggerFactory
 
 import java.util.Locale
@@ -48,11 +49,22 @@ class JoinStrategyExecutor {
     val nestFieldName = joinConfig.nestAs.getOrElse("nested_records")
     rejectOutputNameCollisions(left, Seq(nestFieldName), "nest")
     val rightJoinKeys = joinConfig.conditions.map(_.right)
-    val rightStruct = struct(right.columns.map(right(_)): _*)
+    val payloadFieldName = "__floe_nested_payload"
+    val orderFieldNames = joinConfig.orderBy.indices.map(index => s"__floe_nest_order_$index")
+    val sortableEntry = struct(
+      (joinConfig.orderBy.zip(orderFieldNames).map { case (columnName, fieldName) =>
+        right(columnName).as(fieldName)
+      } :+ struct(right.columns.map(right(_)): _*).as(payloadFieldName)): _*
+    )
+    val sortedEntries = array_sort(
+      collect_list(sortableEntry),
+      (leftEntry, rightEntry) => compareNestEntries(leftEntry, rightEntry, orderFieldNames)
+    )
+    val nestedPayloads = transform(sortedEntries, entry => entry.getField(payloadFieldName))
 
     val groupedRight = right
       .groupBy(rightJoinKeys.map(right(_)): _*)
-      .agg(sort_array(collect_list(rightStruct)).as(nestFieldName))
+      .agg(nestedPayloads.as(nestFieldName))
 
     val joined = left.join(
       groupedRight,
@@ -239,11 +251,15 @@ class JoinStrategyExecutor {
         if (joinConfig.nestAs.exists(value => value != value.trim))
           errors += "nest join nestAs must not have surrounding whitespace"
         if (joinConfig.aggregations.nonEmpty) errors += "nest join must not define aggregations"
+        if (joinConfig.orderBy.isEmpty) errors += "nest join requires orderBy"
+        validateRuntimeOrderBy(right, joinConfig.orderBy, caseSensitive, "nest join", errors)
       case Flatten =>
         if (joinConfig.nestAs.nonEmpty) errors += "flatten join must not define nestAs"
         if (joinConfig.aggregations.nonEmpty) errors += "flatten join must not define aggregations"
+        if (joinConfig.orderBy.nonEmpty) errors += "flatten join must not define orderBy"
       case Aggregate =>
         if (joinConfig.nestAs.nonEmpty) errors += "aggregate join must not define nestAs"
+        if (joinConfig.orderBy.nonEmpty) errors += "aggregate join must not define join-level orderBy"
         if (joinConfig.aggregations.isEmpty) errors += "aggregate join requires at least one aggregation function"
         joinConfig.aggregations.foreach { aggregation =>
           if (aggregation.column.trim.isEmpty) errors += "aggregation column must not be blank"
@@ -270,6 +286,49 @@ class JoinStrategyExecutor {
     val validationErrors = errors.result()
     if (validationErrors.nonEmpty) throw ValidationConfigException(validationErrors.distinct.mkString("; "))
   }
+
+  private def validateRuntimeOrderBy(
+      right: DataFrame,
+      orderBy: Seq[String],
+      caseSensitive: Boolean,
+      label: String,
+      errors: scala.collection.mutable.Builder[String, Seq[String]]
+  ): Unit = {
+    if (orderBy.exists(_.trim.isEmpty)) errors += s"$label orderBy columns must not be blank"
+    if (orderBy.exists(column => column.trim.nonEmpty && column != column.trim))
+      errors += s"$label orderBy columns must not have surrounding whitespace"
+
+    val normalized = orderBy.map(column => normalizeColumnName(column.trim, caseSensitive))
+    if (normalized.distinct.size != normalized.size)
+      errors += s"$label orderBy columns must be unique"
+
+    orderBy.filter(_.trim.nonEmpty).foreach { column =>
+      findField(right, column, caseSensitive) match {
+        case None => errors += s"$label orderBy column '$column' was not found"
+        case Some(field) if !isOrderable(field.dataType) =>
+          errors += s"$label orderBy column '$column' has non-orderable type ${field.dataType.catalogString}"
+        case _ =>
+      }
+    }
+  }
+
+  private def isOrderable(dataType: DataType): Boolean = dataType match {
+    case _: MapType                => false
+    case ArrayType(elementType, _) => isOrderable(elementType)
+    case StructType(fields)        => fields.forall(field => isOrderable(field.dataType))
+    case _                         => true
+  }
+
+  private def compareNestEntries(left: Column, right: Column, orderFields: Seq[String]): Column =
+    orderFields.reverse.foldLeft(lit(0)) { (nextComparison, fieldName) =>
+      val leftValue = left.getField(fieldName)
+      val rightValue = right.getField(fieldName)
+      when(leftValue.isNull && rightValue.isNotNull, lit(-1))
+        .when(leftValue.isNotNull && rightValue.isNull, lit(1))
+        .when(leftValue < rightValue, lit(-1))
+        .when(leftValue > rightValue, lit(1))
+        .otherwise(nextComparison)
+    }
 
   private def hasColumn(dataFrame: DataFrame, name: String, caseSensitive: Boolean): Boolean =
     findField(dataFrame, name, caseSensitive).nonEmpty

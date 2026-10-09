@@ -39,7 +39,8 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
     conditions = Seq(JoinCondition("id", "parent_id")),
     strategy = JoinStrategy.Nest,
     nestAs = Some(nestAs),
-    aggregations = Seq.empty
+    aggregations = Seq.empty,
+    orderBy = Seq("child_name")
   )
 
   "Nest join" should "create nested array field" in {
@@ -112,7 +113,8 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
       `with` = "customers",
       conditions = Seq(JoinCondition("customer_id", "customer_id")),
       strategy = JoinStrategy.Nest,
-      nestAs = Some("orders")
+      nestAs = Some("orders"),
+      orderBy = Seq("order_id")
     )
 
     val executor = new JoinStrategyExecutor()
@@ -159,7 +161,8 @@ class NestJoinTest extends AnyFlatSpec with Matchers {
       `with` = "parent",
       conditions = Seq(JoinCondition("id", "parent_id")),
       strategy = JoinStrategy.Nest,
-      nestAs = Some("children")
+      nestAs = Some("children"),
+      orderBy = Seq("value")
     )
 
     val executor = new JoinStrategyExecutor()

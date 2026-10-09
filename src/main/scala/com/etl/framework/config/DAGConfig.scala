@@ -29,7 +29,8 @@ case class JoinConfig(
     conditions: Seq[JoinCondition],
     strategy: JoinStrategy,
     nestAs: Option[String] = None,
-    aggregations: Seq[AggregationSpec] = Seq.empty
+    aggregations: Seq[AggregationSpec] = Seq.empty,
+    orderBy: Seq[String] = Seq.empty
 )
 
 /** Join condition

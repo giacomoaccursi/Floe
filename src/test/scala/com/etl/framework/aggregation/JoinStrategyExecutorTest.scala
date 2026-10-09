@@ -762,6 +762,65 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     invalidOrder.getMessage should include("non-orderable type map<string,string>")
   }
 
+  it should "reject implicit string coercion for numeric aggregations" in {
+    val parent = Seq(1).toDF("id")
+    val child = Seq((1, "10.50"), (1, "not-a-number")).toDF("parent_id", "amount")
+    import com.etl.framework.config.AggregationFunction._
+    import com.etl.framework.config.JoinType._
+
+    val error = intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(
+          LeftOuter,
+          "child",
+          Seq(JoinCondition("id", "parent_id")),
+          Aggregate,
+          aggregations = Seq(
+            AggregationSpec("amount", Sum, "total_amount"),
+            AggregationSpec("amount", Avg, "average_amount")
+          )
+        )
+      )
+    }
+
+    error.getMessage should include("sum requires a numeric or ANSI interval column")
+    error.getMessage should include("avg requires a numeric or ANSI interval column")
+  }
+
+  it should "accept decimal and ANSI interval additive aggregations" in {
+    val parent = Seq(1).toDF("id")
+    val child = spark.sql(
+      """
+        |SELECT 1 AS parent_id, CAST(10.50 AS DECIMAL(10, 2)) AS amount, INTERVAL '1' DAY AS duration
+        |UNION ALL
+        |SELECT 1 AS parent_id, CAST(4.50 AS DECIMAL(10, 2)) AS amount, INTERVAL '3' DAY AS duration
+        |""".stripMargin
+    )
+    import com.etl.framework.config.AggregationFunction._
+    import com.etl.framework.config.JoinType._
+
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(
+        LeftOuter,
+        "child",
+        Seq(JoinCondition("id", "parent_id")),
+        Aggregate,
+        aggregations = Seq(
+          AggregationSpec("amount", Sum, "total_amount"),
+          AggregationSpec("duration", Avg, "average_duration")
+        )
+      )
+    )
+
+    val row = result.head()
+    row.getDecimal(row.fieldIndex("total_amount")) shouldBe new java.math.BigDecimal("15.00")
+    row.isNullAt(row.fieldIndex("average_duration")) shouldBe false
+  }
+
   it should "preserve child-only keys in right outer aggregate joins" in {
     val parent = Seq((1, "Alice")).toDF("id", "name")
     val child = Seq((2, 5.0)).toDF("parent_id", "amount")

@@ -4,7 +4,21 @@ import com.etl.framework.config.JoinConfig
 import com.etl.framework.exceptions.ValidationConfigException
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{ArrayType, DataType, MapType, StructType}
+import org.apache.spark.sql.types.{
+  ArrayType,
+  ByteType,
+  DataType,
+  DayTimeIntervalType,
+  DecimalType,
+  DoubleType,
+  FloatType,
+  IntegerType,
+  LongType,
+  MapType,
+  ShortType,
+  StructType,
+  YearMonthIntervalType
+}
 import org.slf4j.LoggerFactory
 
 import java.util.Locale
@@ -312,6 +326,12 @@ class JoinStrategyExecutor {
                   s"aggregation '${aggregation.alias}' column '${aggregation.column}' has non-orderable type " +
                     field.dataType.catalogString
               }
+            case Sum | Avg =>
+              aggregationField.filterNot(field => supportsAdditiveAggregation(field.dataType)).foreach { field =>
+                errors +=
+                  s"aggregation '${aggregation.alias}' ${aggregation.function.name} requires a numeric or ANSI " +
+                    s"interval column, but '${aggregation.column}' has type ${field.dataType.catalogString}"
+              }
             case _ =>
           }
         }
@@ -351,6 +371,13 @@ class JoinStrategyExecutor {
     case ArrayType(elementType, _) => isOrderable(elementType)
     case StructType(fields)        => fields.forall(field => isOrderable(field.dataType))
     case _                         => true
+  }
+
+  private def supportsAdditiveAggregation(dataType: DataType): Boolean = dataType match {
+    case ByteType | ShortType | IntegerType | LongType | FloatType | DoubleType => true
+    case _: DecimalType                                                         => true
+    case _: DayTimeIntervalType | _: YearMonthIntervalType                      => true
+    case _                                                                      => false
   }
 
   private def compareNestEntries(left: Column, right: Column, orderFields: Seq[String]): Column =

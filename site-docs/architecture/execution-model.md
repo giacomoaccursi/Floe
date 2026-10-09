@@ -96,7 +96,7 @@ Attempt artifacts use:
 {root}/{pipelineId}/{logicalRunId}/{attemptId}/...
 ```
 
-Per-flow metadata, rejected rows, validation warnings, the batch report, and optional quality metrics are observability outputs. Per-flow diagnostic failures produce warnings after a known data commit. The default report is also diagnostic; applications that use it to publish snapshots to consumers must elevate publication to a required application-level output.
+Per-flow metadata, rejected rows, validation warnings, the batch report, and optional quality metrics are observability outputs. Failures of per-flow diagnostics, the batch report, or the quality-metrics append are returned in `IngestionResult.warnings`; when functional data succeeded, the aggregate status becomes `SUCCEEDED_WITH_WARNINGS` without invalidating a known commit. The default report is also diagnostic; applications that use it to publish snapshots to consumers must elevate publication to a required application-level output.
 
 ## External orchestration
 

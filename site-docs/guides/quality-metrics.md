@@ -11,7 +11,7 @@ processing:
   qualityMetricsTable: "quality_metrics"
 ```
 
-The target follows the global DDL policy. With the enterprise default `ddlMode: validate`, provision it with the exact schema below before running the pipeline; its absence fails target preflight before any flow executes. With the explicit local/bootstrap mode `ddlMode: automatic`, Floe creates it on first use. Metric appends remain diagnostic and best-effort after the table contract has passed preflight.
+The target follows the global DDL policy. With the enterprise default `ddlMode: validate`, provision it with the exact schema below before running the pipeline; its absence fails target preflight before any flow executes. With the explicit local/bootstrap mode `ddlMode: automatic`, Floe creates it on first use. Metric appends remain diagnostic and best-effort after the table contract has passed preflight. If an append fails after functional data succeeded, Floe preserves the committed result, adds `Quality metrics write failed: ...` to `IngestionResult.warnings`, and returns `SUCCEEDED_WITH_WARNINGS`.
 
 ## Table schema
 
@@ -107,7 +107,7 @@ The quality metrics table does not replace the JSON metadata written to `metadat
 | Use case | Debugging, audit trail | Trend analysis, dashboards, alerting |
 | Requires Spark | No | Yes |
 
-Neither output is a workflow coordinator. JSON and quality metrics are best-effort diagnostics and may fail independently; the hosting platform owns job state, while Iceberg snapshot history supplies commit evidence. Maintenance is a separate scheduled job and does not update earlier metric rows.
+Neither output is a workflow coordinator. JSON and quality metrics are best-effort diagnostics and may fail independently; their failures are returned in `IngestionResult.warnings` rather than used to reinterpret completed data commits. The hosting platform owns job state, while Iceberg snapshot history supplies commit evidence. Maintenance is a separate scheduled job and does not update earlier metric rows.
 
 ## Related
 

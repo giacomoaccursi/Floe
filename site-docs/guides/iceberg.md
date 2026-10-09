@@ -458,7 +458,7 @@ Derived tables are committed with the same attempt identity properties. FLOe the
 
 ### 3. Diagnostic metadata
 
-Per-flow diagnostic-output failures are returned in `FlowResult.warnings` and produce `SUCCEEDED_WITH_WARNINGS` when the functional work succeeded. Batch-summary and quality-metric failures do not negate commits already observed. Because these artifacts are best effort, they must not be used as the only durable evidence that a write did or did not occur.
+Per-flow diagnostic-output failures are returned in `FlowResult.warnings`. Batch-summary and quality-metric failures are returned in `IngestionResult.warnings`. Each produces `SUCCEEDED_WITH_WARNINGS` when the functional work succeeded and does not negate commits already observed. Because these artifacts are best effort, they must not be used as the only durable evidence that a write did or did not occur.
 
 ### 4. Independently scheduled maintenance
 

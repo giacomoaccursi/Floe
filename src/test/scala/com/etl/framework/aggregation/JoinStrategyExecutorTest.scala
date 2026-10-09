@@ -693,6 +693,75 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     unmatched.isNullAt(unmatched.fieldIndex("total_amount")) shouldBe true
   }
 
+  it should "reject non-orderable collection inputs before Spark analysis" in {
+    val parent = Seq(1).toDF("id")
+    val child = Seq((1, Map("status" -> "paid"))).toDF("parent_id", "attributes")
+    import com.etl.framework.config.AggregationFunction._
+    import com.etl.framework.config.JoinType._
+
+    val error = intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(
+          LeftOuter,
+          "child",
+          Seq(JoinCondition("id", "parent_id")),
+          Aggregate,
+          aggregations = Seq(AggregationSpec("attributes", CollectList, "attribute_history"))
+        )
+      )
+    }
+
+    error.getMessage should include("non-orderable type map<string,string>")
+  }
+
+  it should "reject non-orderable or ambiguous aggregate comparison keys" in {
+    val parent = Seq(1).toDF("id")
+    val child = Seq((1, "paid", 1, Map("priority" -> "high")))
+      .toDF("parent_id", "status", "sequence", "attributes")
+    import com.etl.framework.config.AggregationFunction._
+    import com.etl.framework.config.JoinType._
+
+    val nonOrderableValue = intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(
+          LeftOuter,
+          "child",
+          Seq(JoinCondition("id", "parent_id")),
+          Aggregate,
+          aggregations = Seq(AggregationSpec("attributes", Min, "minimum_attributes"))
+        )
+      )
+    }
+    nonOrderableValue.getMessage should include("non-orderable type map<string,string>")
+
+    val invalidOrder = intercept[ValidationConfigException] {
+      executor.applyJoin(
+        parent,
+        child,
+        JoinConfig(
+          LeftOuter,
+          "child",
+          Seq(JoinCondition("id", "parent_id")),
+          Aggregate,
+          aggregations = Seq(
+            AggregationSpec(
+              "status",
+              First,
+              "first_status",
+              orderBy = Seq("attributes", "sequence", "SEQUENCE")
+            )
+          )
+        )
+      )
+    }
+    invalidOrder.getMessage should include("orderBy columns must be unique")
+    invalidOrder.getMessage should include("non-orderable type map<string,string>")
+  }
+
   it should "preserve child-only keys in right outer aggregate joins" in {
     val parent = Seq((1, "Alice")).toDF("id", "name")
     val child = Seq((2, 5.0)).toDF("parent_id", "amount")

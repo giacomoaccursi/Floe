@@ -277,22 +277,41 @@ class JoinStrategyExecutor {
         if (joinConfig.orderBy.nonEmpty) errors += "aggregate join must not define join-level orderBy"
         if (joinConfig.aggregations.isEmpty) errors += "aggregate join requires at least one aggregation function"
         joinConfig.aggregations.foreach { aggregation =>
-          if (aggregation.column.trim.isEmpty) errors += "aggregation column must not be blank"
-          else if (!hasColumn(right, aggregation.column, caseSensitive))
-            errors += s"aggregation column '${aggregation.column}' was not found"
+          val aggregationField =
+            if (aggregation.column.trim.isEmpty) {
+              errors += "aggregation column must not be blank"
+              None
+            } else {
+              val field = findField(right, aggregation.column, caseSensitive)
+              if (field.isEmpty) errors += s"aggregation column '${aggregation.column}' was not found"
+              field
+            }
           if (aggregation.alias.trim.isEmpty) errors += "aggregation alias must not be blank"
-          if (aggregation.orderBy.exists(_.trim.isEmpty)) errors += "aggregation orderBy columns must not be blank"
-          aggregation.orderBy.filter(_.trim.nonEmpty).foreach { column =>
-            if (!hasColumn(right, column, caseSensitive))
-              errors += s"aggregation orderBy column '$column' was not found"
-          }
+          if (aggregation.orderBy.nonEmpty)
+            validateRuntimeOrderBy(
+              right,
+              aggregation.orderBy,
+              caseSensitive,
+              s"aggregation '${aggregation.alias}'",
+              errors
+            )
+
+          import com.etl.framework.config.AggregationFunction._
           aggregation.function match {
-            case com.etl.framework.config.AggregationFunction.First |
-                com.etl.framework.config.AggregationFunction.Last =>
+            case First | Last =>
               if (aggregation.orderBy.isEmpty)
                 errors += s"aggregation '${aggregation.alias}' with ${aggregation.function.name} requires orderBy"
             case _ if aggregation.orderBy.nonEmpty =>
               errors += s"aggregation '${aggregation.alias}' orderBy is only supported by first and last"
+            case _ =>
+          }
+          aggregation.function match {
+            case Min | Max | CollectList | CollectSet =>
+              aggregationField.filterNot(field => isOrderable(field.dataType)).foreach { field =>
+                errors +=
+                  s"aggregation '${aggregation.alias}' column '${aggregation.column}' has non-orderable type " +
+                    field.dataType.catalogString
+              }
             case _ =>
           }
         }

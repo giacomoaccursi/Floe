@@ -114,8 +114,10 @@ class JoinStrategyExecutor {
 
     val caseSensitive = isCaseSensitive(left)
     val leftColumns = left.columns.map(normalizeColumnName(_, caseSensitive)).toSet
-    val rightJoinKeys = joinConfig.conditions.map(_.right).toSet
-    val rightDataColumns = right.columns.toSeq.filterNot(rightJoinKeys)
+    val rightJoinKeys =
+      joinConfig.conditions.map(condition => normalizeColumnName(condition.right, caseSensitive)).toSet
+    val rightDataColumns =
+      right.columns.toSeq.filterNot(column => rightJoinKeys.contains(normalizeColumnName(column, caseSensitive)))
 
     val prefix = s"${joinConfig.`with`}_"
     val renamedRight = rightDataColumns.foldLeft(right) { (df, rightCol) =>

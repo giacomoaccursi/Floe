@@ -334,7 +334,27 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     val result = executor.applyJoin(parent, child, joinConfig)
 
     result.columns should contain("detail")
-    // parent_id is a join key and should not appear as a separate column
+    result.columns should not contain "parent_id"
+  }
+
+  it should "exclude child join keys using Spark case-insensitive resolution" in {
+    val parent = Seq((1, "Alice")).toDF("id", "name")
+    val child = Seq((1, "Rome")).toDF("parent_id", "city")
+    import com.etl.framework.config.JoinType._
+
+    spark.conf.set("spark.sql.caseSensitive", "false")
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(
+        Inner,
+        "child",
+        Seq(JoinCondition("ID", "PARENT_ID")),
+        Flatten
+      )
+    )
+
+    result.columns shouldBe Array("id", "name", "city")
   }
 
   it should "reject joins without conditions before building a Spark expression" in {

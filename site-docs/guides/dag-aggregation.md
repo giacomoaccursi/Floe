@@ -239,7 +239,7 @@ The DAG is executed in topological order. YAML and programmatic construction sha
 1. Validates all nodes: checks source exclusivity, blank and case-insensitively duplicated identifiers, missing or self-referential dependencies, join conditions, strategy-specific fields, aggregation aliases, and ordering requirements.
 2. Builds a dependency graph. Join parents are implicit dependencies — a node cannot execute before its join parent even if not listed in `dependencies`.
 3. Performs topological sort. If a cycle is detected, a `CircularDependencyException` is thrown with the full cycle path.
-4. Groups nodes by dependency level, then constructs their logical plans in deterministic sequence.
+4. Groups nodes by dependency level, using lexical node-ID order as the deterministic tie-breaker, then constructs their logical plans in that sequence.
 
 ### Lazy execution boundary
 

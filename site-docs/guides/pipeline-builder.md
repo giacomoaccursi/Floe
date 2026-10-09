@@ -132,7 +132,7 @@ Flows are not executed in config file order. The framework builds an execution p
 
 1. FK references and explicit `dependsOn` declarations are analyzed to build a dependency graph
 2. Flows are topologically sorted so that dependencies execute before dependents
-3. Independent flows (no dependency relationship) are grouped for potential parallel execution
+3. Independent flows (no dependency relationship) are ordered lexicographically by ID and grouped for potential parallel execution
 
 If `performance.parallelFlows` is `true` in `global.yaml`, independent flows within the same group run in parallel using a bounded thread pool sized by `maxParallelFlows`.
 
@@ -142,7 +142,7 @@ performance:
   maxParallelFlows: 4
 ```
 
-This means if flow `orders` has a FK referencing `customers` (or declares `dependsOn: [customers]`), `customers` is guaranteed to execute first — regardless of the order in the YAML files or the `withFlowConfigs()` list.
+This means if flow `orders` has a FK referencing `customers` (or declares `dependsOn: [customers]`), `customers` is guaranteed to execute first — regardless of the order in the YAML files or the `withFlowConfigs()` list. When parallel execution is disabled, independent flows run sequentially in lexical ID order.
 
 ## IngestionResult
 

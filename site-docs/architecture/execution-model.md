@@ -10,7 +10,7 @@ Group 2: orders            (depends on customers)
 Group 3: order_items       (depends on orders)
 ```
 
-Groups execute in order. With `performance.parallelFlows: true`, flows in the same group run concurrently on a bounded execution context; otherwise they run sequentially. Floe does not distribute individual flows as external Airflow/Step Functions tasks and cannot resume at an arbitrary group after the driver exits.
+Groups execute in order. Nodes tied at the same dependency level are ordered lexicographically by flow ID, independent of YAML, `Map`, or `Set` iteration order. With `performance.parallelFlows: true`, flows in the same group run concurrently on a bounded execution context; otherwise that lexical order is their execution order. Floe does not distribute individual flows as external Airflow/Step Functions tasks and cannot resume at an arbitrary group after the driver exits.
 
 ## One immutable attempt
 

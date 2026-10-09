@@ -21,6 +21,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
@@ -46,6 +47,7 @@ class FlowOrchestrator(
 )(implicit spark: SparkSession) {
 
   private val logger = LoggerFactory.getLogger(getClass)
+  private val executionStarted = new AtomicBoolean(false)
 
   def executionDefinition: PipelineDefinition = pipelineDefinition
 
@@ -68,6 +70,11 @@ class FlowOrchestrator(
 
   /** Executes exactly one attempt. No automatic retry is performed at flow or job level. */
   def execute(request: ExecutionRequest): IngestionResult = {
+    if (!executionStarted.compareAndSet(false, true))
+      throw new IllegalStateException(
+        "FlowOrchestrator instances are single-use; create a new orchestrator for each execution attempt"
+      )
+
     try {
       pipelineDefinition.validateRequest(request)
       validateTargetTables()

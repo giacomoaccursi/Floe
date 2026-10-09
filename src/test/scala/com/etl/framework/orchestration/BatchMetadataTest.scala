@@ -127,6 +127,18 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     } finally cleanupTempDir(tempDir)
   }
 
+  it should "reject reuse of a single-attempt orchestrator" in {
+    val tempDir = Files.createTempDirectory("single-use-orchestrator-test").toString
+    try {
+      val orchestrator = FlowOrchestrator(createGlobalConfig(tempDir), Seq.empty)
+
+      orchestrator.execute().success shouldBe true
+
+      val error = intercept[IllegalStateException](orchestrator.execute())
+      error.getMessage should include("single-use")
+    } finally cleanupTempDir(tempDir)
+  }
+
   it should "reject a request for a different pipeline before executing a flow" in {
     val tempDir = Files.createTempDirectory("pipeline-mismatch-test").toString
     try {

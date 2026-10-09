@@ -50,9 +50,9 @@ class QualityMetricsWriter(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConf
       orphanReports: Seq[OrphanReport],
       executionTimeMs: Long,
       batchSuccess: Boolean
-  ): Unit = {
+  ): Option[String] = {
     globalConfig.processing.qualityMetricsTable match {
-      case None =>
+      case None => None
       case Some(tableName) =>
         try {
           val fullTableName = globalConfig.iceberg.fullTableName(tableName)
@@ -60,9 +60,12 @@ class QualityMetricsWriter(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConf
           val df = buildMetricsDataFrame(batchId, flowResults, orphanReports, executionTimeMs, batchSuccess)
           df.writeTo(SqlIdentifier.quoteMultipart(fullTableName)).append()
           logger.info(s"Quality metrics written to $fullTableName: ${flowResults.size} flow rows")
+          None
         } catch {
           case NonFatal(e) =>
-            logger.warn(s"Failed to write quality metrics: ${SensitiveDataRedactor.message(e)}")
+            val warning = s"Quality metrics write failed: ${SensitiveDataRedactor.message(e)}"
+            logger.warn(warning, SensitiveDataRedactor.safeThrowable(e))
+            Some(warning)
         }
     }
   }

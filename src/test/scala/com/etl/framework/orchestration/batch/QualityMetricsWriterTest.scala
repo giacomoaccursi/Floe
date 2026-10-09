@@ -145,7 +145,7 @@ class QualityMetricsWriterTest extends AnyFlatSpec with Matchers with BeforeAndA
 
   it should "do nothing when qualityMetricsTable is not configured" in {
     val w = writer(enabled = false)
-    noException should be thrownBy w.write("batch_005", Seq(flowResult("flow_e")), Seq.empty, 500L, batchSuccess = true)
+    w.write("batch_005", Seq(flowResult("flow_e")), Seq.empty, 500L, batchSuccess = true) shouldBe None
   }
 
   it should "honor validate mode without creating a missing metrics table" in {
@@ -155,8 +155,14 @@ class QualityMetricsWriterTest extends AnyFlatSpec with Matchers with BeforeAndA
       iceberg = globalConfig().iceberg.copy(ddlMode = DdlMode.Validate)
     )
 
-    noException should be thrownBy new QualityMetricsWriter(config, flowConfigs)
+    val warning = new QualityMetricsWriter(config, flowConfigs)
       .write("batch_validate", Seq(flowResult("flow_a")), Seq.empty, 100L, batchSuccess = true)
+
+    warning shouldBe Some(
+      "Quality metrics write failed: requirement failed: Iceberg table " +
+        "'qm_catalog.default.quality_metrics_validate_missing' does not exist and ddlMode=validate forbids Floe " +
+        "from creating it"
+    )
 
     an[org.apache.spark.sql.AnalysisException] should be thrownBy spark.sql(
       s"DESCRIBE TABLE qm_catalog.default.$missingTable"

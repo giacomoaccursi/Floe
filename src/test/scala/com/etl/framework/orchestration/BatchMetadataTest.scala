@@ -320,4 +320,31 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
       result.flowResults.head.dataOutcome shouldBe DataOutcome.Committed
     } finally cleanupTempDir(tempDir)
   }
+
+  it should "surface a quality metrics write failure without downgrading committed data" in {
+    val tempDir = Files.createTempDirectory("quality-metrics-warning-test").toString
+    val metricsTable = "quality_metrics_warning"
+    try {
+      spark.sql("CREATE NAMESPACE IF NOT EXISTS floe.default")
+      spark.sql(
+        s"CREATE TABLE floe.default.$metricsTable (required_extra STRING NOT NULL) USING iceberg"
+      )
+
+      val flow = createFlow("quality_metrics_warning_flow", tempDir)
+      val baseConfig = createGlobalConfig(tempDir)
+      val config = baseConfig.copy(
+        processing = baseConfig.processing.copy(qualityMetricsTable = Some(metricsTable))
+      )
+
+      val result = FlowOrchestrator(config, Seq(flow)).execute()
+
+      result.success shouldBe true
+      result.status shouldBe ExecutionStatus.SucceededWithWarnings
+      result.warnings.mkString(" ") should include("Quality metrics write failed")
+      result.flowResults.head.dataOutcome shouldBe DataOutcome.Committed
+    } finally {
+      spark.sql(s"DROP TABLE IF EXISTS floe.default.$metricsTable")
+      cleanupTempDir(tempDir)
+    }
+  }
 }

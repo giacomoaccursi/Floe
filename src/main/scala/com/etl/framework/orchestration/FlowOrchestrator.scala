@@ -234,6 +234,7 @@ class FlowOrchestrator(
     // Quality metrics are diagnostic and their writer is intentionally best-effort.
     new QualityMetricsWriter(globalConfig, flowConfigs)
       .write(request.attemptId, result.flowResults, orphanReports, executionTimeMs, result.success)
+      .foreach(warnings += _)
     warnings.result()
   }
 

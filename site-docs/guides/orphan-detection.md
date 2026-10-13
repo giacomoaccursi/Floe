@@ -22,7 +22,7 @@ FLOe performs post-flow detection and supports two actions:
 
 `warn` is the default.
 
-`onOrphan: delete` is deliberately unsupported and is rejected during configuration loading or programmatic pipeline validation. Automatic deletion would be a second functional write, potentially followed by more deletes across descendants. Iceberg makes each table commit atomic, not an arbitrary multi-table cascade. Without a durable worklist and recovery protocol, a terminated driver could leave the cascade partially applied and a later run could not prove which deletes remain. FLOe therefore reports the integrity violation and leaves remediation to an explicit, reviewed workflow.
+`onOrphan: delete` is deliberately unsupported and is rejected during configuration loading, programmatic pipeline validation, and direct orchestrator execution. Automatic deletion would be a second functional write, potentially followed by more deletes across descendants. Iceberg makes each table commit atomic, not an arbitrary multi-table cascade. Without a durable worklist and recovery protocol, a terminated driver could leave the cascade partially applied and a later run could not prove which deletes remain. FLOe therefore reports the integrity violation and leaves remediation to an explicit, reviewed workflow.
 
 ## Detection algorithm
 
@@ -53,7 +53,7 @@ FLOe joins the removed parent keys to the child FK columns and counts matching c
 
 ### 4. Fail safely when evidence is unavailable
 
-If a required retained snapshot cannot be read, or the child state cannot be inspected, orphan detection fails the attempt. FLOe does not turn missing evidence into an empty orphan set. Derived tables are not run after this failure, and already committed flow tables are not rolled back.
+If a required retained snapshot cannot be read, or the child state cannot be inspected, orphan detection fails the attempt. FLOe does not turn missing evidence into an empty orphan set. Derived tables are not run after this failure, and already committed flow tables are not rolled back. Because supported orphan detection is read-only, known completed commits produce `FAILED_PARTIAL`; `UNKNOWN` is used only when a target mutation itself has an uncertain outcome.
 
 ## Execution conditions
 

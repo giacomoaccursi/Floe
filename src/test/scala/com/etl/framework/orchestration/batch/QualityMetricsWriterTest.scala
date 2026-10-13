@@ -181,6 +181,18 @@ class QualityMetricsWriterTest extends AnyFlatSpec with Matchers with BeforeAndA
     row.getAs[String]("load_mode") shouldBe "none"
   }
 
+  it should "mark an empty failed batch summary as unsuccessful" in {
+    val w = writer()
+    w.write("batch_empty_failed", Seq.empty, Seq.empty, 100L, batchSuccess = false)
+
+    val row = spark
+      .sql(s"SELECT batch_success, success FROM $fullTableName WHERE batch_id = 'batch_empty_failed'")
+      .collect()
+      .head
+    row.getAs[Boolean]("batch_success") shouldBe false
+    row.getAs[Boolean]("success") shouldBe false
+  }
+
   override def afterAll(): Unit = {
     spark.sql(s"DROP TABLE IF EXISTS $fullTableName")
     super.afterAll()

@@ -102,7 +102,7 @@ class QualityMetricsWriter(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConf
     )
 
     if (flowResults.isEmpty) {
-      Seq((batchId, batchSuccess, "batch_summary", "none", 0L, 0L, 0L, 0.0, 0L, 0L, executionTimeMs, true))
+      Seq((batchId, batchSuccess, "batch_summary", "none", 0L, 0L, 0L, 0.0, 0L, 0L, executionTimeMs, batchSuccess))
         .toDF(
           "batch_id",
           "batch_success",

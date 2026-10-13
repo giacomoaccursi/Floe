@@ -222,6 +222,66 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     } finally cleanupTempDir(tempDir)
   }
 
+  it should "reject unknown flow dependencies through the direct orchestrator API" in {
+    val tempDir = Files.createTempDirectory("direct-unknown-flow-dependency-test").toString
+    try {
+      val flow = TestFixtures
+        .flowConfig("orders", sourcePath = "/must-not-be-read/orders")
+        .copy(dependsOn = Seq("missing"))
+
+      val error = intercept[IllegalArgumentException] {
+        FlowOrchestrator(createGlobalConfig(tempDir), Seq(flow)).execute()
+      }
+
+      error.getMessage should include("dependsOn references unknown flow 'missing'")
+    } finally cleanupTempDir(tempDir)
+  }
+
+  it should "reject flow dependency cycles through the direct orchestrator API" in {
+    val tempDir = Files.createTempDirectory("direct-flow-cycle-test").toString
+    try {
+      val first = TestFixtures
+        .flowConfig("first", sourcePath = "/must-not-be-read/first")
+        .copy(dependsOn = Seq("second"))
+      val second = TestFixtures
+        .flowConfig("second", sourcePath = "/must-not-be-read/second")
+        .copy(dependsOn = Seq("first"))
+
+      val error = intercept[IllegalArgumentException] {
+        FlowOrchestrator(createGlobalConfig(tempDir), Seq(first, second)).execute()
+      }
+
+      error.getMessage should include("Circular dependency")
+    } finally cleanupTempDir(tempDir)
+  }
+
+  it should "reject missing referenced columns through the direct orchestrator API" in {
+    val tempDir = Files.createTempDirectory("direct-fk-contract-test").toString
+    try {
+      val parent = TestFixtures.flowConfig(
+        "customers",
+        columns = Seq(ColumnConfig("id", "string", nullable = false)),
+        enforceSchema = true,
+        sourcePath = "/must-not-be-read/customers"
+      )
+      val child = TestFixtures.flowConfig(
+        "orders",
+        columns = Seq(ColumnConfig("id", "string", nullable = false), ColumnConfig("customer_id", "string", true)),
+        enforceSchema = true,
+        foreignKeys = Seq(
+          ForeignKeyConfig(Seq("customer_id"), ReferenceConfig("customers", Seq("missing_id")))
+        ),
+        sourcePath = "/must-not-be-read/orders"
+      )
+
+      val error = intercept[IllegalArgumentException] {
+        FlowOrchestrator(createGlobalConfig(tempDir), Seq(parent, child)).execute()
+      }
+
+      error.getMessage should include("references columns not declared by flow 'customers': missing_id")
+    } finally cleanupTempDir(tempDir)
+  }
+
   it should "reject a request for a different pipeline before executing a flow" in {
     val tempDir = Files.createTempDirectory("pipeline-mismatch-test").toString
     try {

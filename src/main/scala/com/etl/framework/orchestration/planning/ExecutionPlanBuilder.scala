@@ -25,7 +25,7 @@ class ExecutionPlanBuilder(
     logger.info(s"Building execution plan for ${flowConfigs.size} flows")
 
     PipelineStructureValidator.requireValidFlowNames(flowConfigs)
-    validateForeignKeyReferences()
+    PipelineStructureValidator.requireValidFlowReferences(flowConfigs)
 
     val dependencyGraph = dependencyBuilder.buildGraph()
     val sortedFlows = dependencyBuilder.topologicalSort(dependencyGraph)
@@ -38,31 +38,6 @@ class ExecutionPlanBuilder(
     logger.info(s"Execution plan created with ${groups.size} groups (${flowConfigs.size} flows)")
 
     ExecutionPlan(groups)
-  }
-
-  private def validateForeignKeyReferences(): Unit = {
-    val flowNames = flowConfigs.map(_.name).toSet
-    flowConfigs.foreach { fc =>
-      fc.validation.foreignKeys.foreach { fk =>
-        if (!flowNames.contains(fk.references.flow)) {
-          throw new IllegalArgumentException(
-            s"Flow '${fc.name}': FK '${fk.displayName}' references unknown flow '${fk.references.flow}'"
-          )
-        }
-      }
-      fc.dependsOn.foreach { dep =>
-        if (!flowNames.contains(dep)) {
-          throw new IllegalArgumentException(
-            s"Flow '${fc.name}': dependsOn references unknown flow '$dep'"
-          )
-        }
-        if (dep == fc.name) {
-          throw new IllegalArgumentException(
-            s"Flow '${fc.name}': dependsOn cannot reference itself"
-          )
-        }
-      }
-    }
   }
 }
 

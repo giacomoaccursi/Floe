@@ -4,6 +4,8 @@
 
 Floe builds one in-process DAG from foreign-key references and explicit `dependsOn` declarations. Before catalog or source access, structural preflight verifies that referenced flows exist, FK target columns belong to the declared parent contract, and the graph is acyclic. It also verifies that every custom source has a registered reader, every domain rule resolves to a non-empty domain, and every custom validator is registered or loadable. The planner then topologically sorts flows and groups independent flows. The same checks apply to builder-created pipelines and direct `FlowOrchestrator` use.
 
+Global paths, batch-ID format, rejection thresholds, concurrency limits, Iceberg naming/layout, and maintenance safety constraints use the same validator in both entry points. Direct orchestration rejects an invalid global contract before creating its worker pool or generating an ad-hoc execution request.
+
 ```
 Group 1: customers, products
 Group 2: orders            (depends on customers)

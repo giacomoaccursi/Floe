@@ -11,7 +11,7 @@ processing:
   qualityMetricsTable: "quality_metrics"
 ```
 
-The target follows the global DDL policy. With the enterprise default `ddlMode: validate`, provision it with the exact schema below before running the pipeline; its absence fails target preflight before any flow executes. With the explicit local/bootstrap mode `ddlMode: automatic`, Floe creates it on first use. Metric appends remain diagnostic and best-effort after the table contract has passed preflight. If an append fails after functional data succeeded, Floe preserves the committed result, adds `Quality metrics write failed: ...` to `IngestionResult.warnings`, and returns `SUCCEEDED_WITH_WARNINGS`.
+The target follows the global DDL policy. With the enterprise default `ddlMode: validate`, provision it with the exact schema below before running the pipeline; its absence fails target preflight before any flow executes. With the explicit local/bootstrap mode `ddlMode: automatic`, Floe creates it on first use. Metric appends remain diagnostic and best-effort after the table contract has passed preflight. If an append fails after functional data succeeded, Floe preserves the committed result, adds `Quality metrics write failed: ...` to `IngestionResult.warnings`, and returns `SUCCEEDED_WITH_WARNINGS`. The batch summary is written after this attempt, so its status and warnings record the same observed metrics failure.
 
 ## Table schema
 

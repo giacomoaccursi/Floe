@@ -11,7 +11,12 @@ import com.etl.framework.orchestration.batch.{
 }
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.orchestration.planning.ExecutionPlanBuilder
-import com.etl.framework.pipeline.{DerivedTableDefinition, DerivedTableExecutor, DerivedTableResult}
+import com.etl.framework.pipeline.{
+  DerivedTableDefinition,
+  DerivedTableExecutor,
+  DerivedTableResult,
+  PipelineStructureValidator
+}
 import com.etl.framework.validation.Validator
 import com.etl.framework.util.SensitiveDataRedactor
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -170,9 +175,9 @@ class FlowOrchestrator(
   }
 
   private def validateFlowConfigurations(): Unit = {
-    ExecutionPlanBuilder.validateFlowNames(flowConfigs)
-    val errors = flowConfigs.flatMap { config =>
-      FlowConfigValidator.validate(config).map(error => s"Flow '${config.name}': $error")
+    val errors = PipelineStructureValidator.validate(globalConfig, flowConfigs, derivedTables) ++ flowConfigs.flatMap {
+      config =>
+        FlowConfigValidator.validate(config).map(error => s"Flow '${config.name}': $error")
     }
     require(errors.isEmpty, s"Invalid flow configuration: ${errors.mkString("; ")}")
   }

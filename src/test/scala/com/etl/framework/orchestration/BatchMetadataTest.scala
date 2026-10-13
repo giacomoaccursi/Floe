@@ -6,7 +6,7 @@ import com.etl.framework.io.readers.{DataReader, DataReaderFactory}
 import com.etl.framework.iceberg.{IcebergTableManager, IcebergTableWriter}
 import com.etl.framework.orchestration.batch.{BatchIdGenerator, BatchMetadataWriter, FlowGroupExecutor}
 import com.etl.framework.orchestration.flow.FlowResult
-import com.etl.framework.pipeline.DerivedTableResult
+import com.etl.framework.pipeline.{DerivedTableDefinition, DerivedTableResult}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -174,6 +174,51 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
       }
 
       error.getMessage should include("collide case-insensitively")
+    } finally cleanupTempDir(tempDir)
+  }
+
+  it should "reject derived targets that collide with primary flows before execution" in {
+    val tempDir = Files.createTempDirectory("direct-derived-flow-collision-test").toString
+    try {
+      val flow = TestFixtures.flowConfig("orders", sourcePath = "/must-not-be-read/orders")
+      val derived = DerivedTableDefinition("ORDERS", Seq.empty, _ => spark.emptyDataFrame)
+
+      val error = intercept[IllegalArgumentException] {
+        FlowOrchestrator(createGlobalConfig(tempDir), Seq(flow), derivedTables = Seq(derived)).execute()
+      }
+
+      error.getMessage should include("Derived table 'ORDERS' collides with a managed table")
+    } finally cleanupTempDir(tempDir)
+  }
+
+  it should "reject derived targets that collide with quality metrics before execution" in {
+    val tempDir = Files.createTempDirectory("direct-derived-metrics-collision-test").toString
+    try {
+      val baseConfig = createGlobalConfig(tempDir)
+      val config = baseConfig.copy(
+        processing = baseConfig.processing.copy(qualityMetricsTable = Some("quality_metrics"))
+      )
+      val derived = DerivedTableDefinition("QUALITY_METRICS", Seq.empty, _ => spark.emptyDataFrame)
+
+      val error = intercept[IllegalArgumentException] {
+        FlowOrchestrator(config, Seq.empty, derivedTables = Seq(derived)).execute()
+      }
+
+      error.getMessage should include("Derived table 'QUALITY_METRICS' collides with a managed table")
+    } finally cleanupTempDir(tempDir)
+  }
+
+  it should "reject invalid derived dependency graphs before primary flow execution" in {
+    val tempDir = Files.createTempDirectory("direct-derived-graph-test").toString
+    try {
+      val flow = TestFixtures.flowConfig("orders", sourcePath = "/must-not-be-read/orders")
+      val derived = DerivedTableDefinition("order_summary", Seq("missing"), _ => spark.emptyDataFrame)
+
+      val error = intercept[IllegalArgumentException] {
+        FlowOrchestrator(createGlobalConfig(tempDir), Seq(flow), derivedTables = Seq(derived)).execute()
+      }
+
+      error.getMessage should include("unknown dependency 'missing'")
     } finally cleanupTempDir(tempDir)
   }
 

@@ -27,7 +27,6 @@ import com.etl.framework.validation.Validator
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.LoggerFactory
 import scala.collection._
-import java.util.Locale
 import java.io.FileNotFoundException
 import java.nio.file.NoSuchFileException
 import java.time.format.DateTimeFormatter
@@ -497,20 +496,7 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     }
     globalConfig.iceberg.maintenance.validationErrors.foreach(error => errors += s"Iceberg maintenance: $error")
 
-    val flowNameGroups = flowConfigs.groupBy(_.name.toLowerCase(Locale.ROOT)).values.filter(_.size > 1).toSeq
-    flowNameGroups.foreach { collisions =>
-      errors += s"Flow names collide case-insensitively: ${collisions.map(_.name).sorted.mkString(", ")}"
-    }
-
-    globalConfig.processing.qualityMetricsTable.foreach { metricsTable =>
-      flowConfigs.find(_.name.equalsIgnoreCase(metricsTable)).foreach { flow =>
-        errors += s"qualityMetricsTable '$metricsTable' collides with flow '${flow.name}'"
-      }
-    }
-    derivedTableCollisions(globalConfig, flowConfigs).foreach { name =>
-      errors += s"Derived table '$name' collides with a managed table"
-    }
-    errors ++= DerivedTableExecutor.validateDefinitions(derivedTables.toSeq, flowConfigs.map(_.name).toSet)
+    errors ++= PipelineStructureValidator.validate(globalConfig, flowConfigs, derivedTables.toSeq)
     val flowNames = flowConfigs.map(_.name).toSet
     val flowsByName = flowConfigs.map(flow => flow.name -> flow).toMap
     flowTransformations.keys.filterNot(flowNames).toSeq.sorted.foreach { flowName =>
@@ -588,14 +574,6 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
         java.lang.reflect.Modifier.isPublic(clazz.getDeclaredConstructor().getModifiers)
       }
       .getOrElse(false)
-
-  private def derivedTableCollisions(globalConfig: GlobalConfig, flowConfigs: Seq[FlowConfig]): Seq[String] = {
-    val managedNames =
-      (flowConfigs.map(_.name) ++ globalConfig.processing.qualityMetricsTable.toSeq)
-        .map(_.toLowerCase(Locale.ROOT))
-        .toSet
-    derivedTables.map(_.name).filter(name => managedNames.contains(name.toLowerCase(Locale.ROOT))).toSeq
-  }
 
   private def loadConfigs(): (GlobalConfig, Seq[FlowConfig]) = {
     (globalConfigOpt, flowConfigsOpt) match {

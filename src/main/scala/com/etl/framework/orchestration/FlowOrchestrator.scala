@@ -228,21 +228,22 @@ class FlowOrchestrator(
       orphanReports: Seq[OrphanReport],
       executionTimeMs: Long
   ): Seq[String] = {
-    val warnings = Vector.newBuilder[String]
+    // Write metrics first so the batch report can record any metrics warning in its final observed status.
+    val metricsWarnings = new QualityMetricsWriter(globalConfig, flowConfigs)
+      .write(request.attemptId, result.flowResults, orphanReports, executionTimeMs, result.success)
+      .toSeq
+    val reportResult = withWarnings(result, metricsWarnings, executionTimeMs)
+
+    val reportWarnings = Vector.newBuilder[String]
     try {
-      metadataWriter.writeBatchMetadata(request, result, executionTimeMs)
+      metadataWriter.writeBatchMetadata(request, reportResult, executionTimeMs)
     } catch {
       case NonFatal(error) =>
         val warning = s"Batch report write failed: ${SensitiveDataRedactor.message(error)}"
         logger.warn(warning, SensitiveDataRedactor.safeThrowable(error))
-        warnings += warning
+        reportWarnings += warning
     }
-
-    // Quality metrics are diagnostic and their writer is intentionally best-effort.
-    new QualityMetricsWriter(globalConfig, flowConfigs)
-      .write(request.attemptId, result.flowResults, orphanReports, executionTimeMs, result.success)
-      .foreach(warnings += _)
-    warnings.result()
+    metricsWarnings ++ reportWarnings.result()
   }
 
   private def withWarnings(

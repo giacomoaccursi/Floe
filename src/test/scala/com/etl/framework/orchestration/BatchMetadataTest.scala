@@ -354,6 +354,9 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
       result.status shouldBe ExecutionStatus.SucceededWithWarnings
       result.warnings.mkString(" ") should include("Quality metrics write failed")
       result.flowResults.head.dataOutcome shouldBe DataOutcome.Committed
+      val report = Files.readString(reportPath(tempDir, result))
+      report should include("\"status\":\"SUCCEEDED_WITH_WARNINGS\"")
+      report should include("Quality metrics write failed")
     } finally {
       spark.sql(s"DROP TABLE IF EXISTS floe.default.$metricsTable")
       cleanupTempDir(tempDir)

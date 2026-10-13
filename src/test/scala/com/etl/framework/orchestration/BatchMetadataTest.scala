@@ -344,6 +344,32 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     } finally cleanupTempDir(tempDir)
   }
 
+  it should "reject invalid global contracts through the direct orchestrator API" in {
+    val tempDir = Files.createTempDirectory("direct-global-contract-test").toString
+    try {
+      val base = createGlobalConfig(tempDir)
+      val config = base.copy(
+        processing = base.processing.copy(
+          batchIdFormat = "invalid",
+          maxRejectionRate = Some(Double.NaN)
+        ),
+        iceberg = base.iceberg.copy(
+          fileFormat = "json",
+          maintenance = base.iceberg.maintenance.copy(orphanRetentionMinutes = Some(60))
+        )
+      )
+
+      val error = intercept[IllegalArgumentException] {
+        FlowOrchestrator(config, Seq.empty).execute()
+      }
+
+      error.getMessage should include("processing.batchIdFormat is not a valid DateTimeFormatter pattern")
+      error.getMessage should include("processing.maxRejectionRate must be finite")
+      error.getMessage should include("iceberg.fileFormat must be one of: avro, orc, parquet")
+      error.getMessage should include("orphanRetentionMinutes must be at least 1440")
+    } finally cleanupTempDir(tempDir)
+  }
+
   it should "reject a request for a different pipeline before executing a flow" in {
     val tempDir = Files.createTempDirectory("pipeline-mismatch-test").toString
     try {

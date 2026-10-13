@@ -1,6 +1,13 @@
 package com.etl.framework.orchestration
 
-import com.etl.framework.config.{DomainsConfig, FlowConfig, FlowConfigValidator, GlobalConfig, OrphanAction}
+import com.etl.framework.config.{
+  DomainsConfig,
+  FlowConfig,
+  FlowConfigValidator,
+  GlobalConfig,
+  GlobalConfigValidator,
+  OrphanAction
+}
 import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetectionResult, OrphanDetector, OrphanReport}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.batch.{
@@ -177,6 +184,7 @@ class FlowOrchestrator(
   }
 
   private def validateFlowConfigurations(): Unit = {
+    GlobalConfigValidator.requireValid(globalConfig)
     val errors =
       PipelineStructureValidator.validate(globalConfig, flowConfigs, derivedTables) ++
         PipelineStructureValidator.validateExtensions(
@@ -318,7 +326,7 @@ object FlowOrchestrator {
       pipelineId: String = "local",
       codeVersion: String = "unversioned"
   )(implicit spark: SparkSession): FlowOrchestrator = {
-    require(globalConfig.performance.maxParallelFlows > 0, "maxParallelFlows must be greater than zero")
+    GlobalConfigValidator.requireValid(globalConfig)
     val workerCount = if (globalConfig.performance.parallelFlows) globalConfig.performance.maxParallelFlows else 1
     val pool = Executors.newFixedThreadPool(workerCount)
     val executionContext = ExecutionContext.fromExecutorService(pool)

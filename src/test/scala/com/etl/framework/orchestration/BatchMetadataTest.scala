@@ -139,6 +139,30 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     } finally cleanupTempDir(tempDir)
   }
 
+  it should "reject destructive orphan cleanup through the direct orchestrator API" in {
+    val tempDir = Files.createTempDirectory("direct-orphan-policy-test").toString
+    try {
+      val parent = TestFixtures.flowConfig("direct_orphan_parent", sourcePath = "/must-not-be-read/parent")
+      val child = TestFixtures.flowConfig(
+        "direct_orphan_child",
+        sourcePath = "/must-not-be-read/child",
+        foreignKeys = Seq(
+          ForeignKeyConfig(
+            columns = Seq("parent_id"),
+            references = ReferenceConfig(parent.name, Seq("id")),
+            onOrphan = OrphanAction.Delete
+          )
+        )
+      )
+
+      val error = intercept[IllegalArgumentException] {
+        FlowOrchestrator(createGlobalConfig(tempDir), Seq(parent, child)).execute()
+      }
+
+      error.getMessage should include("unsupported onOrphan=delete")
+    } finally cleanupTempDir(tempDir)
+  }
+
   it should "reject a request for a different pipeline before executing a flow" in {
     val tempDir = Files.createTempDirectory("pipeline-mismatch-test").toString
     try {

@@ -1,6 +1,6 @@
 package com.etl.framework.orchestration
 
-import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig, OrphanAction}
+import com.etl.framework.config.{DomainsConfig, FlowConfig, FlowConfigValidator, GlobalConfig, OrphanAction}
 import com.etl.framework.iceberg.{IcebergTableManager, OrphanDetectionResult, OrphanDetector, OrphanReport}
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.batch.{
@@ -77,6 +77,7 @@ class FlowOrchestrator(
 
     try {
       pipelineDefinition.validateRequest(request)
+      validateFlowConfigurations()
       validateTargetTables()
 
       val startedAtNanos = System.nanoTime()
@@ -135,8 +136,7 @@ class FlowOrchestrator(
                   state.flowResults,
                   errors.mkString("; "),
                   derivedResults,
-                  orphanReports,
-                  forceUnknown = orphanError.isDefined
+                  orphanReports
                 )
           }
         } catch {
@@ -167,6 +167,13 @@ class FlowOrchestrator(
       flowConfigs.map(_.name) ++ derivedTables.map(_.name) ++ globalConfig.processing.qualityMetricsTable.toSeq
     new IcebergTableManager(spark, globalConfig.iceberg)
       .validateTargetsExist(targetNames.map(globalConfig.iceberg.fullTableName))
+  }
+
+  private def validateFlowConfigurations(): Unit = {
+    val errors = flowConfigs.flatMap { config =>
+      FlowConfigValidator.validate(config).map(error => s"Flow '${config.name}': $error")
+    }
+    require(errors.isEmpty, s"Invalid flow configuration: ${errors.mkString("; ")}")
   }
 
   private def executeGroup(
@@ -200,12 +207,11 @@ class FlowOrchestrator(
       flowResults: Seq[FlowResult],
       error: String,
       derivedResults: Seq[DerivedTableResult] = Seq.empty,
-      orphanReports: Seq[OrphanReport] = Seq.empty,
-      forceUnknown: Boolean = false
+      orphanReports: Seq[OrphanReport] = Seq.empty
   ): IngestionResult = {
     val outcomes = flowResults.map(_.dataOutcome) ++ derivedResults.map(_.dataOutcome)
     val status =
-      if (forceUnknown || outcomes.contains(DataOutcome.Unknown)) ExecutionStatus.Unknown
+      if (outcomes.contains(DataOutcome.Unknown)) ExecutionStatus.Unknown
       else if (outcomes.exists(outcome => outcome == DataOutcome.Committed || outcome == DataOutcome.NoChange))
         ExecutionStatus.FailedPartial
       else ExecutionStatus.Failed

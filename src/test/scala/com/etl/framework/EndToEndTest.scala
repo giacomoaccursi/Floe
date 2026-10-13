@@ -54,7 +54,8 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
       configDir: Path,
       maxRejectionRate: Option[Double] = None,
       metadataPath: Option[Path] = None,
-      qualityMetricsTable: Option[String] = None
+      qualityMetricsTable: Option[String] = None,
+      enableSnapshotTagging: Boolean = true
   ): Unit = {
     val thresholdSetting = maxRejectionRate.map(rate => s"  maxRejectionRate: $rate").getOrElse("")
     val qualityMetricsSetting = qualityMetricsTable.map(name => s"  qualityMetricsTable: $name").getOrElse("")
@@ -75,7 +76,7 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
          |  ddlMode: "automatic"
          |  catalogType: "hadoop"
          |  warehouse: "$warehousePath"
-         |  enableSnapshotTagging: true
+         |  enableSnapshotTagging: $enableSnapshotTagging
          |""".stripMargin
     )
   }
@@ -291,6 +292,111 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
     // Customers table should have 1 record
     spark.sql("SELECT * FROM floe.default.customers").count() shouldBe 1
+  }
+
+  it should "classify orphan evidence failure after known commits as partial failure" in {
+    val configDir = tempDir.resolve("e2e_orphan_status").resolve("config")
+    val dataDir = tempDir.resolve("e2e_orphan_status").resolve("data")
+    val parentName = "orphan_status_parent"
+    val childName = "orphan_status_child"
+
+    setupConfig(configDir, enableSnapshotTagging = false)
+    writeFile(
+      configDir.resolve("flows").resolve(s"$parentName.yaml"),
+      s"""
+         |name: $parentName
+         |source:
+         |  path: "${dataDir.resolve("parents")}"
+         |  format: csv
+         |  options:
+         |    header: "true"
+         |schema:
+         |  enforceSchema: false
+         |loadMode:
+         |  type: full
+         |validation:
+         |  primaryKey: [parent_id]
+         |""".stripMargin
+    )
+    writeFile(
+      configDir.resolve("flows").resolve(s"$childName.yaml"),
+      s"""
+         |name: $childName
+         |source:
+         |  path: "${dataDir.resolve("children")}"
+         |  format: csv
+         |  options:
+         |    header: "true"
+         |schema:
+         |  enforceSchema: false
+         |loadMode:
+         |  type: delta
+         |validation:
+         |  primaryKey: [child_id]
+         |  foreignKeys:
+         |    - columns: [parent_id]
+         |      references:
+         |        flow: $parentName
+         |        columns: [parent_id]
+         |      onOrphan: warn
+         |""".stripMargin
+    )
+
+    import spark.implicits._
+    Seq(("1", "parent-1"), ("2", "parent-2"))
+      .toDF("parent_id", "value")
+      .write
+      .mode("overwrite")
+      .format("csv")
+      .option("header", "true")
+      .save(dataDir.resolve("parents").toString)
+    Seq(("10", "1"), ("20", "2"))
+      .toDF("child_id", "parent_id")
+      .write
+      .mode("overwrite")
+      .format("csv")
+      .option("header", "true")
+      .save(dataDir.resolve("children").toString)
+
+    IngestionPipeline.builder().withConfigDirectory(configDir.toString).build().execute().success shouldBe true
+
+    Seq(("1", "parent-1"))
+      .toDF("parent_id", "value")
+      .write
+      .mode("overwrite")
+      .format("csv")
+      .option("header", "true")
+      .save(dataDir.resolve("parents").toString)
+    Seq(("10", "1"))
+      .toDF("child_id", "parent_id")
+      .write
+      .mode("overwrite")
+      .format("csv")
+      .option("header", "true")
+      .save(dataDir.resolve("children").toString)
+
+    val result = IngestionPipeline
+      .builder()
+      .withConfigDirectory(configDir.toString)
+      .withCodeVersion("orphan-status-test-v1")
+      .withPostValidationTransformation(
+        childName,
+        context => {
+          context.spark.sql(
+            s"CALL floe.system.expire_snapshots(" +
+              s"table => 'default.$parentName', " +
+              "older_than => TIMESTAMP '2100-01-01 00:00:00', retain_last => 1)"
+          )
+          context
+        }
+      )
+      .build()
+      .execute()
+
+    result.success shouldBe false
+    result.error.getOrElse("") should include("Orphan detection failed")
+    all(result.flowResults.map(_.dataOutcome)) shouldBe com.etl.framework.orchestration.DataOutcome.Committed
+    result.status shouldBe ExecutionStatus.FailedPartial
   }
 
   it should "call batch listeners" in {

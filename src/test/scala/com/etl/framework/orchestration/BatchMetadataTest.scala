@@ -282,6 +282,68 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     } finally cleanupTempDir(tempDir)
   }
 
+  it should "reject unregistered custom readers through the direct orchestrator API" in {
+    val tempDir = Files.createTempDirectory("direct-custom-reader-test").toString
+    try {
+      val base = TestFixtures.flowConfig("orders", sourcePath = "/must-not-be-read/orders")
+      val flow = base.copy(source = base.source.copy(`type` = SourceType.Custom("missing-reader")))
+
+      val error = intercept[IllegalArgumentException] {
+        FlowOrchestrator(createGlobalConfig(tempDir), Seq(flow)).execute()
+      }
+
+      error.getMessage should include("custom source type 'missing-reader' has no registered data reader")
+    } finally cleanupTempDir(tempDir)
+  }
+
+  it should "reject missing validation domains through the direct orchestrator API" in {
+    val tempDir = Files.createTempDirectory("direct-domain-test").toString
+    try {
+      val flow = TestFixtures.flowConfig(
+        "orders",
+        primaryKey = Seq.empty,
+        columns = Seq(ColumnConfig("country", "string", nullable = true)),
+        enforceSchema = true,
+        rules = Seq(
+          ValidationRule(
+            ValidationRuleType.Domain,
+            column = Some("country"),
+            domainName = Some("countries")
+          )
+        ),
+        sourcePath = "/must-not-be-read/orders"
+      )
+
+      val error = intercept[IllegalArgumentException] {
+        FlowOrchestrator(createGlobalConfig(tempDir), Seq(flow)).execute()
+      }
+
+      error.getMessage should include("domain 'countries' is not configured")
+    } finally cleanupTempDir(tempDir)
+  }
+
+  it should "reject unresolved custom validators through the direct orchestrator API" in {
+    val tempDir = Files.createTempDirectory("direct-custom-validator-test").toString
+    try {
+      val flow = TestFixtures.flowConfig(
+        "orders",
+        rules = Seq(
+          ValidationRule(
+            ValidationRuleType.Custom,
+            `class` = Some("com.example.validators.DoesNotExist")
+          )
+        ),
+        sourcePath = "/must-not-be-read/orders"
+      )
+
+      val error = intercept[IllegalArgumentException] {
+        FlowOrchestrator(createGlobalConfig(tempDir), Seq(flow)).execute()
+      }
+
+      error.getMessage should include("neither registered nor a loadable Validator class")
+    } finally cleanupTempDir(tempDir)
+  }
+
   it should "reject a request for a different pipeline before executing a flow" in {
     val tempDir = Files.createTempDirectory("pipeline-mismatch-test").toString
     try {

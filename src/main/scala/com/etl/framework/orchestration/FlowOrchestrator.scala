@@ -46,6 +46,8 @@ class FlowOrchestrator(
     metadataWriter: BatchMetadataWriter,
     executionLogger: ExecutionLogger,
     pipelineDefinition: PipelineDefinition,
+    customValidatorNames: Set[String] = Set.empty,
+    customReaderNames: Set[String] = Set.empty,
     threadPool: Option[java.util.concurrent.ExecutorService] = None,
     batchListeners: Seq[BatchListener] = Seq.empty,
     derivedTables: Seq[DerivedTableDefinition] = Seq.empty
@@ -175,10 +177,18 @@ class FlowOrchestrator(
   }
 
   private def validateFlowConfigurations(): Unit = {
-    val errors = PipelineStructureValidator.validate(globalConfig, flowConfigs, derivedTables) ++ flowConfigs.flatMap {
-      config =>
-        FlowConfigValidator.validate(config).map(error => s"Flow '${config.name}': $error")
-    }
+    val errors =
+      PipelineStructureValidator.validate(globalConfig, flowConfigs, derivedTables) ++
+        PipelineStructureValidator.validateExtensions(
+          flowConfigs,
+          domainsConfig,
+          customValidatorNames,
+          customReaderNames,
+          getClass.getClassLoader
+        ) ++
+        flowConfigs.flatMap { config =>
+          FlowConfigValidator.validate(config).map(error => s"Flow '${config.name}': $error")
+        }
     require(errors.isEmpty, s"Invalid flow configuration: ${errors.mkString("; ")}")
   }
 
@@ -341,6 +351,8 @@ object FlowOrchestrator {
       metadataWriter = new BatchMetadataWriter(globalConfig, flowConfigs),
       executionLogger = new ExecutionLogger(),
       pipelineDefinition = definition,
+      customValidatorNames = customValidators.keySet,
+      customReaderNames = customReaders.keySet,
       threadPool = Some(pool),
       batchListeners = batchListeners,
       derivedTables = derivedTables

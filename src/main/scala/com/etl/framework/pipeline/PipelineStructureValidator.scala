@@ -1,7 +1,8 @@
 package com.etl.framework.pipeline
 
-import com.etl.framework.config.{FlowConfig, GlobalConfig}
+import com.etl.framework.config.{DomainsConfig, FlowConfig, GlobalConfig, SourceType, ValidationRuleType}
 import com.etl.framework.util.{SensitiveDataRedactor, TopologicalSorter}
+import com.etl.framework.validation.Validator
 
 import java.util.Locale
 
@@ -98,6 +99,60 @@ object PipelineStructureValidator {
 
     errors.result().distinct
   }
+
+  def validateExtensions(
+      flowConfigs: Seq[FlowConfig],
+      domainsConfig: Option[DomainsConfig],
+      customValidatorNames: Set[String],
+      customReaderNames: Set[String],
+      classLoader: ClassLoader
+  ): Seq[String] = {
+    val errors = Vector.newBuilder[String]
+
+    flowConfigs.foreach { config =>
+      config.source.`type` match {
+        case SourceType.Custom(typeName) if !customReaderNames.contains(typeName) =>
+          errors += s"Flow '${config.name}': custom source type '$typeName' has no registered data reader"
+        case _ =>
+      }
+
+      config.validation.rules
+        .filter(_.`type` == ValidationRuleType.Custom)
+        .flatMap(_.`class`)
+        .filter(_.trim.nonEmpty)
+        .distinct
+        .filterNot(name => customValidatorNames.contains(name) || isLoadableValidatorClass(name, classLoader))
+        .foreach { name =>
+          errors +=
+            s"Flow '${config.name}': custom validator '$name' is neither registered nor a loadable Validator class"
+        }
+
+      config.validation.rules
+        .filter(_.`type` == ValidationRuleType.Domain)
+        .flatMap(_.domainName)
+        .filter(_.trim.nonEmpty)
+        .foreach { domainName =>
+          domainsConfig.flatMap(_.domains.get(domainName)) match {
+            case None => errors += s"Flow '${config.name}': domain '$domainName' is not configured"
+            case Some(domain) if domain.values.isEmpty =>
+              errors += s"Flow '${config.name}': domain '$domainName' has no values"
+            case _ =>
+          }
+        }
+    }
+
+    errors.result().distinct
+  }
+
+  private def isLoadableValidatorClass(className: String, classLoader: ClassLoader): Boolean =
+    scala.util
+      .Try {
+        val clazz = Class.forName(className, false, classLoader)
+        classOf[Validator].isAssignableFrom(clazz) &&
+        java.lang.reflect.Modifier.isPublic(clazz.getModifiers) &&
+        java.lang.reflect.Modifier.isPublic(clazz.getDeclaredConstructor().getModifiers)
+      }
+      .getOrElse(false)
 
   def requireValidFlowNames(flowConfigs: Seq[FlowConfig]): Unit = {
     val errors = validateFlowNames(flowConfigs)

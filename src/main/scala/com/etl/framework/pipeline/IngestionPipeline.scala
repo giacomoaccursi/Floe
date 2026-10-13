@@ -497,6 +497,13 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
     globalConfig.iceberg.maintenance.validationErrors.foreach(error => errors += s"Iceberg maintenance: $error")
 
     errors ++= PipelineStructureValidator.validate(globalConfig, flowConfigs, derivedTables.toSeq)
+    errors ++= PipelineStructureValidator.validateExtensions(
+      flowConfigs,
+      domainsConfigOpt,
+      customValidators.keySet.toSet,
+      customReaders.keySet.toSet,
+      getClass.getClassLoader
+    )
     val flowNames = flowConfigs.map(_.name).toSet
     flowTransformations.keys.filterNot(flowNames).toSeq.sorted.foreach { flowName =>
       errors += s"Transformation references unknown flow '$flowName'"
@@ -504,46 +511,9 @@ class IngestionPipelineBuilder(implicit spark: SparkSession) {
 
     flowConfigs.foreach { config =>
       FlowConfigValidator.validate(config).foreach(error => errors += s"Flow '${config.name}': $error")
-      config.source.`type` match {
-        case com.etl.framework.config.SourceType.Custom(typeName) if !customReaders.contains(typeName) =>
-          errors += s"Flow '${config.name}': custom source type '$typeName' has no registered data reader"
-        case _ =>
-      }
-      config.validation.rules
-        .filter(_.`type` == com.etl.framework.config.ValidationRuleType.Custom)
-        .flatMap(_.`class`)
-        .filter(_.trim.nonEmpty)
-        .distinct
-        .filterNot(name => customValidators.contains(name) || isLoadableValidatorClass(name))
-        .foreach { name =>
-          errors +=
-            s"Flow '${config.name}': custom validator '$name' is neither registered nor a loadable Validator class"
-        }
-      config.validation.rules
-        .filter(_.`type` == com.etl.framework.config.ValidationRuleType.Domain)
-        .flatMap(_.domainName)
-        .filter(_.trim.nonEmpty)
-        .foreach { domainName =>
-          domainsConfigOpt.flatMap(_.domains.get(domainName)) match {
-            case None => errors += s"Flow '${config.name}': domain '$domainName' is not configured"
-            case Some(domain) if domain.values.isEmpty =>
-              errors += s"Flow '${config.name}': domain '$domainName' has no values"
-            case _ =>
-          }
-        }
     }
     errors.toSeq
   }
-
-  private def isLoadableValidatorClass(className: String): Boolean =
-    scala.util
-      .Try {
-        val clazz = Class.forName(className, false, getClass.getClassLoader)
-        classOf[Validator].isAssignableFrom(clazz) &&
-        java.lang.reflect.Modifier.isPublic(clazz.getModifiers) &&
-        java.lang.reflect.Modifier.isPublic(clazz.getDeclaredConstructor().getModifiers)
-      }
-      .getOrElse(false)
 
   private def loadConfigs(): (GlobalConfig, Seq[FlowConfig]) = {
     (globalConfigOpt, flowConfigsOpt) match {

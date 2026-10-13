@@ -170,6 +170,7 @@ class FlowOrchestrator(
   }
 
   private def validateFlowConfigurations(): Unit = {
+    ExecutionPlanBuilder.validateFlowNames(flowConfigs)
     val errors = flowConfigs.flatMap { config =>
       FlowConfigValidator.validate(config).map(error => s"Flow '${config.name}': $error")
     }

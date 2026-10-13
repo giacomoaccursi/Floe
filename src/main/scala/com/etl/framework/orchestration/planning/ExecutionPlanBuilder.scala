@@ -4,6 +4,8 @@ import com.etl.framework.config.{FlowConfig, GlobalConfig}
 import com.etl.framework.orchestration.ExecutionPlan
 import org.slf4j.LoggerFactory
 
+import java.util.Locale
+
 /** Builds execution plans based on flow dependencies. Extracted from FlowOrchestrator to follow Single Responsibility
   * Principle.
   */
@@ -23,6 +25,7 @@ class ExecutionPlanBuilder(
   def build(): ExecutionPlan = {
     logger.info(s"Building execution plan for ${flowConfigs.size} flows")
 
+    ExecutionPlanBuilder.validateFlowNames(flowConfigs)
     validateForeignKeyReferences()
 
     val dependencyGraph = dependencyBuilder.buildGraph()
@@ -65,6 +68,21 @@ class ExecutionPlanBuilder(
 }
 
 object ExecutionPlanBuilder {
+  def validateFlowNames(flowConfigs: Seq[FlowConfig]): Unit = {
+    val collisions = flowConfigs
+      .groupBy(_.name.toLowerCase(Locale.ROOT))
+      .values
+      .filter(_.size > 1)
+      .map(_.map(_.name).sorted.mkString(", "))
+      .toSeq
+      .sorted
+
+    require(
+      collisions.isEmpty,
+      s"Flow names collide case-insensitively: ${collisions.mkString("; ")}"
+    )
+  }
+
   def apply(
       flowConfigs: Seq[FlowConfig],
       globalConfig: GlobalConfig

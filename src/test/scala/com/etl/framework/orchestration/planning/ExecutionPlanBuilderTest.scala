@@ -295,4 +295,13 @@ class ExecutionPlanBuilderTest extends AnyFlatSpec with Matchers {
     val ex = intercept[IllegalArgumentException] { builder.build() }
     ex.getMessage should include("cannot reference itself")
   }
+
+  it should "reject case-insensitive duplicate flow names" in {
+    val flows = Seq(createFlowConfig("Orders"), createFlowConfig("orders"))
+    val builder = new ExecutionPlanBuilder(flows, createGlobalConfig())
+
+    val ex = intercept[IllegalArgumentException] { builder.build() }
+    ex.getMessage should include("Flow names collide case-insensitively")
+    ex.getMessage should include("Orders, orders")
+  }
 }

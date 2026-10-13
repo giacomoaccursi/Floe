@@ -163,6 +163,20 @@ class BatchMetadataTest extends AnyFlatSpec with Matchers {
     } finally cleanupTempDir(tempDir)
   }
 
+  it should "reject case-insensitive flow name collisions through the direct orchestrator API" in {
+    val tempDir = Files.createTempDirectory("direct-flow-collision-test").toString
+    try {
+      val first = TestFixtures.flowConfig("Direct_Collision", sourcePath = "/must-not-be-read/first")
+      val second = TestFixtures.flowConfig("direct_collision", sourcePath = "/must-not-be-read/second")
+
+      val error = intercept[IllegalArgumentException] {
+        FlowOrchestrator(createGlobalConfig(tempDir), Seq(first, second)).execute()
+      }
+
+      error.getMessage should include("collide case-insensitively")
+    } finally cleanupTempDir(tempDir)
+  }
+
   it should "reject a request for a different pipeline before executing a flow" in {
     val tempDir = Files.createTempDirectory("pipeline-mismatch-test").toString
     try {

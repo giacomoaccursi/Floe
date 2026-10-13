@@ -31,7 +31,7 @@ The target follows the global DDL policy. With the enterprise default `ddlMode: 
 | `execution_time_ms` | LONG | Flow execution time in milliseconds |
 | `success` | BOOLEAN | Whether this individual flow succeeded |
 
-Each batch appends one row per flow. Empty batches write a single summary row with `flow_name = "batch_summary"`.
+Each batch appends one row per flow. Attempts with no flow results write a single summary row with `flow_name = "batch_summary"`; for that synthetic row, both `batch_success` and `success` carry the attempt's functional outcome.
 
 For the default Parquet/format-v2 contract, a platform migration can provision the table as follows (replace the identifier with the configured catalog, namespace, and `qualityMetricsTable` value):
 

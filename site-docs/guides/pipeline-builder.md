@@ -367,7 +367,7 @@ Each derived table function receives a `DerivedTableContext`:
 | `effectiveAt` | `Instant` | Functional time supplied in the request, with at most microsecond precision |
 | `availableTables` | `Set[String]` | Declared dependencies successfully resolved for this target |
 
-Each derived table must have a non-blank, unqualified name. Names are unique case-insensitively because Spark commonly resolves identifiers case-insensitively; catalog and namespace come from the Iceberg configuration. Dependencies are likewise unqualified logical flow or derived names. Invalid or colliding declarations fail during registration or build.
+Each derived table must have a non-blank, unqualified name. Names are unique case-insensitively because Spark commonly resolves identifiers case-insensitively; catalog and namespace come from the Iceberg configuration. Dependencies are likewise unqualified logical flow or derived names. Invalid graphs and collisions with primary or quality-metrics targets fail during pipeline construction and are checked again by direct orchestrator execution before catalog, source, or target access.
 
 ### ctx.table(name)
 
@@ -385,13 +385,14 @@ ctx.table("customers")  // fails unless "customers" is declared
 
 ### Execution order
 
-1. All flows execute (read → validate → transform → write to Iceberg)
-2. Orphan detection completes successfully
-3. Derived dependencies are validated; unknown inputs, self-dependencies, duplicates, and cycles are rejected before execution
-4. Derived tables execute in stable topological order, so registration order does not encode dependencies
-5. Each derived table writes to `{catalogName}.{namespace}.{tableName}` as a full-load overwrite
-6. A successful snapshot is tagged when `enableSnapshotTagging` is enabled
-7. The attempt report records typed outcomes, resulting schemas, and snapshot references
+1. Pipeline-wide structural preflight rejects unknown inputs, self-dependencies, duplicate names or dependencies, cycles, and managed-target collisions before any source or target access
+2. All flows execute (read → validate → transform → write to Iceberg)
+3. Orphan detection completes successfully
+4. The derived executor revalidates its dependency graph against the attempt-pinned primary inputs as a last line of defence
+5. Derived tables execute in stable topological order, so registration order does not encode dependencies
+6. Each derived table writes to `{catalogName}.{namespace}.{tableName}` as a full-load overwrite
+7. A successful snapshot is tagged when `enableSnapshotTagging` is enabled
+8. The attempt report records typed outcomes, resulting schemas, and snapshot references
 
 If a derived table fails, its transitive dependents are returned as failed and `NOT_ATTEMPTED`; independent derived tables still execute. The final attempt has `success = false`, `executeOrThrow()` throws, and listeners receive `onBatchFailed`. Already committed tables are not rolled back.
 

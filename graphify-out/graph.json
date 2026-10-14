@@ -2536,7 +2536,7 @@
       "file_type": "code",
       "norm_label": "completed",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L32"
+      "source_location": "L33"
     },
     {
       "id": "src_main_scala_com_etl_framework_iceberg_orphandetector_failed",
@@ -2549,7 +2549,7 @@
       "file_type": "code",
       "norm_label": "failed",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L34"
+      "source_location": "L35"
     },
     {
       "id": "src_main_scala_com_etl_framework_iceberg_orphandetector_orphandetectionresult",
@@ -2562,7 +2562,7 @@
       "file_type": "code",
       "norm_label": "orphandetectionresult",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L27"
+      "source_location": "L28"
     },
     {
       "id": "src_main_scala_com_etl_framework_iceberg_orphandetector_orphandetector",
@@ -2575,7 +2575,7 @@
       "file_type": "code",
       "norm_label": "orphandetector",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L40"
+      "source_location": "L41"
     },
     {
       "id": "src_main_scala_com_etl_framework_iceberg_orphandetector_orphanreport",
@@ -2588,7 +2588,7 @@
       "file_type": "code",
       "norm_label": "orphanreport",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L16"
+      "source_location": "L17"
     },
     {
       "id": "src_main_scala_com_etl_framework_iceberg_orphandetector_skipped",
@@ -2601,7 +2601,7 @@
       "file_type": "code",
       "norm_label": "skipped",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L33"
+      "source_location": "L34"
     },
     {
       "id": "src_test_scala_com_etl_framework_orchestration_flowresultprocessortest_flowresultprocessortest",
@@ -9310,7 +9310,7 @@
       "file_type": "code",
       "norm_label": ".detectandresolveorphans()",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L55"
+      "source_location": "L56"
     },
     {
       "id": "src_main_scala_com_etl_framework_iceberg_orphandetector_orphandetector_findremovedkeysviatimetravel",
@@ -9322,7 +9322,7 @@
       "file_type": "code",
       "norm_label": ".findremovedkeysviatimetravel()",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L135"
+      "source_location": "L136"
     },
     {
       "id": "src_main_scala_com_etl_framework_iceberg_orphandetector_orphandetector_findremovedparentkeys",
@@ -9334,7 +9334,7 @@
       "file_type": "code",
       "norm_label": ".findremovedparentkeys()",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L117"
+      "source_location": "L118"
     },
     {
       "id": "src_main_scala_com_etl_framework_iceberg_orphandetector_orphandetector_processfk",
@@ -9346,7 +9346,7 @@
       "file_type": "code",
       "norm_label": ".processfk()",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L83"
+      "source_location": "L84"
     },
     {
       "id": "src_main_scala_com_etl_framework_iceberg_orphandetector_orphandetector_readresultstate",
@@ -9358,7 +9358,7 @@
       "file_type": "code",
       "norm_label": ".readresultstate()",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L337"
+      "source_location": "L356"
     },
     {
       "id": "src_main_scala_com_etl_framework_iceberg_orphandetector_orphandetector_resolveorphans",
@@ -9370,7 +9370,7 @@
       "file_type": "code",
       "norm_label": ".resolveorphans()",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L201"
+      "source_location": "L220"
     },
     {
       "id": "src_test_scala_com_etl_framework_orchestration_flowresultprocessortest_flowresultprocessortest_createflowconfig",
@@ -10762,7 +10762,7 @@
       "file_type": "code",
       "norm_label": ".afterall()",
       "source_file": "src/test/scala/com/etl/framework/iceberg/OrphanDetectorTest.scala",
-      "source_location": "L1342"
+      "source_location": "L1383"
     },
     {
       "id": "src_test_scala_com_etl_framework_iceberg_orphandetectortest_orphandetectortest_makeflowconfig",
@@ -13453,7 +13453,7 @@
       "node_kind": "heading",
       "norm_label": "external orchestration",
       "source_file": "site-docs/architecture/execution-model.md",
-      "source_location": "L103"
+      "source_location": "L105"
     },
     {
       "id": "site_docs_guides_runner_deployment_contract",
@@ -19089,7 +19089,7 @@
       "node_kind": "heading",
       "norm_label": "atomicity and partial results",
       "source_file": "site-docs/architecture/execution-model.md",
-      "source_location": "L56"
+      "source_location": "L58"
     },
     {
       "id": "site_docs_architecture_execution_model_commit_identity",
@@ -19101,7 +19101,7 @@
       "node_kind": "heading",
       "norm_label": "commit identity",
       "source_file": "site-docs/architecture/execution-model.md",
-      "source_location": "L80"
+      "source_location": "L82"
     },
     {
       "id": "site_docs_architecture_execution_model_diagnostics",
@@ -19113,7 +19113,7 @@
       "node_kind": "heading",
       "norm_label": "diagnostics",
       "source_file": "site-docs/architecture/execution-model.md",
-      "source_location": "L93"
+      "source_location": "L95"
     },
     {
       "id": "site_docs_architecture_execution_model_execution_model",
@@ -32078,7 +32078,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L63",
+      "source_location": "L64",
       "weight": 1.0
     },
     {
@@ -32090,7 +32090,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L68",
+      "source_location": "L69",
       "weight": 1.0
     },
     {
@@ -32102,7 +32102,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L73",
+      "source_location": "L74",
       "weight": 1.0
     },
     {
@@ -32114,7 +32114,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L169",
+      "source_location": "L188",
       "weight": 1.0
     },
     {
@@ -32126,7 +32126,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L130",
+      "source_location": "L131",
       "weight": 1.0
     },
     {
@@ -32138,7 +32138,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L101",
+      "source_location": "L102",
       "weight": 1.0
     },
     {
@@ -32150,7 +32150,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L94",
+      "source_location": "L95",
       "weight": 1.0
     },
     {
@@ -32162,7 +32162,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L229",
+      "source_location": "L248",
       "weight": 1.0
     },
     {
@@ -32174,7 +32174,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L250",
+      "source_location": "L269",
       "weight": 1.0
     },
     {
@@ -34706,7 +34706,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/test/scala/com/etl/framework/iceberg/OrphanDetectorTest.scala",
-      "source_location": "L1346",
+      "source_location": "L1387",
       "weight": 1.0
     },
     {
@@ -37550,7 +37550,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L32",
+      "source_location": "L33",
       "weight": 1.0
     },
     {
@@ -37562,7 +37562,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L34",
+      "source_location": "L35",
       "weight": 1.0
     },
     {
@@ -37574,7 +37574,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L34",
+      "source_location": "L35",
       "weight": 1.0
     },
     {
@@ -37586,7 +37586,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L41",
+      "source_location": "L42",
       "weight": 1.0
     },
     {
@@ -37598,7 +37598,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L42",
+      "source_location": "L43",
       "weight": 1.0
     },
     {
@@ -37610,7 +37610,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L44",
+      "source_location": "L45",
       "weight": 1.0
     },
     {
@@ -37622,7 +37622,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L23",
+      "source_location": "L24",
       "weight": 1.0
     },
     {
@@ -37634,7 +37634,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L24",
+      "source_location": "L25",
       "weight": 1.0
     },
     {
@@ -37646,7 +37646,7 @@
       "confidence_score": 1.0,
       "context": "field",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L33",
+      "source_location": "L34",
       "weight": 1.0
     },
     {
@@ -43502,7 +43502,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L32",
+      "source_location": "L33",
       "weight": 1.0
     },
     {
@@ -43514,7 +43514,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L34",
+      "source_location": "L35",
       "weight": 1.0
     },
     {
@@ -43526,7 +43526,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L43",
+      "source_location": "L44",
       "weight": 1.0
     },
     {
@@ -43538,7 +43538,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L44",
+      "source_location": "L45",
       "weight": 1.0
     },
     {
@@ -43550,7 +43550,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L135",
+      "source_location": "L136",
       "weight": 1.0
     },
     {
@@ -43562,7 +43562,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L117",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -43574,7 +43574,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L117",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -43586,7 +43586,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L83",
+      "source_location": "L84",
       "weight": 1.0
     },
     {
@@ -43598,7 +43598,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L83",
+      "source_location": "L84",
       "weight": 1.0
     },
     {
@@ -43610,7 +43610,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L83",
+      "source_location": "L84",
       "weight": 1.0
     },
     {
@@ -43622,7 +43622,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L201",
+      "source_location": "L220",
       "weight": 1.0
     },
     {
@@ -43634,7 +43634,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L201",
+      "source_location": "L220",
       "weight": 1.0
     },
     {
@@ -43646,7 +43646,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L24",
+      "source_location": "L25",
       "weight": 1.0
     },
     {
@@ -43658,7 +43658,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L33",
+      "source_location": "L34",
       "weight": 1.0
     },
     {
@@ -48734,7 +48734,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L10",
+      "source_location": "L11",
       "weight": 1.0
     },
     {
@@ -48746,7 +48746,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L12",
+      "source_location": "L13",
       "weight": 1.0
     },
     {
@@ -48758,7 +48758,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L14",
+      "source_location": "L15",
       "weight": 1.0
     },
     {
@@ -55022,7 +55022,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L55",
+      "source_location": "L56",
       "weight": 1.0
     },
     {
@@ -55034,7 +55034,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L135",
+      "source_location": "L136",
       "weight": 1.0
     },
     {
@@ -55046,7 +55046,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L135",
+      "source_location": "L136",
       "weight": 1.0
     },
     {
@@ -55058,7 +55058,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L135",
+      "source_location": "L136",
       "weight": 1.0
     },
     {
@@ -55070,7 +55070,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L117",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -55082,7 +55082,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L117",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -55094,7 +55094,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L117",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -55106,7 +55106,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L83",
+      "source_location": "L84",
       "weight": 1.0
     },
     {
@@ -55118,7 +55118,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L83",
+      "source_location": "L84",
       "weight": 1.0
     },
     {
@@ -55130,7 +55130,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L337",
+      "source_location": "L356",
       "weight": 1.0
     },
     {
@@ -55142,7 +55142,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L337",
+      "source_location": "L356",
       "weight": 1.0
     },
     {
@@ -55154,7 +55154,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L201",
+      "source_location": "L220",
       "weight": 1.0
     },
     {
@@ -55166,7 +55166,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L201",
+      "source_location": "L220",
       "weight": 1.0
     },
     {
@@ -55178,7 +55178,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L201",
+      "source_location": "L220",
       "weight": 1.0
     },
     {
@@ -63410,7 +63410,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L55",
+      "source_location": "L56",
       "weight": 1.0
     },
     {
@@ -63422,7 +63422,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L135",
+      "source_location": "L136",
       "weight": 1.0
     },
     {
@@ -63434,7 +63434,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L117",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -63446,7 +63446,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L83",
+      "source_location": "L84",
       "weight": 1.0
     },
     {
@@ -63458,7 +63458,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L337",
+      "source_location": "L356",
       "weight": 1.0
     },
     {
@@ -63470,7 +63470,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L201",
+      "source_location": "L220",
       "weight": 1.0
     },
     {
@@ -66566,7 +66566,7 @@
       "confidence_score": 1.0,
       "context": "return_type",
       "source_file": "src/test/scala/com/etl/framework/iceberg/OrphanDetectorTest.scala",
-      "source_location": "L1342",
+      "source_location": "L1383",
       "weight": 1.0
     },
     {
@@ -69225,7 +69225,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/architecture/execution-model.md",
-      "source_location": "L103",
+      "source_location": "L105",
       "weight": 1.0
     },
     {
@@ -69269,7 +69269,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/architecture/execution-model.md",
-      "source_location": "L56",
+      "source_location": "L58",
       "weight": 1.0
     },
     {
@@ -69280,7 +69280,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/architecture/execution-model.md",
-      "source_location": "L80",
+      "source_location": "L82",
       "weight": 1.0
     },
     {
@@ -69291,7 +69291,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/architecture/execution-model.md",
-      "source_location": "L93",
+      "source_location": "L95",
       "weight": 1.0
     },
     {
@@ -74813,7 +74813,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L16",
+      "source_location": "L17",
       "weight": 1.0
     },
     {
@@ -74824,7 +74824,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L31",
+      "source_location": "L32",
       "weight": 1.0
     },
     {
@@ -74835,7 +74835,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L40",
+      "source_location": "L41",
       "weight": 1.0
     },
     {
@@ -74846,7 +74846,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L32",
+      "source_location": "L33",
       "weight": 1.0
     },
     {
@@ -74857,7 +74857,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L34",
+      "source_location": "L35",
       "weight": 1.0
     },
     {
@@ -77948,7 +77948,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L33",
+      "source_location": "L34",
       "weight": 1.0
     },
     {
@@ -81380,7 +81380,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L117",
+      "source_location": "L118",
       "weight": 1.0
     },
     {
@@ -81391,7 +81391,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L135",
+      "source_location": "L136",
       "weight": 1.0
     },
     {
@@ -81402,7 +81402,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L201",
+      "source_location": "L220",
       "weight": 1.0
     },
     {
@@ -81413,7 +81413,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L337",
+      "source_location": "L356",
       "weight": 1.0
     },
     {
@@ -81424,7 +81424,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L55",
+      "source_location": "L56",
       "weight": 1.0
     },
     {
@@ -81435,7 +81435,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/main/scala/com/etl/framework/iceberg/OrphanDetector.scala",
-      "source_location": "L83",
+      "source_location": "L84",
       "weight": 1.0
     },
     {
@@ -84570,7 +84570,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/test/scala/com/etl/framework/iceberg/OrphanDetectorTest.scala",
-      "source_location": "L1342",
+      "source_location": "L1383",
       "weight": 1.0
     },
     {
@@ -86781,7 +86781,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "site-docs/architecture/execution-model.md",
-      "source_location": "L115",
+      "source_location": "L117",
       "weight": 1.0
     },
     {
@@ -91285,7 +91285,7 @@
       "confidence_score": 0.95,
       "context": "main",
       "source_file": "site-docs/architecture/execution-model.md",
-      "source_location": "L117",
+      "source_location": "L119",
       "weight": 1.0
     },
     {
@@ -91614,5 +91614,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "b3d42b274dbcff9d13bd589f4adb601055717800"
+  "built_at_commit": "2a4e61b04293c86d0d5884339cb770bcba6b83a4"
 }

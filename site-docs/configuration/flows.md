@@ -207,7 +207,7 @@ Defines the expected schema and controls enforcement during read.
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `enforceSchema` | yes | — | If `true`, validate column presence and exact Spark data types. File readers also apply the declared schema during parsing; JDBC values are validated after the database read. |
-| `allowExtraColumns` | no | `true` | If `false`, reject data with columns not defined in `columns`. Only evaluated when `enforceSchema: true`. |
+| `allowExtraColumns` | no | `true` | If `false`, reject data with any column not defined in `columns`, including underscore-prefixed names. Only evaluated when `enforceSchema: true`. |
 | `columns` | no | `[]` | List of column definitions. Required when `enforceSchema: true`. |
 
 When schema enforcement is not needed, the minimal configuration is:

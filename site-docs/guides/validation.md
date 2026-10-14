@@ -73,7 +73,7 @@ When `schema.enforceSchema` is `true`, the validator checks two things:
 
 1. All columns defined in `schema.columns` must be present in the DataFrame. If any are missing, the **entire DataFrame is rejected** with code `SCHEMA_VALIDATION_FAILED`. No valid records survive — this is a fatal schema mismatch.
 
-2. If `schema.allowExtraColumns` is `false`, columns present in the DataFrame but not defined in `schema.columns` are flagged. Internal columns (prefixed with `_`) are excluded from this check. Same behavior: the entire DataFrame is rejected with code `SCHEMA_EXTRA_COLUMNS`.
+2. If `schema.allowExtraColumns` is `false`, every column present in the input DataFrame but not defined in `schema.columns` is flagged, including names prefixed with `_`. Floe adds diagnostic columns only after this check, so an undeclared underscore-prefixed column is still source data. The entire DataFrame is rejected with code `SCHEMA_EXTRA_COLUMNS`.
 
 For built-in file readers with `enforceSchema: true`, Spark may project away undeclared source fields while applying the read schema, before this validator sees the DataFrame. Therefore `allowExtraColumns: false` checks the post-read DataFrame; it is not a raw-file contract check. See [Data Sources — Schema enforcement](data-sources.md#schema-enforcement).
 

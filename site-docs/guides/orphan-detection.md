@@ -49,7 +49,7 @@ The first successful write has no previous snapshot, so there is no removal base
 
 ### 3. Match current child records
 
-FLOe joins the removed parent keys to the child FK columns and counts matching current child records. For an SCD2 child, only its current versions are considered. The result is logged and included in attempt metadata; child rows are never mutated by orphan detection.
+FLOe maps composite keys by configured position, projects every referenced column directly to its child FK name, and then counts matching current child records. This remains unambiguous even when parent and child key names overlap or cross. For an SCD2 child, only its current versions are considered. The result is logged and included in attempt metadata; child rows are never mutated by orphan detection.
 
 ### 4. Fail safely when evidence is unavailable
 

@@ -212,7 +212,7 @@ Each flow produces a `FlowResult`:
 | `error` | `Option[String]` | Error message if the flow failed |
 | `icebergMetadata` | `Option[IcebergFlowMetadata]` | Iceberg snapshot metadata (see [Iceberg Integration](iceberg.md)) |
 | `resultingSnapshotId` | `Option[Long]` | Snapshot pinned for downstream dependencies, including a verified no-change state |
-| `resultingSchemaJson` | `Option[String]` | Frozen Spark schema used when a valid empty table has no snapshot; avoids a fallback read from mutable HEAD |
+| `resultingSchemaJson` | `Option[String]` | Frozen Spark schema required when a valid empty table has no snapshot; optional for a snapshot-backed result, whose snapshot ID is authoritative |
 | `warnings` | `Seq[String]` | Operational side-output failures that did not invalidate the committed target data |
 | `dataOutcome` | `DataOutcome` | `NOT_ATTEMPTED`, `NOT_COMMITTED`, `NO_CHANGE`, `COMMITTED`, or `UNKNOWN` |
 

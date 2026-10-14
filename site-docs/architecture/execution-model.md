@@ -53,6 +53,8 @@ read
 
 After a successful flow, Floe resolves the exact state produced by that attempt before starting another dependency group. A committed table is read at its `resultingSnapshotId`; a successful snapshotless empty table is reconstructed as an empty DataFrame from its frozen schema. Failure to resolve either form is a functional failure, not a warning: execution stops, retains every completed flow result, and reports `FAILED_PARTIAL` when a known commit already exists. Floe never falls back to mutable HEAD or lets downstream FK and transformation logic run with a missing input.
 
+Post-batch orphan detection uses the same attempt-pinned evidence. For a committed parent, the previous boundary is taken from the committed snapshot itself when optional diagnostic metadata is unavailable; missing or expired snapshot evidence fails orphan detection instead of being interpreted as a first load. A verified `NO_CHANGE` operation does not repeat removal detection from an older snapshot.
+
 ## Atomicity and partial results
 
 The atomic unit is one Iceberg table commit. There is no transaction across flows, derived tables, FK cleanup, metrics, or diagnostics.

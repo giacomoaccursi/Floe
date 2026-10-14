@@ -2,7 +2,7 @@ package com.etl.framework.iceberg
 
 import com.etl.framework.config._
 import com.etl.framework.TestFixtures
-import com.etl.framework.orchestration.{ExecutionGroup, ExecutionPlan}
+import com.etl.framework.orchestration.{DataOutcome, ExecutionGroup, ExecutionPlan}
 import com.etl.framework.orchestration.flow.FlowResult
 import com.etl.framework.util.SqlIdentifier
 import org.apache.spark.sql.SparkSession
@@ -258,6 +258,47 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     val reports = runDetection(flowConfigs, flowResults, plan)
 
     reports shouldBe empty
+  }
+
+  it should "recover the committed parent boundary when optional snapshot metadata is unavailable" in {
+    val customersConfig = makeFlowConfig("od_cust_missing_metadata")
+    val ordersConfig = makeFlowConfig(
+      "od_orders_missing_metadata",
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("customer_id"),
+          references = ReferenceConfig(flow = "od_cust_missing_metadata", columns = Seq("id")),
+          onOrphan = OrphanAction.Warn
+        )
+      )
+    )
+
+    writer.writeFullLoad(Seq((1, "Alice"), (2, "Bob")).toDF("id", "name"), customersConfig)
+    writer.writeFullLoad(Seq((100, 1), (101, 2)).toDF("id", "customer_id"), ordersConfig)
+    val changed = writer.writeFullLoad(Seq((1, "Alice")).toDF("id", "name"), customersConfig)
+
+    val parentResult = makeFlowResult(
+      "od_cust_missing_metadata",
+      changed.snapshotId,
+      None,
+      Some(tableManager.resolveTableName(customersConfig))
+    ).copy(
+      icebergMetadata = None,
+      dataOutcome = DataOutcome.Committed
+    )
+    val childResult = makeFlowResult("od_orders_missing_metadata", None, None)
+    val plan = ExecutionPlan(
+      Seq(
+        ExecutionGroup(Seq(customersConfig), parallel = false),
+        ExecutionGroup(Seq(ordersConfig), parallel = false)
+      )
+    )
+
+    val reports = runDetection(Seq(customersConfig, ordersConfig), Seq(parentResult, childResult), plan)
+
+    reports should have size 1
+    reports.head.orphanCount shouldBe 1L
+    reports.head.parentFlowName shouldBe customersConfig.name
   }
 
   it should "return empty reports when onOrphan=Ignore" in {

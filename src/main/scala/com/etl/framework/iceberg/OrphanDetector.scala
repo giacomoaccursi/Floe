@@ -2,8 +2,9 @@ package com.etl.framework.iceberg
 
 import com.etl.framework.config._
 import com.etl.framework.util.{SensitiveDataRedactor, SqlIdentifier}
-import com.etl.framework.orchestration.ExecutionPlan
+import com.etl.framework.orchestration.{DataOutcome, ExecutionPlan}
 import com.etl.framework.orchestration.flow.FlowResult
+import org.apache.iceberg.spark.Spark3Util
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.functions.col
@@ -144,7 +145,25 @@ class OrphanDetector(
     }
     if (!canRemoveRecords) return None
 
-    val parentSnapshotId = parentResult.icebergMetadata.flatMap(_.parentSnapshotId)
+    val parentSnapshotId = parentResult.icebergMetadata match {
+      case Some(metadata) => metadata.parentSnapshotId
+      case None if parentResult.dataOutcome == DataOutcome.Committed =>
+        val committedSnapshotId = parentResult.resultingSnapshotId.getOrElse(
+          throw new IllegalStateException(
+            s"Committed flow '${parentCfg.name}' has no resulting snapshot for orphan detection"
+          )
+        )
+        val tableName = tableManager.resolveTableName(parentCfg)
+        val table = Spark3Util.loadIcebergTable(spark, SqlIdentifier.quoteMultipart(tableName))
+        table.refresh()
+        val snapshot = Option(table.snapshot(committedSnapshotId)).getOrElse(
+          throw new IllegalStateException(
+            s"Committed snapshot $committedSnapshotId for '${parentCfg.name}' is no longer addressable"
+          )
+        )
+        Option(snapshot.parentId()).map(_.longValue())
+      case None => None
+    }
     parentSnapshotId match {
       case None =>
         logger.debug(s"No previous snapshot for ${parentCfg.name}, skipping orphan check")

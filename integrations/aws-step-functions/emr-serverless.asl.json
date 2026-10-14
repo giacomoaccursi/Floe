@@ -13,7 +13,7 @@
         "JobDriver": {
           "SparkSubmit": {
             "EntryPoint.$": "$.application_jar_uri",
-            "EntryPointArguments.$": "States.Array('run', '--config', $.config_uri, '--request', $.request_uri)",
+            "EntryPointArguments.$": "States.Array('run', '--config', $.config_uri, '--request', $.request_uri, '--pipeline-id', 'orders-prod', '--code-version', 'sha256:replace-with-immutable-artifact-digest')",
             "SparkSubmitParameters": "--class com.etl.framework.runner.FloeRunner --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
           }
         },

@@ -20,6 +20,25 @@ class FloeRunnerTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
   private val requestPath = root.resolve("request.json")
   private val failingRequestPath = root.resolve("failing-request.json")
 
+  private def attemptArguments(
+      command: String,
+      config: Path,
+      request: Path,
+      pipelineId: String,
+      codeVersion: String = "artifact-v1"
+  ): Seq[String] =
+    Seq(
+      command,
+      "--config",
+      config.toString,
+      "--request",
+      request.toString,
+      "--pipeline-id",
+      pipelineId,
+      "--code-version",
+      codeVersion
+    )
+
   implicit private var spark: SparkSession = _
 
   override def beforeAll(): Unit = {
@@ -111,7 +130,7 @@ class FloeRunnerTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     Files.write(requestPath, ExecutionRequestJson.toJson(request).getBytes(StandardCharsets.UTF_8))
 
     val (exitCode, stdout, stderr) = execute(
-      Seq("run", "--config", configDirectory.toString, "--request", requestPath.toString)
+      attemptArguments("run", configDirectory, requestPath, "runner-pipeline")
     )
 
     exitCode shouldBe FloeRunner.ExitCode.Success
@@ -146,14 +165,14 @@ class FloeRunnerTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     val request = pipeline.executionDefinition.newRequest("logical-inspect", Instant.parse("2026-10-01T08:30:00Z"))
     Files.write(requestPath, ExecutionRequestJson.toJson(request).getBytes(StandardCharsets.UTF_8))
     val (runExitCode, _, runStderr) = execute(
-      Seq("run", "--config", configDirectory.toString, "--request", requestPath.toString)
+      attemptArguments("run", configDirectory, requestPath, "runner-pipeline")
     )
     withClue(runStderr) {
       runExitCode shouldBe FloeRunner.ExitCode.Success
     }
 
     val (exitCode, stdout, stderr) = execute(
-      Seq("inspect", "--config", configDirectory.toString, "--request", requestPath.toString)
+      attemptArguments("inspect", configDirectory, requestPath, "runner-pipeline")
     )
 
     exitCode shouldBe FloeRunner.ExitCode.Success
@@ -162,6 +181,31 @@ class FloeRunnerTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     stdout should include("\"retry_safe\":false")
     stdout should include("\"status\":\"PRESENT\"")
     stderr shouldBe empty
+  }
+
+  it should "reject request identity not owned by the deployment" in {
+    val pipeline = IngestionPipeline
+      .builder()
+      .withConfigDirectory(configDirectory.toString)
+      .withPipelineId("runner-pipeline")
+      .withCodeVersion("artifact-v1")
+      .build()
+    val request = pipeline.executionDefinition.newRequest("logical-mismatch", Instant.parse("2026-10-01T08:45:00Z"))
+    Files.write(requestPath, ExecutionRequestJson.toJson(request).getBytes(StandardCharsets.UTF_8))
+
+    val wrongPipeline = execute(
+      attemptArguments("run", configDirectory, requestPath, "different-pipeline")
+    )
+    val wrongArtifact = execute(
+      attemptArguments("inspect", configDirectory, requestPath, "runner-pipeline", "artifact-v2")
+    )
+
+    wrongPipeline._1 shouldBe FloeRunner.ExitCode.InvalidRequestOrConfig
+    wrongPipeline._2 shouldBe empty
+    wrongPipeline._3 should include("does not match configured pipeline")
+    wrongArtifact._1 shouldBe FloeRunner.ExitCode.InvalidRequestOrConfig
+    wrongArtifact._2 shouldBe empty
+    wrongArtifact._3 should include("does not match configured code")
   }
 
   it should "translate a normally returned pipeline failure into a non-zero exit code" in {
@@ -175,7 +219,7 @@ class FloeRunnerTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     Files.write(failingRequestPath, ExecutionRequestJson.toJson(request).getBytes(StandardCharsets.UTF_8))
 
     val (exitCode, stdout, stderr) = execute(
-      Seq("run", "--config", failingConfigDirectory.toString, "--request", failingRequestPath.toString)
+      attemptArguments("run", failingConfigDirectory, failingRequestPath, "failing-pipeline")
     )
 
     withClue(stderr) {

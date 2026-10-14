@@ -25,6 +25,10 @@ class OrchestratorExamplesTest extends AnyFlatSpec with Matchers {
     dag should include("pool=\"floe_orders_writers\"")
     dag should include("\"--request\"")
     dag should include("\"{{ params.request_uri }}\"")
+    dag should include("\"--pipeline-id\"")
+    dag should include("PIPELINE_ID")
+    dag should include("\"--code-version\"")
+    dag should include("CODE_VERSION")
     dag should not include "xcom_push"
 
     requirements.split("\\r?\\n").iterator.filter(_.nonEmpty).toSet shouldBe Set(
@@ -44,6 +48,10 @@ class OrchestratorExamplesTest extends AnyFlatSpec with Matchers {
     (task \ "TimeoutSeconds").extract[Int] shouldBe 14400
     (task \ "Parameters" \ "JobDriver" \ "SparkSubmit" \ "EntryPointArguments.$")
       .extract[String] should include("$.request_uri")
+    (task \ "Parameters" \ "JobDriver" \ "SparkSubmit" \ "EntryPointArguments.$")
+      .extract[String] should include("'--pipeline-id', 'orders-prod'")
+    (task \ "Parameters" \ "JobDriver" \ "SparkSubmit" \ "EntryPointArguments.$")
+      .extract[String] should include("'--code-version', 'sha256:replace-with-immutable-artifact-digest'")
     (task \ "Parameters" \ "JobDriver" \ "SparkSubmit" \ "SparkSubmitParameters")
       .extract[String] should include("com.etl.framework.runner.FloeRunner")
     (task \ "Catch") should not be JNothing

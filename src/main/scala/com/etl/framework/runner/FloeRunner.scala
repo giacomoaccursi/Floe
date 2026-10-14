@@ -121,8 +121,8 @@ object FloeRunner {
             val pipeline = IngestionPipeline
               .builder()
               .withConfigDirectory(command.configDirectory)
-              .withPipelineId(request.pipelineId)
-              .withCodeVersion(request.codeVersion)
+              .withPipelineId(command.pipelineId)
+              .withCodeVersion(command.codeVersion)
               .build()
             val result = pipeline.execute(request)
             out.println(
@@ -158,8 +158,8 @@ object FloeRunner {
             val inspection = IngestionPipeline
               .builder()
               .withConfigDirectory(command.configDirectory)
-              .withPipelineId(request.pipelineId)
-              .withCodeVersion(request.codeVersion)
+              .withPipelineId(command.pipelineId)
+              .withCodeVersion(command.codeVersion)
               .build()
               .inspect(request)
             out.println(inspectionJson(inspection))

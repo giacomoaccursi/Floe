@@ -11,10 +11,32 @@ class RunnerArgumentsTest extends AnyFlatSpec with Matchers {
     RunnerArguments.parse(
       Seq("validate", "--config", "config", "--pipeline-id", "orders", "--code-version", "v1")
     ) shouldBe Right(RunnerCommand.Validate("config", "orders", "v1"))
-    RunnerArguments.parse(Seq("run", "--request", "request.json", "--config", "config")) shouldBe
-      Right(RunnerCommand.Run("config", "request.json"))
-    RunnerArguments.parse(Seq("inspect", "--request", "request.json", "--config", "config")) shouldBe
-      Right(RunnerCommand.Inspect("config", "request.json"))
+    RunnerArguments.parse(
+      Seq(
+        "run",
+        "--request",
+        "request.json",
+        "--config",
+        "config",
+        "--pipeline-id",
+        "orders",
+        "--code-version",
+        "v1"
+      )
+    ) shouldBe Right(RunnerCommand.Run("config", "request.json", "orders", "v1"))
+    RunnerArguments.parse(
+      Seq(
+        "inspect",
+        "--request",
+        "request.json",
+        "--config",
+        "config",
+        "--pipeline-id",
+        "orders",
+        "--code-version",
+        "v1"
+      )
+    ) shouldBe Right(RunnerCommand.Inspect("config", "request.json", "orders", "v1"))
     RunnerArguments.parse(Seq("maintenance", "--table", "orders", "--config", "config")) shouldBe
       Right(RunnerCommand.Maintenance("config", "orders"))
   }
@@ -29,6 +51,17 @@ class RunnerArgumentsTest extends AnyFlatSpec with Matchers {
       .parse(Seq("run", "--config", "a", "--request", "b", "--retry", "true"))
       .left
       .get should include("Unknown")
+  }
+
+  it should "require deployment-owned identity for run and inspect" in {
+    RunnerArguments
+      .parse(Seq("run", "--config", "config", "--request", "request.json"))
+      .left
+      .get should include("--pipeline-id")
+    RunnerArguments
+      .parse(Seq("inspect", "--config", "config", "--request", "request.json"))
+      .left
+      .get should include("--pipeline-id")
   }
 
   "FloeRunner exit mapping" should "preserve partial and unknown outcomes" in {

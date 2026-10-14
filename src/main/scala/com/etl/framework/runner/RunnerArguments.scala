@@ -3,16 +3,18 @@ package com.etl.framework.runner
 sealed trait RunnerCommand
 object RunnerCommand {
   final case class Validate(configDirectory: String, pipelineId: String, codeVersion: String) extends RunnerCommand
-  final case class Run(configDirectory: String, requestPath: String) extends RunnerCommand
-  final case class Inspect(configDirectory: String, requestPath: String) extends RunnerCommand
+  final case class Run(configDirectory: String, requestPath: String, pipelineId: String, codeVersion: String)
+      extends RunnerCommand
+  final case class Inspect(configDirectory: String, requestPath: String, pipelineId: String, codeVersion: String)
+      extends RunnerCommand
   final case class Maintenance(configDirectory: String, tableName: String) extends RunnerCommand
 }
 
 object RunnerArguments {
   val Usage: String =
     "Usage: FloeRunner validate --config <directory> --pipeline-id <id> --code-version <version>\n" +
-      "       FloeRunner run --config <directory> --request <request.json>\n" +
-      "       FloeRunner inspect --config <directory> --request <request.json>\n" +
+      "       FloeRunner run --config <directory> --request <request.json> --pipeline-id <id> --code-version <version>\n" +
+      "       FloeRunner inspect --config <directory> --request <request.json> --pipeline-id <id> --code-version <version>\n" +
       "       FloeRunner maintenance --config <directory> --table <logical-table>"
 
   def parse(args: Seq[String]): Either[String, RunnerCommand] = args.headOption match {
@@ -25,18 +27,22 @@ object RunnerArguments {
         } yield RunnerCommand.Validate(config, pipelineId, codeVersion)
       }
     case Some("run") =>
-      parseOptions(args.tail, Set("--config", "--request")).flatMap { options =>
+      parseOptions(args.tail, Set("--config", "--request", "--pipeline-id", "--code-version")).flatMap { options =>
         for {
           config <- required(options, "--config")
           request <- required(options, "--request")
-        } yield RunnerCommand.Run(config, request)
+          pipelineId <- required(options, "--pipeline-id")
+          codeVersion <- required(options, "--code-version")
+        } yield RunnerCommand.Run(config, request, pipelineId, codeVersion)
       }
     case Some("inspect") =>
-      parseOptions(args.tail, Set("--config", "--request")).flatMap { options =>
+      parseOptions(args.tail, Set("--config", "--request", "--pipeline-id", "--code-version")).flatMap { options =>
         for {
           config <- required(options, "--config")
           request <- required(options, "--request")
-        } yield RunnerCommand.Inspect(config, request)
+          pipelineId <- required(options, "--pipeline-id")
+          codeVersion <- required(options, "--code-version")
+        } yield RunnerCommand.Inspect(config, request, pipelineId, codeVersion)
       }
     case Some("maintenance") =>
       parseOptions(args.tail, Set("--config", "--table")).flatMap { options =>

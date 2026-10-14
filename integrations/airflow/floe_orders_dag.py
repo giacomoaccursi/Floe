@@ -10,6 +10,12 @@ from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOpe
 from airflow.sdk import DAG, Param
 
 
+# Deployment-owned identity. Replace CODE_VERSION during image/DAG promotion;
+# never copy either value from the submitted execution request.
+PIPELINE_ID = "orders-prod"
+CODE_VERSION = "sha256:replace-with-immutable-artifact-digest"
+
+
 with DAG(
     dag_id="floe_orders_kubernetes",
     description="Run one persisted Floe request and wait for its Spark driver",
@@ -37,6 +43,10 @@ with DAG(
             "{{ params.config_uri }}",
             "--request",
             "{{ params.request_uri }}",
+            "--pipeline-id",
+            PIPELINE_ID,
+            "--code-version",
+            CODE_VERSION,
         ],
         conf={
             "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",

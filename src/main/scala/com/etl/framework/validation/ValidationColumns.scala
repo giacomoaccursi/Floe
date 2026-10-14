@@ -15,4 +15,16 @@ object ValidationColumns {
   val WARNING_MESSAGE = "_warning_message"
   val WARNING_COLUMN = "_warning_column"
   val WARNED_AT = "_warned_at"
+
+  val ReservedDiagnosticColumns: Set[String] = Set(
+    REJECTION_CODE,
+    REJECTION_REASON,
+    REJECTED_AT,
+    BATCH_ID,
+    VALIDATION_STEP,
+    WARNING_RULE,
+    WARNING_MESSAGE,
+    WARNING_COLUMN,
+    WARNED_AT
+  )
 }

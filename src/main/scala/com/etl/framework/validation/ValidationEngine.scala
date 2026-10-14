@@ -1,9 +1,12 @@
 package com.etl.framework.validation
 
 import com.etl.framework.config.{DomainsConfig, FlowConfig, ValidationRule, ValidationRuleType}
+import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.validation.ValidationColumns._
 import com.etl.framework.validation.validators._
 import org.apache.spark.sql.DataFrame
+
+import java.util.Locale
 
 /** Core validation engine that coordinates all validation steps Delegates actual validation logic to specialized
   * validators
@@ -29,6 +32,13 @@ class ValidationEngine(
       flowConfig: FlowConfig,
       validatedFlows: Map[String, DataFrame] = Map.empty
   ): ValidationResult = {
+
+    val reserved = ReservedDiagnosticColumns.map(_.toLowerCase(Locale.ROOT))
+    val collisions = df.columns.filter(column => reserved.contains(column.toLowerCase(Locale.ROOT))).sorted
+    if (collisions.nonEmpty)
+      throw ValidationConfigException(
+        s"Flow '${flowConfig.name}' input uses reserved diagnostic columns: ${collisions.mkString(", ")}"
+      )
 
     val flowName = Some(flowConfig.name)
 

@@ -2,6 +2,7 @@ package com.etl.framework.validation
 
 import com.etl.framework.TestFixtures
 import com.etl.framework.config._
+import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.validation.ValidationColumns._
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.types._
@@ -116,6 +117,17 @@ class SchemaValidationTest extends AnyFlatSpec with Matchers {
     result.rejected.get.select(REJECTION_CODE).distinct().collect().map(_.getString(0)) should contain(
       "SCHEMA_EXTRA_COLUMNS"
     )
+  }
+
+  it should "fail before validation when source data collides with diagnostic columns" in {
+    val df = createDf(Seq("id", "name", "age", REJECTION_CODE), 1)
+    val flowConfig = createFlowConfig(schemaFields = standardColumns, enforceSchema = false)
+
+    val error = intercept[ValidationConfigException] {
+      new ValidationEngine().validate(df, flowConfig)
+    }
+
+    error.getMessage should include(REJECTION_CODE)
   }
 
   it should "detect missing columns even on empty DataFrame" in {

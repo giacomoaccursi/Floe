@@ -7,6 +7,8 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 
+import java.util.UUID
+
 /** Validator for Primary Key uniqueness Validates that primary key columns contain unique values
   */
 class PrimaryKeyValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
@@ -22,16 +24,20 @@ class PrimaryKeyValidator(flowConfig: FlowConfig, flowName: Option[String] = Non
     } else {
       val keyWindow = Window.partitionBy(pkColumns.map(col): _*)
       val hasNullKey = pkColumns.map(name => col(name).isNull).reduce(_ || _)
+      val classifierColumn = Iterator
+        .continually(s"__floe_pk_invalid_${UUID.randomUUID().toString.replace("-", "")}")
+        .find(candidate => !df.columns.exists(_.equalsIgnoreCase(candidate)))
+        .get
       val classified = df
-        .withColumn("_pk_invalid", hasNullKey || count(lit(1)).over(keyWindow) > 1)
+        .withColumn(classifierColumn, hasNullKey || count(lit(1)).over(keyWindow) > 1)
         .cache()
 
       try {
-        if (classified.filter(col("_pk_invalid")).isEmpty) {
+        if (classified.filter(col(classifierColumn)).isEmpty) {
           ValidationUtils.validResult(df)
         } else {
-          val rejectedDf = classified.filter(col("_pk_invalid")).drop("_pk_invalid")
-          val validDf = classified.filter(not(col("_pk_invalid"))).drop("_pk_invalid")
+          val rejectedDf = classified.filter(col(classifierColumn)).drop(classifierColumn)
+          val validDf = classified.filter(not(col(classifierColumn))).drop(classifierColumn)
 
           ValidationUtils.resultWithRejections(
             validDf,

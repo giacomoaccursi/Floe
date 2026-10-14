@@ -38,4 +38,28 @@ class ForeignKeyValidatorRegressionTest extends AnyFlatSpec with Matchers {
     result.valid.select("child_id").collect().map(_.getInt(0)).toSeq shouldBe Seq(10)
     result.rejected.get.select("child_id").collect().map(_.getInt(0)).toSeq shouldBe Seq(11)
   }
+
+  it should "preserve user columns whose names match former temporary join columns" in {
+    val flowConfig = TestFixtures.flowConfig(
+      name = "child_with_internal_names",
+      primaryKey = Seq("child_id"),
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("parent_id"),
+          references = ReferenceConfig(flow = "parent", columns = Seq("parent_id"))
+        )
+      )
+    )
+    val parents = Seq(1).toDF("parent_id")
+    val children = Seq(
+      (10, 1, "source-marker", "source-reference"),
+      (11, 2, "orphan-marker", "orphan-reference")
+    ).toDF("child_id", "parent_id", "_fk_ref_exists", "_fk_ref_parent_id")
+
+    val result = new ValidationEngine().validate(children, flowConfig, Map("parent" -> parents))
+
+    result.valid.select("_fk_ref_exists", "_fk_ref_parent_id").as[(String, String)].collect().toSeq shouldBe
+      Seq("source-marker" -> "source-reference")
+    result.rejected.get.columns should contain allOf ("_fk_ref_exists", "_fk_ref_parent_id")
+  }
 }

@@ -6,6 +6,8 @@ import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, lit}
 
+import java.util.UUID
+
 /** Validator for Foreign Key integrity. Supports composite (multi-column) foreign keys.
   */
 class ForeignKeyValidator(
@@ -57,19 +59,26 @@ class ForeignKeyValidator(
     val nullCondition = fk.columns.map(c => col(c).isNull).reduce(_ || _)
     val nonNullCurrentDf = currentDf.filter(nonNullCondition)
 
-    // Rename ref columns to avoid ambiguity, add marker
+    // Project reference keys under per-validation aliases so source columns can use any non-reserved name.
     val renamedPairs = fk.columns.zip(fk.references.columns)
-    val markedRef = renamedPairs
-      .foldLeft(refKeys) { case (df, (_, refCol)) =>
-        df.withColumnRenamed(refCol, s"_fk_ref_$refCol")
-      }
-      .withColumn("_fk_ref_exists", lit(true))
+    def temporaryNames(suffix: String): Seq[String] =
+      renamedPairs.indices.map(index => s"__floe_fk_ref_${index}_$suffix") :+ s"__floe_fk_exists_$suffix"
+    val suffix = Iterator
+      .continually(UUID.randomUUID().toString.replace("-", ""))
+      .find(candidate => temporaryNames(candidate).forall(name => !currentDf.columns.exists(_.equalsIgnoreCase(name))))
+      .get
+    val referenceAliases = renamedPairs.indices.map(index => s"__floe_fk_ref_${index}_$suffix")
+    val markerColumn = s"__floe_fk_exists_$suffix"
+    val markedRef = refKeys
+      .select(renamedPairs.zip(referenceAliases).map { case ((_, refCol), alias) => col(refCol).as(alias) }: _*)
+      .withColumn(markerColumn, lit(true))
 
     val joinCondition = renamedPairs
-      .map { case (localCol, refCol) => nonNullCurrentDf(localCol) === col(s"_fk_ref_$refCol") }
+      .zip(referenceAliases)
+      .map { case ((localCol, _), alias) => nonNullCurrentDf(localCol) === markedRef(alias) }
       .reduce(_ && _)
 
-    val refColsToDrop = renamedPairs.map { case (_, refCol) => s"_fk_ref_$refCol" }
+    val refColsToDrop = referenceAliases
 
     val joinedWithRef = nonNullCurrentDf
       .join(markedRef, joinCondition, "left")
@@ -77,8 +86,8 @@ class ForeignKeyValidator(
       .cache()
 
     try {
-      val orphans = joinedWithRef.filter(col("_fk_ref_exists").isNull).drop("_fk_ref_exists")
-      val validNonNull = joinedWithRef.filter(col("_fk_ref_exists").isNotNull).drop("_fk_ref_exists")
+      val orphans = joinedWithRef.filter(col(markerColumn).isNull).drop(markerColumn)
+      val validNonNull = joinedWithRef.filter(col(markerColumn).isNotNull).drop(markerColumn)
 
       if (orphans.isEmpty) {
         ValidationStepResult(currentDf, rejectedAcc)

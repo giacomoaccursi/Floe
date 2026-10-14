@@ -25,4 +25,13 @@ class PrimaryKeyValidatorRegressionTest extends AnyFlatSpec with Matchers {
     result.valid.select("id").collect().map(_.getInt(0)).toSeq shouldBe Seq(1)
     result.rejected.get.count() shouldBe 2L
   }
+
+  it should "preserve a user column whose name matches the former temporary classifier" in {
+    val input = Seq((1, "first"), (1, "duplicate"), (2, "kept")).toDF("id", "_pk_invalid")
+    val result = new ValidationEngine().validate(input, TestFixtures.flowConfig("pk_internal_name"))
+
+    result.valid.columns should contain("_pk_invalid")
+    result.valid.select("_pk_invalid").collect().map(_.getString(0)).toSeq shouldBe Seq("kept")
+    result.rejected.get.columns should contain("_pk_invalid")
+  }
 }

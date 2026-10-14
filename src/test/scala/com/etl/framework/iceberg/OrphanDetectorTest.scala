@@ -427,6 +427,52 @@ class OrphanDetectorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAl
     reports.head.actionTaken shouldBe "warn"
   }
 
+  it should "detect composite orphans when child and parent key names cross" in {
+    val parentConfig = makeFlowConfig("od_parent_crossed", primaryKey = Seq("region", "dept_id"))
+    val childConfig = makeFlowConfig(
+      "od_child_crossed",
+      primaryKey = Seq("emp_id"),
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("dept_id", "region"),
+          references = ReferenceConfig(flow = parentConfig.name, columns = Seq("region", "dept_id")),
+          onOrphan = OrphanAction.Warn
+        )
+      )
+    )
+
+    val initialParent = Seq(("US", 1), ("US", 2)).toDF("region", "dept_id")
+    val initialWrite = writer.writeFullLoad(initialParent, parentConfig)
+    writer.writeFullLoad(
+      Seq((100, "US", 1), (101, "US", 2)).toDF("emp_id", "dept_id", "region"),
+      childConfig
+    )
+    val currentWrite = writer.writeFullLoad(Seq(("US", 1)).toDF("region", "dept_id"), parentConfig)
+
+    val reports = runDetection(
+      Seq(parentConfig, childConfig),
+      Seq(
+        makeFlowResult(
+          parentConfig.name,
+          currentWrite.snapshotId,
+          initialWrite.snapshotId,
+          Some(tableManager.resolveTableName(parentConfig))
+        ),
+        makeFlowResult(childConfig.name, None, None)
+      ),
+      ExecutionPlan(
+        Seq(
+          ExecutionGroup(Seq(parentConfig), parallel = false),
+          ExecutionGroup(Seq(childConfig), parallel = false)
+        )
+      )
+    )
+
+    reports should have size 1
+    reports.head.orphanCount shouldBe 1L
+    reports.head.fkName shouldBe "(dept_id, region) -> od_parent_crossed.(region, dept_id)"
+  }
+
   // ── New tests: cascade ──────────────────────────────────────────────
 
   it should "cascade delete from parent to child to grandchild" in {

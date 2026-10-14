@@ -230,10 +230,9 @@ class OrphanDetector(
     val refCols = fk.references.columns
     val colPairs = fkCols.zip(refCols)
 
-    // Rename ref columns to match child FK columns for join
-    val renamedKeys = colPairs.foldLeft(removedParentKeys) { case (df, (fkCol, refCol)) =>
-      if (fkCol != refCol) df.withColumnRenamed(refCol, fkCol) else df
-    }
+    // Project every reference column to its child name in one operation. Sequential renames are unsafe when names
+    // cross (for example parent (a, b) -> child (b, a)) because an intermediate DataFrame contains duplicates.
+    val renamedKeys = removedParentKeys.select(colPairs.map { case (fkCol, refCol) => col(refCol).as(fkCol) }: _*)
 
     // Select only FK + PK columns from child table instead of SELECT *
     val childPkCols = childFlow.validation.primaryKey

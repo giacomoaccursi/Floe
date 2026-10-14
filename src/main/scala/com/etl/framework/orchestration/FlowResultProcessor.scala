@@ -3,6 +3,7 @@ package com.etl.framework.orchestration
 import com.etl.framework.config.{FlowConfig, GlobalConfig, LoadMode}
 import com.etl.framework.orchestration.batch.FlowGroupExecutor
 import com.etl.framework.orchestration.flow.FlowResult
+import com.etl.framework.util.SensitiveDataRedactor
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.functions.col
@@ -66,18 +67,19 @@ class FlowResultProcessor(
         s"Flow ${result.flowName} exceeded rejection threshold or has validation errors"
       )
     } else {
-      val newValidated = loadValidatedData(result) match {
-        case Some(df) => validatedFlows + (result.flowName -> df)
-        case None     => validatedFlows
+      loadValidatedData(result) match {
+        case Right(df) => ContinueWith(BatchState(allResults, validatedFlows + (result.flowName -> df)))
+        case Left(error) =>
+          logger.error(error)
+          StopExecution(BatchState(allResults, validatedFlows), error)
       }
-      ContinueWith(BatchState(allResults, newValidated))
     }
   }
 
   /** Loads the Iceberg table for a completed flow so downstream flows can use it for FK validation. */
-  private def loadValidatedData(result: FlowResult): Option[DataFrame] = {
+  private def loadValidatedData(result: FlowResult): Either[String, DataFrame] = {
     val tableName = globalConfig.iceberg.fullTableName(result.flowName)
-    scala.util.Try {
+    try {
       val table = result.resultingSnapshotId match {
         case Some(snapshotId) => spark.read.option("snapshot-id", snapshotId).table(tableName)
         case None =>
@@ -88,14 +90,15 @@ class FlowResultProcessor(
       }
       flowConfigs.find(_.name == result.flowName) match {
         case Some(config) if config.loadMode.`type` == LoadMode.SCD2 =>
-          table.filter(col(config.loadMode.isCurrentColumn.getOrElse("is_current")) === true)
-        case _ => table
+          Right(table.filter(col(config.loadMode.isCurrentColumn.getOrElse("is_current")) === true))
+        case _ => Right(table)
       }
-    }.toOption match {
-      case some @ Some(_) => some
-      case None =>
-        logger.warn(s"Could not load Iceberg table $tableName, FK checks against it will fail")
-        None
+    } catch {
+      case scala.util.control.NonFatal(error) =>
+        Left(
+          s"Could not load attempt-pinned state for flow '${result.flowName}' from $tableName: " +
+            SensitiveDataRedactor.message(error)
+        )
     }
   }
 }

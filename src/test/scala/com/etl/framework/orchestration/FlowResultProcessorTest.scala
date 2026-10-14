@@ -65,6 +65,27 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
       enforceSchema = true
     )
 
+  private val frozenSchemaJson = StructType(Seq(StructField("id", StringType, nullable = false))).json
+
+  private def successfulResult(
+      flowName: String,
+      inputRecords: Long,
+      mergedRecords: Long,
+      validRecords: Long,
+      rejectedRecords: Long,
+      rejectionReasons: Map[String, Long] = Map.empty
+  ): FlowResult =
+    FlowResult.success(
+      flowName,
+      "batch1",
+      inputRecords,
+      mergedRecords,
+      validRecords,
+      rejectedRecords,
+      rejectionReasons,
+      resultingSchemaJson = Some(frozenSchemaJson)
+    )
+
   "FlowResultProcessor" should "continue processing for successful flow result" in {
     val globalConfig = createGlobalConfig()
     val flowConfigs = Seq(createFlowConfig("flow_a"))
@@ -74,8 +95,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
       new FlowResultProcessor(globalConfig, flowConfigs, groupExecutor)
     import processor.ContinueWith
 
-    val result =
-      FlowResult.success("flow_a", "batch1", 100, 100, 95, 5, Map.empty)
+    val result = successfulResult("flow_a", 100, 100, 95, 5)
     val state = BatchState(Seq.empty, Map.empty)
 
     val processingResult = processor.processGroupResults(
@@ -104,6 +124,34 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
         state.validatedFlows("never_created").schema shouldBe schema
         state.validatedFlows("never_created").count() shouldBe 0L
       case _ => fail("Expected ContinueWith")
+    }
+  }
+
+  it should "stop when a successful flow's attempt-pinned state cannot be loaded" in {
+    val flowName = "unreadable_snapshot"
+    val flowConfigs = Seq(createFlowConfig(flowName))
+    val processor = new FlowResultProcessor(createGlobalConfig(), flowConfigs, new MockFlowGroupExecutor())
+    import processor.StopExecution
+    val schema = StructType(Seq(StructField("id", StringType, nullable = false)))
+    val result = FlowResult.success(
+      flowName,
+      "batch1",
+      1,
+      1,
+      1,
+      0,
+      Map.empty,
+      resultingSnapshotId = Some(Long.MaxValue),
+      resultingSchemaJson = Some(schema.json)
+    )
+
+    processor.processGroupResults(Seq(result), BatchState(Seq.empty, Map.empty), "batch1") match {
+      case StopExecution(state, error) =>
+        state.flowResults should contain only result
+        state.validatedFlows shouldBe empty
+        error should include("attempt-pinned state")
+        error should include(flowName)
+      case _ => fail("Expected StopExecution")
     }
   }
 
@@ -143,7 +191,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     val processingResult = processor.processGroupResults(
       Seq(
         FlowResult.failure("flow_a", "batch1", "failed first"),
-        FlowResult.success("flow_b", "batch1", 1, 1, 1, 0, Map.empty)
+        successfulResult("flow_b", 1, 1, 1, 0)
       ),
       BatchState(Seq.empty, Map.empty),
       "batch1"
@@ -168,8 +216,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     import processor.StopExecution
 
     // Rejection rate = 30/100 = 0.3 (30%), exceeds threshold of 10%
-    val result =
-      FlowResult.success("flow_a", "batch1", 100, 100, 70, 30, Map.empty)
+    val result = successfulResult("flow_a", 100, 100, 70, 30)
     val state = BatchState(Seq.empty, Map.empty)
 
     val processingResult = processor.processGroupResults(
@@ -199,9 +246,9 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     import processor.ContinueWith
 
     val results = Seq(
-      FlowResult.success("flow_a", "batch1", 100, 100, 95, 5, Map.empty),
-      FlowResult.success("flow_b", "batch1", 200, 200, 190, 10, Map.empty),
-      FlowResult.success("flow_c", "batch1", 150, 150, 145, 5, Map.empty)
+      successfulResult("flow_a", 100, 100, 95, 5),
+      successfulResult("flow_b", 200, 200, 190, 10),
+      successfulResult("flow_c", 150, 150, 145, 5)
     )
     val state = BatchState(Seq.empty, Map.empty)
 
@@ -236,9 +283,9 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     import processor.StopExecution
 
     val results = Seq(
-      FlowResult.success("flow_a", "batch1", 100, 100, 95, 5, Map.empty),
+      successfulResult("flow_a", 100, 100, 95, 5),
       FlowResult.failure("flow_b", "batch1", "Processing error"),
-      FlowResult.success("flow_c", "batch1", 150, 150, 145, 5, Map.empty)
+      successfulResult("flow_c", 150, 150, 145, 5)
     )
     val state = BatchState(Seq.empty, Map.empty)
 
@@ -318,8 +365,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
     import processor.ContinueWith
 
     // Rejection rate = 10/100 = 0.1 (10%), below threshold of 20%
-    val result =
-      FlowResult.success("flow_a", "batch1", 100, 100, 90, 10, Map.empty)
+    val result = successfulResult("flow_a", 100, 100, 90, 10)
     val state = BatchState(Seq.empty, Map.empty)
 
     val processingResult = processor.processGroupResults(
@@ -358,8 +404,7 @@ class FlowResultProcessorTest extends AnyFlatSpec with Matchers {
       "schema_validation" -> 3L,
       "not_null_validation" -> 2L
     )
-    val result =
-      FlowResult.success("flow_a", "batch1", 100, 100, 95, 5, rejectionReasons)
+    val result = successfulResult("flow_a", 100, 100, 95, 5, rejectionReasons)
     val state = BatchState(Seq.empty, Map.empty)
 
     val processingResult = processor.processGroupResults(

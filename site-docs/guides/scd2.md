@@ -120,7 +120,7 @@ The record is not physically deleted — it remains in the table as a queryable 
 
 ### Reactivated record
 
-A previously soft-deleted record (`is_active = false`) can reappear in the source. In this case, a new version is inserted with `is_current = true` and `is_active = true`. The soft-deleted version remains in the history.
+A previously soft-deleted record (`is_active = false`) can reappear in the source. In this case, a new version is inserted with `is_current = true` and `is_active = true`. The soft-deleted version remains in the history. The reactivation `effectiveAt` must be strictly later than every existing `valid_from`/`valid_to` boundary for that key; an out-of-order reactivation is rejected before the MERGE so it cannot overlap retained history.
 
 Example after delete and reactivation with tier change:
 
@@ -486,20 +486,22 @@ Everything happens in a single atomic SQL statement. If that statement does not 
 
 ## Temporal continuity
 
-For each pair of consecutive versions of the same record, the `valid_to` of the old version equals the `valid_from` of the new one:
+For each adjacent version created by an attribute change, the `valid_to` of the old version equals the `valid_from` of the new one:
 
 ```
 version 1: valid_from=T1, valid_to=T2
 version 2: valid_from=T2, valid_to=NULL
 ```
 
-This is guaranteed because both operations (close old, open new) use the same immutable `ExecutionRequest.effectiveAt` value rendered as a UTC timestamp literal. There are no temporal gaps between versions, and Spark executor clock differences cannot alter the boundary.
+This is guaranteed because both operations (close old, open new) use the same immutable `ExecutionRequest.effectiveAt` value rendered as a UTC timestamp literal. Spark executor clock differences cannot alter the boundary. A soft-delete intentionally closes the active interval without opening another one; a later reactivation therefore starts a new active interval after a legitimate inactive gap.
 
 Before a subsequent MERGE, Floe first verifies that every current target row is structurally valid and that no primary key
 has multiple current versions. It then checks every changed key and every soft-deleted key: `effectiveAt` must be strictly
 later than the current version's `valid_from`, otherwise the load fails before mutation instead of creating a zero-length
-or negative interval. Repeating an unchanged row at the same instant remains a no-op. These checks assume the documented
-single-writer policy—they are not a distributed lock or fencing mechanism.
+or negative interval. For a source key with retained history but no current row, Floe also requires `effectiveAt` to be
+strictly later than its latest historical `valid_from`/`valid_to` boundary before inserting a resumed version. Repeating
+an unchanged current row at the same instant remains a no-op. These checks assume the documented single-writer policy—they
+are not a distributed lock or fencing mechanism.
 
 ## Known limitations
 
@@ -509,7 +511,7 @@ The framework assumes a single writer per table. Concurrent executions of the sa
 
 ### Late-arriving data
 
-SCD2 uses `ExecutionRequest.effectiveAt` as `valid_from` for new versions. The caller may set that instant to a historical processing boundary, but Floe does not infer event-valid time from source rows or splice a late record into existing history. For an existing key, a changed or deleted version whose time is not later than the current version is rejected. New keys start independent histories at the supplied instant.
+SCD2 uses `ExecutionRequest.effectiveAt` as `valid_from` for new versions. The caller may set that instant to a historical processing boundary, but Floe does not infer event-valid time from source rows or splice a late record into existing history. For an existing key, a changed or deleted version whose time is not later than the current version is rejected; a reactivation must also follow the key's latest historical boundary. Only a key with no retained history starts an independent history at the supplied instant.
 
 ### No hard-delete in this load mode
 

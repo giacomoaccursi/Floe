@@ -121,14 +121,18 @@ class DerivedTableExecutor(
         reconciled = write.reconciled,
         dataOutcome = dataOutcome
       )
-      val output = write.resultingSnapshotId match {
-        case Some(snapshotId) =>
-          spark.read.option("snapshot-id", snapshotId).table(SqlIdentifier.quoteMultipart(fullTableName))
-        case None =>
-          val schema = DataType.fromJson(write.resultingSchemaJson).asInstanceOf[StructType]
-          spark.createDataFrame(spark.sparkContext.emptyRDD[Row], schema)
+      try {
+        val output = loadResultingState(fullTableName, write.resultingSnapshotId, write.resultingSchemaJson)
+        DerivedExecution(result, Some(output))
+      } catch {
+        case NonFatal(e) =>
+          val message = SensitiveDataRedactor.message(e)
+          logger.error(
+            s"Derived table $tableName committed but its attempt-pinned state could not be loaded: $message",
+            SensitiveDataRedactor.safeThrowable(e)
+          )
+          DerivedExecution(result.copy(success = false, error = Some(message)), None)
       }
-      DerivedExecution(result, Some(output))
     } catch {
       case NonFatal(e) =>
         val message = SensitiveDataRedactor.message(e)
@@ -139,6 +143,19 @@ class DerivedTableExecutor(
         )
     }
   }
+
+  private[pipeline] def loadResultingState(
+      fullTableName: String,
+      resultingSnapshotId: Option[Long],
+      resultingSchemaJson: String
+  ): DataFrame =
+    resultingSnapshotId match {
+      case Some(snapshotId) =>
+        spark.read.option("snapshot-id", snapshotId).table(SqlIdentifier.quoteMultipart(fullTableName))
+      case None =>
+        val schema = DataType.fromJson(resultingSchemaJson).asInstanceOf[StructType]
+        spark.createDataFrame(spark.sparkContext.emptyRDD[Row], schema)
+    }
 
   private def resolveTableName(tableName: String): String =
     icebergConfig.fullTableName(tableName)

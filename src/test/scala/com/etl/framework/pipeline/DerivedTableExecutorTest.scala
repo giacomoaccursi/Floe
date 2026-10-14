@@ -73,6 +73,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
       "failing_derived",
       "base_derived",
       "second_derived",
+      "unreadable_derived",
       "undeclared_reader",
       "validate_only_derived",
       "daily orders"
@@ -238,6 +239,32 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     results.head.error shouldBe Some("intentional failure")
     results(1).success shouldBe true
     results(1).recordsWritten shouldBe 1L
+  }
+
+  it should "retain commit evidence when the resulting derived snapshot cannot be loaded" in {
+    val executor = new DerivedTableExecutor(icebergConfig) {
+      override private[pipeline] def loadResultingState(
+          fullTableName: String,
+          resultingSnapshotId: Option[Long],
+          resultingSchemaJson: String
+      ): DataFrame = throw new IllegalStateException("simulated pinned-state read failure")
+    }
+
+    val result = executor
+      .execute(
+        Seq(derived("unreadable_derived")(_ => Seq((1, "value")).toDF("id", "name"))),
+        "batch_unreadable",
+        Map.empty[String, DataFrame]
+      )
+      .head
+
+    result.success shouldBe false
+    result.error.get should include("simulated pinned-state read failure")
+    result.dataOutcome.name shouldBe "COMMITTED"
+    result.snapshotId shouldBe defined
+    result.resultingSnapshotId shouldBe result.snapshotId
+    result.resultingSchemaJson shouldBe defined
+    result.operationId shouldBe defined
   }
 
   it should "provide batchId in context" in {

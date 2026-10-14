@@ -89,10 +89,12 @@ spark-submit \
   my-pipeline-assembly.jar \
   run \
   --config s3://company-config/orders/v42 \
-  --request s3://company-control/orders/requests/d59882b1-b84a-4ae2-92fe-2bfe5ec78e41.json
+  --request s3://company-control/orders/requests/d59882b1-b84a-4ae2-92fe-2bfe5ec78e41.json \
+  --pipeline-id orders-prod \
+  --code-version sha256:4f5c2d...
 ```
 
-The runner rebuilds the pipeline, rejects pipeline/code/config identity mismatches, performs target preflight, executes exactly one attempt, attempts the normal diagnostic report, and emits a compact JSON result. It never retries a flow or the whole job. A report failure after known data success produces `SUCCEEDED_WITH_WARNINGS`.
+`--pipeline-id` and `--code-version` are deployment-owned trust anchors. Bake them into the job definition or inject them from immutable deployment metadata; never derive them from the request being checked. The runner rebuilds the pipeline from those trusted values and rejects pipeline/code/config identity mismatches before target or source work. It then executes exactly one attempt, attempts the normal diagnostic report, and emits a compact JSON result. It never retries a flow or the whole job. A report failure after known data success produces `SUCCEEDED_WITH_WARNINGS`.
 
 The runner stops a `SparkSession` it created. When embedded in a process that already owns an active/default session, it leaves that session running.
 
@@ -151,8 +153,12 @@ spark-submit \
   my-pipeline-assembly.jar \
   inspect \
   --config s3://company-config/orders/v42 \
-  --request s3://company-control/orders/requests/d59882b1-b84a-4ae2-92fe-2bfe5ec78e41.json
+  --request s3://company-control/orders/requests/d59882b1-b84a-4ae2-92fe-2bfe5ec78e41.json \
+  --pipeline-id orders-prod \
+  --code-version sha256:4f5c2d...
 ```
+
+Use the same deployment-owned identity that ran the attempt. Supplying identity fields copied from the request defeats the mismatch check and is unsupported.
 
 For every primary and registered derived target, the result includes:
 

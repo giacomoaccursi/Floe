@@ -96,7 +96,7 @@ A mutable directory/glob, ordinary JDBC query, or opaque custom reader is not au
 1. Record `pipelineId`, `logicalRunId`, `attemptId`, platform job/application ID, report path, and original request.
 2. Stop later writers and maintenance for the affected targets. A canceled scheduler task does not by itself prove a remote request stopped.
 3. Retain the application artifact, resolved configuration, input references, logs, report, and Iceberg history.
-4. Run `FloeRunner inspect --config <immutable-config> --request <original-request>` or call `pipeline.inspect(request)`, then inspect the current table identity, snapshot history, snapshot summaries, and refs. Operation metadata is evidence, not a lock, and `retry_safe` remains `false`.
+4. Run `FloeRunner inspect --config <immutable-config> --request <original-request> --pipeline-id <deployment-pipeline-id> --code-version <deployment-artifact-version>` or call `pipeline.inspect(request)`, then inspect the current table identity, snapshot history, snapshot summaries, and refs. The CLI identity values must come from immutable deployment metadata, not from the request under inspection. Operation metadata is evidence, not a lock, and `retry_safe` remains `false`.
 5. Classify every target. Absence of a matching snapshot is not universal proof that no delayed effect can appear.
 6. Correct data with a separately reviewed operation when needed. Floe does not perform an automatic multi-table rollback.
 7. Resubmit the whole job only if the repeatability conditions above are satisfied; keep the same `logicalRunId` and use a new `attemptId`.

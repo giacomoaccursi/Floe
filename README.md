@@ -183,10 +183,12 @@ spark-submit \
   --class com.etl.framework.runner.FloeRunner \
   my-pipeline-assembly.jar \
   run --config s3://company-config/orders/v42 \
-      --request s3://company-control/orders/requests/attempt.json
+      --request s3://company-control/orders/requests/attempt.json \
+      --pipeline-id orders-prod \
+      --code-version "$APP_IMAGE_DIGEST"
 ```
 
-The request is strict, versioned JSON persisted by the host before submission. `FAILED`, `FAILED_PARTIAL`, and `UNKNOWN` produce distinct non-zero exit codes; Floe never turns a returned pipeline failure into process success. See the [Generic Runner guide](https://giacomoaccursi.github.io/Floe/guides/runner/).
+The request is strict, versioned JSON persisted by the host before submission. Pipeline ID and code version must come from trusted deployment metadata, not from that request; the runner compares them before doing data work. `FAILED`, `FAILED_PARTIAL`, and `UNKNOWN` produce distinct non-zero exit codes; Floe never turns a returned pipeline failure into process success. See the [Generic Runner guide](https://giacomoaccursi.github.io/Floe/guides/runner/).
 
 Requests and platform references must never contain secret values. Floe redacts common credential shapes at its own diagnostic boundaries as defence in depth, but the deployment must separately secure and test logs produced by Spark, Hadoop, Iceberg, connectors, custom code, and the hosting platform.
 

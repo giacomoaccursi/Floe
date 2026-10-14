@@ -535,6 +535,24 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     result.icebergMetadata.flatMap(_.summary.get("floe.operation-id")) shouldBe Some(context.operationId)
   }
 
+  it should "retain the committed snapshot when the optional schema lookup fails" in {
+    val fc = flowConfig("tracked_commit_schema_lookup_failure")
+    val context = CommitContext.forFlow("schema-lookup-failure", fc.name, "full")
+    val schemaFailure = new IllegalStateException("simulated post-commit schema lookup failure")
+    val schemaFailingWriter = new IcebergTableWriter(spark, icebergConfig, tableManager) {
+      override private[iceberg] def loadResultingSchemaJson(tableName: String): String = throw schemaFailure
+    }
+
+    val result = schemaFailingWriter.writeFullLoad(Seq((1, "Alice")).toDF("id", "name"), fc, context)
+
+    result.snapshotId shouldBe defined
+    result.resultingSnapshotId shouldBe result.snapshotId
+    result.resultingSchemaJson shouldBe None
+    tableManager.findSnapshotsByOperationId(fc, context.operationId).map(_.snapshotId) shouldBe Seq(
+      result.snapshotId.get
+    )
+  }
+
   it should "propagate fatal errors without attempting commit reconciliation" in {
     class ProbeTableManager extends IcebergTableManager(spark, icebergConfig) {
       var reconciliationLookups: Int = 0

@@ -38,6 +38,21 @@ class IcebergTableWriter(
   private val logger = LoggerFactory.getLogger(getClass)
   private val timestampFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS").withZone(ZoneOffset.UTC)
 
+  private[iceberg] def loadResultingSchemaJson(tableName: String): String =
+    spark.table(SqlIdentifier.quoteMultipart(tableName)).schema.json
+
+  private def loadResultingSchemaJsonSafely(tableName: String): Option[String] =
+    try Some(loadResultingSchemaJson(tableName))
+    catch {
+      case NonFatal(error) =>
+        logger.warn(
+          s"Unable to read the resulting schema for $tableName after reconciling the Iceberg commit; " +
+            "preserving the authoritative snapshot evidence",
+          error
+        )
+        None
+    }
+
   /** Iceberg identifier fields are metadata, not a uniqueness constraint. Never feed an ambiguous source to MERGE. */
   private def validateMergeKeys(df: DataFrame, pkColumns: Seq[String]): Unit = {
     require(pkColumns.nonEmpty, "MERGE requires at least one primary-key column")
@@ -537,7 +552,7 @@ class IcebergTableWriter(
           recordsProcessed = recordsProcessed,
           snapshotId = Some(snapshot.snapshotId),
           resultingSnapshotId = Some(snapshot.snapshotId),
-          resultingSchemaJson = Some(spark.table(SqlIdentifier.quoteMultipart(tableName)).schema.json),
+          resultingSchemaJson = loadResultingSchemaJsonSafely(tableName),
           icebergMetadata = metadata,
           operationId = context.operationId,
           reconciled = reconciled
@@ -548,7 +563,7 @@ class IcebergTableWriter(
           recordsProcessed,
           snapshotId = None,
           resultingSnapshotId = tableManager.getCurrentSnapshotId(flowConfig),
-          resultingSchemaJson = Some(spark.table(SqlIdentifier.quoteMultipart(tableName)).schema.json),
+          resultingSchemaJson = loadResultingSchemaJsonSafely(tableName),
           operationId = context.operationId,
           reconciled = reconciled
         )

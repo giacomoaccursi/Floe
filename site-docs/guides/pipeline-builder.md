@@ -394,7 +394,7 @@ ctx.table("customers")  // fails unless "customers" is declared
 7. A successful snapshot is tagged when `enableSnapshotTagging` is enabled
 8. The attempt report records typed outcomes, resulting schemas, and snapshot references
 
-If a derived table fails, its transitive dependents are returned as failed and `NOT_ATTEMPTED`; independent derived tables still execute. The final attempt has `success = false`, `executeOrThrow()` throws, and listeners receive `onBatchFailed`. Already committed tables are not rolled back.
+If a derived table fails, its transitive dependents are returned as failed and `NOT_ATTEMPTED`; independent derived tables still execute. The final attempt has `success = false`, `executeOrThrow()` throws, and listeners receive `onBatchFailed`. Already committed tables are not rolled back. If the write committed but Floe cannot load its resulting attempt-pinned state, the failed `DerivedTableResult` retains the committed snapshot, resulting snapshot, frozen schema, operation ID, and reconciliation flag; recovery therefore does not lose the evidence merely because downstream consumption failed.
 
 !!!warning "Known limitations"
     - Derived tables always perform a full overwrite. There is no delta/merge mode — the entire table is recomputed each batch. For most use cases (aggregations, splits, denormalizations) this is correct because the result depends on the full dataset.

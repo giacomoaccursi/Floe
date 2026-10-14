@@ -51,7 +51,7 @@ read
 
 `effectiveAt`, `logicalRunId`, and `attemptId` are available in `TransformationContext`. SCD2 timestamps use `effectiveAt`, not wall-clock time. Supply `effectiveAt` with at most microsecond precision: Spark timestamps cannot preserve finer nanosecond digits, so the request rejects them instead of recording two inconsistent representations.
 
-After a successful parent flow, downstream validation reads the exact `resultingSnapshotId`. It does not silently read mutable HEAD. A successful snapshotless empty table is represented by an empty DataFrame with the table schema.
+After a successful flow, Floe resolves the exact state produced by that attempt before starting another dependency group. A committed table is read at its `resultingSnapshotId`; a successful snapshotless empty table is reconstructed as an empty DataFrame from its frozen schema. Failure to resolve either form is a functional failure, not a warning: execution stops, retains every completed flow result, and reports `FAILED_PARTIAL` when a known commit already exists. Floe never falls back to mutable HEAD or lets downstream FK and transformation logic run with a missing input.
 
 ## Atomicity and partial results
 

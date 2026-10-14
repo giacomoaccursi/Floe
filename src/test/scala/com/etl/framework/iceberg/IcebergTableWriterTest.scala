@@ -409,6 +409,76 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     table.filter("is_current = true AND is_active = true").count() shouldBe 2L
   }
 
+  it should "reject an out-of-order reactivation after a soft delete" in {
+    val fc = flowConfig(
+      "scd2_out_of_order_reactivation",
+      loadMode = LoadMode.SCD2,
+      compareColumns = Seq("name"),
+      detectDeletes = true,
+      isActiveColumn = Some("is_active")
+    )
+    val initialTime = Instant.parse("2026-10-06T10:00:00Z")
+    val deletionTime = Instant.parse("2026-10-06T12:00:00Z")
+    val staleReactivationTime = Instant.parse("2026-10-06T11:00:00Z")
+    val original = Seq((1, "Alice")).toDF("id", "name")
+
+    writer.writeSCD2Load(
+      original,
+      fc,
+      CommitContext.forFlow("initial-reactivation", fc.name, "scd2", initialTime)
+    )
+    writer.writeSCD2Load(
+      original.limit(0),
+      fc,
+      CommitContext.forFlow("delete-before-reactivation", fc.name, "scd2", deletionTime)
+    )
+
+    intercept[IllegalArgumentException] {
+      writer.writeSCD2Load(
+        Seq((1, "Alice restored")).toDF("id", "name"),
+        fc,
+        CommitContext.forFlow("stale-reactivation", fc.name, "scd2", staleReactivationTime)
+      )
+    }.getMessage should include("must be later than the latest SCD2 boundary")
+
+    val table = spark.sql("SELECT * FROM writer_catalog.default.scd2_out_of_order_reactivation")
+    table.count() shouldBe 1L
+    table.filter("is_current = true").count() shouldBe 0L
+    table.filter("is_active = false").count() shouldBe 1L
+  }
+
+  it should "reactivate a soft-deleted key after its latest temporal boundary" in {
+    val fc = flowConfig(
+      "scd2_ordered_reactivation",
+      loadMode = LoadMode.SCD2,
+      compareColumns = Seq("name"),
+      detectDeletes = true,
+      isActiveColumn = Some("is_active")
+    )
+    val original = Seq((1, "Alice")).toDF("id", "name")
+
+    writer.writeSCD2Load(
+      original,
+      fc,
+      CommitContext.forFlow("ordered-initial", fc.name, "scd2", Instant.parse("2026-10-06T10:00:00Z"))
+    )
+    writer.writeSCD2Load(
+      original.limit(0),
+      fc,
+      CommitContext.forFlow("ordered-delete", fc.name, "scd2", Instant.parse("2026-10-06T11:00:00Z"))
+    )
+    writer.writeSCD2Load(
+      Seq((1, "Alice restored")).toDF("id", "name"),
+      fc,
+      CommitContext.forFlow("ordered-reactivate", fc.name, "scd2", Instant.parse("2026-10-06T12:00:00Z"))
+    )
+
+    val table = spark.sql("SELECT * FROM writer_catalog.default.scd2_ordered_reactivation")
+    table.count() shouldBe 2L
+    table.filter("is_current = true AND is_active = true AND name = 'Alice restored'").count() shouldBe 1L
+    table.filter("is_current = false AND is_active = false").count() shouldBe 1L
+  }
+
   it should "not affect missing records when detectDeletes is false" in {
     val fc = flowConfig(
       "scd2_no_detect_del",

@@ -352,10 +352,8 @@ class IcebergTableWriter(
       commitContext: CommitContext
   ): Unit = {
     val source = df.alias("source")
-    val target = spark
-      .table(SqlIdentifier.quoteMultipart(tableName))
-      .filter(col(cfg.isCurrentCol) === true)
-      .alias("target")
+    val targetTable = spark.table(SqlIdentifier.quoteMultipart(tableName))
+    val target = targetTable.filter(col(cfg.isCurrentCol) === true).alias("target")
     val keyCondition = cfg.pkColumns
       .map(column => source.col(column).eqNullSafe(target.col(column)))
       .reduce(_ && _)
@@ -378,6 +376,28 @@ class IcebergTableWriter(
     require(
       !invalidChangedVersion && !invalidDeletion,
       s"effectiveAt ${commitContext.effectiveAt} must be later than the current SCD2 version for every changed or deleted key"
+    )
+
+    // A soft-deleted/resumed key has no current row, so the checks above cannot protect its historical boundary.
+    // Such a source row will be inserted as a new current version; reject it if that insertion would overlap or share
+    // an effective instant with any existing version for the same key.
+    val sourceWithoutCurrent = source.join(target, keyCondition, "left_anti").alias("source_without_current")
+    val history = targetTable.filter(col(cfg.isCurrentCol) === false).alias("history")
+    val historyKeyCondition = cfg.pkColumns
+      .map(column => sourceWithoutCurrent.col(column).eqNullSafe(history.col(column)))
+      .reduce(_ && _)
+    val historicalBoundaryViolation =
+      history.col(cfg.validFromCol) >= expr(timestampLiteral(commitContext)) ||
+        history.col(cfg.validToCol) >= expr(timestampLiteral(commitContext))
+    val invalidResumption = history
+      .join(sourceWithoutCurrent, historyKeyCondition, "inner")
+      .filter(historicalBoundaryViolation)
+      .limit(1)
+      .count() > 0L
+
+    require(
+      !invalidResumption,
+      s"effectiveAt ${commitContext.effectiveAt} must be later than the latest SCD2 boundary for every reactivated or resumed key"
     )
   }
 

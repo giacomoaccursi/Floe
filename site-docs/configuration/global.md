@@ -47,7 +47,7 @@ Base directories for all pipeline output.
 | `outputPath` | yes | — | Base directory for flow output data |
 | `rejectedPath` | yes | — | Directory for rejected records |
 | `metadataPath` | yes | — | Directory for batch and flow metadata JSON |
-| `warningsPath` | no | `{outputPath}/warnings` | Base directory for validation warning records. Each batch is written to `{warningsPath}/{flowName}/batch_id={batchId}/`. |
+| `warningsPath` | no | `{outputPath}/warnings` | Base directory for validation warning records. Each attempt is written below `{warningsPath}/{flowName}/pipeline_id={pipelineId}/logical_run_id={logicalRunId}/attempt_id={attemptId}/`. |
 
 The first three paths are required and must be non-blank. `warningsPath` is optional, but must also be non-blank when
 present; if omitted, warnings go to `{outputPath}/warnings`. These invariants are checked by `validate()` before any

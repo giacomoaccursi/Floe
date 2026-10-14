@@ -303,11 +303,13 @@ The record is removed from the valid DataFrame and added to the rejected DataFra
 | `_rejected_at` | Timestamp of the validation step execution |
 | `_batch_id` | Batch identifier |
 
-Rejected records are written to the flow's `rejectedPath` under `batch_id={batchId}/` (or `{global.rejectedPath}/{flowName}/batch_id={batchId}/` without a flow override). A new batch does not erase earlier diagnostic output; rerunning the same batch ID replaces only that batch's directory.
+These diagnostic names are reserved, case-insensitively, in an input DataFrame: `_rejection_code`, `_rejection_reason`, `_validation_step`, `_rejected_at`, `_batch_id`, `_warning_rule`, `_warning_message`, `_warning_column`, and `_warned_at`. Floe fails before validation if source data uses one of them, preventing diagnostic metadata from overwriting business data. Other underscore-prefixed business columns remain valid when declared by the schema.
+
+Rejected records are written below `{rejectedBase}/pipeline_id={pipelineId}/logical_run_id={logicalRunId}/attempt_id={attemptId}/`, where `rejectedBase` is the flow's `rejectedPath` override or `{global.rejectedPath}/{flowName}`. A new attempt does not erase earlier diagnostic output; submitting the same `attemptId` again replaces only that attempt's directory.
 
 ### warn
 
-The record stays in the valid DataFrame unchanged (no extra columns are added). A separate warning record is written to Parquet at `{warningsPath}/{flowName}/batch_id={batchId}/` (defaults to `{outputPath}/warnings/{flowName}/batch_id={batchId}/` if `warningsPath` is not configured in `global.yaml`). Each warning record contains the flow's primary key columns plus warning metadata:
+The record stays in the valid DataFrame unchanged (no extra columns are added). A separate warning record is written to Parquet below `{warningsPath}/{flowName}/pipeline_id={pipelineId}/logical_run_id={logicalRunId}/attempt_id={attemptId}/`; `warningsPath` defaults to `{outputPath}/warnings` when it is not configured in `global.yaml`. Each warning record contains the flow's primary key columns plus warning metadata:
 
 | Column | Description |
 |--------|-------------|

@@ -410,7 +410,7 @@ If a derived table fails, its transitive dependents are returned as failed and `
 | `error` | `Option[String]` | Error message on failure |
 | `snapshotId` | `Option[Long]` | Exact committed snapshot when a snapshot was created |
 | `resultingSnapshotId` | `Option[Long]` | Resulting table reference, including a no-change operation |
-| `resultingSchemaJson` | `Option[String]` | Frozen schema for downstream handling of a snapshotless empty result |
+| `resultingSchemaJson` | `Option[String]` | Frozen schema required for a snapshotless empty result; optional when `resultingSnapshotId` is present |
 | `operationId` | `Option[String]` | Identity of this commit attempt, stored in snapshot metadata |
 | `reconciled` | `Boolean` | Whether a client exception was resolved by finding this attempt's snapshot |
 | `dataOutcome` | `DataOutcome` | Typed data effect for the target |

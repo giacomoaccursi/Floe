@@ -105,6 +105,19 @@ class SchemaValidationTest extends AnyFlatSpec with Matchers {
     schemaRejections shouldBe 0
   }
 
+  it should "reject undeclared underscore-prefixed source columns" in {
+    val df = createDf(Seq("id", "name", "age", "_shadow"), 2)
+    val flowConfig = createFlowConfig(schemaFields = standardColumns, allowExtraColumns = false)
+
+    val result = new ValidationEngine().validate(df, flowConfig)
+
+    result.valid.count() shouldBe 0L
+    result.rejected.map(_.count()) shouldBe Some(2L)
+    result.rejected.get.select(REJECTION_CODE).distinct().collect().map(_.getString(0)) should contain(
+      "SCHEMA_EXTRA_COLUMNS"
+    )
+  }
+
   it should "detect missing columns even on empty DataFrame" in {
     val df = createDf(Seq("id", "name"), 0) // 0 rows, missing "age"
     val flowConfig = createFlowConfig(schemaFields = standardColumns)

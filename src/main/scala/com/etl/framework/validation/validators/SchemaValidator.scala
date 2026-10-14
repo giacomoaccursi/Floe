@@ -55,9 +55,8 @@ class SchemaValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
       actualColumns: Set[String]
   ): ValidationStepResult = {
     if (!flowConfig.schema.allowExtraColumns) {
-      // 2. Check for extra columns (if not allowed)
-      // Exclude internal validation columns (prefixed with _)
-      val extraColumns = (actualColumns -- requiredColumns).filterNot(_.startsWith("_"))
+      // Schema validation runs before Floe adds diagnostic columns, so every undeclared input column is external.
+      val extraColumns = actualColumns -- requiredColumns
       if (extraColumns.nonEmpty) {
         ValidationUtils.resultWithRejections(
           df.limit(0),

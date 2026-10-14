@@ -74,6 +74,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
       "base_derived",
       "second_derived",
       "unreadable_derived",
+      "schema_unavailable_derived",
       "undeclared_reader",
       "validate_only_derived",
       "daily orders"
@@ -246,7 +247,7 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
       override private[pipeline] def loadResultingState(
           fullTableName: String,
           resultingSnapshotId: Option[Long],
-          resultingSchemaJson: String
+          resultingSchemaJson: Option[String]
       ): DataFrame = throw new IllegalStateException("simulated pinned-state read failure")
     }
 
@@ -264,6 +265,28 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
     result.snapshotId shouldBe defined
     result.resultingSnapshotId shouldBe result.snapshotId
     result.resultingSchemaJson shouldBe defined
+    result.operationId shouldBe defined
+  }
+
+  it should "retain commit evidence when the optional resulting schema cannot be read" in {
+    val executor = new DerivedTableExecutor(icebergConfig) {
+      override private[pipeline] def loadResultingSchemaJson(fullTableName: String): String =
+        throw new IllegalStateException("simulated post-commit schema lookup failure")
+    }
+
+    val result = executor
+      .execute(
+        Seq(derived("schema_unavailable_derived")(_ => Seq((1, "value")).toDF("id", "name"))),
+        "batch_schema_unavailable",
+        Map.empty[String, DataFrame]
+      )
+      .head
+
+    result.success shouldBe true
+    result.dataOutcome.name shouldBe "COMMITTED"
+    result.snapshotId shouldBe defined
+    result.resultingSnapshotId shouldBe result.snapshotId
+    result.resultingSchemaJson shouldBe None
     result.operationId shouldBe defined
   }
 

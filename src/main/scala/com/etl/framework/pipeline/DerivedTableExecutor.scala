@@ -31,6 +31,21 @@ class DerivedTableExecutor(
   private val logger = LoggerFactory.getLogger(getClass)
   private val tableManager = new IcebergTableManager(spark, icebergConfig)
 
+  private[pipeline] def loadResultingSchemaJson(fullTableName: String): String =
+    spark.table(SqlIdentifier.quoteMultipart(fullTableName)).schema.json
+
+  private def loadResultingSchemaJsonSafely(fullTableName: String): Option[String] =
+    try Some(loadResultingSchemaJson(fullTableName))
+    catch {
+      case NonFatal(error) =>
+        logger.warn(
+          s"Unable to read the resulting schema for derived table $fullTableName after reconciling the Iceberg " +
+            "commit; preserving the authoritative snapshot evidence",
+          SensitiveDataRedactor.safeThrowable(error)
+        )
+        None
+    }
+
   /** Ad-hoc convenience API. Platform-managed execution should pass a complete ExecutionRequest. */
   def execute(
       derivedTables: Seq[DerivedTableDefinition],
@@ -116,7 +131,7 @@ class DerivedTableExecutor(
         recordsWritten = write.recordsWritten,
         snapshotId = write.snapshotId,
         resultingSnapshotId = write.resultingSnapshotId,
-        resultingSchemaJson = Some(write.resultingSchemaJson),
+        resultingSchemaJson = write.resultingSchemaJson,
         operationId = Some(commitContext.operationId),
         reconciled = write.reconciled,
         dataOutcome = dataOutcome
@@ -147,13 +162,16 @@ class DerivedTableExecutor(
   private[pipeline] def loadResultingState(
       fullTableName: String,
       resultingSnapshotId: Option[Long],
-      resultingSchemaJson: String
+      resultingSchemaJson: Option[String]
   ): DataFrame =
     resultingSnapshotId match {
       case Some(snapshotId) =>
         spark.read.option("snapshot-id", snapshotId).table(SqlIdentifier.quoteMultipart(fullTableName))
       case None =>
-        val schema = DataType.fromJson(resultingSchemaJson).asInstanceOf[StructType]
+        val schema = resultingSchemaJson
+          .map(DataType.fromJson)
+          .map(_.asInstanceOf[StructType])
+          .getOrElse(throw new IllegalStateException(s"Missing resulting schema for snapshotless table $fullTableName"))
         spark.createDataFrame(spark.sparkContext.emptyRDD[Row], schema)
     }
 
@@ -164,7 +182,7 @@ class DerivedTableExecutor(
       recordsWritten: Long,
       snapshotId: Option[Long],
       resultingSnapshotId: Option[Long],
-      resultingSchemaJson: String,
+      resultingSchemaJson: Option[String],
       reconciled: Boolean
   )
 
@@ -200,7 +218,7 @@ class DerivedTableExecutor(
       val matches = reconcileSnapshots(fullTableName, context, None)
       val committedSnapshot = matches.headOption.map(_.snapshotId)
       val resultingSnapshot = committedSnapshot.orElse(tableManager.getCurrentSnapshotId(fullTableName))
-      val resultingSchemaJson = spark.table(SqlIdentifier.quoteMultipart(fullTableName)).schema.json
+      val resultingSchemaJson = loadResultingSchemaJsonSafely(fullTableName)
       DerivedWrite(recordsWritten, committedSnapshot, resultingSnapshot, resultingSchemaJson, reconciled)
     } finally {
       cachedDf.unpersist()

@@ -8,7 +8,7 @@ The DAG is defined in a YAML configuration file. Floe resolves dependencies, det
 
 ## Architecture
 
-The module validates the DAG configuration, resolves dependencies from join declarations, detects cycles, groups nodes by dependency level, and produces a single lazy DataFrame from the root node. Three join strategies are supported: Nest, Flatten, and Aggregate.
+The module validates the DAG configuration, resolves dependencies from join declarations, detects cycles, groups nodes by dependency level, pins every distinct Iceberg source, and produces a single lazy DataFrame from the root node. Three join strategies are supported: Nest, Flatten, and Aggregate.
 
 DAG nodes can reference any Iceberg table in the catalog, including [derived tables](pipeline-builder.md#derived-tables) produced by the pipeline.
 
@@ -108,7 +108,7 @@ By default, a node reads from `{catalogName}.{namespace}.{sourceFlow}`. If you n
 
 Write `sourceTable` as an unquoted dot-separated identifier. Floe quotes each component before passing it to Spark, so names containing spaces, hyphens, reserved words, or backticks do not require hand-written SQL quoting.
 
-When `sourceTable` is set, `sourceFlow` is not needed. Use one or the other:
+When `sourceTable` is set, `sourceFlow` is not needed. The resolved source must be an Iceberg table; views and non-Iceberg relations are rejected because Floe cannot give them the snapshot-stability guarantee. Use one or the other:
 
 - `sourceFlow: customers` → reads from `{catalogName}.default.customers` (framework-managed table)
 - `sourceTable: "other_catalog.analytics.customers"` → reads from the exact table specified
@@ -243,9 +243,11 @@ The DAG is executed in topological order. YAML and programmatic construction sha
 
 ### Lazy execution boundary
 
-`DAGOrchestrator.execute()` constructs and returns a DataFrame; it does not call a Spark action and does not materialize or cache intermediate nodes. This keeps the library composable and prevents hidden scans, memory pressure, and duplicate work.
+`DAGOrchestrator.execute()` constructs and returns a DataFrame; it does not call a Spark action and does not materialize or cache intermediate nodes. Before returning, it resolves every distinct source exactly once. A source with a current snapshot is read by explicit snapshot ID; a valid table without a snapshot is represented by an empty DataFrame with the schema captured at that boundary. Advancing catalog `main` after `execute()` therefore cannot change the eventual result. If a pinned snapshot expires before the action, the action fails instead of falling back to a newer HEAD.
 
 The caller or external orchestrator owns the terminal action or write. Once materialization starts, Spark—not Floe driver threads—plans stages and task parallelism from the complete physical DAG. The removed `parallelNodes` and `maxParallelNodes` fields are rejected as unknown configuration rather than silently ignored.
+
+Iceberg does not provide an atomic snapshot across multiple tables. Floe captures distinct DAG sources one by one, in deterministic table-name order. If the DAG requires a mutually consistent multi-table boundary, the platform must prevent writes while sources are captured or publish a coordinated set of table states before calling `execute()`. Once captured, each individual source remains stable.
 
 ### Root node
 

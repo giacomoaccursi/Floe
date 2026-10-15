@@ -118,7 +118,7 @@ Every flow maps to a single Iceberg table with the convention:
 {catalogName}.{namespace}.{flowName}
 ```
 
-For example, a flow named `customers` with catalog `floe` and namespace `default` becomes `floe.default.customers`. The namespace is configurable via `iceberg.namespace` in `global.yaml` (defaults to `default`).
+For example, a flow named `customers` with catalog `floe` and namespace `default` becomes `floe.default.customers`. The namespace is configurable via `iceberg.namespace` in `global.yaml` (defaults to `default`). Floe quotes every identifier component consistently for writes, metadata queries, and downstream snapshot reads, so valid unqualified names containing spaces, reserved words, hyphens, or backticks do not require hand-written SQL quoting.
 
 ### Table creation and schema
 

@@ -219,6 +219,8 @@ schema:
 
 When `enforceSchema: true`, `columns` must be non-empty. Column names, physical `sourceColumn` mappings, primary keys, dependencies, and SCD2 metadata names are checked for blanks and ambiguous duplicates before any source is read.
 
+Configured column names are exact top-level identifiers throughout rename, validation, PK/FK processing, Delta/SCD2 writes, and orphan checks. A name such as `customer.id` means one literal column named `customer.id`; it is not parsed as nested-field traversal. Spaces, dots, reserved words, and backticks are quoted internally. Use a transformation when a nested struct field must be projected into a top-level managed column.
+
 ### Column definition
 
 | Field | Required | Default | Description |

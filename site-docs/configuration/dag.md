@@ -72,6 +72,8 @@ nodes:
 
 The join-level `orderBy` and `aggregations[].orderBy` are separate fields. `first` and `last` require a non-empty aggregation-level `orderBy`; the other functions reject it because it would otherwise be ignored. `nestAs` and aggregation aliases must be unique and must not collide with parent columns. Nest and aggregation ordering keys, plus inputs to `min`, `max`, `collect_list`, and `collect_set`, must be Spark-orderable; the nested payload and the value selected by `first`/`last` may contain non-orderable data such as maps. `sum` and `avg` accept numeric or ANSI interval columns only; Floe does not allow Spark to coerce strings implicitly. Collection outputs are sorted by value for deterministic output, and `collect_set` removes duplicates. For an outer-join parent with no matching children, `count` returns `0`, collection functions return `[]`, and nullable scalar aggregates remain `NULL`.
 
+All column-name fields (`select`, join conditions, ordering keys, aggregation inputs, and aliases) identify exact top-level columns. Dots and backticks are treated literally and quoted internally. `filters` is intentionally different: each entry is a Spark SQL expression, so quote special identifiers there with Spark SQL backticks.
+
 ## Fail-fast validation
 
 The same structural validator runs for YAML loading and the programmatic `DAGOrchestrator` API. It rejects blank or case-insensitively duplicated node IDs, ambiguous sources, missing/self join targets, empty or duplicated join conditions, blank filters or column references, strategy-specific fields that would be ignored, and duplicated output aliases. Cycles and multiple terminal roots are rejected while building the execution plan.

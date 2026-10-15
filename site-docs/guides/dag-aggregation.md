@@ -108,6 +108,8 @@ By default, a node reads from `{catalogName}.{namespace}.{sourceFlow}`. If you n
 
 Write `sourceTable` as an unquoted dot-separated identifier. Floe quotes each component before passing it to Spark, so names containing spaces, hyphens, reserved words, or backticks do not require hand-written SQL quoting.
 
+Within a node, configured column-name fields resolve exact top-level columns; for example, `select: [customer.id]` selects one literal column named `customer.id`. Only `filters` contains Spark SQL expressions and therefore requires explicit Spark SQL backticks around special column names.
+
 When `sourceTable` is set, `sourceFlow` is not needed. The resolved source must be an Iceberg table; views and non-Iceberg relations are rejected because Floe cannot give them the snapshot-stability guarantee. Use one or the other:
 
 - `sourceFlow: customers` → reads from `{catalogName}.default.customers` (framework-managed table)

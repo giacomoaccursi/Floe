@@ -27,11 +27,12 @@ class DAGOrchestrator(
 
   def execute(): DataFrame = {
     logger.info("Preparing lazy DAG DataFrame")
+    val plan = buildExecutionPlan()
     val joinExecutor = new JoinStrategyExecutor()
     val nodeProcessor =
       new DAGNodeProcessor(joinExecutor, globalConfig.iceberg.catalogName, globalConfig.iceberg.namespace)
+    nodeProcessor.prepareSources(plan.groups.flatMap(_.nodes))
     val dagExecutor = new DAGExecutor(nodeProcessor)
-    val plan = buildExecutionPlan()
     dagExecutor.execute(plan)
   }
 }

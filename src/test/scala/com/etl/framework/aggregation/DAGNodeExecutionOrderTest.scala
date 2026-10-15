@@ -2,6 +2,7 @@ package com.etl.framework.aggregation
 
 import com.etl.framework.config._
 import com.etl.framework.exceptions.{CircularDependencyException, ValidationConfigException}
+import com.etl.framework.util.SqlIdentifier
 import org.apache.spark.sql.SparkSession
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -115,7 +116,14 @@ class DAGNodeExecutionOrderTest extends AnyFlatSpec with Matchers {
         )
       )
 
-      val result = new DAGOrchestrator(createDagConfig(Seq(childNode, rootNode)), globalConfig).execute()
+      val orchestrator = new DAGOrchestrator(createDagConfig(Seq(childNode, rootNode)), globalConfig)
+      val processor = new DAGNodeProcessor(
+        new JoinStrategyExecutor(),
+        globalConfig.iceberg.catalogName,
+        globalConfig.iceberg.namespace,
+        Some(tableName => spark.table(SqlIdentifier.quoteMultipart(tableName)))
+      )
+      val result = new DAGExecutor(processor).execute(orchestrator.buildExecutionPlan())
 
       result.select("id", "name", "city").as[(Int, String, String)].head() shouldBe ((1, "Alice", "Rome"))
     } finally {

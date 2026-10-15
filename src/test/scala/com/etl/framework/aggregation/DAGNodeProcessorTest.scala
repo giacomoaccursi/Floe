@@ -1,6 +1,7 @@
 package com.etl.framework.aggregation
 
 import com.etl.framework.config._
+import com.etl.framework.util.SqlIdentifier
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
@@ -22,7 +23,11 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
   import spark.implicits._
 
   private val joinExecutor = new JoinStrategyExecutor()
-  private val processor = new DAGNodeProcessor(joinExecutor, "test_catalog")
+  private val processor = new DAGNodeProcessor(
+    joinExecutor,
+    "test_catalog",
+    sourceLoader = Some(tableName => spark.table(SqlIdentifier.quoteMultipart(tableName)))
+  )
 
   private var parquetDir: java.nio.file.Path = _
 
@@ -123,6 +128,27 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
     } finally {
       val _ = spark.sql("DROP VIEW IF EXISTS `test-order-items`")
     }
+  }
+
+  it should "resolve the same source only once when multiple nodes reference it" in {
+    var loads = 0
+    val countingProcessor = new DAGNodeProcessor(
+      joinExecutor,
+      "test_catalog",
+      sourceLoader = Some { tableName =>
+        loads += 1
+        spark.table(SqlIdentifier.quoteMultipart(tableName))
+      }
+    )
+    val nodes = Seq(
+      DAGNode(id = "customers_a", sourceTable = Some("test_customers_table")),
+      DAGNode(id = "customers_b", sourceTable = Some("test_customers_table"))
+    )
+
+    countingProcessor.prepareSources(nodes)
+    nodes.foreach(node => countingProcessor.executeNode(node, Map.empty))
+
+    loads shouldBe 1
   }
 
   it should "throw an exception when join parent is not found in node results" in {

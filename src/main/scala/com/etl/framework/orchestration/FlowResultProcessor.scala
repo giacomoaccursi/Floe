@@ -3,7 +3,7 @@ package com.etl.framework.orchestration
 import com.etl.framework.config.{FlowConfig, GlobalConfig, LoadMode}
 import com.etl.framework.orchestration.batch.FlowGroupExecutor
 import com.etl.framework.orchestration.flow.FlowResult
-import com.etl.framework.util.SensitiveDataRedactor
+import com.etl.framework.util.{SensitiveDataRedactor, SqlIdentifier}
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.functions.col
@@ -81,7 +81,8 @@ class FlowResultProcessor(
     val tableName = globalConfig.iceberg.fullTableName(result.flowName)
     try {
       val table = result.resultingSnapshotId match {
-        case Some(snapshotId) => spark.read.option("snapshot-id", snapshotId).table(tableName)
+        case Some(snapshotId) =>
+          spark.read.option("snapshot-id", snapshotId).table(SqlIdentifier.quoteMultipart(tableName))
         case None =>
           val schema = result.resultingSchemaJson
             .map(json => DataType.fromJson(json).asInstanceOf[StructType])

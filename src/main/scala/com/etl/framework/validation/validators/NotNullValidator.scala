@@ -1,9 +1,9 @@
 package com.etl.framework.validation.validators
 
 import com.etl.framework.config.{FlowConfig, ValidationRule}
+import com.etl.framework.util.SparkColumn
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.col
 
 /** Validator for not-null constraints Validates that non-nullable columns don't contain null values
   */
@@ -18,7 +18,7 @@ class NotNullValidator(flowConfig: FlowConfig, flowName: Option[String] = None)
     if (notNullColumns.isEmpty) {
       ValidationUtils.validResult(df)
     } else {
-      val nullCondition = notNullColumns.map(c => col(c).isNull).reduce(_ || _)
+      val nullCondition = notNullColumns.map(c => SparkColumn(c).isNull).reduce(_ || _)
 
       val rejectedDf = df.filter(nullCondition)
       val validDf = df.filter(!nullCondition)

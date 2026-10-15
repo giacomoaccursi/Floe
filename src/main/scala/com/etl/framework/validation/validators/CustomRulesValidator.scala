@@ -3,6 +3,7 @@ package com.etl.framework.validation.validators
 import com.etl.framework.config.{DomainsConfig, FlowConfig, OnFailureAction, ValidationRule}
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils, Validator, ValidatorFactory}
 import com.etl.framework.validation.ValidationColumns._
+import com.etl.framework.util.SparkColumn
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.DataFrame
 
@@ -30,8 +31,8 @@ class CustomRulesValidator(
 
           val (dfForValidation, nullRows) =
             if (skipNull && targetColumn.isDefined) {
-              val nulls = currentDf.filter(col(targetColumn.get).isNull)
-              val nonNulls = currentDf.filter(col(targetColumn.get).isNotNull)
+              val nulls = currentDf.filter(SparkColumn(targetColumn.get).isNull)
+              val nonNulls = currentDf.filter(SparkColumn(targetColumn.get).isNotNull)
               (nonNulls, Some(nulls))
             } else {
               (currentDf, None)
@@ -79,7 +80,7 @@ class CustomRulesValidator(
     )
 
     failedDf
-      .select(pkSelect.map(col): _*)
+      .select(pkSelect.map(SparkColumn(failedDf, _)): _*)
       .withColumn(WARNING_RULE, lit(rule.`type`.name))
       .withColumn(WARNING_MESSAGE, lit(warningMessage))
       .withColumn(WARNING_COLUMN, lit(rule.column.getOrElse("unknown")))

@@ -2,6 +2,7 @@ package com.etl.framework.validation.validators
 
 import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.config.{DomainsConfig, ValidationRule}
+import com.etl.framework.util.SparkColumn
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Column
@@ -63,10 +64,10 @@ class DomainValidator(
     // Build condition based on case sensitivity
     val caseSensitive = domainConfig.caseSensitive
     if (caseSensitive) {
-      col(column).isin(domainValues: _*)
+      SparkColumn(column).isin(domainValues: _*)
     } else {
       val lowerValues = domainValues.map(_.toLowerCase(Locale.ROOT))
-      lower(col(column)).isin(lowerValues: _*)
+      lower(SparkColumn(column)).isin(lowerValues: _*)
     }
   }
 }

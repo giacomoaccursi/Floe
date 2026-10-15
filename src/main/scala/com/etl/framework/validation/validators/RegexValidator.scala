@@ -2,8 +2,8 @@ package com.etl.framework.validation.validators
 
 import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.config.ValidationRule
+import com.etl.framework.util.SparkColumn
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Column
 
 import scala.util.control.NonFatal
@@ -45,6 +45,6 @@ class RegexValidator(flowName: Option[String] = None) extends BaseValidator(flow
         )
     }
 
-    col(column).rlike(pattern)
+    SparkColumn(column).rlike(pattern)
   }
 }

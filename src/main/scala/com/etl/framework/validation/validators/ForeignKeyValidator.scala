@@ -2,6 +2,7 @@ package com.etl.framework.validation.validators
 
 import com.etl.framework.config.{FlowConfig, ForeignKeyConfig, ValidationRule}
 import com.etl.framework.exceptions.ValidationConfigException
+import com.etl.framework.util.SparkColumn
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, lit}
@@ -29,7 +30,7 @@ class ForeignKeyValidator(
           .distinct
           .flatMap { case (refFlow, refCols) =>
             validatedFlows.get(refFlow).map { refDf =>
-              (refFlow, refCols) -> refDf.select(refCols.map(col): _*).distinct()
+              (refFlow, refCols) -> refDf.select(refCols.map(SparkColumn(refDf, _)): _*).distinct()
             }
           }
           .toMap
@@ -55,8 +56,8 @@ class ForeignKeyValidator(
       refKeys: DataFrame
   ): ValidationStepResult = {
     // Exclude rows where ANY FK column is NULL (standard SQL semantics)
-    val nonNullCondition = fk.columns.map(c => col(c).isNotNull).reduce(_ && _)
-    val nullCondition = fk.columns.map(c => col(c).isNull).reduce(_ || _)
+    val nonNullCondition = fk.columns.map(c => SparkColumn(c).isNotNull).reduce(_ && _)
+    val nullCondition = fk.columns.map(c => SparkColumn(c).isNull).reduce(_ || _)
     val nonNullCurrentDf = currentDf.filter(nonNullCondition)
 
     // Project reference keys under per-validation aliases so source columns can use any non-reserved name.
@@ -70,12 +71,18 @@ class ForeignKeyValidator(
     val referenceAliases = renamedPairs.indices.map(index => s"__floe_fk_ref_${index}_$suffix")
     val markerColumn = s"__floe_fk_exists_$suffix"
     val markedRef = refKeys
-      .select(renamedPairs.zip(referenceAliases).map { case ((_, refCol), alias) => col(refCol).as(alias) }: _*)
+      .select(
+        renamedPairs.zip(referenceAliases).map { case ((_, refCol), alias) =>
+          SparkColumn(refKeys, refCol).as(alias)
+        }: _*
+      )
       .withColumn(markerColumn, lit(true))
 
     val joinCondition = renamedPairs
       .zip(referenceAliases)
-      .map { case ((localCol, _), alias) => nonNullCurrentDf(localCol) === markedRef(alias) }
+      .map { case ((localCol, _), alias) =>
+        SparkColumn(nonNullCurrentDf, localCol) === SparkColumn(markedRef, alias)
+      }
       .reduce(_ && _)
 
     val refColsToDrop = referenceAliases

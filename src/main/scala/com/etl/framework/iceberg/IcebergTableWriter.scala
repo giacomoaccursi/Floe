@@ -1,7 +1,7 @@
 package com.etl.framework.iceberg
 
 import com.etl.framework.config.{FlowConfig, IcebergConfig}
-import com.etl.framework.util.SqlIdentifier
+import com.etl.framework.util.{SparkColumn, SqlIdentifier}
 import org.apache.iceberg.exceptions.CommitStateUnknownException
 import org.apache.iceberg.spark.CommitMetadata
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -59,12 +59,12 @@ class IcebergTableWriter(
     val missing = pkColumns.filterNot(df.columns.contains)
     require(missing.isEmpty, s"MERGE key columns missing from source: ${missing.mkString(", ")}")
 
-    val nullKey = pkColumns.map(c => col(c).isNull).reduce(_ || _)
+    val nullKey = pkColumns.map(c => SparkColumn(c).isNull).reduce(_ || _)
     require(df.filter(nullKey).limit(1).count() == 0L, "MERGE source contains a NULL primary key")
 
     val duplicateCountCol = s"__floe_merge_key_count_${UUID.randomUUID().toString.replace("-", "")}"
     val hasDuplicateKey = df
-      .groupBy(pkColumns.map(col): _*)
+      .groupBy(pkColumns.map(SparkColumn(df, _)): _*)
       .agg(count(lit(1)).as(duplicateCountCol))
       .filter(col(duplicateCountCol) > 1L)
       .limit(1)
@@ -326,13 +326,13 @@ class IcebergTableWriter(
   private def validateSCD2CurrentRows(tableName: String, cfg: SCD2Config): Unit = {
     val current = spark
       .table(SqlIdentifier.quoteMultipart(tableName))
-      .filter(col(cfg.isCurrentCol) === true)
+      .filter(SparkColumn(cfg.isCurrentCol) === true)
 
-    val nullPrimaryKey = cfg.pkColumns.map(column => col(column).isNull).reduce(_ || _)
+    val nullPrimaryKey = cfg.pkColumns.map(column => SparkColumn(column).isNull).reduce(_ || _)
     val invalidOpenVersion =
-      nullPrimaryKey || col(cfg.validFromCol).isNull || col(cfg.validToCol).isNotNull
+      nullPrimaryKey || SparkColumn(cfg.validFromCol).isNull || SparkColumn(cfg.validToCol).isNotNull
     val invalidActiveState =
-      if (cfg.detectDeletes) cfg.isActiveCol.map(column => !col(column).eqNullSafe(lit(true)))
+      if (cfg.detectDeletes) cfg.isActiveCol.map(column => !SparkColumn(column).eqNullSafe(lit(true)))
       else None
     val hasInvalidCurrentRow = current
       .filter(invalidActiveState.fold(invalidOpenVersion)(invalidOpenVersion || _))
@@ -346,7 +346,7 @@ class IcebergTableWriter(
 
     val duplicateCountColumn = s"__floe_current_count_${UUID.randomUUID().toString.replace("-", "")}"
     val hasDuplicateCurrentKey = current
-      .groupBy(cfg.pkColumns.map(col): _*)
+      .groupBy(cfg.pkColumns.map(SparkColumn(current, _)): _*)
       .agg(count(lit(1)).as(duplicateCountColumn))
       .filter(col(duplicateCountColumn) > 1L)
       .limit(1)
@@ -368,13 +368,13 @@ class IcebergTableWriter(
   ): Unit = {
     val source = df.alias("source")
     val targetTable = spark.table(SqlIdentifier.quoteMultipart(tableName))
-    val target = targetTable.filter(col(cfg.isCurrentCol) === true).alias("target")
+    val target = targetTable.filter(SparkColumn(cfg.isCurrentCol) === true).alias("target")
     val keyCondition = cfg.pkColumns
-      .map(column => source.col(column).eqNullSafe(target.col(column)))
+      .map(column => SparkColumn(source, column).eqNullSafe(SparkColumn(target, column)))
       .reduce(_ && _)
-    val boundaryViolation = target.col(cfg.validFromCol) >= expr(timestampLiteral(commitContext))
+    val boundaryViolation = SparkColumn(target, cfg.validFromCol) >= expr(timestampLiteral(commitContext))
     val changedCondition = cfg.compareColumns
-      .map(column => !source.col(column).eqNullSafe(target.col(column)))
+      .map(column => !SparkColumn(source, column).eqNullSafe(SparkColumn(target, column)))
       .reduce(_ || _)
 
     val invalidChangedVersion = target
@@ -397,13 +397,13 @@ class IcebergTableWriter(
     // Such a source row will be inserted as a new current version; reject it if that insertion would overlap or share
     // an effective instant with any existing version for the same key.
     val sourceWithoutCurrent = source.join(target, keyCondition, "left_anti").alias("source_without_current")
-    val history = targetTable.filter(col(cfg.isCurrentCol) === false).alias("history")
+    val history = targetTable.filter(SparkColumn(cfg.isCurrentCol) === false).alias("history")
     val historyKeyCondition = cfg.pkColumns
-      .map(column => sourceWithoutCurrent.col(column).eqNullSafe(history.col(column)))
+      .map(column => SparkColumn(sourceWithoutCurrent, column).eqNullSafe(SparkColumn(history, column)))
       .reduce(_ && _)
     val historicalBoundaryViolation =
-      history.col(cfg.validFromCol) >= expr(timestampLiteral(commitContext)) ||
-        history.col(cfg.validToCol) >= expr(timestampLiteral(commitContext))
+      SparkColumn(history, cfg.validFromCol) >= expr(timestampLiteral(commitContext)) ||
+        SparkColumn(history, cfg.validToCol) >= expr(timestampLiteral(commitContext))
     val invalidResumption = history
       .join(sourceWithoutCurrent, historyKeyCondition, "inner")
       .filter(historicalBoundaryViolation)

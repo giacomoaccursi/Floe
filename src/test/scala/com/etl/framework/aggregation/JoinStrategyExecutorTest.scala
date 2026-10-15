@@ -357,6 +357,21 @@ class JoinStrategyExecutorTest extends AnyFlatSpec with Matchers {
     result.columns shouldBe Array("id", "name", "city")
   }
 
+  it should "treat dotted join and payload names as literal columns" in {
+    val parent = Seq((1, "Alice")).toDF("account.id", "display.name")
+    val child = Seq((1, "Rome")).toDF("account.id", "home.city")
+    import com.etl.framework.config.JoinType._
+
+    val result = executor.applyJoin(
+      parent,
+      child,
+      JoinConfig(Inner, "child", Seq(JoinCondition("account.id", "account.id")), Flatten)
+    )
+
+    result.columns shouldBe Array("account.id", "display.name", "home.city")
+    result.select("`home.city`").as[String].collect().toSeq shouldBe Seq("Rome")
+  }
+
   it should "reject joins without conditions before building a Spark expression" in {
     val parent = Seq((1, "Alice")).toDF("id", "name")
     val child = Seq((1, "Rome")).toDF("parent_id", "city")

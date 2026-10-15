@@ -34,4 +34,14 @@ class PrimaryKeyValidatorRegressionTest extends AnyFlatSpec with Matchers {
     result.valid.select("_pk_invalid").collect().map(_.getString(0)).toSeq shouldBe Seq("kept")
     result.rejected.get.columns should contain("_pk_invalid")
   }
+
+  it should "treat a dotted primary-key name as one literal column" in {
+    val input = Seq((1, "first"), (1, "duplicate"), (2, "kept")).toDF("account.id", "payload")
+    val config = TestFixtures.flowConfig("dotted_pk", primaryKey = Seq("account.id"))
+
+    val result = new ValidationEngine().validate(input, config)
+
+    result.valid.select("`account.id`").collect().map(_.getInt(0)).toSeq shouldBe Seq(2)
+    result.rejected.get.count() shouldBe 2L
+  }
 }

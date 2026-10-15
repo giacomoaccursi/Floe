@@ -157,6 +157,22 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     rows(1).getString(1) shouldBe "Robert"
   }
 
+  it should "treat a dotted delta key as one literal column" in {
+    val fc = flowConfig(
+      "dotted_delta_key",
+      loadMode = LoadMode.Delta,
+      primaryKey = Seq("account.id")
+    )
+    writer.writeDeltaLoad(Seq((1, "Alice"), (2, "Bob")).toDF("account.id", "name"), fc)
+    writer.writeDeltaLoad(Seq((2, "Robert"), (3, "Charlie")).toDF("account.id", "name"), fc)
+
+    val rows = spark
+      .sql("SELECT `account.id`, name FROM writer_catalog.default.dotted_delta_key ORDER BY `account.id`")
+      .collect()
+    rows.map(_.getInt(0)) shouldBe Array(1, 2, 3)
+    rows(1).getString(1) shouldBe "Robert"
+  }
+
   it should "reject duplicate source keys before a delta MERGE" in {
     val fc = flowConfig("delta_duplicate_source", loadMode = LoadMode.Delta)
     val duplicates = Seq((1, "Alice"), (1, "Alice_v2")).toDF("id", "name")
@@ -205,6 +221,26 @@ class IcebergTableWriterTest extends AnyFlatSpec with Matchers with BeforeAndAft
     readBack.count() shouldBe 2
     readBack.filter("is_current = true").count() shouldBe 2
     readBack.filter("valid_to IS NULL").count() shouldBe 2
+  }
+
+  it should "treat dotted SCD2 keys and comparison columns as literal names" in {
+    val fc = flowConfig(
+      "dotted_scd2_columns",
+      loadMode = LoadMode.SCD2,
+      primaryKey = Seq("account.id"),
+      compareColumns = Seq("display.name")
+    )
+    writer.writeSCD2Load(Seq((1, "Alice")).toDF("account.id", "display.name"), fc)
+    writer.writeSCD2Load(Seq((1, "Alicia")).toDF("account.id", "display.name"), fc)
+
+    val rows = spark
+      .sql(
+        "SELECT `display.name`, is_current FROM writer_catalog.default.dotted_scd2_columns " +
+          "ORDER BY valid_from"
+      )
+      .collect()
+    rows.map(_.getString(0)) shouldBe Array("Alice", "Alicia")
+    rows.map(_.getBoolean(1)) shouldBe Array(false, true)
   }
 
   it should "create new versions for changed records" in {

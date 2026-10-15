@@ -62,4 +62,24 @@ class ForeignKeyValidatorRegressionTest extends AnyFlatSpec with Matchers {
       Seq("source-marker" -> "source-reference")
     result.rejected.get.columns should contain allOf ("_fk_ref_exists", "_fk_ref_parent_id")
   }
+
+  it should "treat dotted foreign-key names as literal columns" in {
+    val flowConfig = TestFixtures.flowConfig(
+      name = "child_with_dotted_key",
+      primaryKey = Seq("child.id"),
+      foreignKeys = Seq(
+        ForeignKeyConfig(
+          columns = Seq("parent.id"),
+          references = ReferenceConfig(flow = "parent", columns = Seq("parent.id"))
+        )
+      )
+    )
+    val parents = Seq(1).toDF("parent.id")
+    val children = Seq((10, 1), (11, 2)).toDF("child.id", "parent.id")
+
+    val result = new ValidationEngine().validate(children, flowConfig, Map("parent" -> parents))
+
+    result.valid.select("`child.id`").collect().map(_.getInt(0)).toSeq shouldBe Seq(10)
+    result.rejected.get.select("`child.id`").collect().map(_.getInt(0)).toSeq shouldBe Seq(11)
+  }
 }

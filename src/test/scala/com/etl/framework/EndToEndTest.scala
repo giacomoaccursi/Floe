@@ -573,6 +573,56 @@ class EndToEndTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     df.count() shouldBe 2
   }
 
+  it should "rename and validate literal dotted column names" in {
+    val configDir = tempDir.resolve("e2e_dotted_rename").resolve("config")
+    val dataDir = tempDir.resolve("e2e_dotted_rename").resolve("data")
+
+    setupConfig(configDir)
+    writeFile(
+      configDir.resolve("flows").resolve("dotted_customers.yaml"),
+      s"""
+         |name: dotted_customers
+         |source:
+         |  path: "${dataDir.resolve("dotted_customers")}"
+         |  format: csv
+         |  options:
+         |    header: "true"
+         |schema:
+         |  enforceSchema: true
+         |  columns:
+         |    - name: customer.id
+         |      type: string
+         |      nullable: false
+         |      sourceColumn: Raw.ID
+         |    - name: display.name
+         |      type: string
+         |      nullable: true
+         |      sourceColumn: Raw.Name
+         |loadMode:
+         |  type: full
+         |validation:
+         |  primaryKey: [customer.id]
+         |""".stripMargin
+    )
+
+    import spark.implicits._
+    Seq(("1", "Alice"), ("2", "Bob"))
+      .toDF("Raw.ID", "Raw.Name")
+      .write
+      .mode("overwrite")
+      .format("csv")
+      .option("header", "true")
+      .save(dataDir.resolve("dotted_customers").toString)
+
+    val result = IngestionPipeline.builder().withConfigDirectory(configDir.toString).build().execute()
+
+    result.success shouldBe true
+    val rows = spark
+      .sql("SELECT `customer.id`, `display.name` FROM floe.default.dotted_customers ORDER BY `customer.id`")
+      .collect()
+    rows.map(_.getString(0)) shouldBe Array("1", "2")
+  }
+
   it should "leave a full-load table unchanged when the rejection threshold fails" in {
     val configDir = tempDir.resolve("e2e_threshold").resolve("config")
     val dataDir = tempDir.resolve("e2e_threshold").resolve("data")

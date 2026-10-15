@@ -2,6 +2,7 @@ package com.etl.framework.aggregation
 
 import com.etl.framework.config.JoinConfig
 import com.etl.framework.exceptions.ValidationConfigException
+import com.etl.framework.util.SparkColumn
 import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{
@@ -67,8 +68,8 @@ class JoinStrategyExecutor {
     val orderFieldNames = joinConfig.orderBy.indices.map(index => s"__floe_nest_order_$index")
     val sortableEntry = struct(
       (joinConfig.orderBy.zip(orderFieldNames).map { case (columnName, fieldName) =>
-        right(columnName).as(fieldName)
-      } :+ struct(right.columns.map(right(_)): _*).as(payloadFieldName)): _*
+        SparkColumn(right, columnName).as(fieldName)
+      } :+ struct(right.columns.map(SparkColumn(right, _)): _*).as(payloadFieldName)): _*
     )
     val sortedEntries = array_sort(
       collect_list(sortableEntry),
@@ -77,14 +78,14 @@ class JoinStrategyExecutor {
     val nestedPayloads = transform(sortedEntries, entry => entry.getField(payloadFieldName))
 
     val groupedRight = right
-      .groupBy(rightJoinKeys.map(right(_)): _*)
+      .groupBy(rightJoinKeys.map(SparkColumn(right, _)): _*)
       .agg(nestedPayloads.as(nestFieldName))
 
     val joined = left.join(
       groupedRight,
       joinConfig.conditions
         .map { cond =>
-          left(cond.left) === groupedRight(cond.right)
+          SparkColumn(left, cond.left) === SparkColumn(groupedRight, cond.right)
         }
         .reduce(_ && _),
       joinConfig.`type`.sparkType
@@ -94,7 +95,7 @@ class JoinStrategyExecutor {
     // has the same name in both parent and groupedRight
     val columnsToKeep = selectParentColumns(left, groupedRight, joinConfig) :+
       coalesce(
-        joined(nestFieldName),
+        SparkColumn(joined, nestFieldName),
         array().cast(joined.schema(nestFieldName).dataType)
       ).as(nestFieldName)
 
@@ -129,7 +130,7 @@ class JoinStrategyExecutor {
     }
 
     val joinExpr = joinConfig.conditions
-      .map { cond => left(cond.left) === renamedRight(cond.right) }
+      .map { cond => SparkColumn(left, cond.left) === SparkColumn(renamedRight, cond.right) }
       .reduce(_ && _)
 
     val joined = left.join(renamedRight, joinExpr, joinConfig.`type`.sparkType)
@@ -137,7 +138,7 @@ class JoinStrategyExecutor {
     val finalRightColumns = rightDataColumns.map { rightCol =>
       val outputName =
         if (leftColumns.contains(normalizeColumnName(rightCol, caseSensitive))) s"$prefix$rightCol" else rightCol
-      renamedRight(outputName)
+      SparkColumn(renamedRight, outputName)
     }
 
     // Preserve parent column order, append child columns after
@@ -162,15 +163,15 @@ class JoinStrategyExecutor {
     val aggExprs = joinConfig.aggregations.map { aggSpec =>
       import com.etl.framework.config.AggregationFunction._
       val aggFunc = aggSpec.function match {
-        case Sum         => sum(right(aggSpec.column))
-        case Count       => count(right(aggSpec.column))
-        case Avg         => avg(right(aggSpec.column))
-        case Min         => min(right(aggSpec.column))
-        case Max         => max(right(aggSpec.column))
-        case First       => min_by(right(aggSpec.column), orderingColumn(right, aggSpec))
-        case Last        => max_by(right(aggSpec.column), orderingColumn(right, aggSpec))
-        case CollectList => sort_array(collect_list(right(aggSpec.column)))
-        case CollectSet  => sort_array(collect_set(right(aggSpec.column)))
+        case Sum         => sum(SparkColumn(right, aggSpec.column))
+        case Count       => count(SparkColumn(right, aggSpec.column))
+        case Avg         => avg(SparkColumn(right, aggSpec.column))
+        case Min         => min(SparkColumn(right, aggSpec.column))
+        case Max         => max(SparkColumn(right, aggSpec.column))
+        case First       => min_by(SparkColumn(right, aggSpec.column), orderingColumn(right, aggSpec))
+        case Last        => max_by(SparkColumn(right, aggSpec.column), orderingColumn(right, aggSpec))
+        case CollectList => sort_array(collect_list(SparkColumn(right, aggSpec.column)))
+        case CollectSet  => sort_array(collect_set(SparkColumn(right, aggSpec.column)))
       }
       aggFunc.as(aggSpec.alias)
     }
@@ -182,14 +183,14 @@ class JoinStrategyExecutor {
     }
 
     val aggregatedRight = right
-      .groupBy(rightJoinKeys.map(right(_)): _*)
+      .groupBy(rightJoinKeys.map(SparkColumn(right, _)): _*)
       .agg(aggExprs.head, aggExprs.tail: _*)
 
     val result = left.join(
       aggregatedRight,
       joinConfig.conditions
         .map { cond =>
-          left(cond.left) === aggregatedRight(cond.right)
+          SparkColumn(left, cond.left) === SparkColumn(aggregatedRight, cond.right)
         }
         .reduce(_ && _),
       joinConfig.`type`.sparkType
@@ -208,7 +209,7 @@ class JoinStrategyExecutor {
   ): Column = {
     import com.etl.framework.config.AggregationFunction.{CollectList, CollectSet, Count}
 
-    val output = aggregatedRight(spec.alias)
+    val output = SparkColumn(aggregatedRight, spec.alias)
     spec.function match {
       case Count => coalesce(output, lit(0L)).as(spec.alias)
       case CollectList | CollectSet =>
@@ -226,8 +227,8 @@ class JoinStrategyExecutor {
       throw ValidationConfigException(
         s"Aggregation '${spec.alias}' orderBy columns not found: ${missing.mkString(", ")}"
       )
-    if (spec.orderBy.size == 1) right(spec.orderBy.head)
-    else struct(spec.orderBy.map(right(_)): _*)
+    if (spec.orderBy.size == 1) SparkColumn(right, spec.orderBy.head)
+    else struct(spec.orderBy.map(SparkColumn(right, _)): _*)
   }
 
   private def rejectOutputNameCollisions(left: DataFrame, outputNames: Seq[String], strategy: String): Unit = {
@@ -412,9 +413,9 @@ class JoinStrategyExecutor {
       }
       if (preserveRightKeys)
         matchingCondition
-          .map(condition => coalesce(left(leftColumn), right(condition.right)).as(leftColumn))
-          .getOrElse(left(leftColumn))
-      else left(leftColumn)
+          .map(condition => coalesce(SparkColumn(left, leftColumn), SparkColumn(right, condition.right)).as(leftColumn))
+          .getOrElse(SparkColumn(left, leftColumn))
+      else SparkColumn(left, leftColumn)
     }
   }
 

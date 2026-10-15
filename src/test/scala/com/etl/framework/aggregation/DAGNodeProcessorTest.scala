@@ -102,6 +102,24 @@ class DAGNodeProcessorTest extends AnyFlatSpec with Matchers with BeforeAndAfter
     result.columns should not contain "amount"
   }
 
+  it should "treat dotted select entries as literal column names" in {
+    Seq((1, "Alice")).toDF("customer.id", "display.name").createOrReplaceTempView("dotted_customers")
+    try {
+      val node = DAGNode(
+        id = "dotted_customers",
+        sourceTable = Some("dotted_customers"),
+        select = Seq("customer.id")
+      )
+
+      val result = processor.executeNode(node, Map.empty)
+
+      result.columns shouldBe Array("customer.id")
+      result.select("`customer.id`").as[Int].head() shouldBe 1
+    } finally {
+      val _ = spark.catalog.dropTempView("dotted_customers")
+    }
+  }
+
   it should "use sourceTable when explicitly provided" in {
     val node = DAGNode(
       id = "customers",

@@ -2,6 +2,7 @@ package com.etl.framework.validation.validators
 
 import com.etl.framework.exceptions.ValidationConfigException
 import com.etl.framework.config.{NumericBound, ValidationRule}
+import com.etl.framework.util.SparkColumn
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Column
@@ -58,8 +59,8 @@ class RangeValidator(flowName: Option[String] = None) extends BaseValidator(flow
     // promotes String/Decimal comparisons to Double, so numeric strings are explicitly
     // cast to the widest Decimal that can still represent the configured bounds.
     val valueColumn = df.schema(column).dataType match {
-      case StringType => col(column).cast(decimalTypeFor(parsedBounds))
-      case _          => col(column)
+      case StringType => SparkColumn(column).cast(decimalTypeFor(parsedBounds))
+      case _          => SparkColumn(column)
     }
 
     val minCondition = parsedMin

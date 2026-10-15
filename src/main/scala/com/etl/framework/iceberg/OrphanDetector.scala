@@ -1,13 +1,12 @@
 package com.etl.framework.iceberg
 
 import com.etl.framework.config._
-import com.etl.framework.util.{SensitiveDataRedactor, SqlIdentifier}
+import com.etl.framework.util.{SensitiveDataRedactor, SparkColumn, SqlIdentifier}
 import com.etl.framework.orchestration.{DataOutcome, ExecutionPlan}
 import com.etl.framework.orchestration.flow.FlowResult
 import org.apache.iceberg.spark.Spark3Util
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-import org.apache.spark.sql.functions.col
 import org.slf4j.LoggerFactory
 
 import java.util.UUID
@@ -125,7 +124,7 @@ class OrphanDetector(
       case Some(cascadedKeys) =>
         val refCols = fk.references.columns
         if (refCols.forall(cascadedKeys.columns.contains)) {
-          Some(cascadedKeys.select(refCols.map(col): _*).distinct())
+          Some(cascadedKeys.select(refCols.map(SparkColumn(cascadedKeys, _)): _*).distinct())
         } else None
       case None =>
         findRemovedKeysViaTimeTravel(parentCfg, parentResult, fk)
@@ -190,11 +189,11 @@ class OrphanDetector(
             case LoadMode.SCD2 =>
               val isCurrentCol = parentCfg.loadMode.isCurrentColumn.getOrElse("is_current")
               resultingParent
-                .filter(col(isCurrentCol) === true)
-                .select(refCols.map(col): _*)
+                .filter(SparkColumn(isCurrentCol) === true)
+                .select(refCols.map(SparkColumn(resultingParent, _)): _*)
                 .distinct()
             case _ =>
-              resultingParent.select(refCols.map(col): _*).distinct()
+              resultingParent.select(refCols.map(SparkColumn(resultingParent, _)): _*).distinct()
           }
 
           val removed = previousPKs.join(currentPKs, refCols, "left_anti")
@@ -232,7 +231,9 @@ class OrphanDetector(
 
     // Project every reference column to its child name in one operation. Sequential renames are unsafe when names
     // cross (for example parent (a, b) -> child (b, a)) because an intermediate DataFrame contains duplicates.
-    val renamedKeys = removedParentKeys.select(colPairs.map { case (fkCol, refCol) => col(refCol).as(fkCol) }: _*)
+    val renamedKeys = removedParentKeys.select(colPairs.map { case (fkCol, refCol) =>
+      SparkColumn(removedParentKeys, refCol).as(fkCol)
+    }: _*)
 
     // Select only FK + PK columns from child table instead of SELECT *
     val childPkCols = childFlow.validation.primaryKey
@@ -248,12 +249,12 @@ class OrphanDetector(
     }
     val currentChild = childFlow.loadMode.`type` match {
       case LoadMode.SCD2 =>
-        childTable.filter(col(childFlow.loadMode.isCurrentColumn.getOrElse("is_current")) === true)
+        childTable.filter(SparkColumn(childFlow.loadMode.isCurrentColumn.getOrElse("is_current")) === true)
       case _ => childTable
     }
     val childTableCols = childTable.columns.toSet
     val columnsNeeded = (fkCols ++ childPkCols).distinct.filter(childTableCols.contains)
-    val childProjection = currentChild.select(columnsNeeded.map(col): _*)
+    val childProjection = currentChild.select(columnsNeeded.map(SparkColumn(currentChild, _)): _*)
     val orphans = childProjection.join(renamedKeys, fkCols, "inner")
 
     fk.onOrphan match {
@@ -281,7 +282,7 @@ class OrphanDetector(
         // Use localCheckpoint to break lineage dependency on the parent removed-keys DataFrame,
         // which will be unpersisted by the caller after this method returns.
         val cascadeCols = columnsNeeded
-        val cachedOrphans = orphans.select(cascadeCols.map(col): _*).distinct().localCheckpoint()
+        val cachedOrphans = orphans.select(cascadeCols.map(SparkColumn(orphans, _)): _*).distinct().localCheckpoint()
         val orphanCount = cachedOrphans.count()
         if (orphanCount == 0) {
           cachedOrphans.unpersist()

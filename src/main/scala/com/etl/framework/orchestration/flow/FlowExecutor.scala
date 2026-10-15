@@ -5,10 +5,9 @@ import com.etl.framework.iceberg.{IcebergFlowMetadata, IcebergTableManager, Iceb
 import com.etl.framework.io.readers.DataReaderFactory
 import com.etl.framework.orchestration.{DataOutcome, ExecutionRequest, RejectionThresholdPolicy}
 import com.etl.framework.exceptions.MaxRejectionRateExceededException
-import com.etl.framework.util.{SensitiveDataRedactor, TimingUtil}
+import com.etl.framework.util.{SensitiveDataRedactor, SparkColumn, TimingUtil}
 import com.etl.framework.validation.{ValidationEngine, ValidationResult, Validator}
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.functions.col
 import org.slf4j.LoggerFactory
 
 import scala.util.{Failure, Success, Try}
@@ -203,7 +202,7 @@ class FlowExecutor(
           .collect { case (name, occurrences) if occurrences.length > 1 => name }
           .mkString(", ")
     )
-    df.select(df.columns.map(name => col(name).as(renames.getOrElse(name, name))): _*)
+    df.select(df.columns.map(name => SparkColumn(df, name).as(renames.getOrElse(name, name))): _*)
   }
 
   protected def validateData(data: DataFrame): ValidationResult = {

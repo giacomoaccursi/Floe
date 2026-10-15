@@ -2,10 +2,9 @@ package com.etl.framework.aggregation
 
 import com.etl.framework.config.DAGNode
 import com.etl.framework.exceptions.ValidationConfigException
-import com.etl.framework.util.SqlIdentifier
+import com.etl.framework.util.{SparkColumn, SqlIdentifier}
 import org.apache.iceberg.spark.{Spark3Util, SparkSchemaUtil}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-import org.apache.spark.sql.functions._
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
@@ -118,7 +117,7 @@ class DAGNodeProcessor(
       data
     } else {
       logger.debug(s"Selecting columns: ${columns.mkString(", ")}")
-      data.select(columns.map(col): _*)
+      data.select(columns.map(SparkColumn(data, _)): _*)
     }
   }
 }

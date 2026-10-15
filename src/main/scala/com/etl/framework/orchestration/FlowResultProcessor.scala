@@ -3,10 +3,9 @@ package com.etl.framework.orchestration
 import com.etl.framework.config.{FlowConfig, GlobalConfig, LoadMode}
 import com.etl.framework.orchestration.batch.FlowGroupExecutor
 import com.etl.framework.orchestration.flow.FlowResult
-import com.etl.framework.util.{SensitiveDataRedactor, SqlIdentifier}
+import com.etl.framework.util.{SensitiveDataRedactor, SparkColumn, SqlIdentifier}
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-import org.apache.spark.sql.functions.col
 import org.slf4j.LoggerFactory
 
 case class BatchState(
@@ -91,7 +90,7 @@ class FlowResultProcessor(
       }
       flowConfigs.find(_.name == result.flowName) match {
         case Some(config) if config.loadMode.`type` == LoadMode.SCD2 =>
-          Right(table.filter(col(config.loadMode.isCurrentColumn.getOrElse("is_current")) === true))
+          Right(table.filter(SparkColumn(config.loadMode.isCurrentColumn.getOrElse("is_current")) === true))
         case _ => Right(table)
       }
     } catch {

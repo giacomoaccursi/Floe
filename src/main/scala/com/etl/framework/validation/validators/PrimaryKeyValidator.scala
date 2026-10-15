@@ -2,6 +2,7 @@ package com.etl.framework.validation.validators
 
 import com.etl.framework.config.{FlowConfig, ValidationRule}
 import com.etl.framework.exceptions.ValidationConfigException
+import com.etl.framework.util.SparkColumn
 import com.etl.framework.validation.{ValidationStepResult, ValidationUtils}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
@@ -22,8 +23,8 @@ class PrimaryKeyValidator(flowConfig: FlowConfig, flowName: Option[String] = Non
         s"Primary key is not defined for flow ${flowName.getOrElse("unknown")}"
       )
     } else {
-      val keyWindow = Window.partitionBy(pkColumns.map(col): _*)
-      val hasNullKey = pkColumns.map(name => col(name).isNull).reduce(_ || _)
+      val keyWindow = Window.partitionBy(pkColumns.map(SparkColumn(_)): _*)
+      val hasNullKey = pkColumns.map(name => SparkColumn(name).isNull).reduce(_ || _)
       val classifierColumn = Iterator
         .continually(s"__floe_pk_invalid_${UUID.randomUUID().toString.replace("-", "")}")
         .find(candidate => !df.columns.exists(_.equalsIgnoreCase(candidate)))

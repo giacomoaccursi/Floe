@@ -75,7 +75,7 @@ output:
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `name` | yes | — | Non-blank, unqualified flow name — maps to the Iceberg table name; catalog and namespace are configured globally |
+| `name` | yes | — | Non-blank, unqualified flow name with no surrounding whitespace, path separators, or control characters. It maps to both the Iceberg table name and an artifact-path segment; catalog and namespace are configured globally. Spaces, reserved words, hyphens, and backticks inside the name are supported through identifier quoting. |
 | `description` | no | `""` | Human-readable description |
 | `version` | no | `""` | Flow version string |
 | `owner` | no | `""` | Team or person responsible |

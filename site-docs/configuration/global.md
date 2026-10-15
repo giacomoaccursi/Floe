@@ -69,7 +69,7 @@ Controls batch execution and validation behavior. This entire section is optiona
 |-------|---------|-------------|
 | `batchIdFormat` | `yyyyMMdd_HHmmss` | Non-blank Java `DateTimeFormatter` pattern for the readable prefix of a batch ID. Use `timestamp` for epoch millis or `datetime` for `yyyyMMdd_HHmmss`. Invalid patterns fail static validation. A random UUID suffix is always appended to avoid collisions. |
 | `maxRejectionRate` | — (disabled) | If set, it must be finite and in `[0.0, 1.0]`; the batch stops when any flow's rejection rate exceeds it (0.1 = 10%). |
-| `qualityMetricsTable` | — (disabled) | If set, it must be non-blank and writes per-flow quality metrics to this Iceberg table after each batch. Its name must not collide case-insensitively with a flow or derived table. See [Quality Metrics](../guides/quality-metrics.md). |
+| `qualityMetricsTable` | — (disabled) | If set, it must be a non-blank, unqualified managed-table name with no surrounding whitespace, path separators, or control characters. It writes per-flow quality metrics to this Iceberg table after each batch and must not collide case-insensitively with a flow or derived table. See [Quality Metrics](../guides/quality-metrics.md). |
 
 !!!warning "Batch ID collisions"
     The timestamp pattern controls readability, not uniqueness: every generated ID also includes a UUID suffix. Full loads are destructive replacements and Delta loads require an explicit primary key; neither constitutes a general replay guarantee. Retain the generated ID and the exact source input when investigating a failed run.

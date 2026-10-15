@@ -367,7 +367,7 @@ Each derived table function receives a `DerivedTableContext`:
 | `effectiveAt` | `Instant` | Functional time supplied in the request, with at most microsecond precision |
 | `availableTables` | `Set[String]` | Declared dependencies successfully resolved for this target |
 
-Each derived table must have a non-blank, unqualified name. Names are unique case-insensitively because Spark commonly resolves identifiers case-insensitively; catalog and namespace come from the Iceberg configuration. Dependencies are likewise unqualified logical flow or derived names. Invalid graphs and collisions with primary or quality-metrics targets fail during pipeline construction and are checked again by direct orchestrator execution before catalog, source, or target access.
+Each derived table must have a non-blank, unqualified name without surrounding whitespace, path separators, or control characters. Names are unique case-insensitively because Spark commonly resolves identifiers case-insensitively; catalog and namespace come from the Iceberg configuration. Dependencies follow the same logical-name constraints. Invalid graphs and collisions with primary or quality-metrics targets fail during pipeline construction and are checked again by direct orchestrator execution before catalog, source, or target access.
 
 ### ctx.table(name)
 

@@ -1,5 +1,6 @@
 package com.etl.framework.config
 
+import com.etl.framework.util.ManagedTableName
 import java.util.Locale
 import java.util.regex.Pattern
 import scala.util.Try
@@ -17,6 +18,8 @@ object FlowConfigValidator {
     else if (config.name != config.name.trim) errors += "name must not have leading or trailing whitespace"
     if (config.name.contains("."))
       errors += "name must be unqualified; configure catalog and namespace globally"
+    if (ManagedTableName.containsUnsafeCharacters(config.name))
+      errors += s"name ${ManagedTableName.unsafeCharactersMessage}"
     config.source.`type` match {
       case SourceType.File =>
         if (config.source.path.trim.isEmpty) errors += "file source path must not be blank"

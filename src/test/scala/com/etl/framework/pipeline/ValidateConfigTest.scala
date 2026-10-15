@@ -355,6 +355,30 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
     intercept[IllegalArgumentException](builder.build()).getMessage should include("qualityMetricsTable")
   }
 
+  it should "reject an unsafe or qualified quality metrics target" in {
+    val base = TestFixtures.globalConfig()
+    val unsafeGlobal = base.copy(processing = base.processing.copy(qualityMetricsTable = Some("metrics/archive")))
+    val qualifiedGlobal = base.copy(processing = base.processing.copy(qualityMetricsTable = Some("ops.metrics")))
+
+    val unsafeIssues = IngestionPipeline
+      .builder()
+      .withGlobalConfig(unsafeGlobal)
+      .withFlowConfigs(Seq(TestFixtures.flowConfig("orders")))
+      .validate()
+      .mkString(" ")
+    val qualifiedIssues = IngestionPipeline
+      .builder()
+      .withGlobalConfig(qualifiedGlobal)
+      .withFlowConfigs(Seq(TestFixtures.flowConfig("orders")))
+      .validate()
+      .mkString(" ")
+
+    unsafeIssues should include(
+      "processing.qualityMetricsTable must not contain path separators or control characters"
+    )
+    qualifiedIssues should include("processing.qualityMetricsTable must be unqualified")
+  }
+
   it should "reject malformed schema identifiers before reading a source" in {
     val flow = TestFixtures.flowConfig(
       "sales.daily",
@@ -378,6 +402,17 @@ class ValidateConfigTest extends AnyFlatSpec with Matchers {
     issues should include("schema column types must not be blank")
     issues should include("case-insensitive duplicate column names")
     issues should include("sourceColumn values must not be blank")
+  }
+
+  it should "reject flow names that can escape their artifact path segment" in {
+    val issues = IngestionPipeline
+      .builder()
+      .withGlobalConfig(TestFixtures.globalConfig())
+      .withFlowConfigs(Seq(TestFixtures.flowConfig("orders/../../customers")))
+      .validate()
+      .mkString(" ")
+
+    issues should include("name must not contain path separators or control characters")
   }
 
   it should "reject incomplete validation rules before reading a source" in {

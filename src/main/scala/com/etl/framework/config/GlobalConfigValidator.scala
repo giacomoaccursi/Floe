@@ -1,5 +1,6 @@
 package com.etl.framework.config
 
+import com.etl.framework.util.ManagedTableName
 import java.time.format.DateTimeFormatter
 import scala.util.Try
 
@@ -26,8 +27,16 @@ object GlobalConfigValidator {
       Try(DateTimeFormatter.ofPattern(batchIdFormat)).isFailure
     ) errors += "processing.batchIdFormat is not a valid DateTimeFormatter pattern"
 
-    if (config.processing.qualityMetricsTable.exists(_.trim.isEmpty))
-      errors += "processing.qualityMetricsTable must not be blank"
+    config.processing.qualityMetricsTable.foreach { tableName =>
+      if (tableName.trim.isEmpty)
+        errors += "processing.qualityMetricsTable must not be blank"
+      else if (tableName != tableName.trim)
+        errors += "processing.qualityMetricsTable must not have leading or trailing whitespace"
+      if (tableName.contains("."))
+        errors += "processing.qualityMetricsTable must be unqualified; configure catalog and namespace globally"
+      if (ManagedTableName.containsUnsafeCharacters(tableName))
+        errors += s"processing.qualityMetricsTable ${ManagedTableName.unsafeCharactersMessage}"
+    }
     config.processing.maxRejectionRate.foreach { rate =>
       if (!java.lang.Double.isFinite(rate)) errors += "processing.maxRejectionRate must be finite"
       else if (rate < 0.0 || rate > 1.0)

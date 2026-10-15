@@ -477,6 +477,24 @@ class DerivedTableExecutorTest extends AnyFlatSpec with Matchers with BeforeAndA
       .withDerivedTable("daily_orders", Seq("analytics.orders"), _ => spark.emptyDataFrame)
   }
 
+  it should "reject path separators in derived table and dependency names" in {
+    an[IllegalArgumentException] should be thrownBy IngestionPipeline
+      .builder()
+      .withDerivedTable("daily/orders", Seq.empty, _ => spark.emptyDataFrame)
+    an[IllegalArgumentException] should be thrownBy IngestionPipeline
+      .builder()
+      .withDerivedTable("daily_orders", Seq("orders\\archive"), _ => spark.emptyDataFrame)
+  }
+
+  it should "reject surrounding whitespace in derived table and dependency names" in {
+    an[IllegalArgumentException] should be thrownBy IngestionPipeline
+      .builder()
+      .withDerivedTable(" daily_orders", Seq.empty, _ => spark.emptyDataFrame)
+    an[IllegalArgumentException] should be thrownBy IngestionPipeline
+      .builder()
+      .withDerivedTable("daily_orders", Seq("orders "), _ => spark.emptyDataFrame)
+  }
+
   it should "reject a derived table that collides with a primary flow table" in {
     val builder = IngestionPipeline
       .builder()

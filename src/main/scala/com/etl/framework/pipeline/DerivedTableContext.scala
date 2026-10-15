@@ -1,5 +1,6 @@
 package com.etl.framework.pipeline
 
+import com.etl.framework.util.ManagedTableName
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import java.time.Instant
 
@@ -10,11 +11,28 @@ final case class DerivedTableDefinition(
     transform: DerivedTableContext => DataFrame
 ) {
   require(name != null && name.trim.nonEmpty, "Derived table name must not be blank")
+  require(name == name.trim, "Derived table name must not have leading or trailing whitespace")
   require(!name.contains("."), "Derived table name must be unqualified; configure catalog and namespace globally")
+  require(
+    !ManagedTableName.containsUnsafeCharacters(name),
+    s"Derived table name ${ManagedTableName.unsafeCharactersMessage}"
+  )
   require(dependencies != null, "Derived table dependencies must not be null")
   require(
-    dependencies.forall(dependency => dependency != null && dependency.trim.nonEmpty && !dependency.contains(".")),
-    "Derived table dependencies must be non-blank, unqualified names"
+    dependencies.forall(dependency => dependency != null && dependency.trim.nonEmpty),
+    "Derived table dependencies must be non-blank names"
+  )
+  require(
+    dependencies.forall(dependency => dependency == dependency.trim),
+    "Derived table dependencies must not have leading or trailing whitespace"
+  )
+  require(
+    dependencies.forall(dependency => !dependency.contains(".")),
+    "Derived table dependencies must be unqualified names"
+  )
+  require(
+    dependencies.forall(dependency => !ManagedTableName.containsUnsafeCharacters(dependency)),
+    s"Derived table dependencies ${ManagedTableName.unsafeCharactersMessage}"
   )
   require(transform != null, "Derived table transform must not be null")
 }
